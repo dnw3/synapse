@@ -1185,6 +1185,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "synapse-embeddings"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "synapse-core",
+ "synapse-models",
+ "tokio",
+]
+
+[[package]]
 name = "synapse-eval"
 version = "0.1.0"
 
@@ -1298,6 +1310,18 @@ dependencies = [
  "async-trait",
  "serde_json",
  "synapse-core",
+ "tokio",
+]
+
+[[package]]
+name = "synapse-vectorstores"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde_json",
+ "synapse-core",
+ "synapse-embeddings",
+ "synapse-retrieval",
  "tokio",
 ]
 

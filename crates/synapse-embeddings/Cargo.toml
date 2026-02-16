@@ -1,0 +1,17 @@
+[package]
+name = "synapse-embeddings"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+synapse-core = { path = "../synapse-core" }
+synapse-models = { path = "../synapse-models" }
+
+[dev-dependencies]
+tokio.workspace = true

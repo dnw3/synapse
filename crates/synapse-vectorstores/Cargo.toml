@@ -1,0 +1,18 @@
+[package]
+name = "synapse-vectorstores"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+synapse-core = { path = "../synapse-core" }
+synapse-embeddings = { path = "../synapse-embeddings" }
+synapse-retrieval = { path = "../synapse-retrieval" }
+
+[dev-dependencies]
+tokio.workspace = true

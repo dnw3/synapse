@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Synapse is a Rust agent framework with LangChain-compatible architecture. It provides composable building blocks for AI agents: tool execution, memory, callbacks, retrieval, and evaluation. Phases 1–5 (core refactor, multi-provider model adapters + streaming, LCEL composition, prompt templates + output parsers, document pipeline) are complete; Phase 6 (embeddings + vector stores) is next.
+Synapse is a Rust agent framework with LangChain-compatible architecture. It provides composable building blocks for AI agents: tool execution, memory, callbacks, retrieval, and evaluation. Phases 1–6 (core refactor, multi-provider model adapters + streaming, LCEL composition, prompt templates + output parsers, document pipeline, embeddings + vector stores) are complete; Phase 7 (advanced retrieval) is next.
 
 ## Build & Test Commands
 
@@ -20,7 +20,7 @@ cargo fmt --all -- --check           # Check formatting
 
 ## Workspace Architecture
 
-16 library crates in `crates/`, 3 example binaries in `examples/`:
+18 library crates in `crates/`, 3 example binaries in `examples/`:
 
 **Core layer** — `synapse-core` defines all shared traits and types:
 - `ChatModel`, `Tool`, `MemoryStore`, `CallbackHandler`, `Agent` traits
@@ -46,6 +46,8 @@ cargo fmt --all -- --check           # Check formatting
 - `synapse-retrieval` — `Retriever` trait + `InMemoryRetriever`; `Document` has `id`, `content`, `metadata: HashMap<String, Value>`
 - `synapse-loaders` — `Loader` async trait, `TextLoader`, `JsonLoader` (configurable id/content keys), `CsvLoader` (column-based with metadata), `DirectoryLoader` (glob filtering, recursive)
 - `synapse-splitters` — `TextSplitter` trait with `split_text()`/`split_documents()`, `CharacterTextSplitter`, `RecursiveCharacterTextSplitter` (hierarchical separators), `MarkdownHeaderTextSplitter` (header-aware with metadata)
+- `synapse-embeddings` — `Embeddings` trait (`embed_documents`/`embed_query`), `FakeEmbeddings` (deterministic testing), `OpenAiEmbeddings`, `OllamaEmbeddings` (use `ProviderBackend`)
+- `synapse-vectorstores` — `VectorStore` trait (`add_documents`/`similarity_search`/`delete`), `InMemoryVectorStore` (cosine similarity, `RwLock<HashMap>`), `VectorStoreRetriever` (bridges to `Retriever` trait)
 - `synapse-guardrails` — `JsonObjectGuard` (validates JSON shape)
 - `synapse-eval` — `EvalCase`/`EvalReport` (accuracy metrics)
 

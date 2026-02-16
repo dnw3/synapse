@@ -15,6 +15,8 @@ members = [
   "crates/synapse-eval",
   "crates/synapse-parsers",
   "crates/synapse-splitters",
+  "crates/synapse-embeddings",
+  "crates/synapse-vectorstores",
   "examples/react_basic",
   "examples/tool_calling_basic",
   "examples/memory_chat",

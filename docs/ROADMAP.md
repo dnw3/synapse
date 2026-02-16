@@ -14,8 +14,9 @@
 - Phase 9: memory strategies — ConversationBufferMemory, ConversationWindowMemory (last K messages), ConversationSummaryMemory (LLM summarization), ConversationTokenBufferMemory (token budget estimator), RunnableWithMessageHistory (auto load/save wrapper)
 - Foundations: runnable, chain, retrieval, loader, guardrail, eval baseline abstractions
 
+- Phase 10: caching, rate limiting, reliability — LlmCache trait, InMemoryCache (optional TTL), SemanticCache (embedding similarity), CachedChatModel; TokenBucket + TokenBucketChatModel rate limiter
+
 ## Next
-- Phase 10: caching, rate limiting, reliability
 - Phase 11: observability (tracing, OpenTelemetry) + evaluation (LLM-as-judge, datasets)
 - Phase 12: full LangChain parity + ecosystem (API server, CLI, unified facade crate)
 

@@ -23,3 +23,6 @@ pub use retry::{RetryChatModel, RetryPolicy};
 
 mod rate_limit;
 pub use rate_limit::RateLimitedChatModel;
+
+mod token_bucket;
+pub use token_bucket::{TokenBucket, TokenBucketChatModel};

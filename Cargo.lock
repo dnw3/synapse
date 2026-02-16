@@ -1152,6 +1152,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "synapse-cache"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "synapse-core",
+ "synapse-embeddings",
+ "synapse-models",
+ "tokio",
+]
+
+[[package]]
 name = "synapse-callbacks"
 version = "0.1.0"
 dependencies = [

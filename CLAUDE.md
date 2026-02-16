@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Synapse is a Rust agent framework with LangChain-compatible architecture. It provides composable building blocks for AI agents: tool execution, memory, callbacks, retrieval, and evaluation. Phases 1–4 (core refactor, multi-provider model adapters + streaming, LCEL composition, prompt templates + output parsers) are complete; Phase 5 (document pipeline) is next.
+Synapse is a Rust agent framework with LangChain-compatible architecture. It provides composable building blocks for AI agents: tool execution, memory, callbacks, retrieval, and evaluation. Phases 1–5 (core refactor, multi-provider model adapters + streaming, LCEL composition, prompt templates + output parsers, document pipeline) are complete; Phase 6 (embeddings + vector stores) is next.
 
 ## Build & Test Commands
 
@@ -20,7 +20,7 @@ cargo fmt --all -- --check           # Check formatting
 
 ## Workspace Architecture
 
-14 library crates in `crates/`, 3 example binaries in `examples/`:
+16 library crates in `crates/`, 3 example binaries in `examples/`:
 
 **Core layer** — `synapse-core` defines all shared traits and types:
 - `ChatModel`, `Tool`, `MemoryStore`, `CallbackHandler`, `Agent` traits
@@ -44,7 +44,8 @@ cargo fmt --all -- --check           # Check formatting
 - `synapse-runnables` — `Runnable<I, O>` trait with `invoke()`/`batch()`/`boxed()`, `BoxRunnable` (type-erased, `|` pipe operator via `BitOr`), composition types: `RunnablePassthrough`, `RunnableLambda`, `RunnableSequence`, `RunnableParallel`, `RunnableBranch`, `RunnableWithFallbacks`
 - `synapse-chains` — `SequentialChain` (pipes `BoxRunnable<String, String>` steps with `RunnableConfig`)
 - `synapse-retrieval` — `Retriever` trait + `InMemoryRetriever`; `Document` has `id`, `content`, `metadata: HashMap<String, Value>`
-- `synapse-loaders` — `TextLoader` (wraps text into `Document`)
+- `synapse-loaders` — `Loader` async trait, `TextLoader`, `JsonLoader` (configurable id/content keys), `CsvLoader` (column-based with metadata), `DirectoryLoader` (glob filtering, recursive)
+- `synapse-splitters` — `TextSplitter` trait with `split_text()`/`split_documents()`, `CharacterTextSplitter`, `RecursiveCharacterTextSplitter` (hierarchical separators), `MarkdownHeaderTextSplitter` (header-aware with metadata)
 - `synapse-guardrails` — `JsonObjectGuard` (validates JSON shape)
 - `synapse-eval` — `EvalCase`/`EvalReport` (accuracy metrics)
 
@@ -63,7 +64,7 @@ cargo fmt --all -- --check           # Check formatting
 
 ## Workspace Dependencies (shared via `[workspace.dependencies]`)
 
-async-trait, serde/serde_json, thiserror 2.0, tokio (macros + rt-multi-thread + sync + time), tracing/tracing-subscriber, reqwest (json + stream), futures, async-stream, eventsource-stream, bytes. Rust edition 2021, MSRV 1.78.
+async-trait, serde/serde_json, thiserror 2.0, tokio (macros + rt-multi-thread + sync + time), tracing/tracing-subscriber, reqwest (json + stream), futures, async-stream, eventsource-stream, bytes, csv. Rust edition 2021, MSRV 1.78.
 
 ## Development Roadmap
 

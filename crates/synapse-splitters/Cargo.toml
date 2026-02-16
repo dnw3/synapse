@@ -1,5 +1,5 @@
 [package]
-name = "synapse-loaders"
+name = "synapse-splitters"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
@@ -7,11 +7,9 @@ authors.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-async-trait.workspace = true
-csv.workspace = true
-serde_json.workspace = true
 synapse-core = { path = "../synapse-core" }
 synapse-retrieval = { path = "../synapse-retrieval" }
+serde_json.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

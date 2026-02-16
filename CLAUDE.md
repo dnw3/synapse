@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Synapse is a Rust agent framework with LangChain-compatible architecture. It provides composable building blocks for AI agents: tool execution, memory, callbacks, retrieval, and evaluation. Phase 1 (core refactor) is complete; Phase 2 (multi-provider model adapters + streaming) is next.
+Synapse is a Rust agent framework with LangChain-compatible architecture. It provides composable building blocks for AI agents: tool execution, memory, callbacks, retrieval, and evaluation. Phases 1–3 (core refactor, multi-provider model adapters + streaming, LCEL composition) are complete; Phase 4 (prompt templates + output parsers) is next.
 
 ## Build & Test Commands
 
@@ -26,7 +26,8 @@ cargo fmt --all -- --check           # Check formatting
 - `ChatModel`, `Tool`, `MemoryStore`, `CallbackHandler`, `Agent` traits
 - `Message` enum (`System`, `Human`, `AI`, `Tool` variants) — factory methods: `Message::system()`, `human()`, `ai()`, `ai_with_tool_calls()`, `tool()`; accessors: `content()`, `role()`, `is_*()`, `tool_calls()`, `tool_call_id()`
 - `AIMessageChunk` — streaming chunk with `+`/`+=` merge and `into_message()`
-- `ChatRequest`, `ChatResponse` (message + usage), `ToolCall`, `RunEvent`, `TokenUsage`
+- `ChatRequest` (messages + tools), `ChatResponse` (message + usage), `ToolCall`, `ToolDefinition`, `RunEvent`, `TokenUsage`
+- `ChatStream` type alias — `Pin<Box<dyn Stream<Item = Result<AIMessageChunk, SynapseError>> + Send>>`
 - `RunnableConfig` — runtime config (tags, metadata, max_concurrency, recursion_limit, run_id, run_name)
 - `SynapseError` enum (19 variants covering all subsystems)
 
@@ -35,12 +36,12 @@ cargo fmt --all -- --check           # Check formatting
 - `synapse-tools` — `ToolRegistry` (Arc<RwLock<HashMap>>) + `SerialToolExecutor`
 - `synapse-memory` — `InMemoryStore` (session-keyed message storage)
 - `synapse-callbacks` — `RecordingCallback`, `LoggingCallback`
-- `synapse-models` — `ScriptedChatModel` (test double; real adapters are Phase 2)
+- `synapse-models` — provider adapters (`OpenAiChatModel`, `AnthropicChatModel`, `GeminiChatModel`, `OllamaChatModel`) + `ScriptedChatModel` (test double) + `RetryChatModel`, `RateLimitedChatModel` wrappers + `ProviderBackend` trait (`HttpBackend`, `FakeBackend`)
 - `synapse-prompts` — `PromptTemplate` with `{{ variable }}` interpolation
 
 **Composition & retrieval crates:**
-- `synapse-runnables` — `Runnable<I, O>` trait + `IdentityRunnable`
-- `synapse-chains` — `SequentialChain` (pipes runnable outputs)
+- `synapse-runnables` — `Runnable<I, O>` trait with `invoke()`/`batch()`/`boxed()`, `BoxRunnable` (type-erased, `|` pipe operator via `BitOr`), composition types: `RunnablePassthrough`, `RunnableLambda`, `RunnableSequence`, `RunnableParallel`, `RunnableBranch`, `RunnableWithFallbacks`
+- `synapse-chains` — `SequentialChain` (pipes `BoxRunnable<String, String>` steps with `RunnableConfig`)
 - `synapse-retrieval` — `Retriever` trait + `InMemoryRetriever`; `Document` has `id`, `content`, `metadata: HashMap<String, Value>`
 - `synapse-loaders` — `TextLoader` (wraps text into `Document`)
 - `synapse-guardrails` — `JsonObjectGuard` (validates JSON shape)
@@ -49,15 +50,19 @@ cargo fmt --all -- --check           # Check formatting
 ## Key Patterns
 
 - **Message is a tagged enum** — `#[serde(tag = "role")]` with variants `System`, `Human`, `AI` (carries `tool_calls`), `Tool` (carries `tool_call_id`). Use factory methods, not struct literals.
+- **ChatModel has streaming** — `chat()` for single response, `stream_chat()` returns `ChatStream` (default impl wraps `chat()` as single chunk).
+- **ChatRequest uses constructor** — `ChatRequest::new(messages)`, optional `.with_tools(tools)`. Never use struct literal.
+- **Provider adapters use ProviderBackend** — `HttpBackend` for production, `FakeBackend` for tests. Adapters map Synapse types ↔ provider JSON.
 - **All traits are async** via `#[async_trait]`. Tests use `#[tokio::test]`.
 - **Concurrency**: `Arc<RwLock<_>>` for registries, `Arc<tokio::sync::Mutex<_>>` for callbacks/memory.
 - **Session isolation**: Memory and agent runs are keyed by `session_id`.
 - **Event-driven callbacks**: `RunEvent` enum fired at each agent lifecycle stage.
+- **LCEL pipe composition** — `let chain = step1.boxed() | step2.boxed();` via `BitOr` on `BoxRunnable`. `RunnableLambda::new(|x| async { Ok(transform(x)) })` wraps async closures. `RunnableParallel` runs named branches concurrently, merges to `serde_json::Value`. `RunnableBranch` routes by condition with default fallthrough.
 - **Each crate has `tests/` directory** with integration-style tests in separate files.
 
 ## Workspace Dependencies (shared via `[workspace.dependencies]`)
 
-async-trait, serde/serde_json, thiserror 2.0, tokio (macros + rt-multi-thread + sync + time), tracing/tracing-subscriber. Rust edition 2021, MSRV 1.78.
+async-trait, serde/serde_json, thiserror 2.0, tokio (macros + rt-multi-thread + sync + time), tracing/tracing-subscriber, reqwest (json + stream), futures, async-stream, eventsource-stream, bytes. Rust edition 2021, MSRV 1.78.
 
 ## Development Roadmap
 

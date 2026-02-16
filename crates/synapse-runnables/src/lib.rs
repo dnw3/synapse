@@ -1,20 +1,23 @@
-use async_trait::async_trait;
-use synapse_core::SynapseError;
+mod runnable;
+pub use runnable::{BoxRunnable, Runnable, RunnableOutputStream};
 
-#[async_trait]
-pub trait Runnable<I, O>: Send + Sync {
-    async fn run(&self, input: I) -> Result<O, SynapseError>;
-}
+mod passthrough;
+pub use passthrough::RunnablePassthrough;
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct IdentityRunnable;
+mod lambda;
+pub use lambda::RunnableLambda;
 
-#[async_trait]
-impl<T> Runnable<T, T> for IdentityRunnable
-where
-    T: Send + Sync + 'static,
-{
-    async fn run(&self, input: T) -> Result<T, SynapseError> {
-        Ok(input)
-    }
-}
+mod sequence;
+pub use sequence::RunnableSequence;
+
+mod parallel;
+pub use parallel::RunnableParallel;
+
+mod branch;
+pub use branch::RunnableBranch;
+
+mod fallback;
+pub use fallback::RunnableWithFallbacks;
+
+/// Backward-compatible alias for `RunnablePassthrough`.
+pub type IdentityRunnable = RunnablePassthrough;

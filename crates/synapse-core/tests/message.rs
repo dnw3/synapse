@@ -1,5 +1,5 @@
 use serde_json::json;
-use synapse_core::{Message, ToolCall};
+use synapse_core::{AIMessageChunk, Message, TokenUsage, ToolCall};
 
 #[test]
 fn system_message_factory() {
@@ -84,4 +84,103 @@ fn message_serde_tool_calls_omitted_when_empty() {
     let msg = Message::ai("hello");
     let json = serde_json::to_value(&msg).unwrap();
     assert!(json.get("tool_calls").is_none());
+}
+
+#[test]
+fn chunk_add_concatenates_content() {
+    let a = AIMessageChunk {
+        content: "Hello".into(),
+        tool_calls: vec![],
+        usage: None,
+    };
+    let b = AIMessageChunk {
+        content: " world".into(),
+        tool_calls: vec![],
+        usage: None,
+    };
+    let merged = a + b;
+    assert_eq!(merged.content, "Hello world");
+}
+
+#[test]
+fn chunk_add_merges_tool_calls() {
+    let a = AIMessageChunk {
+        content: String::new(),
+        tool_calls: vec![ToolCall {
+            id: "c1".into(),
+            name: "search".into(),
+            arguments: json!({}),
+        }],
+        usage: None,
+    };
+    let b = AIMessageChunk {
+        content: String::new(),
+        tool_calls: vec![ToolCall {
+            id: "c2".into(),
+            name: "calc".into(),
+            arguments: json!({}),
+        }],
+        usage: None,
+    };
+    let merged = a + b;
+    assert_eq!(merged.tool_calls.len(), 2);
+}
+
+#[test]
+fn chunk_add_merges_usage() {
+    let a = AIMessageChunk {
+        content: "a".into(),
+        tool_calls: vec![],
+        usage: Some(TokenUsage {
+            input_tokens: 10,
+            output_tokens: 5,
+            total_tokens: 15,
+        }),
+    };
+    let b = AIMessageChunk {
+        content: "b".into(),
+        tool_calls: vec![],
+        usage: Some(TokenUsage {
+            input_tokens: 0,
+            output_tokens: 3,
+            total_tokens: 3,
+        }),
+    };
+    let merged = a + b;
+    let usage = merged.usage.unwrap();
+    assert_eq!(usage.input_tokens, 10);
+    assert_eq!(usage.output_tokens, 8);
+    assert_eq!(usage.total_tokens, 18);
+}
+
+#[test]
+fn chunk_add_assign_works() {
+    let mut chunk = AIMessageChunk {
+        content: "Hello".into(),
+        tool_calls: vec![],
+        usage: None,
+    };
+    chunk += AIMessageChunk {
+        content: " world".into(),
+        tool_calls: vec![],
+        usage: None,
+    };
+    assert_eq!(chunk.content, "Hello world");
+}
+
+#[test]
+fn chunk_into_message() {
+    let chunk = AIMessageChunk {
+        content: "final answer".into(),
+        tool_calls: vec![ToolCall {
+            id: "c1".into(),
+            name: "tool".into(),
+            arguments: json!({}),
+        }],
+        usage: None,
+    };
+    let msg = chunk.into_message();
+    assert!(msg.is_ai());
+    assert_eq!(msg.content(), "final answer");
+    assert_eq!(msg.tool_calls().len(), 1);
 }

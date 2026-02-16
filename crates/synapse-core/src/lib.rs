@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -106,6 +108,48 @@ impl Message {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct AIMessageChunk {
+    pub content: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ToolCall>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<TokenUsage>,
+}
+
+impl AIMessageChunk {
+    pub fn into_message(self) -> Message {
+        Message::ai_with_tool_calls(self.content, self.tool_calls)
+    }
+}
+
+impl std::ops::Add for AIMessageChunk {
+    type Output = Self;
+
+    fn add(mut self, rhs: Self) -> Self {
+        self += rhs;
+        self
+    }
+}
+
+impl std::ops::AddAssign for AIMessageChunk {
+    fn add_assign(&mut self, rhs: Self) {
+        self.content.push_str(&rhs.content);
+        self.tool_calls.extend(rhs.tool_calls);
+        match (&mut self.usage, rhs.usage) {
+            (Some(u), Some(rhs_u)) => {
+                u.input_tokens += rhs_u.input_tokens;
+                u.output_tokens += rhs_u.output_tokens;
+                u.total_tokens += rhs_u.total_tokens;
+            }
+            (None, Some(rhs_u)) => {
+                self.usage = Some(rhs_u);
+            }
+            _ => {}
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ToolCall {
     pub id: String,
@@ -183,6 +227,22 @@ pub enum SynapseError {
     Callback(String),
     #[error("max steps exceeded: {max_steps}")]
     MaxStepsExceeded { max_steps: usize },
+    #[error("embedding error: {0}")]
+    Embedding(String),
+    #[error("vector store error: {0}")]
+    VectorStore(String),
+    #[error("retriever error: {0}")]
+    Retriever(String),
+    #[error("loader error: {0}")]
+    Loader(String),
+    #[error("splitter error: {0}")]
+    Splitter(String),
+    #[error("graph error: {0}")]
+    Graph(String),
+    #[error("cache error: {0}")]
+    Cache(String),
+    #[error("config error: {0}")]
+    Config(String),
 }
 
 #[async_trait]
@@ -212,4 +272,52 @@ pub trait CallbackHandler: Send + Sync {
 #[async_trait]
 pub trait Agent: Send + Sync {
     async fn run(&self, session_id: &str, input: &str) -> Result<String, SynapseError>;
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RunnableConfig {
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub metadata: HashMap<String, Value>,
+    #[serde(default)]
+    pub max_concurrency: Option<usize>,
+    #[serde(default)]
+    pub recursion_limit: Option<usize>,
+    #[serde(default)]
+    pub run_id: Option<String>,
+    #[serde(default)]
+    pub run_name: Option<String>,
+}
+
+impl RunnableConfig {
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+
+    pub fn with_run_name(mut self, name: impl Into<String>) -> Self {
+        self.run_name = Some(name.into());
+        self
+    }
+
+    pub fn with_run_id(mut self, id: impl Into<String>) -> Self {
+        self.run_id = Some(id.into());
+        self
+    }
+
+    pub fn with_max_concurrency(mut self, max: usize) -> Self {
+        self.max_concurrency = Some(max);
+        self
+    }
+
+    pub fn with_recursion_limit(mut self, limit: usize) -> Self {
+        self.recursion_limit = Some(limit);
+        self
+    }
+
+    pub fn with_metadata(mut self, key: impl Into<String>, value: Value) -> Self {
+        self.metadata.insert(key.into(), value);
+        self
+    }
 }

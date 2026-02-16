@@ -1,13 +1,16 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use synapse_core::SynapseError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Document {
     pub id: String,
     pub content: String,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub metadata: HashMap<String, Value>,
 }
 
 impl Document {
@@ -15,6 +18,19 @@ impl Document {
         Self {
             id: id.into(),
             content: content.into(),
+            metadata: HashMap::new(),
+        }
+    }
+
+    pub fn with_metadata(
+        id: impl Into<String>,
+        content: impl Into<String>,
+        metadata: HashMap<String, Value>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            content: content.into(),
+            metadata,
         }
     }
 }

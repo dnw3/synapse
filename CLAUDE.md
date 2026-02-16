@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Synapse is a Rust agent framework with LangChain-compatible architecture. It provides composable building blocks for AI agents: tool execution, memory, callbacks, retrieval, and evaluation. Phases 1–7 (core refactor, multi-provider model adapters + streaming, LCEL composition, prompt templates + output parsers, document pipeline, embeddings + vector stores, advanced retrieval) are complete; Phase 8 (graph agent orchestration) is next.
+Synapse is a Rust agent framework with LangChain-compatible architecture. It provides composable building blocks for AI agents: tool execution, memory, callbacks, retrieval, and evaluation. Phases 1–8 (core refactor, multi-provider model adapters + streaming, LCEL composition, prompt templates + output parsers, document pipeline, embeddings + vector stores, advanced retrieval, graph agent orchestration) are complete; Phase 9 (memory strategies + persistence) is next.
 
 ## Build & Test Commands
 
@@ -20,7 +20,7 @@ cargo fmt --all -- --check           # Check formatting
 
 ## Workspace Architecture
 
-18 library crates in `crates/`, 3 example binaries in `examples/`:
+19 library crates in `crates/`, 3 example binaries in `examples/`:
 
 **Core layer** — `synapse-core` defines all shared traits and types:
 - `ChatModel`, `Tool`, `MemoryStore`, `CallbackHandler`, `Agent` traits
@@ -48,6 +48,7 @@ cargo fmt --all -- --check           # Check formatting
 - `synapse-splitters` — `TextSplitter` trait with `split_text()`/`split_documents()`, `CharacterTextSplitter`, `RecursiveCharacterTextSplitter` (hierarchical separators), `MarkdownHeaderTextSplitter` (header-aware with metadata)
 - `synapse-embeddings` — `Embeddings` trait (`embed_documents`/`embed_query`), `FakeEmbeddings` (deterministic testing), `OpenAiEmbeddings`, `OllamaEmbeddings` (use `ProviderBackend`)
 - `synapse-vectorstores` — `VectorStore` trait (`add_documents`/`similarity_search`/`delete`), `InMemoryVectorStore` (cosine similarity, `RwLock<HashMap>`), `VectorStoreRetriever` (bridges to `Retriever` trait)
+- `synapse-graph` — LangGraph-style state machine: `State` trait (merge/reduce), `MessageState`, `Node<S>` trait + `FnNode`, `StateGraph<S>` builder (add_node/add_edge/add_conditional_edges/interrupt_before/interrupt_after/compile), `CompiledGraph<S>` (invoke/invoke_with_config/update_state), `Checkpointer` trait + `MemorySaver`, `ToolNode`, `create_react_agent(model, tools)`
 - `synapse-guardrails` — `JsonObjectGuard` (validates JSON shape)
 - `synapse-eval` — `EvalCase`/`EvalReport` (accuracy metrics)
 

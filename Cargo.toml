@@ -17,6 +17,7 @@ members = [
   "crates/synapse-splitters",
   "crates/synapse-embeddings",
   "crates/synapse-vectorstores",
+  "crates/synapse-graph",
   "examples/react_basic",
   "examples/tool_calling_basic",
   "examples/memory_chat",

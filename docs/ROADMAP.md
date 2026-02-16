@@ -10,10 +10,10 @@
 - Phase 5: document pipeline — Loader async trait, TextLoader, JsonLoader, CsvLoader, DirectoryLoader; TextSplitter trait, CharacterTextSplitter, RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
 - Phase 6: embeddings + vector stores — Embeddings trait, FakeEmbeddings, OpenAiEmbeddings, OllamaEmbeddings; VectorStore trait, InMemoryVectorStore (cosine similarity), VectorStoreRetriever bridge to Retriever
 - Phase 7: advanced retrieval — BM25Retriever (Okapi BM25 scoring, tunable k1/b), MultiQueryRetriever (LLM query variants + dedup), EnsembleRetriever (Reciprocal Rank Fusion with weights), ContextualCompressionRetriever + DocumentCompressor trait + EmbeddingsFilter (cosine similarity threshold)
+- Phase 8: graph agent orchestration — StateGraph<S> builder, CompiledGraph<S> execution engine, State trait (merge/reduce), MessageState, Node<S> trait + FnNode, Edge + ConditionalEdge + RouterFn, Checkpointer trait + MemorySaver, interrupt_before/interrupt_after (human-in-the-loop), update_state(), ToolNode, create_react_agent(model, tools)
 - Foundations: runnable, chain, retrieval, loader, guardrail, eval baseline abstractions
 
 ## Next
-- Phase 8: graph agent orchestration (StateGraph, checkpointing, human-in-the-loop)
 - Phase 9: memory strategies (Buffer, Window, Summary, Token) + persistence backends
 - Phase 10: caching, rate limiting, reliability
 - Phase 11: observability (tracing, OpenTelemetry) + evaluation (LLM-as-judge, datasets)

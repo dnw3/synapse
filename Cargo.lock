@@ -1201,6 +1201,19 @@ name = "synapse-eval"
 version = "0.1.0"
 
 [[package]]
+name = "synapse-graph"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "synapse-core",
+ "synapse-models",
+ "synapse-tools",
+ "tokio",
+]
+
+[[package]]
 name = "synapse-guardrails"
 version = "0.1.0"
 dependencies = [

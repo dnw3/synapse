@@ -8,8 +8,7 @@ use std::{
 
 use async_trait::async_trait;
 use synapse_core::{
-    Agent, CallbackHandler, ChatModel, ChatRequest, MemoryStore, Message, RunEvent,
-    SynapseError,
+    Agent, CallbackHandler, ChatModel, ChatRequest, MemoryStore, Message, RunEvent, SynapseError,
 };
 use synapse_tools::SerialToolExecutor;
 
@@ -112,7 +111,10 @@ impl Agent for ReActAgentExecutor {
                     })
                     .await?;
 
-                let result = self.tools.execute(&call.name, call.arguments.clone()).await?;
+                let result = self
+                    .tools
+                    .execute(&call.name, call.arguments.clone())
+                    .await?;
                 self.memory
                     .append(session_id, Message::tool(result.to_string(), &call.id))
                     .await?;

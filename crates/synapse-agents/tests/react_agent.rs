@@ -5,8 +5,7 @@ use serde_json::json;
 use synapse_agents::{AgentConfig, ReActAgentExecutor};
 use synapse_callbacks::RecordingCallback;
 use synapse_core::{
-    Agent, ChatModel, ChatRequest, ChatResponse, MemoryStore, Message, SynapseError, Tool,
-    ToolCall,
+    Agent, ChatModel, ChatRequest, ChatResponse, MemoryStore, Message, SynapseError, Tool, ToolCall,
 };
 use synapse_memory::InMemoryStore;
 use synapse_tools::{SerialToolExecutor, ToolRegistry};
@@ -16,10 +15,7 @@ struct ScriptedModel;
 #[async_trait]
 impl ChatModel for ScriptedModel {
     async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapseError> {
-        let has_tool_result = request
-            .messages
-            .iter()
-            .any(|m| m.is_tool());
+        let has_tool_result = request.messages.iter().any(|m| m.is_tool());
 
         if !has_tool_result {
             Ok(ChatResponse {

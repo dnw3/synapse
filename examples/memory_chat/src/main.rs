@@ -10,10 +10,7 @@ async fn main() -> Result<(), SynapseError> {
         .append(session_id, Message::human("Hello, Synapse"))
         .await?;
     memory
-        .append(
-            session_id,
-            Message::ai("Hello, how can I help you?"),
-        )
+        .append(session_id, Message::ai("Hello, how can I help you?"))
         .await?;
 
     let transcript = memory.load(session_id).await?;

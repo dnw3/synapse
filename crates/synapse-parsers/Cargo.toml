@@ -15,3 +15,4 @@ synapse-runnables = { path = "../synapse-runnables" }
 
 [dev-dependencies]
 tokio.workspace = true
+synapse-models = { path = "../synapse-models" }

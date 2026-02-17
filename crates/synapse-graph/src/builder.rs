@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use synapse_core::SynapseError;
 
+use crate::command::GraphContext;
 use crate::compiled::CompiledGraph;
 use crate::edge::{ConditionalEdge, Edge};
 use crate::node::Node;
@@ -55,6 +56,25 @@ impl<S: State> StateGraph<S> {
         self.conditional_edges.push(ConditionalEdge {
             source: source.into(),
             router: Arc::new(router),
+            path_map: None,
+        });
+        self
+    }
+
+    /// Add a conditional edge with a routing function and a path map for visualization.
+    ///
+    /// The `path_map` maps labels to target node names, enabling graph visualization
+    /// tools to show possible routing targets for conditional edges.
+    pub fn add_conditional_edges_with_path_map(
+        mut self,
+        source: impl Into<String>,
+        router: impl Fn(&S) -> String + Send + Sync + 'static,
+        path_map: HashMap<String, String>,
+    ) -> Self {
+        self.conditional_edges.push(ConditionalEdge {
+            source: source.into(),
+            router: Arc::new(router),
+            path_map: Some(path_map),
         });
         self
     }
@@ -112,6 +132,16 @@ impl<S: State> StateGraph<S> {
                     ce.source
                 )));
             }
+            // Validate path_map targets reference existing nodes or END
+            if let Some(ref path_map) = ce.path_map {
+                for (label, target) in path_map {
+                    if target != END && !self.nodes.contains_key(target) {
+                        return Err(SynapseError::Graph(format!(
+                            "conditional edge path_map target '{target}' (label '{label}') not found"
+                        )));
+                    }
+                }
+            }
         }
 
         Ok(CompiledGraph {
@@ -122,6 +152,7 @@ impl<S: State> StateGraph<S> {
             interrupt_before: self.interrupt_before,
             interrupt_after: self.interrupt_after,
             checkpointer: None,
+            command_context: GraphContext::new(),
         })
     }
 }

@@ -1,6 +1,8 @@
 mod in_memory;
+mod multi_vector;
 
 pub use in_memory::{InMemoryVectorStore, VectorStoreRetriever};
+pub use multi_vector::MultiVectorRetriever;
 
 use async_trait::async_trait;
 use synapse_core::SynapseError;
@@ -32,6 +34,13 @@ pub trait VectorStore: Send + Sync {
         k: usize,
         embeddings: &dyn Embeddings,
     ) -> Result<Vec<(Document, f32)>, SynapseError>;
+
+    /// Search by pre-computed embedding vector instead of text query.
+    async fn similarity_search_by_vector(
+        &self,
+        embedding: &[f32],
+        k: usize,
+    ) -> Result<Vec<Document>, SynapseError>;
 
     /// Delete documents by ID.
     async fn delete(&self, ids: &[&str]) -> Result<(), SynapseError>;

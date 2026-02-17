@@ -5,6 +5,8 @@ use serde::de::DeserializeOwned;
 use synapse_core::{RunnableConfig, SynapseError};
 use synapse_runnables::Runnable;
 
+use crate::FormatInstructions;
+
 /// Parses a JSON string and deserializes it into type `T`.
 pub struct StructuredOutputParser<T> {
     _phantom: PhantomData<T>,
@@ -21,6 +23,12 @@ impl<T> StructuredOutputParser<T> {
 impl<T> Default for StructuredOutputParser<T> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<T> FormatInstructions for StructuredOutputParser<T> {
+    fn get_format_instructions(&self) -> String {
+        "Your response should be a valid JSON object matching the expected schema.".to_string()
     }
 }
 

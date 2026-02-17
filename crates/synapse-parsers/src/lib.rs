@@ -1,11 +1,25 @@
+mod boolean_parser;
 mod enum_parser;
+mod fixing_parser;
+mod format_instructions;
 mod json_parser;
 mod list_parser;
+mod markdown_list_parser;
+mod numbered_list_parser;
+mod retry_parser;
 mod str_parser;
 mod structured_parser;
+mod xml_parser;
 
+pub use boolean_parser::BooleanOutputParser;
 pub use enum_parser::EnumOutputParser;
+pub use fixing_parser::OutputFixingParser;
+pub use format_instructions::FormatInstructions;
 pub use json_parser::JsonOutputParser;
 pub use list_parser::{ListOutputParser, ListSeparator};
+pub use markdown_list_parser::MarkdownListOutputParser;
+pub use numbered_list_parser::NumberedListOutputParser;
+pub use retry_parser::RetryOutputParser;
 pub use str_parser::StrOutputParser;
 pub use structured_parser::StructuredOutputParser;
+pub use xml_parser::{XmlElement, XmlOutputParser};

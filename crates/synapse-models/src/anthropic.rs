@@ -15,6 +15,8 @@ pub struct AnthropicConfig {
     pub model: String,
     pub base_url: String,
     pub max_tokens: u32,
+    pub top_p: Option<f64>,
+    pub stop: Option<Vec<String>>,
 }
 
 impl AnthropicConfig {
@@ -24,6 +26,8 @@ impl AnthropicConfig {
             model: model.into(),
             base_url: "https://api.anthropic.com".to_string(),
             max_tokens: 1024,
+            top_p: None,
+            stop: None,
         }
     }
 
@@ -34,6 +38,16 @@ impl AnthropicConfig {
 
     pub fn with_max_tokens(mut self, max_tokens: u32) -> Self {
         self.max_tokens = max_tokens;
+        self
+    }
+
+    pub fn with_top_p(mut self, top_p: f64) -> Self {
+        self.top_p = Some(top_p);
+        self
+    }
+
+    pub fn with_stop(mut self, stop: Vec<String>) -> Self {
+        self.stop = Some(stop);
         self
     }
 }
@@ -54,10 +68,10 @@ impl AnthropicChatModel {
 
         for msg in &request.messages {
             match msg {
-                Message::System { content } => {
+                Message::System { content, .. } => {
                     system_text = Some(content.clone());
                 }
-                Message::Human { content } => {
+                Message::Human { content, .. } => {
                     messages.push(json!({
                         "role": "user",
                         "content": content,
@@ -66,6 +80,7 @@ impl AnthropicChatModel {
                 Message::AI {
                     content,
                     tool_calls,
+                    ..
                 } => {
                     let mut content_blocks: Vec<Value> = Vec::new();
                     if !content.is_empty() {
@@ -90,6 +105,7 @@ impl AnthropicChatModel {
                 Message::Tool {
                     content,
                     tool_call_id,
+                    ..
                 } => {
                     messages.push(json!({
                         "role": "user",
@@ -100,6 +116,17 @@ impl AnthropicChatModel {
                         }],
                     }));
                 }
+                Message::Chat {
+                    custom_role,
+                    content,
+                    ..
+                } => {
+                    messages.push(json!({
+                        "role": custom_role,
+                        "content": content,
+                    }));
+                }
+                Message::Remove { .. } => { /* skip Remove messages */ }
             }
         }
 
@@ -112,6 +139,13 @@ impl AnthropicChatModel {
 
         if let Some(system) = system_text {
             body["system"] = json!(system);
+        }
+
+        if let Some(top_p) = self.config.top_p {
+            body["top_p"] = json!(top_p);
+        }
+        if let Some(ref stop) = self.config.stop {
+            body["stop_sequences"] = json!(stop);
         }
 
         if !request.tools.is_empty() {
@@ -219,6 +253,8 @@ fn parse_usage(usage: &Value) -> Option<TokenUsage> {
         output_tokens: usage["output_tokens"].as_u64().unwrap_or(0) as u32,
         total_tokens: (usage["input_tokens"].as_u64().unwrap_or(0)
             + usage["output_tokens"].as_u64().unwrap_or(0)) as u32,
+        input_details: None,
+        output_details: None,
     })
 }
 
@@ -231,8 +267,7 @@ fn parse_stream_event(event_type: &str, data: &str) -> Option<AIMessageChunk> {
             match delta["type"].as_str() {
                 Some("text_delta") => Some(AIMessageChunk {
                     content: delta["text"].as_str().unwrap_or("").to_string(),
-                    tool_calls: vec![],
-                    usage: None,
+                    ..Default::default()
                 }),
                 Some("input_json_delta") => {
                     // Tool input streaming — we accumulate partial JSON
@@ -248,13 +283,12 @@ fn parse_stream_event(event_type: &str, data: &str) -> Option<AIMessageChunk> {
                 let id = block["id"].as_str().unwrap_or("").to_string();
                 let name = block["name"].as_str().unwrap_or("").to_string();
                 Some(AIMessageChunk {
-                    content: String::new(),
                     tool_calls: vec![ToolCall {
                         id,
                         name,
                         arguments: block["input"].clone(),
                     }],
-                    usage: None,
+                    ..Default::default()
                 })
             } else {
                 None
@@ -264,9 +298,8 @@ fn parse_stream_event(event_type: &str, data: &str) -> Option<AIMessageChunk> {
             let usage = parse_usage(&v["usage"]);
             if usage.is_some() {
                 Some(AIMessageChunk {
-                    content: String::new(),
-                    tool_calls: vec![],
                     usage,
+                    ..Default::default()
                 })
             } else {
                 None

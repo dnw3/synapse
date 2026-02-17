@@ -61,3 +61,22 @@ async fn cache_no_ttl_persists() {
     assert!(result.is_some());
     assert_eq!(result.unwrap().message.content(), "persistent");
 }
+
+#[tokio::test]
+async fn cache_clear_removes_all_entries() {
+    let cache = InMemoryCache::new();
+
+    cache.put("key1", &make_response("a")).await.unwrap();
+    cache.put("key2", &make_response("b")).await.unwrap();
+
+    // Both should be present
+    assert!(cache.get("key1").await.unwrap().is_some());
+    assert!(cache.get("key2").await.unwrap().is_some());
+
+    // Clear the cache
+    cache.clear().await.unwrap();
+
+    // Both should be gone
+    assert!(cache.get("key1").await.unwrap().is_none());
+    assert!(cache.get("key2").await.unwrap().is_none());
+}

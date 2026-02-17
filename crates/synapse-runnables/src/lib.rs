@@ -25,5 +25,14 @@ pub use assign::RunnableAssign;
 mod pick;
 pub use pick::RunnablePick;
 
+mod each;
+pub use each::RunnableEach;
+
+mod retry;
+pub use retry::{RetryPolicy, RunnableRetry};
+
+mod generator;
+pub use generator::RunnableGenerator;
+
 /// Backward-compatible alias for `RunnablePassthrough`.
 pub type IdentityRunnable = RunnablePassthrough;

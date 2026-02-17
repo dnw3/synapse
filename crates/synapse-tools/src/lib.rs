@@ -1,3 +1,11 @@
+mod handle_error;
+mod parallel_executor;
+mod return_direct;
+
+pub use handle_error::HandleErrorTool;
+pub use parallel_executor::ParallelToolExecutor;
+pub use return_direct::ReturnDirectTool;
+
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},

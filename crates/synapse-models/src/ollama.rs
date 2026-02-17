@@ -13,6 +13,9 @@ use crate::backend::{ProviderBackend, ProviderRequest, ProviderResponse};
 pub struct OllamaConfig {
     pub model: String,
     pub base_url: String,
+    pub top_p: Option<f64>,
+    pub stop: Option<Vec<String>>,
+    pub seed: Option<u64>,
 }
 
 impl OllamaConfig {
@@ -20,11 +23,29 @@ impl OllamaConfig {
         Self {
             model: model.into(),
             base_url: "http://localhost:11434".to_string(),
+            top_p: None,
+            stop: None,
+            seed: None,
         }
     }
 
     pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
         self.base_url = url.into();
+        self
+    }
+
+    pub fn with_top_p(mut self, top_p: f64) -> Self {
+        self.top_p = Some(top_p);
+        self
+    }
+
+    pub fn with_stop(mut self, stop: Vec<String>) -> Self {
+        self.stop = Some(stop);
+        self
+    }
+
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
         self
     }
 }
@@ -67,6 +88,26 @@ impl OllamaChatModel {
             };
         }
 
+        {
+            let mut options = json!({});
+            let mut has_options = false;
+            if let Some(top_p) = self.config.top_p {
+                options["top_p"] = json!(top_p);
+                has_options = true;
+            }
+            if let Some(ref stop) = self.config.stop {
+                options["stop"] = json!(stop);
+                has_options = true;
+            }
+            if let Some(seed) = self.config.seed {
+                options["seed"] = json!(seed);
+                has_options = true;
+            }
+            if has_options {
+                body["options"] = options;
+            }
+        }
+
         ProviderRequest {
             url: format!("{}/api/chat", self.config.base_url),
             headers: vec![("Content-Type".to_string(), "application/json".to_string())],
@@ -77,17 +118,18 @@ impl OllamaChatModel {
 
 fn message_to_ollama(msg: &Message) -> Value {
     match msg {
-        Message::System { content } => json!({
+        Message::System { content, .. } => json!({
             "role": "system",
             "content": content,
         }),
-        Message::Human { content } => json!({
+        Message::Human { content, .. } => json!({
             "role": "user",
             "content": content,
         }),
         Message::AI {
             content,
             tool_calls,
+            ..
         } => {
             let mut obj = json!({
                 "role": "assistant",
@@ -109,10 +151,20 @@ fn message_to_ollama(msg: &Message) -> Value {
         Message::Tool {
             content,
             tool_call_id: _,
+            ..
         } => json!({
             "role": "tool",
             "content": content,
         }),
+        Message::Chat {
+            custom_role,
+            content,
+            ..
+        } => json!({
+            "role": custom_role,
+            "content": content,
+        }),
+        Message::Remove { .. } => json!(null), // Remove messages are skipped
     }
 }
 
@@ -187,6 +239,8 @@ fn parse_usage(body: &Value) -> Option<TokenUsage> {
             input_tokens: p as u32,
             output_tokens: c as u32,
             total_tokens: (p + c) as u32,
+            input_details: None,
+            output_details: None,
         }),
         _ => None,
     }
@@ -206,6 +260,7 @@ fn parse_ndjson_chunk(line: &str) -> Option<AIMessageChunk> {
         content,
         tool_calls,
         usage,
+        ..Default::default()
     })
 }
 

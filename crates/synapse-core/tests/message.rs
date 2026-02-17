@@ -94,13 +94,11 @@ fn message_serde_tool_calls_omitted_when_empty() {
 fn chunk_add_concatenates_content() {
     let a = AIMessageChunk {
         content: "Hello".into(),
-        tool_calls: vec![],
-        usage: None,
+        ..Default::default()
     };
     let b = AIMessageChunk {
         content: " world".into(),
-        tool_calls: vec![],
-        usage: None,
+        ..Default::default()
     };
     let merged = a + b;
     assert_eq!(merged.content, "Hello world");
@@ -115,7 +113,7 @@ fn chunk_add_merges_tool_calls() {
             name: "search".into(),
             arguments: json!({}),
         }],
-        usage: None,
+        ..Default::default()
     };
     let b = AIMessageChunk {
         content: String::new(),
@@ -124,7 +122,7 @@ fn chunk_add_merges_tool_calls() {
             name: "calc".into(),
             arguments: json!({}),
         }],
-        usage: None,
+        ..Default::default()
     };
     let merged = a + b;
     assert_eq!(merged.tool_calls.len(), 2);
@@ -134,21 +132,25 @@ fn chunk_add_merges_tool_calls() {
 fn chunk_add_merges_usage() {
     let a = AIMessageChunk {
         content: "a".into(),
-        tool_calls: vec![],
         usage: Some(TokenUsage {
             input_tokens: 10,
             output_tokens: 5,
             total_tokens: 15,
+            input_details: None,
+            output_details: None,
         }),
+        ..Default::default()
     };
     let b = AIMessageChunk {
         content: "b".into(),
-        tool_calls: vec![],
         usage: Some(TokenUsage {
             input_tokens: 0,
             output_tokens: 3,
             total_tokens: 3,
+            input_details: None,
+            output_details: None,
         }),
+        ..Default::default()
     };
     let merged = a + b;
     let usage = merged.usage.unwrap();
@@ -161,13 +163,11 @@ fn chunk_add_merges_usage() {
 fn chunk_add_assign_works() {
     let mut chunk = AIMessageChunk {
         content: "Hello".into(),
-        tool_calls: vec![],
-        usage: None,
+        ..Default::default()
     };
     chunk += AIMessageChunk {
         content: " world".into(),
-        tool_calls: vec![],
-        usage: None,
+        ..Default::default()
     };
     assert_eq!(chunk.content, "Hello world");
 }
@@ -181,12 +181,49 @@ fn chunk_into_message() {
             name: "tool".into(),
             arguments: json!({}),
         }],
-        usage: None,
+        ..Default::default()
     };
     let msg = chunk.into_message();
     assert!(msg.is_ai());
     assert_eq!(msg.content(), "final answer");
     assert_eq!(msg.tool_calls().len(), 1);
+}
+
+#[test]
+fn remove_message_factory() {
+    let msg = Message::remove("msg-42");
+    assert_eq!(msg.role(), "remove");
+    assert_eq!(msg.content(), "");
+    assert!(msg.is_remove());
+    assert!(!msg.is_system());
+    assert!(!msg.is_human());
+    assert!(!msg.is_ai());
+    assert!(!msg.is_tool());
+    assert_eq!(msg.remove_id(), Some("msg-42"));
+    assert!(msg.tool_calls().is_empty());
+    assert_eq!(msg.tool_call_id(), None);
+}
+
+#[test]
+fn remove_message_id_accessor() {
+    let msg = Message::remove("msg-99");
+    assert_eq!(msg.id(), Some("msg-99"));
+}
+
+#[test]
+fn remove_message_serde_roundtrip() {
+    let msg = Message::remove("msg-123");
+    let json_str = serde_json::to_string(&msg).unwrap();
+    let deserialized: Message = serde_json::from_str(&json_str).unwrap();
+    assert_eq!(msg, deserialized);
+}
+
+#[test]
+fn remove_message_serde_format() {
+    let msg = Message::remove("msg-7");
+    let json = serde_json::to_value(&msg).unwrap();
+    assert_eq!(json["role"], "remove");
+    assert_eq!(json["id"], "msg-7");
 }
 
 struct FakeModel;

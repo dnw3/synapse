@@ -117,6 +117,36 @@ impl<I: Send + 'static, O: Send + 'static> BoxRunnable<I, O> {
             config_transform: Box::new(transform),
         })
     }
+
+    /// Return a new runnable that always uses the given config, ignoring the
+    /// config passed at invocation time.
+    pub fn with_config(self, config: RunnableConfig) -> BoxRunnable<I, O> {
+        self.bind(move |_| config.clone())
+    }
+
+    /// Wrap this runnable with before/after listener callbacks.
+    pub fn with_listeners(
+        self,
+        on_start: impl Fn(&RunnableConfig) + Send + Sync + 'static,
+        on_end: impl Fn(&RunnableConfig) + Send + Sync + 'static,
+    ) -> BoxRunnable<I, O> {
+        BoxRunnable::new(RunnableWithListeners {
+            inner: self,
+            on_start: Box::new(on_start),
+            on_end: Box::new(on_end),
+        })
+    }
+}
+
+impl<I: Send + 'static, O: Send + 'static> BoxRunnable<Vec<I>, Vec<O>> {
+    /// Shorthand for wrapping this runnable with `RunnableEach`.
+    /// Requires `I: Send + 'static, O: Send + 'static` and that the runnable
+    /// operates on `Vec<I> -> Vec<O>`.
+    ///
+    /// See also `RunnableEach::new()` for wrapping a `BoxRunnable<I, O>`.
+    pub fn map_each(inner: BoxRunnable<I, O>) -> BoxRunnable<Vec<I>, Vec<O>> {
+        BoxRunnable::new(crate::each::RunnableEach::new(inner))
+    }
 }
 
 #[async_trait]
@@ -161,6 +191,38 @@ impl<I: Send + 'static, O: Send + 'static> Runnable<I, O> for RunnableBind<I, O>
             while let Some(item) = inner_stream.next().await {
                 yield item;
             }
+        })
+    }
+}
+
+/// A runnable that fires listener callbacks before and after invocation.
+struct RunnableWithListeners<I: Send + 'static, O: Send + 'static> {
+    inner: BoxRunnable<I, O>,
+    on_start: Box<dyn Fn(&RunnableConfig) + Send + Sync>,
+    on_end: Box<dyn Fn(&RunnableConfig) + Send + Sync>,
+}
+
+#[async_trait]
+impl<I: Send + 'static, O: Send + 'static> Runnable<I, O> for RunnableWithListeners<I, O> {
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapseError> {
+        (self.on_start)(config);
+        let result = self.inner.invoke(input, config).await;
+        (self.on_end)(config);
+        result
+    }
+
+    fn stream<'a>(&'a self, input: I, config: &'a RunnableConfig) -> RunnableOutputStream<'a, O>
+    where
+        I: 'a,
+    {
+        Box::pin(async_stream::stream! {
+            (self.on_start)(config);
+            use futures::StreamExt;
+            let mut s = std::pin::pin!(self.inner.stream(input, config));
+            while let Some(item) = s.next().await {
+                yield item;
+            }
+            (self.on_end)(config);
         })
     }
 }

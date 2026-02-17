@@ -29,3 +29,6 @@ pub use token_bucket::{TokenBucket, TokenBucketChatModel};
 
 mod structured_output;
 pub use structured_output::StructuredOutputChatModel;
+
+mod bound_tools;
+pub use bound_tools::BoundToolsChatModel;

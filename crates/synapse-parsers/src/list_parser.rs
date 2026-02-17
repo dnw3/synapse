@@ -2,6 +2,8 @@ use async_trait::async_trait;
 use synapse_core::{RunnableConfig, SynapseError};
 use synapse_runnables::Runnable;
 
+use crate::FormatInstructions;
+
 /// Separator used to split the input into a list.
 #[derive(Debug, Clone)]
 pub enum ListSeparator {
@@ -34,6 +36,17 @@ impl ListOutputParser {
 impl Default for ListOutputParser {
     fn default() -> Self {
         Self::newline()
+    }
+}
+
+impl FormatInstructions for ListOutputParser {
+    fn get_format_instructions(&self) -> String {
+        let sep_desc = match &self.separator {
+            ListSeparator::Newline => "newlines",
+            ListSeparator::Comma => "commas",
+            ListSeparator::Custom(s) => s.as_str(),
+        };
+        format!("Your response should be a list of items separated by {sep_desc}.")
     }
 }
 

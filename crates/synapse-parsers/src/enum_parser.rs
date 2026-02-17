@@ -2,6 +2,8 @@ use async_trait::async_trait;
 use synapse_core::{RunnableConfig, SynapseError};
 use synapse_runnables::Runnable;
 
+use crate::FormatInstructions;
+
 /// Validates that the trimmed input matches one of the allowed enum values.
 pub struct EnumOutputParser {
     allowed: Vec<String>,
@@ -10,6 +12,13 @@ pub struct EnumOutputParser {
 impl EnumOutputParser {
     pub fn new(allowed: Vec<String>) -> Self {
         Self { allowed }
+    }
+}
+
+impl FormatInstructions for EnumOutputParser {
+    fn get_format_instructions(&self) -> String {
+        let values = self.allowed.join(", ");
+        format!("Your response should be one of the following values: {values}")
     }
 }
 

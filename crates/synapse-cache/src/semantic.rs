@@ -74,6 +74,12 @@ impl LlmCache for SemanticCache {
 
         Ok(())
     }
+
+    async fn clear(&self) -> Result<(), SynapseError> {
+        let mut entries = self.entries.write().await;
+        entries.clear();
+        Ok(())
+    }
 }
 
 /// Compute cosine similarity between two vectors.

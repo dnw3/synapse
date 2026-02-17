@@ -113,8 +113,7 @@ impl ChatModel for StreamOnceModel {
         Box::pin(async_stream::stream! {
             yield Ok(synapse_core::AIMessageChunk {
                 content: "chunk".to_string(),
-                tool_calls: vec![],
-                usage: None,
+                ..Default::default()
             });
         })
     }

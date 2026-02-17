@@ -351,6 +351,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "graph_visualization"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "synapse-core",
+ "synapse-graph",
+ "synapse-models",
+ "synapse-tools",
+ "tokio",
+]
+
+[[package]]
 name = "h2"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1263,7 +1277,9 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "async-trait",
+ "base64",
  "futures",
+ "reqwest",
  "serde",
  "serde_json",
  "synapse-core",
@@ -1276,8 +1292,11 @@ dependencies = [
 name = "synapse-loaders"
 version = "0.1.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "csv",
+ "futures",
+ "reqwest",
  "serde_json",
  "synapse-core",
  "synapse-retrieval",
@@ -1321,6 +1340,7 @@ dependencies = [
  "serde",
  "serde_json",
  "synapse-core",
+ "synapse-models",
  "synapse-runnables",
  "tokio",
 ]
@@ -1333,6 +1353,7 @@ dependencies = [
  "serde",
  "serde_json",
  "synapse-core",
+ "synapse-embeddings",
  "synapse-runnables",
  "thiserror",
  "tokio",
@@ -1378,6 +1399,7 @@ name = "synapse-tools"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "futures",
  "serde_json",
  "synapse-core",
  "tokio",

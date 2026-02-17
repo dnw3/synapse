@@ -14,6 +14,8 @@ pub struct GeminiConfig {
     pub api_key: String,
     pub model: String,
     pub base_url: String,
+    pub top_p: Option<f64>,
+    pub stop: Option<Vec<String>>,
 }
 
 impl GeminiConfig {
@@ -22,11 +24,23 @@ impl GeminiConfig {
             api_key: api_key.into(),
             model: model.into(),
             base_url: "https://generativelanguage.googleapis.com".to_string(),
+            top_p: None,
+            stop: None,
         }
     }
 
     pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
         self.base_url = url.into();
+        self
+    }
+
+    pub fn with_top_p(mut self, top_p: f64) -> Self {
+        self.top_p = Some(top_p);
+        self
+    }
+
+    pub fn with_stop(mut self, stop: Vec<String>) -> Self {
+        self.stop = Some(stop);
         self
     }
 }
@@ -47,10 +61,10 @@ impl GeminiChatModel {
 
         for msg in &request.messages {
             match msg {
-                Message::System { content } => {
+                Message::System { content, .. } => {
                     system_text = Some(content.clone());
                 }
-                Message::Human { content } => {
+                Message::Human { content, .. } => {
                     contents.push(json!({
                         "role": "user",
                         "parts": [{"text": content}],
@@ -59,6 +73,7 @@ impl GeminiChatModel {
                 Message::AI {
                     content,
                     tool_calls,
+                    ..
                 } => {
                     let mut parts: Vec<Value> = Vec::new();
                     if !content.is_empty() {
@@ -80,6 +95,7 @@ impl GeminiChatModel {
                 Message::Tool {
                     content,
                     tool_call_id: _,
+                    ..
                 } => {
                     // Gemini uses functionResponse in parts
                     let result: Value =
@@ -94,6 +110,13 @@ impl GeminiChatModel {
                         }],
                     }));
                 }
+                Message::Chat { content, .. } => {
+                    contents.push(json!({
+                        "role": "user",
+                        "parts": [{"text": content}],
+                    }));
+                }
+                Message::Remove { .. } => { /* skip Remove messages */ }
             }
         }
 
@@ -105,6 +128,22 @@ impl GeminiChatModel {
             body["system_instruction"] = json!({
                 "parts": [{"text": system}],
             });
+        }
+
+        {
+            let mut gen_config = json!({});
+            let mut has_gen_config = false;
+            if let Some(top_p) = self.config.top_p {
+                gen_config["topP"] = json!(top_p);
+                has_gen_config = true;
+            }
+            if let Some(ref stop) = self.config.stop {
+                gen_config["stopSequences"] = json!(stop);
+                has_gen_config = true;
+            }
+            if has_gen_config {
+                body["generationConfig"] = gen_config;
+            }
         }
 
         if !request.tools.is_empty() {
@@ -222,6 +261,8 @@ fn parse_usage(usage: &Value) -> Option<TokenUsage> {
         input_tokens: usage["promptTokenCount"].as_u64().unwrap_or(0) as u32,
         output_tokens: usage["candidatesTokenCount"].as_u64().unwrap_or(0) as u32,
         total_tokens: usage["totalTokenCount"].as_u64().unwrap_or(0) as u32,
+        input_details: None,
+        output_details: None,
     })
 }
 
@@ -256,6 +297,7 @@ fn parse_stream_chunk(data: &str) -> Option<AIMessageChunk> {
         content,
         tool_calls,
         usage,
+        ..Default::default()
     })
 }
 

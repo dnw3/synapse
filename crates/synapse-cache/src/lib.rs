@@ -16,4 +16,6 @@ pub trait LlmCache: Send + Sync {
     async fn get(&self, key: &str) -> Result<Option<ChatResponse>, SynapseError>;
     /// Store a response in the cache.
     async fn put(&self, key: &str, response: &ChatResponse) -> Result<(), SynapseError>;
+    /// Clear all entries from the cache.
+    async fn clear(&self) -> Result<(), SynapseError>;
 }

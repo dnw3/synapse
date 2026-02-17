@@ -1,4 +1,5 @@
 use crate::character::merge_splits;
+use crate::language::Language;
 use crate::TextSplitter;
 
 /// Recursively splits text using a hierarchy of separators.
@@ -31,6 +32,15 @@ impl RecursiveCharacterTextSplitter {
     pub fn with_separators(mut self, separators: Vec<String>) -> Self {
         self.separators = separators;
         self
+    }
+
+    /// Create a splitter with language-aware separators.
+    pub fn from_language(language: Language, chunk_size: usize, chunk_overlap: usize) -> Self {
+        Self {
+            separators: language.separators(),
+            chunk_size,
+            chunk_overlap,
+        }
     }
 
     pub fn with_chunk_overlap(mut self, overlap: usize) -> Self {

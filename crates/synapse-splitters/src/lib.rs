@@ -1,9 +1,13 @@
 mod character;
+mod html_header;
+pub mod language;
 mod markdown;
 mod recursive;
 mod token;
 
 pub use character::CharacterTextSplitter;
+pub use html_header::HtmlHeaderTextSplitter;
+pub use language::Language;
 pub use markdown::{HeaderType, MarkdownHeaderTextSplitter};
 pub use recursive::RecursiveCharacterTextSplitter;
 pub use token::TokenTextSplitter;

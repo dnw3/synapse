@@ -39,8 +39,7 @@ impl ChatModel for SlowModel {
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
             yield Ok(AIMessageChunk {
                 content: "chunk".to_string(),
-                tool_calls: vec![],
-                usage: None,
+                ..Default::default()
             });
         })
     }

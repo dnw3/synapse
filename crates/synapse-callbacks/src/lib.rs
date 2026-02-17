@@ -1,7 +1,9 @@
 mod composite;
+mod stdout;
 mod tracing_cb;
 
 pub use composite::CompositeCallback;
+pub use stdout::StdOutCallbackHandler;
 pub use tracing_cb::TracingCallback;
 
 use std::sync::Arc;

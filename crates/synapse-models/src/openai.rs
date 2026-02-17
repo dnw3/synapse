@@ -16,6 +16,9 @@ pub struct OpenAiConfig {
     pub base_url: String,
     pub max_tokens: Option<u32>,
     pub temperature: Option<f64>,
+    pub top_p: Option<f64>,
+    pub stop: Option<Vec<String>>,
+    pub seed: Option<u64>,
 }
 
 impl OpenAiConfig {
@@ -26,6 +29,9 @@ impl OpenAiConfig {
             base_url: "https://api.openai.com/v1".to_string(),
             max_tokens: None,
             temperature: None,
+            top_p: None,
+            stop: None,
+            seed: None,
         }
     }
 
@@ -41,6 +47,21 @@ impl OpenAiConfig {
 
     pub fn with_temperature(mut self, temperature: f64) -> Self {
         self.temperature = Some(temperature);
+        self
+    }
+
+    pub fn with_top_p(mut self, top_p: f64) -> Self {
+        self.top_p = Some(top_p);
+        self
+    }
+
+    pub fn with_stop(mut self, stop: Vec<String>) -> Self {
+        self.stop = Some(stop);
+        self
+    }
+
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
         self
     }
 }
@@ -69,6 +90,15 @@ impl OpenAiChatModel {
         }
         if let Some(temp) = self.config.temperature {
             body["temperature"] = json!(temp);
+        }
+        if let Some(top_p) = self.config.top_p {
+            body["top_p"] = json!(top_p);
+        }
+        if let Some(ref stop) = self.config.stop {
+            body["stop"] = json!(stop);
+        }
+        if let Some(seed) = self.config.seed {
+            body["seed"] = json!(seed);
         }
         if !request.tools.is_empty() {
             body["tools"] = json!(request
@@ -105,17 +135,18 @@ impl OpenAiChatModel {
 
 fn message_to_openai(msg: &Message) -> Value {
     match msg {
-        Message::System { content } => json!({
+        Message::System { content, .. } => json!({
             "role": "system",
             "content": content,
         }),
-        Message::Human { content } => json!({
+        Message::Human { content, .. } => json!({
             "role": "user",
             "content": content,
         }),
         Message::AI {
             content,
             tool_calls,
+            ..
         } => {
             let mut obj = json!({
                 "role": "assistant",
@@ -139,11 +170,21 @@ fn message_to_openai(msg: &Message) -> Value {
         Message::Tool {
             content,
             tool_call_id,
+            ..
         } => json!({
             "role": "tool",
             "content": content,
             "tool_call_id": tool_call_id,
         }),
+        Message::Chat {
+            custom_role,
+            content,
+            ..
+        } => json!({
+            "role": custom_role,
+            "content": content,
+        }),
+        Message::Remove { .. } => json!(null), // Remove messages are skipped
     }
 }
 
@@ -227,6 +268,8 @@ fn parse_usage(usage: &Value) -> Option<TokenUsage> {
         input_tokens: usage["prompt_tokens"].as_u64().unwrap_or(0) as u32,
         output_tokens: usage["completion_tokens"].as_u64().unwrap_or(0) as u32,
         total_tokens: usage["total_tokens"].as_u64().unwrap_or(0) as u32,
+        input_details: None,
+        output_details: None,
     })
 }
 
@@ -242,6 +285,7 @@ fn parse_stream_chunk(data: &str) -> Option<AIMessageChunk> {
         content,
         tool_calls,
         usage,
+        ..Default::default()
     })
 }
 

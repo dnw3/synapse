@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::State;
@@ -16,4 +17,6 @@ pub type RouterFn<S> = Arc<dyn Fn(&S) -> String + Send + Sync>;
 pub struct ConditionalEdge<S: State> {
     pub source: String,
     pub router: RouterFn<S>,
+    /// Optional mapping of label → target node name, used for visualization.
+    pub path_map: Option<HashMap<String, String>>,
 }

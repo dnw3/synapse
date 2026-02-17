@@ -6,6 +6,7 @@ use futures::Stream;
 use synapse_core::SynapseError;
 
 use crate::checkpoint::{Checkpoint, CheckpointConfig, Checkpointer};
+use crate::command::{GraphCommand, GraphContext};
 use crate::edge::{ConditionalEdge, Edge};
 use crate::node::Node;
 use crate::state::State;
@@ -42,6 +43,7 @@ pub struct CompiledGraph<S: State> {
     pub(crate) interrupt_before: HashSet<String>,
     pub(crate) interrupt_after: HashSet<String>,
     pub(crate) checkpointer: Option<Arc<dyn Checkpointer>>,
+    pub(crate) command_context: GraphContext,
 }
 
 impl<S: State> std::fmt::Debug for CompiledGraph<S> {
@@ -60,6 +62,14 @@ impl<S: State> CompiledGraph<S> {
     pub fn with_checkpointer(mut self, checkpointer: Arc<dyn Checkpointer>) -> Self {
         self.checkpointer = Some(checkpointer);
         self
+    }
+
+    /// Get the `GraphContext` for this compiled graph.
+    ///
+    /// Nodes can use this context to issue dynamic control flow commands
+    /// (e.g., `goto` or `end`) that override normal edge-based routing.
+    pub fn context(&self) -> &GraphContext {
+        &self.command_context
     }
 
     /// Execute the graph with initial state.
@@ -126,25 +136,34 @@ impl<S: State> CompiledGraph<S> {
                 .ok_or_else(|| SynapseError::Graph(format!("node '{current_node}' not found")))?;
             state = node.process(state).await?;
 
-            // Check interrupt_after
-            if self.interrupt_after.contains(&current_node) {
-                // Find next node first so we can save it
-                let next = self.find_next_node(&current_node, &state);
-                if let (Some(ref checkpointer), Some(ref cfg)) = (&self.checkpointer, &config) {
-                    let checkpoint = Checkpoint {
-                        state: serde_json::to_value(&state)
-                            .map_err(|e| SynapseError::Graph(format!("serialize state: {e}")))?,
-                        next_node: Some(next),
-                    };
-                    checkpointer.put(cfg, &checkpoint).await?;
+            // Check for command from GraphContext
+            let next = if let Some(cmd) = self.command_context.take_command().await {
+                match cmd {
+                    GraphCommand::Goto(target) => target,
+                    GraphCommand::End => END.to_string(),
                 }
-                return Err(SynapseError::Graph(format!(
-                    "interrupted after node '{current_node}'"
-                )));
-            }
+            } else {
+                // Check interrupt_after (only when no command override)
+                if self.interrupt_after.contains(&current_node) {
+                    // Find next node first so we can save it
+                    let next = self.find_next_node(&current_node, &state);
+                    if let (Some(ref checkpointer), Some(ref cfg)) = (&self.checkpointer, &config) {
+                        let checkpoint = Checkpoint {
+                            state: serde_json::to_value(&state).map_err(|e| {
+                                SynapseError::Graph(format!("serialize state: {e}"))
+                            })?,
+                            next_node: Some(next),
+                        };
+                        checkpointer.put(cfg, &checkpoint).await?;
+                    }
+                    return Err(SynapseError::Graph(format!(
+                        "interrupted after node '{current_node}'"
+                    )));
+                }
 
-            // Find next node
-            let next = self.find_next_node(&current_node, &state);
+                // Find next node via normal edge routing
+                self.find_next_node(&current_node, &state)
+            };
 
             // Save checkpoint after each node
             if let (Some(ref checkpointer), Some(ref cfg)) = (&self.checkpointer, &config) {
@@ -278,37 +297,45 @@ impl<S: State> CompiledGraph<S> {
                 };
                 yield Ok(event);
 
-                // Check interrupt_after
-                if self.interrupt_after.contains(&current_node) {
-                    let next = self.find_next_node(&current_node, &state);
-                    if let (Some(ref checkpointer), Some(ref cfg)) = (&self.checkpointer, &config) {
-                        let ckpt_result = serde_json::to_value(&state)
-                            .map_err(|e| SynapseError::Graph(format!("serialize state: {e}")));
-                        match ckpt_result {
-                            Ok(state_val) => {
-                                let checkpoint = Checkpoint {
-                                    state: state_val,
-                                    next_node: Some(next),
-                                };
-                                if let Err(e) = checkpointer.put(cfg, &checkpoint).await {
+                // Check for command from GraphContext
+                let next = if let Some(cmd) = self.command_context.take_command().await {
+                    match cmd {
+                        GraphCommand::Goto(target) => target,
+                        GraphCommand::End => END.to_string(),
+                    }
+                } else {
+                    // Check interrupt_after (only when no command override)
+                    if self.interrupt_after.contains(&current_node) {
+                        let next = self.find_next_node(&current_node, &state);
+                        if let (Some(ref checkpointer), Some(ref cfg)) = (&self.checkpointer, &config) {
+                            let ckpt_result = serde_json::to_value(&state)
+                                .map_err(|e| SynapseError::Graph(format!("serialize state: {e}")));
+                            match ckpt_result {
+                                Ok(state_val) => {
+                                    let checkpoint = Checkpoint {
+                                        state: state_val,
+                                        next_node: Some(next),
+                                    };
+                                    if let Err(e) = checkpointer.put(cfg, &checkpoint).await {
+                                        yield Err(e);
+                                        return;
+                                    }
+                                }
+                                Err(e) => {
                                     yield Err(e);
                                     return;
                                 }
                             }
-                            Err(e) => {
-                                yield Err(e);
-                                return;
-                            }
                         }
+                        yield Err(SynapseError::Graph(format!(
+                            "interrupted after node '{current_node}'"
+                        )));
+                        return;
                     }
-                    yield Err(SynapseError::Graph(format!(
-                        "interrupted after node '{current_node}'"
-                    )));
-                    return;
-                }
 
-                // Find next node
-                let next = self.find_next_node(&current_node, &state);
+                    // Find next node via normal edge routing
+                    self.find_next_node(&current_node, &state)
+                };
 
                 // Save checkpoint
                 if let (Some(ref checkpointer), Some(ref cfg)) = (&self.checkpointer, &config) {
@@ -369,6 +396,59 @@ impl<S: State> CompiledGraph<S> {
         checkpointer.put(config, &updated).await?;
 
         Ok(())
+    }
+
+    /// Get the current state for a thread from the checkpointer.
+    ///
+    /// Returns `None` if no checkpoint exists for the given thread.
+    pub async fn get_state(&self, config: &CheckpointConfig) -> Result<Option<S>, SynapseError>
+    where
+        S: serde::de::DeserializeOwned,
+    {
+        let checkpointer = self
+            .checkpointer
+            .as_ref()
+            .ok_or_else(|| SynapseError::Graph("no checkpointer configured".to_string()))?;
+
+        match checkpointer.get(config).await? {
+            Some(checkpoint) => {
+                let state: S = serde_json::from_value(checkpoint.state).map_err(|e| {
+                    SynapseError::Graph(format!("failed to deserialize checkpoint state: {e}"))
+                })?;
+                Ok(Some(state))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Get the state history for a thread (all checkpoints).
+    ///
+    /// Returns a list of `(state, next_node)` pairs, ordered from oldest to newest.
+    /// The `next_node` indicates which node was scheduled to execute next when
+    /// the checkpoint was saved.
+    pub async fn get_state_history(
+        &self,
+        config: &CheckpointConfig,
+    ) -> Result<Vec<(S, Option<String>)>, SynapseError>
+    where
+        S: serde::de::DeserializeOwned,
+    {
+        let checkpointer = self
+            .checkpointer
+            .as_ref()
+            .ok_or_else(|| SynapseError::Graph("no checkpointer configured".to_string()))?;
+
+        let checkpoints = checkpointer.list(config).await?;
+        let mut history = Vec::with_capacity(checkpoints.len());
+
+        for checkpoint in checkpoints {
+            let state: S = serde_json::from_value(checkpoint.state).map_err(|e| {
+                SynapseError::Graph(format!("failed to deserialize checkpoint state: {e}"))
+            })?;
+            history.push((state, checkpoint.next_node));
+        }
+
+        Ok(history)
     }
 
     fn find_next_node(&self, current: &str, state: &S) -> String {

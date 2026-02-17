@@ -70,4 +70,10 @@ impl LlmCache for InMemoryCache {
         );
         Ok(())
     }
+
+    async fn clear(&self) -> Result<(), SynapseError> {
+        let mut store = self.store.write().await;
+        store.clear();
+        Ok(())
+    }
 }

@@ -7,4 +7,4 @@ publish = false
 [dependencies]
 tokio.workspace = true
 tracing-subscriber.workspace = true
-synaptic = { version = "0.1.0", path = "../../crates/synapse", features = ["callbacks"] }
+synaptic = { version = "0.1.0", path = "../../crates/synaptic", features = ["callbacks"] }

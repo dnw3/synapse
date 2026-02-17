@@ -1,0 +1,17 @@
+[package]
+name = "synaptic-splitters"
+description = "Text splitters: Character, Recursive, Markdown, HTML, Language, Token"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+synaptic-core = { version = "0.1.0", path = "../synaptic-core" }
+synaptic-retrieval = { version = "0.1.0", path = "../synaptic-retrieval" }
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

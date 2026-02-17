@@ -1,0 +1,16 @@
+[package]
+name = "synaptic-tools"
+description = "Tool registry and execution: ToolRegistry, SerialToolExecutor, ParallelToolExecutor"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+futures.workspace = true
+synaptic-core = { version = "0.1.0", path = "../synaptic-core" }

@@ -7,4 +7,4 @@ publish = false
 [dependencies]
 serde_json.workspace = true
 tokio.workspace = true
-synaptic = { version = "0.1.0", path = "../../crates/synapse", features = ["runnables"] }
+synaptic = { version = "0.1.0", path = "../../crates/synaptic", features = ["runnables"] }

@@ -1,0 +1,22 @@
+[package]
+name = "synaptic-runnables"
+description = "LCEL composition: Runnable trait, pipe operator, Lambda, Parallel, Branch, Fallbacks"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+async-stream.workspace = true
+futures.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+synaptic-core = { version = "0.1.0", path = "../synaptic-core" }
+
+[dev-dependencies]
+tokio.workspace = true
+futures.workspace = true
+serde_json.workspace = true

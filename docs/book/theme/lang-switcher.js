@@ -1,18 +1,10 @@
 // Language switcher for Synaptic documentation
-// Injects an EN/中文 toggle into the mdBook menu bar.
+// EN docs at /synaptic/  —  ZH docs at /synaptic/zh/
 (function () {
   "use strict";
 
   var path = window.location.pathname;
-
-  // Detect current language from URL path
   var isZh = /\/zh\//.test(path);
-  var isEn = /\/en\//.test(path);
-
-  // Build the target path for the other language
-  function switchPath(from, to) {
-    return path.replace("/" + from + "/", "/" + to + "/");
-  }
 
   function insertSwitcher() {
     var rightButtons = document.querySelector(".right-buttons");
@@ -21,38 +13,43 @@
     var container = document.createElement("div");
     container.className = "lang-switcher";
 
-    if (isEn || isZh) {
-      // Both languages in /en/ and /zh/ subdirectories
-      var enLink = document.createElement("a");
-      enLink.href = isEn ? "#" : switchPath("zh", "en");
-      enLink.textContent = "EN";
-      enLink.className = isEn ? "lang-active" : "";
-      enLink.title = "English";
-      if (isEn) enLink.onclick = function (e) { e.preventDefault(); };
+    var enLink = document.createElement("a");
+    enLink.textContent = "EN";
+    enLink.title = "English";
 
-      var sep = document.createElement("span");
-      sep.className = "lang-sep";
-      sep.textContent = "|";
+    var sep = document.createElement("span");
+    sep.className = "lang-sep";
+    sep.textContent = "|";
 
-      var zhLink = document.createElement("a");
-      zhLink.href = isZh ? "#" : switchPath("en", "zh");
-      zhLink.textContent = "\u4E2D\u6587";
-      zhLink.className = isZh ? "lang-active" : "";
-      zhLink.title = "\u5207\u6362\u5230\u4E2D\u6587";
-      if (isZh) zhLink.onclick = function (e) { e.preventDefault(); };
+    var zhLink = document.createElement("a");
+    zhLink.textContent = "\u4E2D\u6587";
+    zhLink.title = "\u5207\u6362\u5230\u4E2D\u6587";
 
-      container.appendChild(enLink);
-      container.appendChild(sep);
-      container.appendChild(zhLink);
+    if (isZh) {
+      // Currently Chinese → EN link removes /zh/
+      enLink.href = path.replace(/\/zh\//, "/");
+      enLink.className = "";
+      zhLink.href = "#";
+      zhLink.className = "lang-active";
+      zhLink.onclick = function (e) { e.preventDefault(); };
     } else {
-      // Fallback: guess /zh/ is nested under current root
-      var zhFallback = document.createElement("a");
-      zhFallback.href = path.replace(/^(\/[^/]+\/)/, "$1zh/");
-      zhFallback.textContent = "\u4E2D\u6587";
-      zhFallback.title = "\u5207\u6362\u5230\u4E2D\u6587";
-      container.appendChild(zhFallback);
+      // Currently English → ZH link inserts /zh/ after base path
+      // e.g. /synaptic/foo.html → /synaptic/zh/foo.html
+      var match = path.match(/^(\/[^/]+\/)(.*)/);
+      if (match) {
+        zhLink.href = match[1] + "zh/" + match[2];
+      } else {
+        zhLink.href = "/zh" + path;
+      }
+      zhLink.className = "";
+      enLink.href = "#";
+      enLink.className = "lang-active";
+      enLink.onclick = function (e) { e.preventDefault(); };
     }
 
+    container.appendChild(enLink);
+    container.appendChild(sep);
+    container.appendChild(zhLink);
     rightButtons.insertBefore(container, rightButtons.firstChild);
   }
 

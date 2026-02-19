@@ -47,7 +47,7 @@ authors = ["Synaptic Contributors"]
 rust-version = "1.78"
 description = "A Rust agent framework with LangChain-compatible architecture"
 repository = "https://github.com/dnw3/synaptic"
-homepage = "https://github.com/dnw3/synaptic"
+homepage = "https://dnw3.github.io/synaptic/en/"
 keywords = ["ai", "agent", "langchain", "llm", "rag"]
 categories = ["science"]
 

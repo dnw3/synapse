@@ -104,6 +104,7 @@ pub struct CompiledGraph<S: State> {
     /// Cache policies keyed by node name.
     pub(crate) cache_policies: HashMap<String, CachePolicy>,
     /// Node-level cache: node_name -> (state_hash -> cached_output).
+    #[allow(clippy::type_complexity)]
     pub(crate) cache: Arc<RwLock<HashMap<String, HashMap<u64, CachedEntry<S>>>>>,
     /// Nodes marked as deferred (wait for all incoming edges).
     pub(crate) deferred: HashSet<String>,

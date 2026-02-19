@@ -1,6 +1,6 @@
 [package]
 name = "synaptic-deep"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 license.workspace = true
 repository.workspace = true
@@ -19,13 +19,13 @@ regex.workspace = true
 synaptic-core.workspace = true
 synaptic-macros.workspace = true
 synaptic-middleware.workspace = true
-synaptic-graph = { version = "0.2.0", path = "../synaptic-graph" }
-synaptic-tools = { version = "0.2.0", path = "../synaptic-tools" }
+synaptic-graph = { version = "0.2.1", path = "../synaptic-graph" }
+synaptic-tools = { version = "0.2.1", path = "../synaptic-tools" }
 
 [features]
 filesystem = []
 
 [dev-dependencies]
 tokio.workspace = true
-synaptic-models = { version = "0.2.0", path = "../synaptic-models" }
-synaptic-store = { version = "0.2.0", path = "../synaptic-store" }
+synaptic-models = { version = "0.2.1", path = "../synaptic-models" }
+synaptic-store = { version = "0.2.1", path = "../synaptic-store" }

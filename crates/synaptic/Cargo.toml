@@ -10,27 +10,27 @@ repository.workspace = true
 homepage.workspace = true
 
 [dependencies]
-synaptic-core = { version = "0.2.0", path = "../synaptic-core" }
-synaptic-models = { version = "0.2.0", path = "../synaptic-models", optional = true }
-synaptic-runnables = { version = "0.2.0", path = "../synaptic-runnables", optional = true }
-synaptic-prompts = { version = "0.2.0", path = "../synaptic-prompts", optional = true }
-synaptic-parsers = { version = "0.2.0", path = "../synaptic-parsers", optional = true }
-synaptic-tools = { version = "0.2.0", path = "../synaptic-tools", optional = true }
-synaptic-memory = { version = "0.2.0", path = "../synaptic-memory", optional = true }
-synaptic-callbacks = { version = "0.2.0", path = "../synaptic-callbacks", optional = true }
-synaptic-retrieval = { version = "0.2.0", path = "../synaptic-retrieval", optional = true }
-synaptic-loaders = { version = "0.2.0", path = "../synaptic-loaders", optional = true }
-synaptic-splitters = { version = "0.2.0", path = "../synaptic-splitters", optional = true }
-synaptic-embeddings = { version = "0.2.0", path = "../synaptic-embeddings", optional = true }
-synaptic-vectorstores = { version = "0.2.0", path = "../synaptic-vectorstores", optional = true }
-synaptic-graph = { version = "0.2.0", path = "../synaptic-graph", optional = true }
-synaptic-middleware = { version = "0.2.0", path = "../synaptic-middleware", optional = true }
-synaptic-store = { version = "0.2.0", path = "../synaptic-store", optional = true }
-synaptic-cache = { version = "0.2.0", path = "../synaptic-cache", optional = true }
-synaptic-eval = { version = "0.2.0", path = "../synaptic-eval", optional = true }
-synaptic-mcp = { version = "0.2.0", path = "../synaptic-mcp", optional = true }
-synaptic-macros = { version = "0.2.0", path = "../synaptic-macros", optional = true }
-synaptic-deep = { version = "0.2.0", path = "../synaptic-deep", optional = true }
+synaptic-core = { version = "0.2.1", path = "../synaptic-core" }
+synaptic-models = { version = "0.2.1", path = "../synaptic-models", optional = true }
+synaptic-runnables = { version = "0.2.1", path = "../synaptic-runnables", optional = true }
+synaptic-prompts = { version = "0.2.1", path = "../synaptic-prompts", optional = true }
+synaptic-parsers = { version = "0.2.1", path = "../synaptic-parsers", optional = true }
+synaptic-tools = { version = "0.2.1", path = "../synaptic-tools", optional = true }
+synaptic-memory = { version = "0.2.1", path = "../synaptic-memory", optional = true }
+synaptic-callbacks = { version = "0.2.1", path = "../synaptic-callbacks", optional = true }
+synaptic-retrieval = { version = "0.2.1", path = "../synaptic-retrieval", optional = true }
+synaptic-loaders = { version = "0.2.1", path = "../synaptic-loaders", optional = true }
+synaptic-splitters = { version = "0.2.1", path = "../synaptic-splitters", optional = true }
+synaptic-embeddings = { version = "0.2.1", path = "../synaptic-embeddings", optional = true }
+synaptic-vectorstores = { version = "0.2.1", path = "../synaptic-vectorstores", optional = true }
+synaptic-graph = { version = "0.2.1", path = "../synaptic-graph", optional = true }
+synaptic-middleware = { version = "0.2.1", path = "../synaptic-middleware", optional = true }
+synaptic-store = { version = "0.2.1", path = "../synaptic-store", optional = true }
+synaptic-cache = { version = "0.2.1", path = "../synaptic-cache", optional = true }
+synaptic-eval = { version = "0.2.1", path = "../synaptic-eval", optional = true }
+synaptic-mcp = { version = "0.2.1", path = "../synaptic-mcp", optional = true }
+synaptic-macros = { version = "0.2.1", path = "../synaptic-macros", optional = true }
+synaptic-deep = { version = "0.2.1", path = "../synaptic-deep", optional = true }
 schemars = { workspace = true, optional = true }
 
 [features]

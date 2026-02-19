@@ -15,9 +15,9 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-synaptic-core = { version = "0.2.0", path = "../synaptic-core" }
-synaptic-embeddings = { version = "0.2.0", path = "../synaptic-embeddings" }
-synaptic-runnables = { version = "0.2.0", path = "../synaptic-runnables" }
+synaptic-core = { version = "0.2.1", path = "../synaptic-core" }
+synaptic-embeddings = { version = "0.2.1", path = "../synaptic-embeddings" }
+synaptic-runnables = { version = "0.2.1", path = "../synaptic-runnables" }
 
 [dev-dependencies]
 tokio.workspace = true

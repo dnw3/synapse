@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::{CallbackHandler, RunEvent, SynapseError};
+use synaptic_core::{CallbackHandler, RunEvent, SynapticError};
 
 /// A callback handler that prints events to stdout.
 ///
@@ -26,7 +26,7 @@ impl Default for StdOutCallbackHandler {
 
 #[async_trait]
 impl CallbackHandler for StdOutCallbackHandler {
-    async fn on_event(&self, event: RunEvent) -> Result<(), SynapseError> {
+    async fn on_event(&self, event: RunEvent) -> Result<(), SynapticError> {
         match event {
             RunEvent::RunStarted { run_id, session_id } => {
                 if self.verbose {

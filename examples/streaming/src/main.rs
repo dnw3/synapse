@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use synaptic::core::{
     AIMessageChunk, ChatModel, ChatRequest, ChatResponse, ChatStream, Message, RunnableConfig,
-    SynapseError,
+    SynapticError,
 };
 use synaptic::runnables::{Runnable, RunnableLambda};
 
@@ -21,7 +21,7 @@ impl StreamingModel {
 
 #[async_trait]
 impl ChatModel for StreamingModel {
-    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         Ok(ChatResponse {
             message: Message::ai(self.words.join(" ")),
             usage: None,
@@ -47,7 +47,7 @@ impl ChatModel for StreamingModel {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), SynapseError> {
+async fn main() -> Result<(), SynapticError> {
     let config = RunnableConfig::default();
     let model = StreamingModel::new("Rust is a fast and safe language");
 

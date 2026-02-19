@@ -1,30 +1,21 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{ChatResponse, Message, SynapseError, Tool, ToolCall};
+use synaptic_core::{ChatResponse, Message, SynapticError, Tool, ToolCall};
 use synaptic_graph::{create_react_agent, MessageState};
+use synaptic_macros::tool;
 use synaptic_models::ScriptedChatModel;
 
-struct EchoTool;
-
-#[async_trait]
-impl Tool for EchoTool {
-    fn name(&self) -> &'static str {
-        "echo"
-    }
-    fn description(&self) -> &'static str {
-        "echoes input"
-    }
-    async fn call(&self, args: Value) -> Result<Value, SynapseError> {
-        Ok(args)
-    }
+/// echoes input
+#[tool(name = "echo")]
+async fn echo(#[args] args: Value) -> Result<Value, SynapticError> {
+    Ok(args)
 }
 
 #[test]
 fn create_react_agent_compiles() {
     let model = Arc::new(ScriptedChatModel::new(vec![]));
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let result = create_react_agent(model, tools);
     assert!(result.is_ok());
 }
@@ -37,11 +28,11 @@ async fn react_agent_no_tool_calls() {
         usage: None,
     }]));
 
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let graph = create_react_agent(model, tools).unwrap();
 
     let state = MessageState::with_messages(vec![Message::human("hi")]);
-    let result = graph.invoke(state).await.unwrap();
+    let result = graph.invoke(state).await.unwrap().into_state();
 
     // Should have: human message + AI response
     assert_eq!(result.messages.len(), 2);
@@ -71,11 +62,11 @@ async fn react_agent_with_tool_calls() {
         },
     ]));
 
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let graph = create_react_agent(model, tools).unwrap();
 
     let state = MessageState::with_messages(vec![Message::human("echo test")]);
-    let result = graph.invoke(state).await.unwrap();
+    let result = graph.invoke(state).await.unwrap().into_state();
 
     // Should have: human, AI (tool call), tool result, AI (final)
     assert_eq!(result.messages.len(), 4);

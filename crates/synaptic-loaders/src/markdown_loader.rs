@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::Document;
 
 use crate::Loader;
@@ -24,9 +24,9 @@ impl MarkdownLoader {
 
 #[async_trait]
 impl Loader for MarkdownLoader {
-    async fn load(&self) -> Result<Vec<Document>, SynapseError> {
+    async fn load(&self) -> Result<Vec<Document>, SynapticError> {
         let content = tokio::fs::read_to_string(&self.path).await.map_err(|e| {
-            SynapseError::Loader(format!("cannot read {}: {e}", self.path.display()))
+            SynapticError::Loader(format!("cannot read {}: {e}", self.path.display()))
         })?;
 
         let id = self.path.to_string_lossy().to_string();

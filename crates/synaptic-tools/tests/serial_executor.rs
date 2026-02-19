@@ -1,31 +1,24 @@
-use std::sync::Arc;
-
-use async_trait::async_trait;
-use serde_json::json;
-use synaptic_core::{SynapseError, Tool};
+use serde_json::{json, Value};
+use synaptic_core::SynapticError;
+use synaptic_macros::tool;
 use synaptic_tools::{SerialToolExecutor, ToolRegistry};
 
-struct EchoTool;
+/// Echo input
+#[tool(name = "echo")]
+async fn echo(#[args] args: Value) -> Result<Value, SynapticError> {
+    Ok(json!({"echo": args}))
+}
 
-#[async_trait]
-impl Tool for EchoTool {
-    fn name(&self) -> &'static str {
-        "echo"
-    }
-
-    fn description(&self) -> &'static str {
-        "Echo input"
-    }
-
-    async fn call(&self, args: serde_json::Value) -> Result<serde_json::Value, SynapseError> {
-        Ok(json!({"echo": args}))
-    }
+/// Add two numbers.
+#[tool(name = "add")]
+async fn add_tool(a: i64, b: i64) -> Result<serde_json::Value, SynapticError> {
+    Ok(json!({"sum": a + b}))
 }
 
 #[tokio::test]
 async fn executes_registered_tool() {
     let registry = ToolRegistry::new();
-    registry.register(Arc::new(EchoTool)).expect("register");
+    registry.register(echo()).expect("register");
     let executor = SerialToolExecutor::new(registry);
 
     let output = executor
@@ -46,7 +39,7 @@ async fn returns_error_for_unknown_tool() {
         .await
         .expect_err("should fail");
 
-    assert!(matches!(err, SynapseError::ToolNotFound(name) if name == "missing"));
+    assert!(matches!(err, SynapticError::ToolNotFound(name) if name == "missing"));
 }
 
 #[tokio::test]
@@ -59,11 +52,11 @@ async fn get_returns_none_for_unregistered() {
 async fn duplicate_register_overwrites() {
     let registry = ToolRegistry::new();
     registry
-        .register(Arc::new(EchoTool))
+        .register(echo())
         .expect("first register");
     // Registering again should succeed (overwrite)
     registry
-        .register(Arc::new(EchoTool))
+        .register(echo())
         .expect("second register");
     // Only one tool with name "echo" should exist
     assert!(registry.get("echo").is_some());
@@ -71,25 +64,9 @@ async fn duplicate_register_overwrites() {
 
 #[tokio::test]
 async fn multiple_tools_in_registry() {
-    struct AddTool;
-    #[async_trait]
-    impl Tool for AddTool {
-        fn name(&self) -> &'static str {
-            "add"
-        }
-        fn description(&self) -> &'static str {
-            "Add numbers"
-        }
-        async fn call(&self, args: serde_json::Value) -> Result<serde_json::Value, SynapseError> {
-            let a = args["a"].as_i64().unwrap_or(0);
-            let b = args["b"].as_i64().unwrap_or(0);
-            Ok(json!({"sum": a + b}))
-        }
-    }
-
     let registry = ToolRegistry::new();
-    registry.register(Arc::new(EchoTool)).unwrap();
-    registry.register(Arc::new(AddTool)).unwrap();
+    registry.register(echo()).unwrap();
+    registry.register(add_tool()).unwrap();
     assert!(registry.get("echo").is_some());
     assert!(registry.get("add").is_some());
 
@@ -109,7 +86,7 @@ async fn multiple_tools_in_registry() {
 #[tokio::test]
 async fn sequential_executions() {
     let registry = ToolRegistry::new();
-    registry.register(Arc::new(EchoTool)).unwrap();
+    registry.register(echo()).unwrap();
     let executor = SerialToolExecutor::new(registry);
 
     let r1 = executor.execute("echo", json!({"n": 1})).await.unwrap();

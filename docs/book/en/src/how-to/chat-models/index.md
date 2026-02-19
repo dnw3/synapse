@@ -56,3 +56,4 @@ let with_rate_limit = RateLimitedChatModel::new(with_retry, 5);
 - [Structured Output](structured-output.md) -- get typed Rust structs from LLM responses
 - [Caching LLM Responses](caching.md) -- avoid redundant API calls with in-memory or semantic caching
 - [Retry & Rate Limiting](retry-rate-limit.md) -- handle transient failures and control request throughput
+- [Model Profiles](model-profiles.md) -- query model capabilities and limits at runtime

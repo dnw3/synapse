@@ -16,6 +16,11 @@ members = [
   "crates/synaptic-vectorstores",
   "crates/synaptic-graph",
   "crates/synaptic-cache",
+  "crates/synaptic-middleware",
+  "crates/synaptic-store",
+  "crates/synaptic-mcp",
+  "crates/synaptic-macros",
+  "crates/synaptic-deep",
   "crates/synaptic",
   "examples/react_basic",
   "examples/tool_calling_basic",
@@ -30,12 +35,13 @@ members = [
   "examples/callbacks_tracing",
   "examples/evaluation",
   "examples/caching",
+  "examples/macros_showcase",
 ]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.1.0"
+version = "0.2.0"
 license = "MIT"
 authors = ["Synaptic Contributors"]
 rust-version = "1.78"
@@ -61,3 +67,13 @@ bytes = "1"
 csv = "1.3"
 regex = "1"
 base64 = "0.22"
+schemars = { version = "0.8", features = ["derive"] }
+synaptic-core = { version = "0.2.0", path = "crates/synaptic-core" }
+synaptic-mcp = { version = "0.2.0", path = "crates/synaptic-mcp" }
+synaptic-macros = { version = "0.2.0", path = "crates/synaptic-macros" }
+synaptic-middleware = { version = "0.2.0", path = "crates/synaptic-middleware" }
+synaptic-runnables = { version = "0.2.0", path = "crates/synaptic-runnables" }
+synaptic-deep = { version = "0.2.0", path = "crates/synaptic-deep" }
+syn = { version = "2", features = ["full", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"

@@ -1,0 +1,33 @@
+[package]
+name = "synaptic-macros"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Procedural macros for the Synaptic framework (#[tool], #[chain], #[entrypoint], etc.)"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+
+[features]
+schemars = []
+
+[dev-dependencies]
+synaptic-core = { workspace = true, features = ["schemars"] }
+synaptic-middleware = { workspace = true }
+synaptic-runnables = { workspace = true }
+async-trait = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+schemars = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = "0.3"

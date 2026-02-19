@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::runnable::{BoxRunnable, Runnable};
 
@@ -24,7 +24,7 @@ impl<I: Send + 'static, O: Send + 'static> RunnableBranch<I, O> {
 
 #[async_trait]
 impl<I: Send + 'static, O: Send + 'static> Runnable<I, O> for RunnableBranch<I, O> {
-    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapseError> {
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapticError> {
         for (condition, runnable) in &self.branches {
             if condition(&input) {
                 return runnable.invoke(input, config).await;

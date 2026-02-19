@@ -234,3 +234,10 @@ Messages serialize as JSON with a `role` discriminator field:
 The AI variant serializes its role as `"assistant"` (matching OpenAI convention), while `role()` returns `"assistant"` at runtime as well. Empty collections and None optionals are omitted from serialization via `skip_serializing_if` attributes.
 
 This serialization format is compatible with LangChain's message schema, making it straightforward to exchange message histories between Synaptic and Python-based systems.
+
+## See Also
+
+- [Message Types](../how-to/messages/types.md) -- detailed examples for each message variant
+- [Filter & Trim](../how-to/messages/filter-trim.md) -- filtering and trimming message sequences
+- [Merge Runs](../how-to/messages/merge-runs.md) -- merging consecutive same-role messages
+- [Memory](memory.md) -- how messages are stored and managed across sessions

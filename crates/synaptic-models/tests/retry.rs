@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::StreamExt;
-use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapticError};
 use synaptic_models::{RetryChatModel, RetryPolicy};
 use tokio::sync::Mutex;
 
@@ -24,14 +24,14 @@ impl FailThenSucceedModel {
 
 #[async_trait::async_trait]
 impl ChatModel for FailThenSucceedModel {
-    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         let mut attempts = self.attempts.lock().await;
         *attempts += 1;
         if *attempts <= self.fail_count {
             match self.error_kind {
-                "rate_limit" => Err(SynapseError::RateLimit("rate limited".to_string())),
-                "timeout" => Err(SynapseError::Timeout("timed out".to_string())),
-                _ => Err(SynapseError::Model("non-retryable".to_string())),
+                "rate_limit" => Err(SynapticError::RateLimit("rate limited".to_string())),
+                "timeout" => Err(SynapticError::Timeout("timed out".to_string())),
+                _ => Err(SynapticError::Model("non-retryable".to_string())),
             }
         } else {
             Ok(ChatResponse {
@@ -102,7 +102,7 @@ struct StreamOnceModel;
 
 #[async_trait::async_trait]
 impl ChatModel for StreamOnceModel {
-    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         Ok(ChatResponse {
             message: Message::ai("streamed"),
             usage: None,

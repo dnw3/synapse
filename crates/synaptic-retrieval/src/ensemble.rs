@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 use crate::{Document, Retriever};
 
@@ -27,7 +27,7 @@ impl EnsembleRetriever {
 
 #[async_trait]
 impl Retriever for EnsembleRetriever {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError> {
         // Map from doc.id -> (rrf_score, Document)
         let mut scores: HashMap<String, (f64, Document)> = HashMap::new();
 

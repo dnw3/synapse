@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_embeddings::Embeddings;
 
 use crate::{Document, Retriever};
@@ -14,7 +14,7 @@ pub trait DocumentCompressor: Send + Sync {
         &self,
         documents: Vec<Document>,
         query: &str,
-    ) -> Result<Vec<Document>, SynapseError>;
+    ) -> Result<Vec<Document>, SynapticError>;
 }
 
 /// Filters documents based on cosine similarity between the query embedding
@@ -62,7 +62,7 @@ impl DocumentCompressor for EmbeddingsFilter {
         &self,
         documents: Vec<Document>,
         query: &str,
-    ) -> Result<Vec<Document>, SynapseError> {
+    ) -> Result<Vec<Document>, SynapticError> {
         if documents.is_empty() {
             return Ok(vec![]);
         }
@@ -102,7 +102,7 @@ impl ContextualCompressionRetriever {
 
 #[async_trait]
 impl Retriever for ContextualCompressionRetriever {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError> {
         // First, retrieve from the base retriever
         let docs = self.base.retrieve(query, top_k).await?;
 

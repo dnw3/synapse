@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 use crate::FormatInstructions;
@@ -56,7 +56,7 @@ impl Runnable<String, Vec<String>> for ListOutputParser {
         &self,
         input: String,
         _config: &RunnableConfig,
-    ) -> Result<Vec<String>, SynapseError> {
+    ) -> Result<Vec<String>, SynapticError> {
         let sep = match &self.separator {
             ListSeparator::Newline => "\n",
             ListSeparator::Comma => ",",

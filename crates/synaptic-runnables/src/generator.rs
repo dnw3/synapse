@@ -2,12 +2,12 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::runnable::{Runnable, RunnableOutputStream};
 
 type GeneratorFn<I, O> =
-    dyn Fn(I) -> Pin<Box<dyn Stream<Item = Result<O, SynapseError>> + Send>> + Send + Sync;
+    dyn Fn(I) -> Pin<Box<dyn Stream<Item = Result<O, SynapticError>> + Send>> + Send + Sync;
 
 /// A runnable built from a generator function that yields streaming output.
 ///
@@ -33,7 +33,7 @@ impl<I: Send + 'static, O: Send + 'static> RunnableGenerator<I, O> {
     pub fn new<F, S>(func: F) -> Self
     where
         F: Fn(I) -> S + Send + Sync + 'static,
-        S: Stream<Item = Result<O, SynapseError>> + Send + 'static,
+        S: Stream<Item = Result<O, SynapticError>> + Send + 'static,
     {
         Self {
             func: Box::new(move |input| Box::pin(func(input))),
@@ -43,7 +43,7 @@ impl<I: Send + 'static, O: Send + 'static> RunnableGenerator<I, O> {
 
 #[async_trait]
 impl<I: Send + 'static, O: Send + 'static> Runnable<I, Vec<O>> for RunnableGenerator<I, O> {
-    async fn invoke(&self, input: I, _config: &RunnableConfig) -> Result<Vec<O>, SynapseError> {
+    async fn invoke(&self, input: I, _config: &RunnableConfig) -> Result<Vec<O>, SynapticError> {
         let stream = (self.func)(input);
         futures::pin_mut!(stream);
         let mut results = Vec::new();

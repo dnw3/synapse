@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::{CallbackHandler, RunEvent, SynapseError};
+use synaptic_core::{CallbackHandler, RunEvent, SynapticError};
 
 pub struct TracingCallback;
 
@@ -17,7 +17,7 @@ impl Default for TracingCallback {
 
 #[async_trait]
 impl CallbackHandler for TracingCallback {
-    async fn on_event(&self, event: RunEvent) -> Result<(), SynapseError> {
+    async fn on_event(&self, event: RunEvent) -> Result<(), SynapticError> {
         match event {
             RunEvent::RunStarted { run_id, session_id } => {
                 tracing::info!(run_id = %run_id, session_id = %session_id, "run started");

@@ -56,3 +56,5 @@ assert_eq!(result, json!({"result": 7.0}));
 - [Custom Tools](custom-tool.md) -- implement the `Tool` trait for your own tools
 - [Tool Registry](registry.md) -- register, look up, and execute tools
 - [Tool Choice](tool-choice.md) -- control how the model selects tools with `ToolChoice`
+- [Tool Definition Extras](tool-extras.md) -- attach provider-specific parameters to tool definitions
+- [Runtime-Aware Tools](runtime-aware.md) -- tools that access graph state, store, and runtime context

@@ -30,10 +30,13 @@ pub struct ToolDefinition {
     pub name: String,
     pub description: String,
     pub parameters: Value,  // JSON Schema
+    pub extras: Option<HashMap<String, Value>>,  // provider-specific params
 }
 ```
 
 The `parameters` field is a JSON Schema that describes the tool's expected arguments. LLM providers use this schema to generate valid tool calls. The `ToolDefinition` is metadata about the tool -- it never executes anything.
+
+The optional `extras` field carries provider-specific parameters (e.g., Anthropic's `cache_control`). Provider adapters in `synaptic-models` forward these to the API when present.
 
 ## ToolCall and ToolChoice
 
@@ -171,3 +174,13 @@ let graph = create_react_agent_with_options(model, tools, options)?;
 | `interrupt_after` | Pause after named nodes (for human review of tool results) |
 
 Setting `interrupt_before: vec!["tools".into()]` creates a human-in-the-loop agent: the graph pauses before executing tools, allowing a human to inspect the proposed tool calls, modify them, or reject them entirely. The graph is then resumed via `update_state()`.
+
+## See Also
+
+- [Custom Tools](../how-to/tools/custom-tool.md) -- creating tools with the `#[tool]` macro
+- [Tool Registry](../how-to/tools/registry.md) -- managing tool collections
+- [Tool Choice](../how-to/tools/tool-choice.md) -- controlling model tool-calling behavior
+- [Tool Definition Extras](../how-to/tools/tool-extras.md) -- provider-specific parameters
+- [Runtime-Aware Tools](../how-to/tools/runtime-aware.md) -- tools with store/state access
+- [Tool Node](../how-to/graph/tool-node.md) -- ToolNode in graph workflows
+- [Graph](graph.md) -- the graph system that agents run within

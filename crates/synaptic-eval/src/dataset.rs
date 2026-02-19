@@ -1,4 +1,4 @@
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 use crate::evaluator::Evaluator;
 use crate::EvalReport;
@@ -44,9 +44,9 @@ pub async fn evaluate(
     evaluator: &dyn Evaluator,
     dataset: &Dataset,
     predictions: &[String],
-) -> Result<EvalReport, SynapseError> {
+) -> Result<EvalReport, SynapticError> {
     if predictions.len() != dataset.items.len() {
-        return Err(SynapseError::Validation(format!(
+        return Err(SynapticError::Validation(format!(
             "Number of predictions ({}) does not match dataset size ({})",
             predictions.len(),
             dataset.items.len()

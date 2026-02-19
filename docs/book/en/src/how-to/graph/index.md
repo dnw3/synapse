@@ -45,8 +45,69 @@ assert_eq!(result.messages.len(), 2);
 
 - [State & Nodes](state-nodes.md) -- define state types and processing nodes
 - [Edges](edges.md) -- connect nodes with fixed and conditional edges
-- [Graph Streaming](streaming.md) -- consume per-node events during execution
+- [Graph Streaming](streaming.md) -- consume per-node events during execution (single and multi-mode)
 - [Checkpointing](checkpointing.md) -- persist and resume graph state
 - [Human-in-the-Loop](human-in-the-loop.md) -- interrupt execution for human review
 - [Tool Node](tool-node.md) -- auto-dispatch tool calls from AI messages
 - [Visualization](visualization.md) -- render graphs as Mermaid, ASCII, DOT, or PNG
+
+## Advanced Features
+
+### Node Caching
+
+Use `add_node_with_cache()` to cache node results based on input state. Cached entries expire after the specified TTL:
+
+```rust
+use synaptic_graph::{StateGraph, CachePolicy, END};
+use std::time::Duration;
+
+let graph = StateGraph::new()
+    .add_node_with_cache(
+        "expensive",
+        expensive_node,
+        CachePolicy::new(Duration::from_secs(300)),
+    )
+    .add_edge("expensive", END)
+    .set_entry_point("expensive")
+    .compile()?;
+```
+
+When the same input state is seen again within the TTL, the cached result is returned without re-executing the node.
+
+### Deferred Nodes
+
+Use `add_deferred_node()` to create nodes that wait for ALL incoming paths to complete before executing. This is useful for fan-in aggregation after parallel fan-out with `Send`:
+
+```rust
+let graph = StateGraph::new()
+    .add_node("branch_a", node_a)
+    .add_node("branch_b", node_b)
+    .add_deferred_node("aggregate", aggregator_node)
+    .add_edge("branch_a", "aggregate")
+    .add_edge("branch_b", "aggregate")
+    .add_edge("aggregate", END)
+    .set_entry_point("branch_a")
+    .compile()?;
+```
+
+### Structured Output (response_format)
+
+When creating an agent with `create_agent()`, set `response_format` in `AgentOptions` to force the final response into a specific JSON schema:
+
+```rust
+use synaptic_graph::{create_agent, AgentOptions};
+
+let graph = create_agent(model, tools, AgentOptions {
+    response_format: Some(serde_json::json!({
+        "type": "object",
+        "properties": {
+            "answer": { "type": "string" },
+            "confidence": { "type": "number" }
+        },
+        "required": ["answer", "confidence"]
+    })),
+    ..Default::default()
+})?;
+```
+
+When the agent produces its final answer (no tool calls), it re-calls the model with structured output instructions matching the schema.

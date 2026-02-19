@@ -1,8 +1,8 @@
-use synaptic::core::SynapseError;
+use synaptic::core::SynapticError;
 use synaptic::eval::{evaluate, Dataset, Evaluator, ExactMatchEvaluator};
 
 #[tokio::main]
-async fn main() -> Result<(), SynapseError> {
+async fn main() -> Result<(), SynapticError> {
     // --- Single evaluation ---
     println!("=== Single Evaluation ===");
     let evaluator = ExactMatchEvaluator::new();

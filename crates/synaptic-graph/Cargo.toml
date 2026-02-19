@@ -17,9 +17,13 @@ reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-synaptic-core = { version = "0.1.0", path = "../synaptic-core" }
-synaptic-tools = { version = "0.1.0", path = "../synaptic-tools" }
+synaptic-core = { version = "0.2.0", path = "../synaptic-core" }
+synaptic-tools = { version = "0.2.0", path = "../synaptic-tools" }
+synaptic-middleware = { version = "0.2.0", path = "../synaptic-middleware" }
+synaptic-store = { version = "0.2.0", path = "../synaptic-store" }
+synaptic-macros = { workspace = true }
+tracing.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
-synaptic-models = { version = "0.1.0", path = "../synaptic-models" }
+synaptic-models = { version = "0.2.0", path = "../synaptic-models" }

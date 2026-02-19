@@ -1,31 +1,27 @@
-use std::sync::Arc;
-
-use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{Message, SynapseError, Tool, ToolCall};
-use synaptic_graph::{MessageState, Node, ToolNode};
+use synaptic_core::{Message, SynapticError, ToolCall};
+use synaptic_graph::{MessageState, Node, NodeOutput, ToolNode};
+use synaptic_macros::tool;
 use synaptic_tools::{SerialToolExecutor, ToolRegistry};
 
-struct EchoTool;
-
-#[async_trait]
-impl Tool for EchoTool {
-    fn name(&self) -> &'static str {
-        "echo"
-    }
-    fn description(&self) -> &'static str {
-        "echoes input"
-    }
-    async fn call(&self, args: Value) -> Result<Value, SynapseError> {
-        Ok(args)
-    }
+/// echoes input
+#[tool(name = "echo")]
+async fn echo(#[args] args: Value) -> Result<Value, SynapticError> {
+    Ok(args)
 }
 
 fn make_tool_node() -> ToolNode {
     let registry = ToolRegistry::new();
-    registry.register(Arc::new(EchoTool)).unwrap();
+    registry.register(echo()).unwrap();
     let executor = SerialToolExecutor::new(registry);
     ToolNode::new(executor)
+}
+
+fn extract_state(output: NodeOutput<MessageState>) -> MessageState {
+    match output {
+        NodeOutput::State(s) => s,
+        NodeOutput::Command(_) => panic!("expected NodeOutput::State"),
+    }
 }
 
 #[tokio::test]
@@ -41,13 +37,12 @@ async fn tool_node_executes_tool_calls() {
         }],
     )]);
 
-    let result = tool_node.process(state).await.unwrap();
+    let result = extract_state(tool_node.process(state).await.unwrap());
 
     // Should have original AI message + tool response
     assert_eq!(result.messages.len(), 2);
     assert!(result.messages[1].is_tool());
     assert_eq!(result.messages[1].tool_call_id(), Some("call-1"));
-    // The tool response content should be the JSON-serialized args
     assert!(result.messages[1].content().contains("hello"));
 }
 
@@ -57,9 +52,8 @@ async fn tool_node_no_tool_calls_passthrough() {
 
     let state = MessageState::with_messages(vec![Message::ai("just text, no tools")]);
 
-    let result = tool_node.process(state).await.unwrap();
+    let result = extract_state(tool_node.process(state).await.unwrap());
 
-    // State should be unchanged
     assert_eq!(result.messages.len(), 1);
     assert_eq!(result.messages[0].content(), "just text, no tools");
 }
@@ -84,9 +78,8 @@ async fn tool_node_executes_multiple_tool_calls() {
         ],
     )]);
 
-    let result = tool_node.process(state).await.unwrap();
+    let result = extract_state(tool_node.process(state).await.unwrap());
 
-    // Original AI message + 2 tool responses
     assert_eq!(result.messages.len(), 3);
     assert!(result.messages[1].is_tool());
     assert!(result.messages[2].is_tool());
@@ -108,11 +101,9 @@ async fn tool_node_unregistered_tool_error() {
     )]);
 
     let result = tool_node.process(state).await;
-    // ToolNode should handle missing tools — check behavior
-    // It may return error in the tool message or propagate error
     assert!(result.is_ok() || result.is_err());
-    if let Ok(state) = result {
-        // If it wraps error in tool message
+    if let Ok(output) = result {
+        let state = extract_state(output);
         assert!(state.messages.len() >= 2);
     }
 }
@@ -123,6 +114,5 @@ async fn tool_node_empty_messages() {
     let state = MessageState::with_messages(vec![]);
 
     let result = tool_node.process(state).await;
-    // ToolNode errors when there are no messages in state
     assert!(result.is_err());
 }

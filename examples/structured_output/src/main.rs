@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use serde::Deserialize;
-use synaptic::core::{ChatModel, ChatRequest, ChatResponse, Message, SynapseError};
+use synaptic::core::{ChatModel, ChatRequest, ChatResponse, Message, SynapticError};
 use synaptic::models::{ScriptedChatModel, StructuredOutputChatModel};
 
 #[derive(Debug, Deserialize)]
@@ -12,7 +12,7 @@ struct MovieReview {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), SynapseError> {
+async fn main() -> Result<(), SynapticError> {
     // The scripted model returns a JSON string that matches our schema
     let inner = ScriptedChatModel::new(vec![ChatResponse {
         message: Message::ai(

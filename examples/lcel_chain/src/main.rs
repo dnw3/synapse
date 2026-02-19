@@ -1,23 +1,57 @@
 use serde_json::{json, Value};
-use synaptic::core::{RunnableConfig, SynapseError};
+use synaptic::core::{RunnableConfig, SynapticError};
 use synaptic::runnables::{
     BoxRunnable, Runnable, RunnableLambda, RunnableParallel, RunnablePassthrough,
 };
+use synaptic_macros::chain;
+
+// ---------------------------------------------------------------------------
+// #[chain] functions used in RunnableParallel (Value output)
+// ---------------------------------------------------------------------------
+
+#[chain]
+async fn to_upper_value(s: String) -> Result<Value, SynapticError> {
+    Ok(Value::String(s.to_uppercase()))
+}
+
+#[chain]
+async fn to_lower_value(s: String) -> Result<Value, SynapticError> {
+    Ok(Value::String(s.to_lowercase()))
+}
+
+#[chain]
+async fn get_length(s: String) -> Result<Value, SynapticError> {
+    Ok(json!(s.len()))
+}
+
+// ---------------------------------------------------------------------------
+// Typed #[chain] functions (String output — no serialization overhead)
+// ---------------------------------------------------------------------------
+
+#[chain]
+async fn to_upper(s: String) -> Result<String, SynapticError> {
+    Ok(s.to_uppercase())
+}
+
+#[chain]
+async fn exclaim(s: String) -> Result<String, SynapticError> {
+    Ok(format!("{}!", s))
+}
 
 #[tokio::main]
-async fn main() -> Result<(), SynapseError> {
+async fn main() -> Result<(), SynapticError> {
     let config = RunnableConfig::default();
 
     // --- RunnableLambda ---
     println!("=== RunnableLambda ===");
     let upper = RunnableLambda::new(|s: String| async move { Ok(s.to_uppercase()) });
-    let result = upper.invoke("hello synapse".to_string(), &config).await?;
+    let result = upper.invoke("hello synaptic".to_string(), &config).await?;
     println!("upper: {result}");
 
     // --- Pipe operator ---
     println!("\n=== Pipe Operator ===");
-    let exclaim = RunnableLambda::new(|s: String| async move { Ok(format!("{s}!")) });
-    let chain = upper.boxed() | exclaim.boxed();
+    let exclaim_lambda = RunnableLambda::new(|s: String| async move { Ok(format!("{s}!")) });
+    let chain = upper.boxed() | exclaim_lambda.boxed();
     let result = chain.invoke("hello".to_string(), &config).await?;
     println!("upper | exclaim: {result}");
 
@@ -32,23 +66,20 @@ async fn main() -> Result<(), SynapseError> {
         .await?;
     println!("trim | upper | bracket: {result}");
 
-    // --- RunnableParallel ---
+    // --- Typed #[chain] pipe composition (String -> String) ---
+    println!("\n=== Typed #[chain] Pipe ===");
+    let typed_pipeline = to_upper() | exclaim();
+    let result = typed_pipeline
+        .invoke("hello".to_string(), &config)
+        .await?;
+    println!("to_upper | exclaim: {result}");
+
+    // --- RunnableParallel (using #[chain] macro functions with Value output) ---
     println!("\n=== RunnableParallel ===");
     let branches = RunnableParallel::new(vec![
-        (
-            "upper".to_string(),
-            RunnableLambda::new(|s: String| async move { Ok(Value::String(s.to_uppercase())) })
-                .boxed(),
-        ),
-        (
-            "lower".to_string(),
-            RunnableLambda::new(|s: String| async move { Ok(Value::String(s.to_lowercase())) })
-                .boxed(),
-        ),
-        (
-            "length".to_string(),
-            RunnableLambda::new(|s: String| async move { Ok(json!(s.len())) }).boxed(),
-        ),
+        ("upper".to_string(), to_upper_value()),
+        ("lower".to_string(), to_lower_value()),
+        ("length".to_string(), get_length()),
     ]);
     let result = branches.invoke("Hello World".to_string(), &config).await?;
     println!("parallel: {result}");

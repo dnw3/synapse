@@ -126,3 +126,11 @@ The `Runnable<I, O>` trait in `synaptic-runnables` is the universal composition 
 ## The Graph Abstraction
 
 The `StateGraph` builder in `synaptic-graph` provides a higher-level orchestration model for complex workflows. Where LCEL chains are linear pipelines (with branching), graphs support cycles, conditional routing, checkpointing, human-in-the-loop interrupts, and dynamic control flow via `GraphCommand`. See [Graph](./graph.md) for details.
+
+## See Also
+
+- [Installation](../installation.md) -- feature flags for enabling specific crates
+- [Runnables & LCEL](./runnables-lcel.md) -- the composition primitive
+- [Graph](./graph.md) -- state-machine orchestration
+- [Middleware](./middleware.md) -- cross-cutting agent concerns
+- [Key-Value Store](./store.md) -- persistent namespaced storage

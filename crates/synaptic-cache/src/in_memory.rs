@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use synaptic_core::{ChatResponse, SynapseError};
+use synaptic_core::{ChatResponse, SynapticError};
 use tokio::sync::RwLock;
 
 use crate::LlmCache;
@@ -44,7 +44,7 @@ impl Default for InMemoryCache {
 
 #[async_trait]
 impl LlmCache for InMemoryCache {
-    async fn get(&self, key: &str) -> Result<Option<ChatResponse>, SynapseError> {
+    async fn get(&self, key: &str) -> Result<Option<ChatResponse>, SynapticError> {
         let store = self.store.read().await;
         match store.get(key) {
             Some(entry) => {
@@ -59,7 +59,7 @@ impl LlmCache for InMemoryCache {
         }
     }
 
-    async fn put(&self, key: &str, response: &ChatResponse) -> Result<(), SynapseError> {
+    async fn put(&self, key: &str, response: &ChatResponse) -> Result<(), SynapticError> {
         let mut store = self.store.write().await;
         store.insert(
             key.to_string(),
@@ -71,7 +71,7 @@ impl LlmCache for InMemoryCache {
         Ok(())
     }
 
-    async fn clear(&self) -> Result<(), SynapseError> {
+    async fn clear(&self) -> Result<(), SynapticError> {
         let mut store = self.store.write().await;
         store.clear();
         Ok(())

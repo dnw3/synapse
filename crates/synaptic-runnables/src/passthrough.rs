@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::assign::RunnableAssign;
 use crate::runnable::BoxRunnable;
@@ -23,7 +23,7 @@ impl<T> Runnable<T, T> for RunnablePassthrough
 where
     T: Send + Sync + 'static,
 {
-    async fn invoke(&self, input: T, _config: &RunnableConfig) -> Result<T, SynapseError> {
+    async fn invoke(&self, input: T, _config: &RunnableConfig) -> Result<T, SynapticError> {
         Ok(input)
     }
 }

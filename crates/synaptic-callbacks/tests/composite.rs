@@ -35,8 +35,8 @@ struct FailingCallback;
 
 #[async_trait::async_trait]
 impl CallbackHandler for FailingCallback {
-    async fn on_event(&self, _event: RunEvent) -> Result<(), synaptic_core::SynapseError> {
-        Err(synaptic_core::SynapseError::Callback(
+    async fn on_event(&self, _event: RunEvent) -> Result<(), synaptic_core::SynapticError> {
+        Err(synaptic_core::SynapticError::Callback(
             "forced failure".to_string(),
         ))
     }

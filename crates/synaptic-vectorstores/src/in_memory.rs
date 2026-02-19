@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_embeddings::Embeddings;
 use synaptic_retrieval::{Document, Retriever};
 use tokio::sync::RwLock;
@@ -31,7 +31,7 @@ impl InMemoryVectorStore {
     pub async fn from_texts(
         texts: Vec<(&str, &str)>,
         embeddings: &dyn Embeddings,
-    ) -> Result<Self, SynapseError> {
+    ) -> Result<Self, SynapticError> {
         let store = Self::new();
         let docs = texts
             .into_iter()
@@ -45,7 +45,7 @@ impl InMemoryVectorStore {
     pub async fn from_documents(
         documents: Vec<Document>,
         embeddings: &dyn Embeddings,
-    ) -> Result<Self, SynapseError> {
+    ) -> Result<Self, SynapticError> {
         let store = Self::new();
         store.add_documents(documents, embeddings).await?;
         Ok(store)
@@ -66,7 +66,7 @@ impl InMemoryVectorStore {
         fetch_k: usize,
         lambda_mult: f32,
         embeddings: &dyn Embeddings,
-    ) -> Result<Vec<Document>, SynapseError> {
+    ) -> Result<Vec<Document>, SynapticError> {
         let query_vec = embeddings.embed_query(query).await?;
         let entries = self.entries.read().await;
 
@@ -139,7 +139,7 @@ impl VectorStore for InMemoryVectorStore {
         &self,
         docs: Vec<Document>,
         embeddings: &dyn Embeddings,
-    ) -> Result<Vec<String>, SynapseError> {
+    ) -> Result<Vec<String>, SynapticError> {
         let texts: Vec<&str> = docs.iter().map(|d| d.content.as_str()).collect();
         let vectors = embeddings.embed_documents(&texts).await?;
 
@@ -165,7 +165,7 @@ impl VectorStore for InMemoryVectorStore {
         query: &str,
         k: usize,
         embeddings: &dyn Embeddings,
-    ) -> Result<Vec<Document>, SynapseError> {
+    ) -> Result<Vec<Document>, SynapticError> {
         let results = self
             .similarity_search_with_score(query, k, embeddings)
             .await?;
@@ -177,7 +177,7 @@ impl VectorStore for InMemoryVectorStore {
         query: &str,
         k: usize,
         embeddings: &dyn Embeddings,
-    ) -> Result<Vec<(Document, f32)>, SynapseError> {
+    ) -> Result<Vec<(Document, f32)>, SynapticError> {
         let query_vec = embeddings.embed_query(query).await?;
         let entries = self.entries.read().await;
 
@@ -200,7 +200,7 @@ impl VectorStore for InMemoryVectorStore {
         &self,
         embedding: &[f32],
         k: usize,
-    ) -> Result<Vec<Document>, SynapseError> {
+    ) -> Result<Vec<Document>, SynapticError> {
         let entries = self.entries.read().await;
 
         let mut scored: Vec<(Document, f32)> = entries
@@ -217,7 +217,7 @@ impl VectorStore for InMemoryVectorStore {
         Ok(scored.into_iter().map(|(doc, _)| doc).collect())
     }
 
-    async fn delete(&self, ids: &[&str]) -> Result<(), SynapseError> {
+    async fn delete(&self, ids: &[&str]) -> Result<(), SynapticError> {
         let mut entries = self.entries.write().await;
         for id in ids {
             entries.remove(*id);
@@ -254,7 +254,7 @@ impl<S: VectorStore + 'static> VectorStoreRetriever<S> {
 
 #[async_trait]
 impl<S: VectorStore + 'static> Retriever for VectorStoreRetriever<S> {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError> {
         let k = if top_k > 0 { top_k } else { self.k };
 
         if let Some(threshold) = self.score_threshold {

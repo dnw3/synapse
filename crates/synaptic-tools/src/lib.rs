@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use synaptic_core::{SynapseError, Tool};
+use synaptic_core::{SynapticError, Tool};
 
 /// Thread-safe registry for tool definitions and implementations, backed by `Arc<RwLock<HashMap>>`.
 #[derive(Default, Clone)]
@@ -24,11 +24,11 @@ impl ToolRegistry {
         Self::default()
     }
 
-    pub fn register(&self, tool: Arc<dyn Tool>) -> Result<(), SynapseError> {
+    pub fn register(&self, tool: Arc<dyn Tool>) -> Result<(), SynapticError> {
         let mut guard = self
             .inner
             .write()
-            .map_err(|e| SynapseError::Tool(format!("registry lock poisoned: {e}")))?;
+            .map_err(|e| SynapticError::Tool(format!("registry lock poisoned: {e}")))?;
         guard.insert(tool.name().to_string(), tool);
         Ok(())
     }
@@ -54,11 +54,11 @@ impl SerialToolExecutor {
         &self,
         tool_name: &str,
         args: serde_json::Value,
-    ) -> Result<serde_json::Value, SynapseError> {
+    ) -> Result<serde_json::Value, SynapticError> {
         let tool = self
             .registry
             .get(tool_name)
-            .ok_or_else(|| SynapseError::ToolNotFound(tool_name.to_string()))?;
+            .ok_or_else(|| SynapticError::ToolNotFound(tool_name.to_string()))?;
         tool.call(args).await
     }
 }

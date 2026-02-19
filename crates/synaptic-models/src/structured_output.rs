@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
-use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapticError};
 
 /// Wraps a ChatModel to produce structured JSON output.
 ///
@@ -29,16 +29,16 @@ impl<T: DeserializeOwned + Send + Sync + 'static> StructuredOutputChatModel<T> {
     }
 
     /// Parse the model's text response as JSON into type T.
-    pub fn parse_response(&self, response: &ChatResponse) -> Result<T, SynapseError> {
+    pub fn parse_response(&self, response: &ChatResponse) -> Result<T, SynapticError> {
         let text = response.message.content();
         // Try to extract JSON from the response -- handle markdown code blocks
         let json_str = extract_json(text);
         serde_json::from_str::<T>(json_str)
-            .map_err(|e| SynapseError::Parsing(format!("failed to parse structured output: {e}")))
+            .map_err(|e| SynapticError::Parsing(format!("failed to parse structured output: {e}")))
     }
 
     /// Call the model and parse the response as T.
-    pub async fn generate(&self, request: ChatRequest) -> Result<(T, ChatResponse), SynapseError> {
+    pub async fn generate(&self, request: ChatRequest) -> Result<(T, ChatResponse), SynapticError> {
         let response = self.chat(request).await?;
         let parsed = self.parse_response(&response)?;
         Ok((parsed, response))
@@ -67,7 +67,7 @@ fn extract_json(text: &str) -> &str {
 
 #[async_trait]
 impl<T: DeserializeOwned + Send + Sync + 'static> ChatModel for StructuredOutputChatModel<T> {
-    async fn chat(&self, mut request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, mut request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         // Inject system message with schema instructions
         let instruction = format!(
             "You MUST respond with valid JSON matching this schema:\n{}\n\nDo not include any text outside the JSON object. Do not use markdown code blocks.",

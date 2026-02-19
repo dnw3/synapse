@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use synaptic_core::{MemoryStore, Message, RunnableConfig, SynapseError};
+use synaptic_core::{MemoryStore, Message, RunnableConfig, SynapticError};
 use synaptic_memory::{InMemoryStore, RunnableWithMessageHistory};
 use synaptic_runnables::Runnable;
 
@@ -13,7 +13,7 @@ impl Runnable<Vec<Message>, String> for EchoRunnable {
         &self,
         input: Vec<Message>,
         _config: &RunnableConfig,
-    ) -> Result<String, SynapseError> {
+    ) -> Result<String, SynapticError> {
         // Find the last human message and echo it
         let last_human = input
             .iter()

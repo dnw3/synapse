@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{Message, RunnableConfig, SynapseError};
+use synaptic_core::{Message, RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 use crate::PromptTemplate;
@@ -44,7 +44,7 @@ impl ChatPromptTemplate {
     }
 
     /// Render the templates against the given variables, producing a list of messages.
-    pub fn format(&self, values: &HashMap<String, Value>) -> Result<Vec<Message>, SynapseError> {
+    pub fn format(&self, values: &HashMap<String, Value>) -> Result<Vec<Message>, SynapticError> {
         let mut messages = Vec::new();
 
         // Build a string map for PromptTemplate rendering
@@ -64,28 +64,28 @@ impl ChatPromptTemplate {
                 MessageTemplate::System(pt) => {
                     let content = pt
                         .render(&string_values)
-                        .map_err(|e| SynapseError::Prompt(e.to_string()))?;
+                        .map_err(|e| SynapticError::Prompt(e.to_string()))?;
                     messages.push(Message::system(content));
                 }
                 MessageTemplate::Human(pt) => {
                     let content = pt
                         .render(&string_values)
-                        .map_err(|e| SynapseError::Prompt(e.to_string()))?;
+                        .map_err(|e| SynapticError::Prompt(e.to_string()))?;
                     messages.push(Message::human(content));
                 }
                 MessageTemplate::AI(pt) => {
                     let content = pt
                         .render(&string_values)
-                        .map_err(|e| SynapseError::Prompt(e.to_string()))?;
+                        .map_err(|e| SynapticError::Prompt(e.to_string()))?;
                     messages.push(Message::ai(content));
                 }
                 MessageTemplate::Placeholder(key) => {
                     let value = values.get(key).ok_or_else(|| {
-                        SynapseError::Prompt(format!("missing placeholder: {key}"))
+                        SynapticError::Prompt(format!("missing placeholder: {key}"))
                     })?;
                     let msgs: Vec<Message> =
                         serde_json::from_value(value.clone()).map_err(|e| {
-                            SynapseError::Prompt(format!(
+                            SynapticError::Prompt(format!(
                                 "invalid messages for placeholder '{key}': {e}"
                             ))
                         })?;
@@ -104,7 +104,7 @@ impl Runnable<HashMap<String, Value>, Vec<Message>> for ChatPromptTemplate {
         &self,
         input: HashMap<String, Value>,
         _config: &RunnableConfig,
-    ) -> Result<Vec<Message>, SynapseError> {
+    ) -> Result<Vec<Message>, SynapticError> {
         self.format(&input)
     }
 }

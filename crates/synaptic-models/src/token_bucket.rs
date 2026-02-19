@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapticError};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 
@@ -89,7 +89,7 @@ impl TokenBucketChatModel {
 
 #[async_trait]
 impl ChatModel for TokenBucketChatModel {
-    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         self.bucket.acquire().await;
         self.inner.chat(request).await
     }

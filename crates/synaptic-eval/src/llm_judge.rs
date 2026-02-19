@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{ChatModel, ChatRequest, Message, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, Message, SynapticError};
 
 use crate::evaluator::{EvalResult, Evaluator};
 
@@ -61,7 +61,7 @@ impl Evaluator for LLMJudgeEvaluator {
         prediction: &str,
         reference: &str,
         input: &str,
-    ) -> Result<EvalResult, SynapseError> {
+    ) -> Result<EvalResult, SynapticError> {
         let prompt = self
             .prompt_template
             .replace("{input}", input)
@@ -75,7 +75,7 @@ impl Evaluator for LLMJudgeEvaluator {
         match parse_score(response_text) {
             Some(score) => Ok(EvalResult::with_score(score)
                 .with_reasoning(format!("LLM judge score: {:.1}/10", score * 10.0))),
-            None => Err(SynapseError::Parsing(format!(
+            None => Err(SynapticError::Parsing(format!(
                 "Could not parse score from LLM response: {:?}",
                 response_text
             ))),

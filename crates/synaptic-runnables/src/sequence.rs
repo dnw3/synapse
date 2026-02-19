@@ -1,7 +1,7 @@
 use std::ops::BitOr;
 
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::runnable::{BoxRunnable, Runnable, RunnableOutputStream};
 
@@ -24,7 +24,7 @@ where
     M: Send + 'static,
     O: Send + 'static,
 {
-    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapseError> {
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapticError> {
         let mid = self.first.invoke(input, config).await?;
         self.second.invoke(mid, config).await
     }

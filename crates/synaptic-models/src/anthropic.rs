@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use synaptic_core::{
-    AIMessageChunk, ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapseError,
+    AIMessageChunk, ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapticError,
     TokenUsage, ToolCall, ToolChoice, ToolDefinition,
 };
 
@@ -184,7 +184,7 @@ fn tool_def_to_anthropic(def: &ToolDefinition) -> Value {
     })
 }
 
-fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapseError> {
+fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapticError> {
     check_error_status(resp)?;
 
     let content_blocks = resp.body["content"].as_array().cloned().unwrap_or_default();
@@ -223,20 +223,20 @@ fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapseError>
     Ok(ChatResponse { message, usage })
 }
 
-fn check_error_status(resp: &ProviderResponse) -> Result<(), SynapseError> {
+fn check_error_status(resp: &ProviderResponse) -> Result<(), SynapticError> {
     if resp.status == 429 {
         let msg = resp.body["error"]["message"]
             .as_str()
             .unwrap_or("rate limited")
             .to_string();
-        return Err(SynapseError::RateLimit(msg));
+        return Err(SynapticError::RateLimit(msg));
     }
     if resp.status >= 400 {
         let msg = resp.body["error"]["message"]
             .as_str()
             .unwrap_or("unknown API error")
             .to_string();
-        return Err(SynapseError::Model(format!(
+        return Err(SynapticError::Model(format!(
             "Anthropic API error ({}): {}",
             resp.status, msg
         )));
@@ -311,7 +311,7 @@ fn parse_stream_event(event_type: &str, data: &str) -> Option<AIMessageChunk> {
 
 #[async_trait]
 impl ChatModel for AnthropicChatModel {
-    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         let provider_req = self.build_request(&request, false);
         let resp = self.backend.send(provider_req).await?;
         parse_response(&resp)
@@ -348,7 +348,7 @@ impl ChatModel for AnthropicChatModel {
                         }
                     }
                     Err(e) => {
-                        yield Err(SynapseError::Model(format!("SSE parse error: {e}")));
+                        yield Err(SynapticError::Model(format!("SSE parse error: {e}")));
                         break;
                     }
                 }

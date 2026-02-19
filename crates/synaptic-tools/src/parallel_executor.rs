@@ -1,5 +1,5 @@
 use serde_json::Value;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 use crate::ToolRegistry;
 
@@ -21,7 +21,7 @@ impl ParallelToolExecutor {
     pub async fn execute_all(
         &self,
         calls: Vec<(String, Value)>,
-    ) -> Vec<Result<Value, SynapseError>> {
+    ) -> Vec<Result<Value, SynapticError>> {
         let futures: Vec<_> = calls
             .into_iter()
             .map(|(name, args)| {
@@ -29,7 +29,7 @@ impl ParallelToolExecutor {
                 async move {
                     let tool = registry
                         .get(&name)
-                        .ok_or(SynapseError::ToolNotFound(name))?;
+                        .ok_or(SynapticError::ToolNotFound(name))?;
                     tool.call(args).await
                 }
             })

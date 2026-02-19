@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapticError};
 
 use crate::LlmCache;
 
@@ -23,9 +23,9 @@ impl CachedChatModel {
 
 #[async_trait]
 impl ChatModel for CachedChatModel {
-    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         let key = serde_json::to_string(&request)
-            .map_err(|e| SynapseError::Cache(format!("failed to serialize request: {e}")))?;
+            .map_err(|e| SynapticError::Cache(format!("failed to serialize request: {e}")))?;
 
         // Check cache first
         if let Some(cached) = self.cache.get(&key).await? {

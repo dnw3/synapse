@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 /// Result of a single evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,5 +57,5 @@ pub trait Evaluator: Send + Sync {
         prediction: &str,
         reference: &str,
         input: &str,
-    ) -> Result<EvalResult, SynapseError>;
+    ) -> Result<EvalResult, SynapticError>;
 }

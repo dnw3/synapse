@@ -1,4 +1,4 @@
-use synaptic::core::{Message, RunnableConfig, SynapseError};
+use synaptic::core::{Message, RunnableConfig, SynapticError};
 
 #[test]
 fn facade_reexports_core_types() {
@@ -8,9 +8,9 @@ fn facade_reexports_core_types() {
     let config = RunnableConfig::default();
     assert!(config.tags.is_empty());
 
-    // Verify SynapseError is accessible through the facade.
-    let err = SynapseError::Validation("test".into());
-    assert!(matches!(err, SynapseError::Validation(_)));
+    // Verify SynapticError is accessible through the facade.
+    let err = SynapticError::Validation("test".into());
+    assert!(matches!(err, SynapticError::Validation(_)));
 }
 
 #[cfg(feature = "retrieval")]

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_embeddings::Embeddings;
 use synaptic_retrieval::{Document, Retriever};
 use tokio::sync::RwLock;
@@ -56,7 +56,7 @@ impl<S: VectorStore + 'static> MultiVectorRetriever<S> {
         &self,
         parent_docs: Vec<Document>,
         child_docs: Vec<Document>,
-    ) -> Result<(), SynapseError> {
+    ) -> Result<(), SynapticError> {
         // Store parents in the docstore
         {
             let mut store = self.docstore.write().await;
@@ -76,7 +76,7 @@ impl<S: VectorStore + 'static> MultiVectorRetriever<S> {
 
 #[async_trait]
 impl<S: VectorStore + 'static> Retriever for MultiVectorRetriever<S> {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError> {
         let k = if top_k > 0 { top_k } else { self.k };
 
         // Search vectorstore for child documents

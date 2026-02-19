@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::json;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_models::backend::{ProviderBackend, ProviderRequest};
 
 use crate::Embeddings;
@@ -60,9 +60,9 @@ impl OpenAiEmbeddings {
         }
     }
 
-    fn parse_response(&self, body: &serde_json::Value) -> Result<Vec<Vec<f32>>, SynapseError> {
+    fn parse_response(&self, body: &serde_json::Value) -> Result<Vec<Vec<f32>>, SynapticError> {
         let data = body.get("data").and_then(|d| d.as_array()).ok_or_else(|| {
-            SynapseError::Embedding("missing 'data' field in response".to_string())
+            SynapticError::Embedding("missing 'data' field in response".to_string())
         })?;
 
         let mut embeddings = Vec::with_capacity(data.len());
@@ -70,7 +70,7 @@ impl OpenAiEmbeddings {
             let embedding = item
                 .get("embedding")
                 .and_then(|e| e.as_array())
-                .ok_or_else(|| SynapseError::Embedding("missing 'embedding' field".to_string()))?
+                .ok_or_else(|| SynapticError::Embedding("missing 'embedding' field".to_string()))?
                 .iter()
                 .map(|v| v.as_f64().unwrap_or(0.0) as f32)
                 .collect();
@@ -83,13 +83,13 @@ impl OpenAiEmbeddings {
 
 #[async_trait]
 impl Embeddings for OpenAiEmbeddings {
-    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapseError> {
+    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapticError> {
         let input: Vec<String> = texts.iter().map(|s| s.to_string()).collect();
         let request = self.build_request(input);
         let response = self.backend.send(request).await?;
 
         if response.status != 200 {
-            return Err(SynapseError::Embedding(format!(
+            return Err(SynapticError::Embedding(format!(
                 "OpenAI API error ({}): {}",
                 response.status, response.body
             )));
@@ -98,10 +98,10 @@ impl Embeddings for OpenAiEmbeddings {
         self.parse_response(&response.body)
     }
 
-    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapseError> {
+    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapticError> {
         let mut results = self.embed_documents(&[text]).await?;
         results
             .pop()
-            .ok_or_else(|| SynapseError::Embedding("empty response".to_string()))
+            .ok_or_else(|| SynapticError::Embedding("empty response".to_string()))
     }
 }

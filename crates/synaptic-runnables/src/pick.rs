@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::Runnable;
 
@@ -17,11 +17,11 @@ impl RunnablePick {
 
 #[async_trait]
 impl Runnable<Value, Value> for RunnablePick {
-    async fn invoke(&self, input: Value, _config: &RunnableConfig) -> Result<Value, SynapseError> {
+    async fn invoke(&self, input: Value, _config: &RunnableConfig) -> Result<Value, SynapticError> {
         let obj = match &input {
             Value::Object(map) => map,
             other => {
-                return Err(SynapseError::Validation(format!(
+                return Err(SynapticError::Validation(format!(
                     "RunnablePick expects a JSON object, got {}",
                     other
                 )))

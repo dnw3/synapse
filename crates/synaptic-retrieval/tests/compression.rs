@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_embeddings::FakeEmbeddings;
 use synaptic_retrieval::{
     ContextualCompressionRetriever, Document, DocumentCompressor, EmbeddingsFilter,
@@ -8,7 +8,7 @@ use synaptic_retrieval::{
 };
 
 #[tokio::test]
-async fn embeddings_filter_keeps_similar_documents() -> Result<(), SynapseError> {
+async fn embeddings_filter_keeps_similar_documents() -> Result<(), SynapticError> {
     let embeddings = Arc::new(FakeEmbeddings::new(4));
 
     // Use a low threshold so that similar-enough docs pass
@@ -29,7 +29,7 @@ async fn embeddings_filter_keeps_similar_documents() -> Result<(), SynapseError>
 }
 
 #[tokio::test]
-async fn embeddings_filter_high_threshold_filters_dissimilar() -> Result<(), SynapseError> {
+async fn embeddings_filter_high_threshold_filters_dissimilar() -> Result<(), SynapticError> {
     let embeddings = Arc::new(FakeEmbeddings::new(4));
 
     // Use a very high threshold to filter most docs
@@ -57,7 +57,7 @@ async fn embeddings_filter_high_threshold_filters_dissimilar() -> Result<(), Syn
 }
 
 #[tokio::test]
-async fn embeddings_filter_empty_documents() -> Result<(), SynapseError> {
+async fn embeddings_filter_empty_documents() -> Result<(), SynapticError> {
     let embeddings = Arc::new(FakeEmbeddings::new(4));
     let filter = EmbeddingsFilter::new(embeddings, 0.5);
 
@@ -69,7 +69,7 @@ async fn embeddings_filter_empty_documents() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn embeddings_filter_identical_text_passes() -> Result<(), SynapseError> {
+async fn embeddings_filter_identical_text_passes() -> Result<(), SynapticError> {
     let embeddings = Arc::new(FakeEmbeddings::new(4));
 
     // Threshold of 0.99 - identical text should have similarity of 1.0
@@ -86,7 +86,7 @@ async fn embeddings_filter_identical_text_passes() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn contextual_compression_retriever_filters_base_results() -> Result<(), SynapseError> {
+async fn contextual_compression_retriever_filters_base_results() -> Result<(), SynapticError> {
     let base = Arc::new(InMemoryRetriever::new(vec![
         Document::new("1", "rust async programming language"),
         Document::new("2", "rust ownership borrowing"),
@@ -112,7 +112,7 @@ async fn contextual_compression_retriever_filters_base_results() -> Result<(), S
 }
 
 #[tokio::test]
-async fn contextual_compression_retriever_preserves_order() -> Result<(), SynapseError> {
+async fn contextual_compression_retriever_preserves_order() -> Result<(), SynapticError> {
     let base = Arc::new(InMemoryRetriever::new(vec![
         Document::new("1", "rust async tokio"),
         Document::new("2", "rust ownership"),
@@ -139,7 +139,7 @@ async fn contextual_compression_retriever_preserves_order() -> Result<(), Synaps
 }
 
 #[tokio::test]
-async fn embeddings_filter_with_default_threshold() -> Result<(), SynapseError> {
+async fn embeddings_filter_with_default_threshold() -> Result<(), SynapticError> {
     let embeddings = Arc::new(FakeEmbeddings::new(4));
     let filter = EmbeddingsFilter::with_default_threshold(embeddings);
 

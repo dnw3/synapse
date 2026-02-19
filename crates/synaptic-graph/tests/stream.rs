@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_graph::{CheckpointConfig, MemorySaver, Node, State, StateGraph, StreamMode, END};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -25,10 +25,13 @@ struct IncrementNode {
 
 #[async_trait]
 impl Node<CounterState> for IncrementNode {
-    async fn process(&self, mut state: CounterState) -> Result<CounterState, SynapseError> {
+    async fn process(
+        &self,
+        mut state: CounterState,
+    ) -> Result<synaptic_graph::NodeOutput<CounterState>, SynapticError> {
         state.counter += 1;
         state.visited.push(self.name.clone());
-        Ok(state)
+        Ok(state.into())
     }
 }
 

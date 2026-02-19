@@ -101,6 +101,7 @@ async fn cached_model_with_tools_in_request() {
             name: "test_tool".to_string(),
             description: "A test tool".to_string(),
             parameters: serde_json::json!({"type": "object"}),
+            extras: None,
         }]);
 
     let r1 = model.chat(request.clone()).await.unwrap();

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::Document;
 
 use crate::Loader;
@@ -24,9 +24,9 @@ impl WebBaseLoader {
 
 #[async_trait]
 impl Loader for WebBaseLoader {
-    async fn load(&self) -> Result<Vec<Document>, SynapseError> {
+    async fn load(&self) -> Result<Vec<Document>, SynapticError> {
         let response = reqwest::get(&self.url).await.map_err(|e| {
-            SynapseError::Loader(format!("HTTP request failed for {}: {e}", self.url))
+            SynapticError::Loader(format!("HTTP request failed for {}: {e}", self.url))
         })?;
 
         let content_type = response
@@ -39,7 +39,7 @@ impl Loader for WebBaseLoader {
         let text = response
             .text()
             .await
-            .map_err(|e| SynapseError::Loader(format!("failed to read response body: {e}")))?;
+            .map_err(|e| SynapticError::Loader(format!("failed to read response body: {e}")))?;
 
         let mut metadata = HashMap::new();
         metadata.insert("source".to_string(), Value::String(self.url.clone()));

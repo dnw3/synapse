@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 use crate::FormatInstructions;
@@ -15,13 +15,13 @@ impl FormatInstructions for BooleanOutputParser {
 
 #[async_trait]
 impl Runnable<String, bool> for BooleanOutputParser {
-    async fn invoke(&self, input: String, _config: &RunnableConfig) -> Result<bool, SynapseError> {
+    async fn invoke(&self, input: String, _config: &RunnableConfig) -> Result<bool, SynapticError> {
         let normalized = input.trim().to_lowercase();
 
         match normalized.as_str() {
             "true" | "yes" | "y" | "1" => Ok(true),
             "false" | "no" | "n" | "0" => Ok(false),
-            _ => Err(SynapseError::Parsing(format!(
+            _ => Err(SynapticError::Parsing(format!(
                 "cannot parse '{normalized}' as boolean; expected one of: true, false, yes, no, y, n, 1, 0"
             ))),
         }

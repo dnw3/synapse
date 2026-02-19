@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 use crate::FormatInstructions;
@@ -28,12 +28,12 @@ impl Runnable<String, String> for EnumOutputParser {
         &self,
         input: String,
         _config: &RunnableConfig,
-    ) -> Result<String, SynapseError> {
+    ) -> Result<String, SynapticError> {
         let trimmed = input.trim().to_string();
         if self.allowed.contains(&trimmed) {
             Ok(trimmed)
         } else {
-            Err(SynapseError::Parsing(format!(
+            Err(SynapticError::Parsing(format!(
                 "expected one of {:?}, got '{trimmed}'",
                 self.allowed
             )))

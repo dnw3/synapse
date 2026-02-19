@@ -99,4 +99,18 @@ Use `RunnableWithMessageHistory` when:
 - You want to avoid manually loading and saving messages around every invocation.
 - You need session-based conversation management with minimal boilerplate.
 
+## Clearing History
+
+Use `MemoryStore::clear()` on the underlying store to reset a session's history:
+
+```rust
+let store = Arc::new(InMemoryStore::new());
+let with_history = RunnableWithMessageHistory::new(chain.boxed(), store.clone());
+
+// After some conversation...
+store.clear("user-42").await?;
+
+// Next invocation starts fresh -- no previous messages are loaded
+```
+
 For lower-level control over when messages are loaded and saved, use the `MemoryStore` trait directly.

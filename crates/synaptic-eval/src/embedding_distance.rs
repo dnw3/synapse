@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_embeddings::Embeddings;
 
 use crate::evaluator::{EvalResult, Evaluator};
@@ -43,7 +43,7 @@ impl Evaluator for EmbeddingDistanceEvaluator {
         prediction: &str,
         reference: &str,
         _input: &str,
-    ) -> Result<EvalResult, SynapseError> {
+    ) -> Result<EvalResult, SynapticError> {
         let pred_embedding = self.embeddings.embed_query(prediction).await?;
         let ref_embedding = self.embeddings.embed_query(reference).await?;
 

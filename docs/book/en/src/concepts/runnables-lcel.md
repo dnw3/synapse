@@ -230,3 +230,13 @@ Synaptic's LCEL design means that many types across the framework implement `Run
 - **Graphs** produce state from state.
 
 This uniformity means you can compose any of these with `|` and get type-safe, streamable pipelines.
+
+## See Also
+
+- [Pipe Operator](../how-to/runnables/pipe-operator.md) -- composing runnables with `|`
+- [Streaming](../how-to/runnables/streaming.md) -- streaming through chains
+- [Parallel & Branch](../how-to/runnables/parallel-branch.md) -- concurrent execution and routing
+- [Assign & Pick](../how-to/runnables/assign-pick.md) -- JSON manipulation in chains
+- [Fallbacks](../how-to/runnables/fallbacks.md) -- error recovery
+- [Retry](../how-to/runnables/retry.md) -- automatic retry with backoff
+- [Streaming (concept)](streaming.md) -- streaming across all layers

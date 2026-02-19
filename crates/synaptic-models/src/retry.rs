@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapticError};
 
 #[derive(Debug, Clone)]
 pub struct RetryPolicy {
@@ -30,13 +30,13 @@ impl RetryChatModel {
     }
 }
 
-fn is_retryable(err: &SynapseError) -> bool {
-    matches!(err, SynapseError::RateLimit(_) | SynapseError::Timeout(_))
+fn is_retryable(err: &SynapticError) -> bool {
+    matches!(err, SynapticError::RateLimit(_) | SynapticError::Timeout(_))
 }
 
 #[async_trait]
 impl ChatModel for RetryChatModel {
-    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         let mut last_error = None;
         for attempt in 0..self.policy.max_attempts {
             match self.inner.chat(request.clone()).await {
@@ -49,7 +49,7 @@ impl ChatModel for RetryChatModel {
                 Err(e) => return Err(e),
             }
         }
-        Err(last_error.unwrap_or_else(|| SynapseError::Model("retry exhausted".to_string())))
+        Err(last_error.unwrap_or_else(|| SynapticError::Model("retry exhausted".to_string())))
     }
 
     fn stream_chat(&self, request: ChatRequest) -> ChatStream<'_> {

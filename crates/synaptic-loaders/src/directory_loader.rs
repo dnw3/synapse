@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::Document;
 
 use crate::Loader;
@@ -38,15 +38,15 @@ impl DirectoryLoader {
         self
     }
 
-    fn collect_files(&self, dir: &Path) -> Result<Vec<PathBuf>, SynapseError> {
+    fn collect_files(&self, dir: &Path) -> Result<Vec<PathBuf>, SynapticError> {
         let mut files = Vec::new();
         let entries = std::fs::read_dir(dir).map_err(|e| {
-            SynapseError::Loader(format!("cannot read directory {}: {e}", dir.display()))
+            SynapticError::Loader(format!("cannot read directory {}: {e}", dir.display()))
         })?;
 
         for entry in entries {
             let entry =
-                entry.map_err(|e| SynapseError::Loader(format!("directory entry error: {e}")))?;
+                entry.map_err(|e| SynapticError::Loader(format!("directory entry error: {e}")))?;
             let path = entry.path();
 
             if path.is_dir() && self.recursive {
@@ -75,13 +75,13 @@ impl DirectoryLoader {
 
 #[async_trait]
 impl Loader for DirectoryLoader {
-    async fn load(&self) -> Result<Vec<Document>, SynapseError> {
+    async fn load(&self) -> Result<Vec<Document>, SynapticError> {
         let files = self.collect_files(&self.path)?;
         let mut docs = Vec::new();
 
         for file_path in files {
             let content = std::fs::read_to_string(&file_path).map_err(|e| {
-                SynapseError::Loader(format!("cannot read {}: {e}", file_path.display()))
+                SynapticError::Loader(format!("cannot read {}: {e}", file_path.display()))
             })?;
 
             let id = file_path

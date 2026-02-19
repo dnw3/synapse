@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{ChatModel, ChatRequest, Message, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, Message, SynapticError};
 
 use crate::{Document, Retriever};
 
@@ -38,7 +38,7 @@ impl MultiQueryRetriever {
     }
 
     /// Generate alternative query variants using the ChatModel.
-    async fn generate_queries(&self, query: &str) -> Result<Vec<String>, SynapseError> {
+    async fn generate_queries(&self, query: &str) -> Result<Vec<String>, SynapticError> {
         let prompt = format!(
             "You are an AI language model assistant. Your task is to generate {} \
              different versions of the given user question to retrieve relevant documents \
@@ -65,7 +65,7 @@ impl MultiQueryRetriever {
 
 #[async_trait]
 impl Retriever for MultiQueryRetriever {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError> {
         // Generate alternative queries
         let alternative_queries = self.generate_queries(query).await?;
 

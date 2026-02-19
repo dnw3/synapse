@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_embeddings::{CacheBackedEmbeddings, Embeddings, FakeEmbeddings};
 
 /// A counting wrapper around FakeEmbeddings to verify cache behavior.
@@ -32,12 +32,12 @@ impl CountingEmbeddings {
 
 #[async_trait]
 impl Embeddings for CountingEmbeddings {
-    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapseError> {
+    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapticError> {
         self.embed_documents_calls.fetch_add(1, Ordering::SeqCst);
         self.inner.embed_documents(texts).await
     }
 
-    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapseError> {
+    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapticError> {
         self.embed_query_calls.fetch_add(1, Ordering::SeqCst);
         self.inner.embed_query(text).await
     }

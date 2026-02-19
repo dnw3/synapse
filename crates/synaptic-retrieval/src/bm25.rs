@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 use crate::{tokenize_to_vec, Document, Retriever};
 
@@ -105,7 +105,7 @@ impl BM25Retriever {
 
 #[async_trait]
 impl Retriever for BM25Retriever {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError> {
         let query_terms = tokenize_to_vec(query);
 
         if query_terms.is_empty() {

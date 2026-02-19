@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 use crate::evaluator::{EvalResult, Evaluator};
 
@@ -25,7 +25,7 @@ impl Evaluator for JsonValidityEvaluator {
         prediction: &str,
         _reference: &str,
         _input: &str,
-    ) -> Result<EvalResult, SynapseError> {
+    ) -> Result<EvalResult, SynapticError> {
         match serde_json::from_str::<serde_json::Value>(prediction) {
             Ok(_) => Ok(EvalResult::pass()),
             Err(e) => Ok(EvalResult::fail().with_reasoning(format!("Invalid JSON: {}", e))),

@@ -116,6 +116,7 @@ async fn chat_with_function_declarations() {
         name: "search".to_string(),
         description: "Search".to_string(),
         parameters: json!({"type": "object"}),
+        extras: None,
     }];
     let request = ChatRequest::new(vec![Message::human("hi")]).with_tools(tools);
     let response = model.chat(request).await.unwrap();

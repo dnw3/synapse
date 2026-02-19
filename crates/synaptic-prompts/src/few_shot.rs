@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use synaptic_core::{Message, RunnableConfig, SynapseError};
+use synaptic_core::{Message, RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 use crate::PromptTemplate;
@@ -37,13 +37,13 @@ impl FewShotChatMessagePromptTemplate {
         self
     }
 
-    pub fn format(&self, values: &HashMap<String, String>) -> Result<Vec<Message>, SynapseError> {
+    pub fn format(&self, values: &HashMap<String, String>) -> Result<Vec<Message>, SynapticError> {
         let mut messages = Vec::new();
 
         if let Some(prefix) = &self.prefix {
             let content = prefix
                 .render(values)
-                .map_err(|e| SynapseError::Prompt(e.to_string()))?;
+                .map_err(|e| SynapticError::Prompt(e.to_string()))?;
             messages.push(Message::system(content));
         }
 
@@ -55,7 +55,7 @@ impl FewShotChatMessagePromptTemplate {
         let content = self
             .suffix
             .render(values)
-            .map_err(|e| SynapseError::Prompt(e.to_string()))?;
+            .map_err(|e| SynapticError::Prompt(e.to_string()))?;
         messages.push(Message::human(content));
 
         Ok(messages)
@@ -68,7 +68,7 @@ impl Runnable<HashMap<String, String>, Vec<Message>> for FewShotChatMessagePromp
         &self,
         input: HashMap<String, String>,
         _config: &RunnableConfig,
-    ) -> Result<Vec<Message>, SynapseError> {
+    ) -> Result<Vec<Message>, SynapticError> {
         self.format(&input)
     }
 }

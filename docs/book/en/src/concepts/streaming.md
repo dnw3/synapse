@@ -168,3 +168,10 @@ while let Some(result) = stream.next().await {
 ```
 
 There is no automatic retry at the stream level. If a stream fails mid-way, the consumer decides how to handle it -- retry the entire call, return a partial result, or propagate the error. For automatic retries, wrap the model in a `RetryChatModel` before streaming, which retries the entire request on failure.
+
+## See Also
+
+- [Chat Model Streaming](../how-to/chat-models/streaming.md) -- model-level streaming how-to
+- [LCEL Streaming](../how-to/runnables/streaming.md) -- streaming through runnable chains
+- [Graph Streaming](../how-to/graph/streaming.md) -- graph-level streaming with StreamMode
+- [Runnables & LCEL](runnables-lcel.md) -- the composition system that streams run through

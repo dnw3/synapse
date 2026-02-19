@@ -2,12 +2,12 @@ use std::future::Future;
 use std::pin::Pin;
 
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::Runnable;
 
 type AsyncFn<I, O> =
-    dyn Fn(I) -> Pin<Box<dyn Future<Output = Result<O, SynapseError>> + Send>> + Send + Sync;
+    dyn Fn(I) -> Pin<Box<dyn Future<Output = Result<O, SynapticError>> + Send>> + Send + Sync;
 
 /// Wraps an async closure as a `Runnable`.
 ///
@@ -24,7 +24,7 @@ impl<I: Send + 'static, O: Send + 'static> RunnableLambda<I, O> {
     pub fn new<F, Fut>(func: F) -> Self
     where
         F: Fn(I) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<O, SynapseError>> + Send + 'static,
+        Fut: Future<Output = Result<O, SynapticError>> + Send + 'static,
     {
         Self {
             func: Box::new(move |input| Box::pin(func(input))),
@@ -34,7 +34,7 @@ impl<I: Send + 'static, O: Send + 'static> RunnableLambda<I, O> {
 
 #[async_trait]
 impl<I: Send + 'static, O: Send + 'static> Runnable<I, O> for RunnableLambda<I, O> {
-    async fn invoke(&self, input: I, _config: &RunnableConfig) -> Result<O, SynapseError> {
+    async fn invoke(&self, input: I, _config: &RunnableConfig) -> Result<O, SynapticError> {
         (self.func)(input).await
     }
 }

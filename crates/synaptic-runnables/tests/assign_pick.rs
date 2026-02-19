@@ -1,19 +1,36 @@
 use serde_json::json;
-use synaptic_core::RunnableConfig;
-use synaptic_runnables::{
-    Runnable, RunnableAssign, RunnableLambda, RunnablePassthrough, RunnablePick,
-};
+use synaptic_core::{RunnableConfig, SynapticError};
+use synaptic_macros::chain;
+use synaptic_runnables::{Runnable, RunnableAssign, RunnablePassthrough, RunnablePick};
+
+// ---------------------------------------------------------------------------
+// #[chain] functions replacing inline RunnableLambda closures
+// ---------------------------------------------------------------------------
+
+#[chain]
+async fn uppercase_name(input: serde_json::Value) -> Result<serde_json::Value, SynapticError> {
+    let name = input["name"].as_str().unwrap_or("").to_uppercase();
+    Ok(serde_json::Value::String(name))
+}
+
+#[chain]
+async fn always_true(_input: serde_json::Value) -> Result<serde_json::Value, SynapticError> {
+    Ok(serde_json::Value::Bool(true))
+}
+
+#[chain]
+async fn double_n(input: serde_json::Value) -> Result<serde_json::Value, SynapticError> {
+    let n = input["n"].as_i64().unwrap_or(0) * 2;
+    Ok(json!(n))
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[tokio::test]
 async fn assign_merges_computed_keys() {
-    let branches = vec![(
-        "upper".to_string(),
-        RunnableLambda::new(|v: serde_json::Value| async move {
-            let name = v["name"].as_str().unwrap_or("").to_uppercase();
-            Ok(serde_json::Value::String(name))
-        })
-        .boxed(),
-    )];
+    let branches = vec![("upper".to_string(), uppercase_name())];
     let assign = RunnableAssign::new(branches);
     let config = RunnableConfig::default();
     let input = json!({"name": "alice", "age": 30});
@@ -26,13 +43,7 @@ async fn assign_merges_computed_keys() {
 
 #[tokio::test]
 async fn assign_preserves_input_keys() {
-    let branches = vec![(
-        "computed".to_string(),
-        RunnableLambda::new(
-            |_v: serde_json::Value| async move { Ok(serde_json::Value::Bool(true)) },
-        )
-        .boxed(),
-    )];
+    let branches = vec![("computed".to_string(), always_true())];
     let assign = RunnableAssign::new(branches);
     let config = RunnableConfig::default();
     let input = json!({"x": 1, "y": 2});
@@ -45,14 +56,8 @@ async fn assign_preserves_input_keys() {
 
 #[tokio::test]
 async fn passthrough_assign_factory() {
-    let assign = RunnablePassthrough::assign(vec![(
-        "doubled".to_string(),
-        RunnableLambda::new(|v: serde_json::Value| async move {
-            let n = v["n"].as_i64().unwrap_or(0) * 2;
-            Ok(json!(n))
-        })
-        .boxed(),
-    )]);
+    let assign =
+        RunnablePassthrough::assign(vec![("doubled".to_string(), double_n())]);
     let config = RunnableConfig::default();
     let result = assign.invoke(json!({"n": 5}), &config).await.unwrap();
     assert_eq!(result["n"], 5);

@@ -2,11 +2,11 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use futures::Stream;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 /// A stream of results from a runnable.
 pub type RunnableOutputStream<'a, O> =
-    Pin<Box<dyn Stream<Item = Result<O, SynapseError>> + Send + 'a>>;
+    Pin<Box<dyn Stream<Item = Result<O, SynapticError>> + Send + 'a>>;
 
 /// The core composition trait. All LCEL components implement this.
 ///
@@ -20,10 +20,14 @@ where
     O: Send + 'static,
 {
     /// Execute this runnable on a single input.
-    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapseError>;
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapticError>;
 
     /// Execute this runnable on multiple inputs sequentially.
-    async fn batch(&self, inputs: Vec<I>, config: &RunnableConfig) -> Vec<Result<O, SynapseError>> {
+    async fn batch(
+        &self,
+        inputs: Vec<I>,
+        config: &RunnableConfig,
+    ) -> Vec<Result<O, SynapticError>> {
         let mut results = Vec::with_capacity(inputs.len());
         for input in inputs {
             results.push(self.invoke(input, config).await);
@@ -151,11 +155,15 @@ impl<I: Send + 'static, O: Send + 'static> BoxRunnable<Vec<I>, Vec<O>> {
 
 #[async_trait]
 impl<I: Send + 'static, O: Send + 'static> Runnable<I, O> for BoxRunnable<I, O> {
-    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapseError> {
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapticError> {
         self.inner.invoke(input, config).await
     }
 
-    async fn batch(&self, inputs: Vec<I>, config: &RunnableConfig) -> Vec<Result<O, SynapseError>> {
+    async fn batch(
+        &self,
+        inputs: Vec<I>,
+        config: &RunnableConfig,
+    ) -> Vec<Result<O, SynapticError>> {
         self.inner.batch(inputs, config).await
     }
 
@@ -175,7 +183,7 @@ struct RunnableBind<I: Send + 'static, O: Send + 'static> {
 
 #[async_trait]
 impl<I: Send + 'static, O: Send + 'static> Runnable<I, O> for RunnableBind<I, O> {
-    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapseError> {
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapticError> {
         let transformed = (self.config_transform)(config.clone());
         self.inner.invoke(input, &transformed).await
     }
@@ -204,7 +212,7 @@ struct RunnableWithListeners<I: Send + 'static, O: Send + 'static> {
 
 #[async_trait]
 impl<I: Send + 'static, O: Send + 'static> Runnable<I, O> for RunnableWithListeners<I, O> {
-    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapseError> {
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapticError> {
         (self.on_start)(config);
         let result = self.inner.invoke(input, config).await;
         (self.on_end)(config);

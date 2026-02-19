@@ -1,16 +1,16 @@
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 #[test]
 fn new_error_variants_exist() {
     let errors = vec![
-        SynapseError::Embedding("test".into()),
-        SynapseError::VectorStore("test".into()),
-        SynapseError::Retriever("test".into()),
-        SynapseError::Loader("test".into()),
-        SynapseError::Splitter("test".into()),
-        SynapseError::Graph("test".into()),
-        SynapseError::Cache("test".into()),
-        SynapseError::Config("test".into()),
+        SynapticError::Embedding("test".into()),
+        SynapticError::VectorStore("test".into()),
+        SynapticError::Retriever("test".into()),
+        SynapticError::Loader("test".into()),
+        SynapticError::Splitter("test".into()),
+        SynapticError::Graph("test".into()),
+        SynapticError::Cache("test".into()),
+        SynapticError::Config("test".into()),
     ];
     for err in &errors {
         assert!(!err.to_string().is_empty());

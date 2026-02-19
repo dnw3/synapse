@@ -1,5 +1,5 @@
 use serde_json::{json, Value};
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::{Runnable, RunnableLambda, RunnableParallel};
 
 #[tokio::test]
@@ -34,7 +34,7 @@ async fn parallel_propagates_error() {
         (
             "fail".to_string(),
             RunnableLambda::new(|_s: String| async move {
-                Err::<Value, _>(SynapseError::Validation("branch failed".to_string()))
+                Err::<Value, _>(SynapticError::Validation("branch failed".to_string()))
             })
             .boxed(),
         ),

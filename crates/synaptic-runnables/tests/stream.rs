@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::{
     BoxRunnable, Runnable, RunnableLambda, RunnableOutputStream, RunnableWithFallbacks,
 };
@@ -13,7 +13,7 @@ impl Runnable<String, String> for MultiChunkRunnable {
         &self,
         input: String,
         _config: &RunnableConfig,
-    ) -> Result<String, SynapseError> {
+    ) -> Result<String, SynapticError> {
         Ok(input)
     }
 
@@ -81,7 +81,7 @@ async fn stream_sequence_delegates_to_last() {
 #[tokio::test]
 async fn stream_with_error() {
     let failing = RunnableLambda::new(|_s: String| async move {
-        Err::<String, _>(SynapseError::Validation("bad".to_string()))
+        Err::<String, _>(SynapticError::Validation("bad".to_string()))
     });
     let config = RunnableConfig::default();
     let items: Vec<_> = failing
@@ -109,7 +109,7 @@ async fn stream_boxed_delegates() {
 #[tokio::test]
 async fn stream_fallback_uses_fallback_on_error() {
     let failing = RunnableLambda::new(|_s: String| async move {
-        Err::<String, _>(SynapseError::Validation("primary failed".to_string()))
+        Err::<String, _>(SynapticError::Validation("primary failed".to_string()))
     });
     let ok = RunnableLambda::new(|s: String| async move { Ok(s.to_uppercase()) });
     let with_fallback = RunnableWithFallbacks::new(failing.boxed(), vec![ok.boxed()]);

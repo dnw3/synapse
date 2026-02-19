@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::json;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_models::backend::{ProviderBackend, ProviderRequest};
 
 use crate::Embeddings;
@@ -39,7 +39,7 @@ impl OllamaEmbeddings {
 
 #[async_trait]
 impl Embeddings for OllamaEmbeddings {
-    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapseError> {
+    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapticError> {
         let mut all_embeddings = Vec::with_capacity(texts.len());
         for text in texts {
             let embedding = self.embed_query(text).await?;
@@ -48,7 +48,7 @@ impl Embeddings for OllamaEmbeddings {
         Ok(all_embeddings)
     }
 
-    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapseError> {
+    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapticError> {
         let request = ProviderRequest {
             url: format!("{}/api/embed", self.config.base_url),
             headers: vec![("Content-Type".to_string(), "application/json".to_string())],
@@ -61,7 +61,7 @@ impl Embeddings for OllamaEmbeddings {
         let response = self.backend.send(request).await?;
 
         if response.status != 200 {
-            return Err(SynapseError::Embedding(format!(
+            return Err(SynapticError::Embedding(format!(
                 "Ollama API error ({}): {}",
                 response.status, response.body
             )));
@@ -73,7 +73,7 @@ impl Embeddings for OllamaEmbeddings {
             .and_then(|e| e.as_array())
             .and_then(|arr| arr.first())
             .and_then(|e| e.as_array())
-            .ok_or_else(|| SynapseError::Embedding("missing 'embeddings' field".to_string()))?;
+            .ok_or_else(|| SynapticError::Embedding("missing 'embeddings' field".to_string()))?;
 
         Ok(embeddings
             .iter()

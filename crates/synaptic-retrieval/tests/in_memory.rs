@@ -1,8 +1,8 @@
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::{Document, InMemoryRetriever, Retriever};
 
 #[tokio::test]
-async fn retrieves_best_match() -> Result<(), SynapseError> {
+async fn retrieves_best_match() -> Result<(), SynapticError> {
     let retriever = InMemoryRetriever::new(vec![
         Document::new("1", "rust async tokio"),
         Document::new("2", "python notebooks"),
@@ -15,7 +15,7 @@ async fn retrieves_best_match() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn retrieves_multiple_matches() -> Result<(), SynapseError> {
+async fn retrieves_multiple_matches() -> Result<(), SynapticError> {
     let retriever = InMemoryRetriever::new(vec![
         Document::new("1", "rust programming language"),
         Document::new("2", "rust async runtime"),
@@ -31,7 +31,7 @@ async fn retrieves_multiple_matches() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn returns_empty_for_no_match() -> Result<(), SynapseError> {
+async fn returns_empty_for_no_match() -> Result<(), SynapticError> {
     let retriever = InMemoryRetriever::new(vec![Document::new("1", "rust programming")]);
 
     // InMemoryRetriever returns all docs, but top_k limits
@@ -41,7 +41,7 @@ async fn returns_empty_for_no_match() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn top_k_limits_results() -> Result<(), SynapseError> {
+async fn top_k_limits_results() -> Result<(), SynapticError> {
     let retriever = InMemoryRetriever::new(vec![
         Document::new("1", "document one"),
         Document::new("2", "document two"),
@@ -55,7 +55,7 @@ async fn top_k_limits_results() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn metadata_preserved() -> Result<(), SynapseError> {
+async fn metadata_preserved() -> Result<(), SynapticError> {
     use serde_json::json;
     use std::collections::HashMap;
 

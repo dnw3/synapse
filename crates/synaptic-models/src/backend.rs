@@ -3,7 +3,7 @@ use std::{collections::VecDeque, pin::Pin, sync::Arc};
 use async_trait::async_trait;
 use futures::Stream;
 use serde_json::Value;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -19,12 +19,12 @@ pub struct ProviderResponse {
     pub body: Value,
 }
 
-pub type ByteStream = Pin<Box<dyn Stream<Item = Result<bytes::Bytes, SynapseError>> + Send>>;
+pub type ByteStream = Pin<Box<dyn Stream<Item = Result<bytes::Bytes, SynapticError>> + Send>>;
 
 #[async_trait]
 pub trait ProviderBackend: Send + Sync {
-    async fn send(&self, request: ProviderRequest) -> Result<ProviderResponse, SynapseError>;
-    async fn send_stream(&self, request: ProviderRequest) -> Result<ByteStream, SynapseError>;
+    async fn send(&self, request: ProviderRequest) -> Result<ProviderResponse, SynapticError>;
+    async fn send_stream(&self, request: ProviderRequest) -> Result<ByteStream, SynapticError>;
 }
 
 /// Production backend using reqwest.
@@ -48,7 +48,7 @@ impl Default for HttpBackend {
 
 #[async_trait]
 impl ProviderBackend for HttpBackend {
-    async fn send(&self, request: ProviderRequest) -> Result<ProviderResponse, SynapseError> {
+    async fn send(&self, request: ProviderRequest) -> Result<ProviderResponse, SynapticError> {
         let mut builder = self.client.post(&request.url);
         for (key, value) in &request.headers {
             builder = builder.header(key, value);
@@ -58,18 +58,18 @@ impl ProviderBackend for HttpBackend {
         let response = builder
             .send()
             .await
-            .map_err(|e| SynapseError::Model(format!("HTTP request failed: {e}")))?;
+            .map_err(|e| SynapticError::Model(format!("HTTP request failed: {e}")))?;
 
         let status = response.status().as_u16();
         let body: Value = response
             .json()
             .await
-            .map_err(|e| SynapseError::Parsing(format!("failed to parse response JSON: {e}")))?;
+            .map_err(|e| SynapticError::Parsing(format!("failed to parse response JSON: {e}")))?;
 
         Ok(ProviderResponse { status, body })
     }
 
-    async fn send_stream(&self, request: ProviderRequest) -> Result<ByteStream, SynapseError> {
+    async fn send_stream(&self, request: ProviderRequest) -> Result<ByteStream, SynapticError> {
         use futures::StreamExt;
 
         let mut builder = self.client.post(&request.url);
@@ -81,11 +81,11 @@ impl ProviderBackend for HttpBackend {
         let response = builder
             .send()
             .await
-            .map_err(|e| SynapseError::Model(format!("HTTP stream request failed: {e}")))?;
+            .map_err(|e| SynapticError::Model(format!("HTTP stream request failed: {e}")))?;
 
         let stream = response
             .bytes_stream()
-            .map(|result| result.map_err(|e| SynapseError::Model(format!("stream error: {e}"))));
+            .map(|result| result.map_err(|e| SynapticError::Model(format!("stream error: {e}"))));
 
         Ok(Box::pin(stream))
     }
@@ -93,7 +93,7 @@ impl ProviderBackend for HttpBackend {
 
 /// Test backend with queued responses and stream chunks.
 pub struct FakeBackend {
-    responses: Arc<Mutex<VecDeque<Result<ProviderResponse, SynapseError>>>>,
+    responses: Arc<Mutex<VecDeque<Result<ProviderResponse, SynapticError>>>>,
     stream_chunks: Arc<Mutex<VecDeque<Vec<bytes::Bytes>>>>,
 }
 
@@ -113,7 +113,7 @@ impl FakeBackend {
         self
     }
 
-    pub fn push_error(&self, error: SynapseError) -> &Self {
+    pub fn push_error(&self, error: SynapticError) -> &Self {
         self.responses
             .try_lock()
             .expect("not concurrent during setup")
@@ -138,14 +138,14 @@ impl Default for FakeBackend {
 
 #[async_trait]
 impl ProviderBackend for FakeBackend {
-    async fn send(&self, _request: ProviderRequest) -> Result<ProviderResponse, SynapseError> {
+    async fn send(&self, _request: ProviderRequest) -> Result<ProviderResponse, SynapticError> {
         let mut responses = self.responses.lock().await;
         responses
             .pop_front()
-            .unwrap_or_else(|| Err(SynapseError::Model("FakeBackend exhausted".to_string())))
+            .unwrap_or_else(|| Err(SynapticError::Model("FakeBackend exhausted".to_string())))
     }
 
-    async fn send_stream(&self, _request: ProviderRequest) -> Result<ByteStream, SynapseError> {
+    async fn send_stream(&self, _request: ProviderRequest) -> Result<ByteStream, SynapticError> {
         let mut stream_chunks = self.stream_chunks.lock().await;
         let chunks = stream_chunks.pop_front().unwrap_or_default();
 

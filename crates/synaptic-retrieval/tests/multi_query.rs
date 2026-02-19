@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use synaptic_core::{ChatResponse, Message, SynapseError};
+use synaptic_core::{ChatResponse, Message, SynapticError};
 use synaptic_models::ScriptedChatModel;
 use synaptic_retrieval::{Document, InMemoryRetriever, MultiQueryRetriever, Retriever};
 
 #[tokio::test]
-async fn multi_query_deduplicates_results() -> Result<(), SynapseError> {
+async fn multi_query_deduplicates_results() -> Result<(), SynapticError> {
     // Base retriever with documents
     let base = Arc::new(InMemoryRetriever::new(vec![
         Document::new("1", "rust async tokio runtime"),
@@ -36,7 +36,7 @@ async fn multi_query_deduplicates_results() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn multi_query_includes_original_query() -> Result<(), SynapseError> {
+async fn multi_query_includes_original_query() -> Result<(), SynapticError> {
     // Base retriever where only the original query "tokio" finds doc 1
     let base = Arc::new(InMemoryRetriever::new(vec![
         Document::new("1", "tokio async runtime"),
@@ -60,7 +60,7 @@ async fn multi_query_includes_original_query() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn multi_query_with_num_queries() -> Result<(), SynapseError> {
+async fn multi_query_with_num_queries() -> Result<(), SynapticError> {
     let base = Arc::new(InMemoryRetriever::new(vec![Document::new(
         "1",
         "rust programming language",
@@ -82,7 +82,7 @@ async fn multi_query_with_num_queries() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn multi_query_respects_top_k() -> Result<(), SynapseError> {
+async fn multi_query_respects_top_k() -> Result<(), SynapticError> {
     let base = Arc::new(InMemoryRetriever::new(vec![
         Document::new("1", "rust async"),
         Document::new("2", "rust ownership"),

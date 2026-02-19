@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::runnable::{BoxRunnable, Runnable};
 
@@ -28,7 +28,11 @@ impl<I: Send + 'static, O: Send + 'static> RunnableEach<I, O> {
 
 #[async_trait]
 impl<I: Send + 'static, O: Send + 'static> Runnable<Vec<I>, Vec<O>> for RunnableEach<I, O> {
-    async fn invoke(&self, input: Vec<I>, config: &RunnableConfig) -> Result<Vec<O>, SynapseError> {
+    async fn invoke(
+        &self,
+        input: Vec<I>,
+        config: &RunnableConfig,
+    ) -> Result<Vec<O>, SynapticError> {
         let mut results = Vec::with_capacity(input.len());
         for item in input {
             results.push(self.inner.invoke(item, config).await?);

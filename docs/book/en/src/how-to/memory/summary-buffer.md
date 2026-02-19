@@ -71,4 +71,39 @@ This is the closest equivalent to LangChain's `ConversationSummaryBufferMemory` 
 - **Lossy for old messages** -- details from older messages may be lost in the summary, though recent messages are always exact.
 - **Heuristic token counting** -- the split point is based on estimated tokens, not exact counts.
 
+## Offline Testing with ScriptedChatModel
+
+Use `ScriptedChatModel` to test summarization without API keys:
+
+```rust,ignore
+use std::sync::Arc;
+use synaptic_core::{ChatResponse, MemoryStore, Message};
+use synaptic_models::ScriptedChatModel;
+use synaptic_memory::{ConversationSummaryBufferMemory, InMemoryStore};
+
+// Script the model to return a summary when called
+let summarizer = Arc::new(ScriptedChatModel::new(vec![
+    ChatResponse {
+        message: Message::ai("The user asked about Rust and ownership."),
+        usage: None,
+    },
+]));
+
+let store = Arc::new(InMemoryStore::new());
+let memory = ConversationSummaryBufferMemory::new(store, summarizer, 50);
+
+let session = "test";
+
+// Add enough messages to exceed the 50-token threshold
+memory.append(session, Message::human("What is Rust?")).await?;
+memory.append(session, Message::ai("Rust is a systems programming language focused on safety, speed, and concurrency.")).await?;
+memory.append(session, Message::human("How does ownership work?")).await?;
+memory.append(session, Message::ai("Ownership is a set of rules the compiler checks at compile time. Each value has a single owner.")).await?;
+
+// Load -- older messages are now summarized
+let history = memory.load(session).await?;
+// history[0] is a System message with the summary
+// Remaining messages are the most recent ones kept verbatim
+```
+
 For simpler alternatives, see [Buffer Memory](buffer.md) (keep everything), [Window Memory](window.md) (fixed message count), or [Token Buffer Memory](token-buffer.md) (token budget without summarization).

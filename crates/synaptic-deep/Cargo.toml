@@ -1,0 +1,31 @@
+[package]
+name = "synaptic-deep"
+version = "0.2.0"
+edition = "2021"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Deep agent harness for Synaptic — planning, filesystem, subagents, skills, memory"
+
+[dependencies]
+async-trait.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+tokio = { workspace = true, features = ["fs", "process"] }
+tracing.workspace = true
+regex.workspace = true
+synaptic-core.workspace = true
+synaptic-macros.workspace = true
+synaptic-middleware.workspace = true
+synaptic-graph = { version = "0.2.0", path = "../synaptic-graph" }
+synaptic-tools = { version = "0.2.0", path = "../synaptic-tools" }
+
+[features]
+filesystem = []
+
+[dev-dependencies]
+tokio.workspace = true
+synaptic-models = { version = "0.2.0", path = "../synaptic-models" }
+synaptic-store = { version = "0.2.0", path = "../synaptic-store" }

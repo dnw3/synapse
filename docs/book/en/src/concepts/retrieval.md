@@ -174,6 +174,10 @@ This enables natural-language queries that combine semantic search with precise 
 
 Stores small child chunks for embedding (which improves retrieval precision) but returns the larger parent documents they came from (which provides more context to the LLM). This addresses the tension between small chunks (better for matching) and large chunks (better for context).
 
+### MultiVectorRetriever
+
+Similar to `ParentDocumentRetriever`, but implemented at the vector store level. `MultiVectorRetriever` stores child document embeddings in a `VectorStore` and maintains a separate docstore mapping child IDs to parent documents. At query time, it searches for matching child chunks and then looks up their parent documents for return. This is available in `synaptic-vectorstores`.
+
 ## Connecting Retrieval to Generation
 
 Retrievers produce `Vec<Document>`. To use them in a RAG chain, you typically format the documents into a prompt and pass them to an LLM:
@@ -186,3 +190,14 @@ let prompt = format!("Context:\n{context}\n\nQuestion: What is Synaptic?");
 ```
 
 Using LCEL, this can be composed into a reusable chain with `RunnableParallel` (to fetch context and pass through the question simultaneously), `RunnableLambda` (to format the prompt), and a chat model.
+
+## See Also
+
+- [Document Loaders](../how-to/retrieval/loaders.md) -- loading data from files and the web
+- [Text Splitters](../how-to/retrieval/splitters.md) -- splitting documents into chunks
+- [Embeddings](../how-to/retrieval/embeddings.md) -- embedding models for vector search
+- [Vector Stores](../how-to/retrieval/vector-stores.md) -- storing and searching vectors
+- [BM25 Retriever](../how-to/retrieval/bm25.md) -- keyword-based retrieval
+- [Ensemble Retriever](../how-to/retrieval/ensemble.md) -- combining multiple retrievers
+- [Self-Query Retriever](../how-to/retrieval/self-query.md) -- LLM-powered metadata filtering
+- [Runnables & LCEL](runnables-lcel.md) -- composing retrieval into chains

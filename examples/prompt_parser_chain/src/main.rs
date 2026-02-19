@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use serde_json::Value;
-use synaptic::core::{ChatResponse, Message, RunnableConfig, SynapseError};
+use synaptic::core::{ChatResponse, Message, RunnableConfig, SynapticError};
 use synaptic::models::ScriptedChatModel;
 use synaptic::parsers::StrOutputParser;
 use synaptic::prompts::{ChatPromptTemplate, MessageTemplate, PromptTemplate};
 use synaptic::runnables::{Runnable, RunnableLambda};
 
 #[tokio::main]
-async fn main() -> Result<(), SynapseError> {
+async fn main() -> Result<(), SynapticError> {
     let config = RunnableConfig::default();
 
     // --- Build prompt template ---

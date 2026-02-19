@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 use crate::{FewShotExample, PromptTemplate};
@@ -57,7 +57,7 @@ impl FewShotPromptTemplate {
     /// 3. Join examples with separator
     /// 4. Append suffix rendered with provided values
     /// 5. Join all parts with separator
-    pub fn render(&self, values: &HashMap<String, String>) -> Result<String, SynapseError> {
+    pub fn render(&self, values: &HashMap<String, String>) -> Result<String, SynapticError> {
         let mut parts: Vec<String> = Vec::new();
 
         // 1. Prefix
@@ -75,7 +75,7 @@ impl FewShotPromptTemplate {
             let rendered = self
                 .example_prompt
                 .render(&example_values)
-                .map_err(|e| SynapseError::Prompt(e.to_string()))?;
+                .map_err(|e| SynapticError::Prompt(e.to_string()))?;
             example_strings.push(rendered);
         }
 
@@ -87,7 +87,7 @@ impl FewShotPromptTemplate {
         let suffix_rendered = self
             .suffix
             .render(values)
-            .map_err(|e| SynapseError::Prompt(e.to_string()))?;
+            .map_err(|e| SynapticError::Prompt(e.to_string()))?;
         parts.push(suffix_rendered);
 
         // 5. Join all parts
@@ -101,7 +101,7 @@ impl Runnable<HashMap<String, String>, String> for FewShotPromptTemplate {
         &self,
         input: HashMap<String, String>,
         _config: &RunnableConfig,
-    ) -> Result<String, SynapseError> {
+    ) -> Result<String, SynapticError> {
         self.render(&input)
     }
 }

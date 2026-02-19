@@ -9,7 +9,7 @@ pub use tracing_cb::TracingCallback;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{CallbackHandler, RunEvent, SynapseError};
+use synaptic_core::{CallbackHandler, RunEvent, SynapticError};
 use tokio::sync::RwLock;
 
 /// A callback handler that records all received events for later inspection, useful for testing.
@@ -30,7 +30,7 @@ impl RecordingCallback {
 
 #[async_trait]
 impl CallbackHandler for RecordingCallback {
-    async fn on_event(&self, event: RunEvent) -> Result<(), SynapseError> {
+    async fn on_event(&self, event: RunEvent) -> Result<(), SynapticError> {
         self.events.write().await.push(event);
         Ok(())
     }

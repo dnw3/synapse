@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use serde_json::json;
 use synaptic::core::{
-    ChatModel, ChatRequest, ChatResponse, MemoryStore, Message, RunnableConfig, SynapseError,
+    ChatModel, ChatRequest, ChatResponse, MemoryStore, Message, RunnableConfig, SynapticError,
 };
 use synaptic::memory::{
     ConversationBufferMemory, ConversationWindowMemory, InMemoryStore, RunnableWithMessageHistory,
@@ -11,7 +11,7 @@ use synaptic::models::ScriptedChatModel;
 use synaptic::runnables::{Runnable, RunnableLambda};
 
 #[tokio::main]
-async fn main() -> Result<(), SynapseError> {
+async fn main() -> Result<(), SynapticError> {
     // --- Buffer Memory (keeps all messages) ---
     println!("=== ConversationBufferMemory ===");
     let store = Arc::new(InMemoryStore::new());

@@ -1,4 +1,4 @@
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::{Runnable, RunnableLambda, RunnableWithFallbacks};
 
 #[tokio::test]
@@ -17,7 +17,7 @@ async fn primary_succeeds() {
 async fn fallback_used_on_primary_failure() {
     let runnable = RunnableWithFallbacks::new(
         RunnableLambda::new(|_s: String| async move {
-            Err::<String, _>(SynapseError::Model("primary failed".to_string()))
+            Err::<String, _>(SynapticError::Model("primary failed".to_string()))
         })
         .boxed(),
         vec![RunnableLambda::new(|s: String| async move { Ok(format!("fallback: {s}")) }).boxed()],
@@ -32,12 +32,12 @@ async fn fallback_used_on_primary_failure() {
 async fn second_fallback_used() {
     let runnable = RunnableWithFallbacks::new(
         RunnableLambda::new(|_s: String| async move {
-            Err::<String, _>(SynapseError::Model("primary failed".to_string()))
+            Err::<String, _>(SynapticError::Model("primary failed".to_string()))
         })
         .boxed(),
         vec![
             RunnableLambda::new(|_s: String| async move {
-                Err::<String, _>(SynapseError::Model("fallback1 failed".to_string()))
+                Err::<String, _>(SynapticError::Model("fallback1 failed".to_string()))
             })
             .boxed(),
             RunnableLambda::new(|s: String| async move { Ok(format!("fallback2: {s}")) }).boxed(),
@@ -53,11 +53,11 @@ async fn second_fallback_used() {
 async fn all_fail_returns_last_error() {
     let runnable = RunnableWithFallbacks::new(
         RunnableLambda::new(|_s: String| async move {
-            Err::<String, _>(SynapseError::Model("primary".to_string()))
+            Err::<String, _>(SynapticError::Model("primary".to_string()))
         })
         .boxed(),
         vec![RunnableLambda::new(|_s: String| async move {
-            Err::<String, _>(SynapseError::Model("fallback".to_string()))
+            Err::<String, _>(SynapticError::Model("fallback".to_string()))
         })
         .boxed()],
     );

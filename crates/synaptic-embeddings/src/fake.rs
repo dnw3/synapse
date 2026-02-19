@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 use crate::Embeddings;
 
@@ -23,14 +23,14 @@ impl Default for FakeEmbeddings {
 
 #[async_trait]
 impl Embeddings for FakeEmbeddings {
-    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapseError> {
+    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapticError> {
         Ok(texts
             .iter()
             .map(|t| text_to_vector(t, self.dimensions))
             .collect())
     }
 
-    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapseError> {
+    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapticError> {
         Ok(text_to_vector(text, self.dimensions))
     }
 }

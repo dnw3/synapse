@@ -14,9 +14,11 @@ async-stream.workspace = true
 futures.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-synaptic-core = { version = "0.1.0", path = "../synaptic-core" }
+synaptic-core = { version = "0.2.0", path = "../synaptic-core" }
 
 [dev-dependencies]
 tokio.workspace = true
 futures.workspace = true
 serde_json.workspace = true
+synaptic-macros = { workspace = true }
+synaptic-core = { version = "0.2.0", path = "../synaptic-core" }

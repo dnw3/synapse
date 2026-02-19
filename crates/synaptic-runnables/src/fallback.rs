@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::runnable::{BoxRunnable, Runnable, RunnableOutputStream};
 
@@ -18,7 +18,7 @@ impl<I: Send + Clone + 'static, O: Send + 'static> RunnableWithFallbacks<I, O> {
 
 #[async_trait]
 impl<I: Send + Clone + 'static, O: Send + 'static> Runnable<I, O> for RunnableWithFallbacks<I, O> {
-    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapseError> {
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapticError> {
         let mut last_error = match self.primary.invoke(input.clone(), config).await {
             Ok(output) => return Ok(output),
             Err(e) => e,

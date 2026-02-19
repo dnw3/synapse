@@ -1,11 +1,8 @@
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
-use synaptic_core::SynapseError;
-use synaptic_graph::{GraphCommand, GraphContext, Node, State, StateGraph, StreamMode, END};
-use tokio::sync::Mutex;
+use synaptic_core::SynapticError;
+use synaptic_graph::{Command, Node, NodeOutput, State, StateGraph, StreamMode, END};
 
 /// Test state with a counter and log of visited nodes.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -28,73 +25,82 @@ struct IncrementNode {
 
 #[async_trait]
 impl Node<CounterState> for IncrementNode {
-    async fn process(&self, mut state: CounterState) -> Result<CounterState, SynapseError> {
+    async fn process(
+        &self,
+        mut state: CounterState,
+    ) -> Result<NodeOutput<CounterState>, SynapticError> {
         state.counter += 1;
         state.visited.push(self.name.clone());
-        Ok(state)
+        Ok(state.into())
     }
 }
 
-/// A node that can optionally issue a command via a shared GraphContext.
-struct ContextAwareNode {
+/// A node that increments counter, records its name, and optionally issues a Command.
+/// When issuing a command, it packages the state delta (counter=1, visited=[name])
+/// into a `goto_with_update` or `end` command with an update.
+struct CommandNode {
     name: String,
-    shared_ctx: Arc<Mutex<Option<GraphContext>>>,
-    command: Option<GraphCommand>,
+    command: Option<CommandKind>,
+}
+
+/// The kind of command a CommandNode can issue.
+#[derive(Clone)]
+enum CommandKind {
+    Goto(String),
+    End,
 }
 
 #[async_trait]
-impl Node<CounterState> for ContextAwareNode {
-    async fn process(&self, mut state: CounterState) -> Result<CounterState, SynapseError> {
+impl Node<CounterState> for CommandNode {
+    async fn process(
+        &self,
+        mut state: CounterState,
+    ) -> Result<NodeOutput<CounterState>, SynapticError> {
         state.counter += 1;
         state.visited.push(self.name.clone());
-        if let Some(ref cmd) = self.command {
-            let ctx_guard = self.shared_ctx.lock().await;
-            if let Some(ref ctx) = *ctx_guard {
-                match cmd {
-                    GraphCommand::Goto(target) => ctx.goto(target).await,
-                    GraphCommand::End => ctx.end().await,
-                }
+        match &self.command {
+            Some(CommandKind::Goto(target)) => {
+                // Return a goto command; pass the full updated state as NodeOutput::State
+                // won't work since we need routing. Use goto_with_update with the delta.
+                let delta = CounterState {
+                    counter: 1,
+                    visited: vec![self.name.clone()],
+                };
+                Ok(NodeOutput::Command(Command::goto_with_update(
+                    target.clone(),
+                    delta,
+                )))
             }
+            Some(CommandKind::End) => {
+                let delta = CounterState {
+                    counter: 1,
+                    visited: vec![self.name.clone()],
+                };
+                Ok(NodeOutput::Command(Command::goto_with_update(END, delta)))
+            }
+            None => Ok(state.into()),
         }
-        Ok(state)
     }
 }
 
 // ---------------------------------------------------------------------------
-// GraphContext unit tests (public API only)
+// Command unit tests
 // ---------------------------------------------------------------------------
 
 #[test]
-fn graph_context_default() {
-    let ctx = GraphContext::default();
-    let _ = format!("{:?}", ctx); // Debug works
+fn command_debug() {
+    let goto: Command<CounterState> = Command::goto("target");
+    let end: Command<CounterState> = Command::end();
+    assert!(format!("{:?}", goto).contains("goto"));
+    assert!(format!("{:?}", end).contains("goto")); // end uses goto to __end__
 }
 
 #[test]
-fn graph_context_clone_shares_state() {
-    // Clone uses Arc internally, so clones share the same underlying state.
-    let ctx1 = GraphContext::new();
-    let ctx2 = ctx1.clone();
-    // Both are GraphContext instances sharing the same Arc.
-    let _ = (ctx1, ctx2);
-}
-
-#[test]
-fn graph_command_debug() {
-    let goto = GraphCommand::Goto("target".to_string());
-    let end = GraphCommand::End;
-    assert!(format!("{:?}", goto).contains("target"));
-    assert!(format!("{:?}", end).contains("End"));
-}
-
-#[test]
-fn graph_command_clone() {
-    let cmd = GraphCommand::Goto("node_a".to_string());
+fn command_clone() {
+    let cmd: Command<CounterState> = Command::goto("node_a");
     let cloned = cmd.clone();
-    match cloned {
-        GraphCommand::Goto(t) => assert_eq!(t, "node_a"),
-        _ => panic!("expected Goto"),
-    }
+    let dbg = format!("{:?}", cloned);
+    assert!(dbg.contains("goto"));
 }
 
 // ---------------------------------------------------------------------------
@@ -103,30 +109,25 @@ fn graph_command_clone() {
 
 #[tokio::test]
 async fn goto_command_skips_node() {
-    let shared_ctx: Arc<Mutex<Option<GraphContext>>> = Arc::new(Mutex::new(None));
-
     let graph = StateGraph::new()
         .add_node(
             "a",
-            ContextAwareNode {
+            CommandNode {
                 name: "a".into(),
-                shared_ctx: shared_ctx.clone(),
-                command: Some(GraphCommand::Goto("c".to_string())), // skip b
+                command: Some(CommandKind::Goto("c".to_string())), // skip b
             },
         )
         .add_node(
             "b",
-            ContextAwareNode {
+            CommandNode {
                 name: "b".into(),
-                shared_ctx: shared_ctx.clone(),
                 command: None,
             },
         )
         .add_node(
             "c",
-            ContextAwareNode {
+            CommandNode {
                 name: "c".into(),
-                shared_ctx: shared_ctx.clone(),
                 command: None,
             },
         )
@@ -137,13 +138,11 @@ async fn goto_command_skips_node() {
         .compile()
         .unwrap();
 
-    // Inject the graph's context into the shared slot
-    {
-        let mut guard = shared_ctx.lock().await;
-        *guard = Some(graph.context().clone());
-    }
-
-    let result = graph.invoke(CounterState::default()).await.unwrap();
+    let result = graph
+        .invoke(CounterState::default())
+        .await
+        .unwrap()
+        .into_state();
 
     // "a" executes, issues Goto("c"), "b" is skipped, "c" executes
     assert_eq!(result.visited, vec!["a", "c"]);
@@ -154,28 +153,29 @@ async fn goto_command_skips_node() {
 async fn goto_command_redirects_to_earlier_node() {
     // Test that Goto can redirect to a node that would normally come earlier,
     // creating a loop (but we rely on the counter to eventually end).
-    let shared_ctx: Arc<Mutex<Option<GraphContext>>> = Arc::new(Mutex::new(None));
 
     /// A node that issues Goto back to "a" until counter reaches threshold, then goes to END.
     struct LoopNode {
-        shared_ctx: Arc<Mutex<Option<GraphContext>>>,
         threshold: usize,
     }
 
     #[async_trait]
     impl Node<CounterState> for LoopNode {
-        async fn process(&self, mut state: CounterState) -> Result<CounterState, SynapseError> {
+        async fn process(
+            &self,
+            mut state: CounterState,
+        ) -> Result<NodeOutput<CounterState>, SynapticError> {
             state.counter += 1;
             state.visited.push("loop".to_string());
-            let ctx_guard = self.shared_ctx.lock().await;
-            if let Some(ref ctx) = *ctx_guard {
-                if state.counter < self.threshold {
-                    ctx.goto("a").await;
-                } else {
-                    ctx.end().await;
-                }
+            let delta = CounterState {
+                counter: 1,
+                visited: vec!["loop".to_string()],
+            };
+            if state.counter < self.threshold {
+                Ok(NodeOutput::Command(Command::goto_with_update("a", delta)))
+            } else {
+                Ok(NodeOutput::Command(Command::goto_with_update(END, delta)))
             }
-            Ok(state)
         }
     }
 
@@ -184,7 +184,6 @@ async fn goto_command_redirects_to_earlier_node() {
         .add_node(
             "loop",
             LoopNode {
-                shared_ctx: shared_ctx.clone(),
                 threshold: 4, // run until counter >= 4
             },
         )
@@ -194,12 +193,11 @@ async fn goto_command_redirects_to_earlier_node() {
         .compile()
         .unwrap();
 
-    {
-        let mut guard = shared_ctx.lock().await;
-        *guard = Some(graph.context().clone());
-    }
-
-    let result = graph.invoke(CounterState::default()).await.unwrap();
+    let result = graph
+        .invoke(CounterState::default())
+        .await
+        .unwrap()
+        .into_state();
 
     // a(1) -> loop(2, goto a) -> a(3) -> loop(4, end)
     assert_eq!(result.counter, 4);
@@ -212,22 +210,18 @@ async fn goto_command_redirects_to_earlier_node() {
 
 #[tokio::test]
 async fn end_command_stops_execution() {
-    let shared_ctx: Arc<Mutex<Option<GraphContext>>> = Arc::new(Mutex::new(None));
-
     let graph = StateGraph::new()
         .add_node(
             "a",
-            ContextAwareNode {
+            CommandNode {
                 name: "a".into(),
-                shared_ctx: shared_ctx.clone(),
-                command: Some(GraphCommand::End), // end immediately after a
+                command: Some(CommandKind::End), // end immediately after a
             },
         )
         .add_node(
             "b",
-            ContextAwareNode {
+            CommandNode {
                 name: "b".into(),
-                shared_ctx: shared_ctx.clone(),
                 command: None,
             },
         )
@@ -237,12 +231,11 @@ async fn end_command_stops_execution() {
         .compile()
         .unwrap();
 
-    {
-        let mut guard = shared_ctx.lock().await;
-        *guard = Some(graph.context().clone());
-    }
-
-    let result = graph.invoke(CounterState::default()).await.unwrap();
+    let result = graph
+        .invoke(CounterState::default())
+        .await
+        .unwrap()
+        .into_state();
 
     // "a" executes, End command stops execution, "b" never runs
     assert_eq!(result.visited, vec!["a"]);
@@ -266,7 +259,11 @@ async fn no_command_preserves_normal_routing() {
         .compile()
         .unwrap();
 
-    let result = graph.invoke(CounterState::default()).await.unwrap();
+    let result = graph
+        .invoke(CounterState::default())
+        .await
+        .unwrap()
+        .into_state();
     assert_eq!(result.visited, vec!["a", "b", "c"]);
     assert_eq!(result.counter, 3);
 }
@@ -277,30 +274,25 @@ async fn no_command_preserves_normal_routing() {
 
 #[tokio::test]
 async fn goto_command_works_in_stream_mode() {
-    let shared_ctx: Arc<Mutex<Option<GraphContext>>> = Arc::new(Mutex::new(None));
-
     let graph = StateGraph::new()
         .add_node(
             "a",
-            ContextAwareNode {
+            CommandNode {
                 name: "a".into(),
-                shared_ctx: shared_ctx.clone(),
-                command: Some(GraphCommand::Goto("c".to_string())),
+                command: Some(CommandKind::Goto("c".to_string())),
             },
         )
         .add_node(
             "b",
-            ContextAwareNode {
+            CommandNode {
                 name: "b".into(),
-                shared_ctx: shared_ctx.clone(),
                 command: None,
             },
         )
         .add_node(
             "c",
-            ContextAwareNode {
+            CommandNode {
                 name: "c".into(),
-                shared_ctx: shared_ctx.clone(),
                 command: None,
             },
         )
@@ -310,11 +302,6 @@ async fn goto_command_works_in_stream_mode() {
         .set_entry_point("a")
         .compile()
         .unwrap();
-
-    {
-        let mut guard = shared_ctx.lock().await;
-        *guard = Some(graph.context().clone());
-    }
 
     let events: Vec<_> = graph
         .stream(CounterState::default(), StreamMode::Values)
@@ -333,22 +320,18 @@ async fn goto_command_works_in_stream_mode() {
 
 #[tokio::test]
 async fn end_command_works_in_stream_mode() {
-    let shared_ctx: Arc<Mutex<Option<GraphContext>>> = Arc::new(Mutex::new(None));
-
     let graph = StateGraph::new()
         .add_node(
             "a",
-            ContextAwareNode {
+            CommandNode {
                 name: "a".into(),
-                shared_ctx: shared_ctx.clone(),
-                command: Some(GraphCommand::End),
+                command: Some(CommandKind::End),
             },
         )
         .add_node(
             "b",
-            ContextAwareNode {
+            CommandNode {
                 name: "b".into(),
-                shared_ctx: shared_ctx.clone(),
                 command: None,
             },
         )
@@ -357,11 +340,6 @@ async fn end_command_works_in_stream_mode() {
         .set_entry_point("a")
         .compile()
         .unwrap();
-
-    {
-        let mut guard = shared_ctx.lock().await;
-        *guard = Some(graph.context().clone());
-    }
 
     let events: Vec<_> = graph
         .stream(CounterState::default(), StreamMode::Values)

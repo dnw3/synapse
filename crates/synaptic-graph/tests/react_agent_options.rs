@@ -1,48 +1,35 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{ChatResponse, Message, SynapseError, Tool, ToolCall};
+use synaptic_core::{ChatResponse, Message, SynapticError, Tool, ToolCall};
 use synaptic_graph::{
     create_react_agent_with_options, CheckpointConfig, MemorySaver, MessageState, ReactAgentOptions,
 };
+use synaptic_macros::tool;
 use synaptic_models::ScriptedChatModel;
 
-struct EchoTool;
-
-#[async_trait]
-impl Tool for EchoTool {
-    fn name(&self) -> &'static str {
-        "echo"
-    }
-    fn description(&self) -> &'static str {
-        "echoes input"
-    }
-    async fn call(&self, args: Value) -> Result<Value, SynapseError> {
-        Ok(args)
-    }
+/// echoes input
+#[tool(name = "echo")]
+async fn echo(#[args] args: Value) -> Result<Value, SynapticError> {
+    Ok(args)
 }
 
 #[test]
 fn create_with_default_options_compiles() {
     let model = Arc::new(ScriptedChatModel::new(vec![]));
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let result = create_react_agent_with_options(model, tools, ReactAgentOptions::default());
     assert!(result.is_ok());
 }
 
 #[tokio::test]
 async fn agent_with_system_prompt() {
-    // The ScriptedChatModel returns the messages it receives, allowing us to verify
-    // the system prompt was prepended.
-    // For this test, we'll just verify the agent completes successfully and the
-    // system prompt doesn't break anything.
     let model = Arc::new(ScriptedChatModel::new(vec![ChatResponse {
         message: Message::ai("I am a helpful assistant."),
         usage: None,
     }]));
 
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let options = ReactAgentOptions {
         system_prompt: Some("You are a helpful assistant.".to_string()),
         ..Default::default()
@@ -50,9 +37,8 @@ async fn agent_with_system_prompt() {
     let graph = create_react_agent_with_options(model, tools, options).unwrap();
 
     let state = MessageState::with_messages(vec![Message::human("hi")]);
-    let result = graph.invoke(state).await.unwrap();
+    let result = graph.invoke(state).await.unwrap().into_state();
 
-    // Should have: human message + AI response
     assert_eq!(result.messages.len(), 2);
     assert!(result.messages[0].is_human());
     assert!(result.messages[1].is_ai());
@@ -66,12 +52,12 @@ async fn agent_without_system_prompt() {
         usage: None,
     }]));
 
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let options = ReactAgentOptions::default();
     let graph = create_react_agent_with_options(model, tools, options).unwrap();
 
     let state = MessageState::with_messages(vec![Message::human("hi")]);
-    let result = graph.invoke(state).await.unwrap();
+    let result = graph.invoke(state).await.unwrap().into_state();
 
     assert_eq!(result.messages.len(), 2);
     assert_eq!(result.messages[1].content(), "Hello!");
@@ -86,7 +72,7 @@ async fn agent_with_checkpointer() {
         usage: None,
     }]));
 
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let options = ReactAgentOptions {
         checkpointer: Some(saver.clone()),
         ..Default::default()
@@ -98,7 +84,8 @@ async fn agent_with_checkpointer() {
     let result = graph
         .invoke_with_config(state, Some(config.clone()))
         .await
-        .unwrap();
+        .unwrap()
+        .into_state();
 
     assert_eq!(result.messages.len(), 2);
 
@@ -113,7 +100,6 @@ async fn agent_with_checkpointer() {
 async fn agent_with_interrupt_before_tools() {
     let saver = Arc::new(MemorySaver::new());
 
-    // Model returns a tool call -> should trigger interrupt before "tools" node
     let model = Arc::new(ScriptedChatModel::new(vec![ChatResponse {
         message: Message::ai_with_tool_calls(
             "",
@@ -126,7 +112,7 @@ async fn agent_with_interrupt_before_tools() {
         usage: None,
     }]));
 
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let options = ReactAgentOptions {
         checkpointer: Some(saver.clone()),
         interrupt_before: vec!["tools".to_string()],
@@ -136,16 +122,13 @@ async fn agent_with_interrupt_before_tools() {
 
     let config = CheckpointConfig::new("interrupt-thread");
     let state = MessageState::with_messages(vec![Message::human("call echo")]);
-    let result = graph.invoke_with_config(state, Some(config.clone())).await;
+    let result = graph
+        .invoke_with_config(state, Some(config.clone()))
+        .await
+        .unwrap();
 
-    // Should fail with interrupt error
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert!(
-        err.to_string().contains("interrupted before node 'tools'"),
-        "got: {}",
-        err
-    );
+    // Should be interrupted
+    assert!(result.is_interrupted());
 
     // State should have been checkpointed with human + AI (tool call) messages
     let saved: MessageState = graph.get_state(&config).await.unwrap().unwrap();
@@ -164,7 +147,7 @@ async fn agent_with_interrupt_after_agent() {
         usage: None,
     }]));
 
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let options = ReactAgentOptions {
         checkpointer: Some(saver.clone()),
         interrupt_after: vec!["agent".to_string()],
@@ -174,21 +157,17 @@ async fn agent_with_interrupt_after_agent() {
 
     let config = CheckpointConfig::new("interrupt-after-thread");
     let state = MessageState::with_messages(vec![Message::human("hi")]);
-    let result = graph.invoke_with_config(state, Some(config.clone())).await;
+    let result = graph
+        .invoke_with_config(state, Some(config.clone()))
+        .await
+        .unwrap();
 
-    // Should fail with interrupt error
-    assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert!(
-        err.to_string().contains("interrupted after node 'agent'"),
-        "got: {}",
-        err
-    );
+    // Should be interrupted
+    assert!(result.is_interrupted());
 }
 
 #[tokio::test]
 async fn agent_with_tool_calls_and_system_prompt() {
-    // Full cycle: system prompt + tool call + tool execution + final response
     let model = Arc::new(ScriptedChatModel::new(vec![
         ChatResponse {
             message: Message::ai_with_tool_calls(
@@ -207,7 +186,7 @@ async fn agent_with_tool_calls_and_system_prompt() {
         },
     ]));
 
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(EchoTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![echo()];
     let options = ReactAgentOptions {
         system_prompt: Some("You are an echo bot.".to_string()),
         ..Default::default()
@@ -215,7 +194,7 @@ async fn agent_with_tool_calls_and_system_prompt() {
     let graph = create_react_agent_with_options(model, tools, options).unwrap();
 
     let state = MessageState::with_messages(vec![Message::human("echo test")]);
-    let result = graph.invoke(state).await.unwrap();
+    let result = graph.invoke(state).await.unwrap().into_state();
 
     // Should have: human, AI (tool call), tool result, AI (final)
     assert_eq!(result.messages.len(), 4);

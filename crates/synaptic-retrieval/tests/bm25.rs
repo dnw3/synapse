@@ -1,8 +1,8 @@
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::{BM25Retriever, Document, Retriever};
 
 #[tokio::test]
-async fn bm25_ranks_by_term_relevance() -> Result<(), SynapseError> {
+async fn bm25_ranks_by_term_relevance() -> Result<(), SynapticError> {
     let docs = vec![
         Document::new("1", "rust async runtime tokio"),
         Document::new("2", "python machine learning"),
@@ -21,7 +21,7 @@ async fn bm25_ranks_by_term_relevance() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn bm25_respects_top_k() -> Result<(), SynapseError> {
+async fn bm25_respects_top_k() -> Result<(), SynapticError> {
     let docs = vec![
         Document::new("1", "rust async runtime"),
         Document::new("2", "rust ownership"),
@@ -36,7 +36,7 @@ async fn bm25_respects_top_k() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn bm25_empty_query_returns_empty() -> Result<(), SynapseError> {
+async fn bm25_empty_query_returns_empty() -> Result<(), SynapticError> {
     let docs = vec![
         Document::new("1", "rust async runtime"),
         Document::new("2", "python machine learning"),
@@ -50,7 +50,7 @@ async fn bm25_empty_query_returns_empty() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn bm25_no_matching_terms() -> Result<(), SynapseError> {
+async fn bm25_no_matching_terms() -> Result<(), SynapticError> {
     let docs = vec![
         Document::new("1", "rust async runtime"),
         Document::new("2", "python machine learning"),
@@ -64,7 +64,7 @@ async fn bm25_no_matching_terms() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn bm25_with_params_custom_k1_b() -> Result<(), SynapseError> {
+async fn bm25_with_params_custom_k1_b() -> Result<(), SynapticError> {
     let docs = vec![
         Document::new("1", "rust rust rust async"),
         Document::new("2", "rust programming"),
@@ -81,7 +81,7 @@ async fn bm25_with_params_custom_k1_b() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn bm25_prefers_rare_terms() -> Result<(), SynapseError> {
+async fn bm25_prefers_rare_terms() -> Result<(), SynapticError> {
     // "tokio" appears in only doc 1, while "the" appears in all docs.
     // BM25 should rank doc 1 higher for query "tokio" due to higher IDF.
     let docs = vec![
@@ -99,7 +99,7 @@ async fn bm25_prefers_rare_terms() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn bm25_empty_corpus() -> Result<(), SynapseError> {
+async fn bm25_empty_corpus() -> Result<(), SynapticError> {
     let retriever = BM25Retriever::new(vec![]);
     let results = retriever.retrieve("anything", 10).await?;
 
@@ -108,7 +108,7 @@ async fn bm25_empty_corpus() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn bm25_multi_term_query_scores_combine() -> Result<(), SynapseError> {
+async fn bm25_multi_term_query_scores_combine() -> Result<(), SynapticError> {
     let docs = vec![
         Document::new("1", "rust async tokio runtime"),
         Document::new("2", "rust programming language"),

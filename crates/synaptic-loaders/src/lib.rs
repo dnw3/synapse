@@ -18,17 +18,19 @@ use std::pin::Pin;
 
 use async_trait::async_trait;
 use futures::Stream;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::Document;
 
 /// Trait for loading documents from various sources.
 #[async_trait]
 pub trait Loader: Send + Sync {
     /// Load all documents from this source.
-    async fn load(&self) -> Result<Vec<Document>, SynapseError>;
+    async fn load(&self) -> Result<Vec<Document>, SynapticError>;
 
     /// Stream documents lazily. Default implementation wraps load().
-    fn lazy_load(&self) -> Pin<Box<dyn Stream<Item = Result<Document, SynapseError>> + Send + '_>> {
+    fn lazy_load(
+        &self,
+    ) -> Pin<Box<dyn Stream<Item = Result<Document, SynapticError>> + Send + '_>> {
         Box::pin(async_stream::stream! {
             match self.load().await {
                 Ok(docs) => {

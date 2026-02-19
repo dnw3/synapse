@@ -1,0 +1,20 @@
+[package]
+name = "synaptic-middleware"
+description = "Middleware system for Synaptic agents: AgentMiddleware trait and built-in middlewares"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+synaptic-core = { version = "0.2.0", path = "../synaptic-core" }
+
+[dev-dependencies]
+tokio.workspace = true
+synaptic-macros = { workspace = true }

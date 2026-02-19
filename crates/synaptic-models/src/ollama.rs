@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use synaptic_core::{
-    AIMessageChunk, ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapseError,
+    AIMessageChunk, ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapticError,
     TokenUsage, ToolCall, ToolChoice, ToolDefinition,
 };
 
@@ -179,7 +179,7 @@ fn tool_def_to_ollama(def: &ToolDefinition) -> Value {
     })
 }
 
-fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapseError> {
+fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapticError> {
     check_error_status(resp)?;
 
     let message_val = &resp.body["message"];
@@ -197,13 +197,13 @@ fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapseError>
     Ok(ChatResponse { message, usage })
 }
 
-fn check_error_status(resp: &ProviderResponse) -> Result<(), SynapseError> {
+fn check_error_status(resp: &ProviderResponse) -> Result<(), SynapticError> {
     if resp.status >= 400 {
         let msg = resp.body["error"]
             .as_str()
             .unwrap_or("unknown Ollama error")
             .to_string();
-        return Err(SynapseError::Model(format!(
+        return Err(SynapticError::Model(format!(
             "Ollama API error ({}): {}",
             resp.status, msg
         )));
@@ -266,7 +266,7 @@ fn parse_ndjson_chunk(line: &str) -> Option<AIMessageChunk> {
 
 #[async_trait]
 impl ChatModel for OllamaChatModel {
-    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         let provider_req = self.build_request(&request, false);
         let resp = self.backend.send(provider_req).await?;
         parse_response(&resp)

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::Document;
 
 use crate::Loader;
@@ -39,9 +39,9 @@ impl JsonLoader {
 
 #[async_trait]
 impl Loader for JsonLoader {
-    async fn load(&self) -> Result<Vec<Document>, SynapseError> {
+    async fn load(&self) -> Result<Vec<Document>, SynapticError> {
         let value: Value = serde_json::from_str(&self.json)
-            .map_err(|e| SynapseError::Loader(format!("invalid JSON: {e}")))?;
+            .map_err(|e| SynapticError::Loader(format!("invalid JSON: {e}")))?;
 
         match value {
             Value::Array(arr) => {

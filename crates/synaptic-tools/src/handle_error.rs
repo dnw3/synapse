@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use synaptic_core::{SynapseError, Tool};
+use synaptic_core::{SynapticError, Tool};
 
 /// A tool wrapper that catches errors and returns them as string values
 /// instead of propagating them.
 pub struct HandleErrorTool {
     inner: Arc<dyn Tool>,
-    handler: Option<Box<dyn Fn(SynapseError) -> String + Send + Sync>>,
+    handler: Option<Box<dyn Fn(SynapticError) -> String + Send + Sync>>,
 }
 
 impl HandleErrorTool {
@@ -23,7 +23,7 @@ impl HandleErrorTool {
     /// Wrap a tool with a custom error handler function.
     pub fn with_handler(
         inner: Arc<dyn Tool>,
-        handler: impl Fn(SynapseError) -> String + Send + Sync + 'static,
+        handler: impl Fn(SynapticError) -> String + Send + Sync + 'static,
     ) -> Self {
         Self {
             inner,
@@ -42,7 +42,7 @@ impl Tool for HandleErrorTool {
         self.inner.description()
     }
 
-    async fn call(&self, args: Value) -> Result<Value, SynapseError> {
+    async fn call(&self, args: Value) -> Result<Value, SynapticError> {
         match self.inner.call(args).await {
             Ok(value) => Ok(value),
             Err(err) => {

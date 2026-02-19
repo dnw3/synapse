@@ -61,7 +61,39 @@ The `StreamMode` enum controls what the `state` field contains:
 | Mode | Behavior |
 |------|----------|
 | `StreamMode::Values` | Each event contains the **full accumulated state** after the node |
-| `StreamMode::Updates` | Each event contains the **post-node state** (useful for seeing per-node contributions) |
+| `StreamMode::Updates` | Each event contains the **pre-node state** (useful for computing per-node deltas) |
+| `StreamMode::Messages` | Same as Values — callers filter for AI messages in chat UIs |
+| `StreamMode::Debug` | Same as Values — intended for detailed debug information |
+| `StreamMode::Custom` | Events emitted via StreamWriter during node execution |
+
+## Multi-Mode Streaming
+
+You can request multiple stream modes simultaneously using `stream_modes()`. Each event is wrapped in a `MultiGraphEvent` tagged with its mode:
+
+```rust
+use synaptic_graph::{StreamMode, MultiGraphEvent};
+use futures::StreamExt;
+
+let mut stream = graph.stream_modes(
+    initial_state,
+    vec![StreamMode::Values, StreamMode::Updates],
+);
+
+while let Some(result) = stream.next().await {
+    let event: MultiGraphEvent<MessageState> = result?;
+    match event.mode {
+        StreamMode::Values => {
+            println!("Full state after '{}': {:?}", event.event.node, event.event.state);
+        }
+        StreamMode::Updates => {
+            println!("State before '{}': {:?}", event.event.node, event.event.state);
+        }
+        _ => {}
+    }
+}
+```
+
+For each node execution, one event per requested mode is emitted. With two modes and three nodes, you get six events total.
 
 ## Streaming with Checkpoints
 

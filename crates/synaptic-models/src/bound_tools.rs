@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use synaptic_core::{
-    ChatModel, ChatRequest, ChatResponse, ChatStream, SynapseError, ToolDefinition,
+    ChatModel, ChatRequest, ChatResponse, ChatStream, SynapticError, ToolDefinition,
 };
 
 /// A `ChatModel` wrapper that always includes a set of bound tools in every request.
@@ -36,7 +36,7 @@ impl BoundToolsChatModel {
 
 #[async_trait]
 impl ChatModel for BoundToolsChatModel {
-    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         self.inner.chat(self.inject_tools(request)).await
     }
 

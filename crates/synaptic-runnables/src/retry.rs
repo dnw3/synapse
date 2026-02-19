@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::runnable::{BoxRunnable, Runnable};
 
@@ -20,7 +20,7 @@ pub struct RetryPolicy {
     /// Optional predicate to decide if an error is retryable.
     /// When `None`, all errors are retried.
     #[allow(clippy::type_complexity)]
-    retry_on: Option<Box<dyn Fn(&SynapseError) -> bool + Send + Sync>>,
+    retry_on: Option<Box<dyn Fn(&SynapticError) -> bool + Send + Sync>>,
 }
 
 impl std::fmt::Debug for RetryPolicy {
@@ -68,7 +68,7 @@ impl RetryPolicy {
     /// When not set, all errors are retried.
     pub fn with_retry_on(
         mut self,
-        predicate: impl Fn(&SynapseError) -> bool + Send + Sync + 'static,
+        predicate: impl Fn(&SynapticError) -> bool + Send + Sync + 'static,
     ) -> Self {
         self.retry_on = Some(Box::new(predicate));
         self
@@ -81,7 +81,7 @@ impl RetryPolicy {
     }
 
     /// Check whether the given error should be retried.
-    fn should_retry(&self, error: &SynapseError) -> bool {
+    fn should_retry(&self, error: &SynapticError) -> bool {
         match &self.retry_on {
             Some(predicate) => predicate(error),
             None => true,
@@ -113,8 +113,8 @@ impl<I: Send + Clone + 'static, O: Send + 'static> RunnableRetry<I, O> {
 
 #[async_trait]
 impl<I: Send + Clone + 'static, O: Send + 'static> Runnable<I, O> for RunnableRetry<I, O> {
-    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapseError> {
-        let mut last_error: Option<SynapseError> = None;
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<O, SynapticError> {
+        let mut last_error: Option<SynapticError> = None;
 
         for attempt in 0..self.policy.max_attempts {
             let input_clone = input.clone();
@@ -135,7 +135,7 @@ impl<I: Send + Clone + 'static, O: Send + 'static> Runnable<I, O> for RunnableRe
 
         // This is only reached when max_attempts is 0.
         Err(last_error.unwrap_or_else(|| {
-            SynapseError::Config("RunnableRetry: max_attempts must be >= 1".into())
+            SynapticError::Config("RunnableRetry: max_attempts must be >= 1".into())
         }))
     }
 }

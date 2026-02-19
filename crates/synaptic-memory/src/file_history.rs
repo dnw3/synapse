@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use synaptic_core::{MemoryStore, Message, SynapseError};
+use synaptic_core::{MemoryStore, Message, SynapticError};
 
 /// A chat message history backed by a JSON file on disk.
 ///
@@ -24,17 +24,17 @@ impl FileChatMessageHistory {
         self.path.join(format!("{session_id}.json"))
     }
 
-    async fn read_messages(&self, session_id: &str) -> Result<Vec<Message>, SynapseError> {
+    async fn read_messages(&self, session_id: &str) -> Result<Vec<Message>, SynapticError> {
         let path = self.session_path(session_id);
         match tokio::fs::read_to_string(&path).await {
             Ok(contents) => {
                 let messages: Vec<Message> = serde_json::from_str(&contents).map_err(|e| {
-                    SynapseError::Memory(format!("failed to parse {}: {e}", path.display()))
+                    SynapticError::Memory(format!("failed to parse {}: {e}", path.display()))
                 })?;
                 Ok(messages)
             }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-            Err(e) => Err(SynapseError::Memory(format!(
+            Err(e) => Err(SynapticError::Memory(format!(
                 "failed to read {}: {e}",
                 path.display()
             ))),
@@ -45,36 +45,36 @@ impl FileChatMessageHistory {
         &self,
         session_id: &str,
         messages: &[Message],
-    ) -> Result<(), SynapseError> {
+    ) -> Result<(), SynapticError> {
         // Ensure directory exists
         if let Some(parent) = self.session_path(session_id).parent() {
             tokio::fs::create_dir_all(parent)
                 .await
-                .map_err(|e| SynapseError::Memory(format!("failed to create directory: {e}")))?;
+                .map_err(|e| SynapticError::Memory(format!("failed to create directory: {e}")))?;
         }
 
         let path = self.session_path(session_id);
         let json = serde_json::to_string_pretty(messages)
-            .map_err(|e| SynapseError::Memory(format!("failed to serialize messages: {e}")))?;
+            .map_err(|e| SynapticError::Memory(format!("failed to serialize messages: {e}")))?;
         tokio::fs::write(&path, json)
             .await
-            .map_err(|e| SynapseError::Memory(format!("failed to write {}: {e}", path.display())))
+            .map_err(|e| SynapticError::Memory(format!("failed to write {}: {e}", path.display())))
     }
 }
 
 #[async_trait]
 impl MemoryStore for FileChatMessageHistory {
-    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapseError> {
+    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapticError> {
         let mut messages = self.read_messages(session_id).await?;
         messages.push(message);
         self.write_messages(session_id, &messages).await
     }
 
-    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapseError> {
+    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapticError> {
         self.read_messages(session_id).await
     }
 
-    async fn clear(&self, session_id: &str) -> Result<(), SynapseError> {
+    async fn clear(&self, session_id: &str) -> Result<(), SynapticError> {
         self.write_messages(session_id, &[]).await
     }
 }

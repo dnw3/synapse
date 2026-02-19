@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use regex::Regex;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 use crate::evaluator::{EvalResult, Evaluator};
 
@@ -13,9 +13,9 @@ impl RegexMatchEvaluator {
     /// Create a new regex match evaluator with the given pattern.
     ///
     /// Returns an error if the pattern is not a valid regex.
-    pub fn new(pattern: &str) -> Result<Self, SynapseError> {
+    pub fn new(pattern: &str) -> Result<Self, SynapticError> {
         let pattern = Regex::new(pattern)
-            .map_err(|e| SynapseError::Validation(format!("Invalid regex pattern: {}", e)))?;
+            .map_err(|e| SynapticError::Validation(format!("Invalid regex pattern: {}", e)))?;
         Ok(Self { pattern })
     }
 }
@@ -27,7 +27,7 @@ impl Evaluator for RegexMatchEvaluator {
         prediction: &str,
         _reference: &str,
         _input: &str,
-    ) -> Result<EvalResult, SynapseError> {
+    ) -> Result<EvalResult, SynapticError> {
         if self.pattern.is_match(prediction) {
             Ok(EvalResult::pass())
         } else {

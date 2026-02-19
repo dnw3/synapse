@@ -1,4 +1,4 @@
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::{Runnable, RunnableLambda};
 
 #[tokio::test]
@@ -25,7 +25,7 @@ async fn pipe_three_steps() {
 #[tokio::test]
 async fn pipe_propagates_error() {
     let chain = RunnableLambda::new(|_s: String| async move {
-        Err::<String, _>(SynapseError::Validation("fail".to_string()))
+        Err::<String, _>(SynapticError::Validation("fail".to_string()))
     })
     .boxed()
         | RunnableLambda::new(|s: String| async move { Ok(s.to_uppercase()) }).boxed();

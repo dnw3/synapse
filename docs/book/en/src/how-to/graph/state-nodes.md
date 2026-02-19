@@ -82,19 +82,24 @@ A node is any type that implements `Node<S>`:
 ```rust
 use async_trait::async_trait;
 use synaptic_core::SynapticError;
-use synaptic_graph::{Node, MessageState};
+use synaptic_graph::{Node, NodeOutput, MessageState};
 use synaptic_core::Message;
 
 struct GreeterNode;
 
 #[async_trait]
 impl Node<MessageState> for GreeterNode {
-    async fn process(&self, mut state: MessageState) -> Result<MessageState, SynapticError> {
+    async fn process(&self, mut state: MessageState) -> Result<NodeOutput<MessageState>, SynapticError> {
         state.messages.push(Message::ai("Hello! How can I help?"));
-        Ok(state)
+        Ok(state.into()) // NodeOutput::State(state)
     }
 }
 ```
+
+Nodes return `NodeOutput<S>`, which is an enum:
+
+- **`NodeOutput::State(S)`** -- a regular state update (existing behavior). The `From<S>` impl lets you write `Ok(state.into())`.
+- **`NodeOutput::Command(Command<S>)`** -- a control flow command (goto, interrupt, fan-out). See [Human-in-the-Loop](human-in-the-loop.md) for interrupt examples.
 
 Nodes are `Send + Sync`, so they can safely hold shared references (e.g., `Arc<dyn ChatModel>`) and be used across async tasks.
 
@@ -108,11 +113,11 @@ use synaptic_core::Message;
 
 let greeter = FnNode::new(|mut state: MessageState| async move {
     state.messages.push(Message::ai("Hello from a closure!"));
-    Ok(state)
+    Ok(state.into())
 });
 ```
 
-`FnNode` accepts any function with the signature `Fn(S) -> Future<Output = Result<S, SynapticError>>` where `S: State`.
+`FnNode` accepts any function with the signature `Fn(S) -> Future<Output = Result<NodeOutput<S>, SynapticError>>` where `S: State`.
 
 ## Adding Nodes to a Graph
 
@@ -124,12 +129,12 @@ use synaptic_core::Message;
 
 let node_a = FnNode::new(|mut state: MessageState| async move {
     state.messages.push(Message::ai("Step A"));
-    Ok(state)
+    Ok(state.into())
 });
 
 let node_b = FnNode::new(|mut state: MessageState| async move {
     state.messages.push(Message::ai("Step B"));
-    Ok(state)
+    Ok(state.into())
 });
 
 let graph = StateGraph::new()

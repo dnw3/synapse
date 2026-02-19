@@ -61,8 +61,8 @@ fn multiple_partial_variables() {
 #[test]
 fn no_partial_variables_works_as_before() {
     let template = PromptTemplate::new("Hello, {{ name }}.");
-    let values = HashMap::from([("name".to_string(), "Synapse".to_string())]);
+    let values = HashMap::from([("name".to_string(), "Synaptic".to_string())]);
     let rendered = template.render(&values).unwrap();
 
-    assert_eq!(rendered, "Hello, Synapse.");
+    assert_eq!(rendered, "Hello, Synaptic.");
 }

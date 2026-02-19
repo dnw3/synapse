@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use tokio::sync::RwLock;
 
 use crate::{Document, Retriever};
@@ -68,7 +68,7 @@ impl ParentDocumentRetriever {
 
 #[async_trait]
 impl Retriever for ParentDocumentRetriever {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError> {
         // Query child retriever for matching chunks
         let child_results = self.child_retriever.retrieve(query, top_k * 3).await?;
 

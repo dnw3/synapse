@@ -1,8 +1,8 @@
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::{Runnable, RunnablePassthrough};
 
 #[tokio::test]
-async fn passthrough_returns_same_value() -> Result<(), SynapseError> {
+async fn passthrough_returns_same_value() -> Result<(), SynapticError> {
     let runnable = RunnablePassthrough;
     let config = RunnableConfig::default();
     let out = runnable.invoke("synapse".to_string(), &config).await?;
@@ -11,7 +11,7 @@ async fn passthrough_returns_same_value() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn passthrough_works_with_integers() -> Result<(), SynapseError> {
+async fn passthrough_works_with_integers() -> Result<(), SynapticError> {
     let runnable = RunnablePassthrough;
     let config = RunnableConfig::default();
     let out = runnable.invoke(42i32, &config).await?;
@@ -20,7 +20,7 @@ async fn passthrough_works_with_integers() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn passthrough_batch() -> Result<(), SynapseError> {
+async fn passthrough_batch() -> Result<(), SynapticError> {
     let runnable = RunnablePassthrough;
     let config = RunnableConfig::default();
     let results = runnable

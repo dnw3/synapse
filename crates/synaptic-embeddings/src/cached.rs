@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use tokio::sync::RwLock;
 
 use crate::Embeddings;
@@ -29,7 +29,7 @@ impl CacheBackedEmbeddings {
 
 #[async_trait]
 impl Embeddings for CacheBackedEmbeddings {
-    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapseError> {
+    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapticError> {
         // Determine which texts need embedding
         let cache = self.cache.read().await;
         let mut results: Vec<Option<Vec<f32>>> = Vec::with_capacity(texts.len());
@@ -63,7 +63,7 @@ impl Embeddings for CacheBackedEmbeddings {
         Ok(results.into_iter().map(|r| r.unwrap()).collect())
     }
 
-    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapseError> {
+    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapticError> {
         // Check cache
         {
             let cache = self.cache.read().await;

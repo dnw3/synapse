@@ -78,6 +78,99 @@ assert_eq!(result, vec!["a", "b", "c"]);
 
 Each item is trimmed of leading and trailing whitespace. Empty items after trimming are filtered out.
 
+## BooleanOutputParser
+
+Parses yes/no, true/false, y/n, and 1/0 style responses into a `bool`. Case-insensitive and whitespace-trimmed.
+
+**Signature:** `Runnable<String, bool>`
+
+```rust
+use synaptic_parsers::BooleanOutputParser;
+use synaptic_runnables::Runnable;
+use synaptic_core::RunnableConfig;
+
+let parser = BooleanOutputParser;
+let config = RunnableConfig::default();
+
+assert_eq!(parser.invoke("Yes".to_string(), &config).await?, true);
+assert_eq!(parser.invoke("false".to_string(), &config).await?, false);
+assert_eq!(parser.invoke("1".to_string(), &config).await?, true);
+assert_eq!(parser.invoke("N".to_string(), &config).await?, false);
+```
+
+Unrecognized values return `Err(SynapticError::Parsing(...))`.
+
+## XmlOutputParser
+
+Parses XML-formatted LLM output into an `XmlElement` tree. Supports nested elements, attributes, and text content without requiring a full XML library.
+
+**Signature:** `Runnable<String, XmlElement>`
+
+```rust
+use synaptic_parsers::{XmlOutputParser, XmlElement};
+use synaptic_runnables::Runnable;
+use synaptic_core::RunnableConfig;
+
+let config = RunnableConfig::default();
+
+// Parse with a root tag filter
+let parser = XmlOutputParser::with_root_tag("answer");
+let result = parser.invoke(
+    "Here is my answer: <answer><item>hello</item></answer>".to_string(),
+    &config,
+).await?;
+
+assert_eq!(result.tag, "answer");
+assert_eq!(result.children[0].tag, "item");
+assert_eq!(result.children[0].text, Some("hello".to_string()));
+```
+
+Use `XmlOutputParser::new()` to parse the entire input as XML, or `with_root_tag("tag")` to extract content from within a specific root tag.
+
+## MarkdownListOutputParser
+
+Parses markdown-formatted bullet lists (`- item` or `* item`) into a `Vec<String>`. Lines not starting with a bullet marker are ignored.
+
+**Signature:** `Runnable<String, Vec<String>>`
+
+```rust
+use synaptic_parsers::MarkdownListOutputParser;
+use synaptic_runnables::Runnable;
+use synaptic_core::RunnableConfig;
+
+let parser = MarkdownListOutputParser;
+let config = RunnableConfig::default();
+
+let result = parser.invoke(
+    "Here are the items:\n- Apple\n- Banana\n* Cherry\nNot a list item".to_string(),
+    &config,
+).await?;
+
+assert_eq!(result, vec!["Apple", "Banana", "Cherry"]);
+```
+
+## NumberedListOutputParser
+
+Parses numbered lists (`1. item`, `2. item`) into a `Vec<String>`. The number prefix is stripped; only lines matching the `N. text` pattern are included.
+
+**Signature:** `Runnable<String, Vec<String>>`
+
+```rust
+use synaptic_parsers::NumberedListOutputParser;
+use synaptic_runnables::Runnable;
+use synaptic_core::RunnableConfig;
+
+let parser = NumberedListOutputParser;
+let config = RunnableConfig::default();
+
+let result = parser.invoke(
+    "Top 3 languages:\n1. Rust\n2. Python\n3. TypeScript".to_string(),
+    &config,
+).await?;
+
+assert_eq!(result, vec!["Rust", "Python", "TypeScript"]);
+```
+
 ## Format Instructions
 
 All parsers implement the `FormatInstructions` trait. You can include the instructions in your prompt to guide the model:

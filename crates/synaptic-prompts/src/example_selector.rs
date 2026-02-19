@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_embeddings::Embeddings;
 use tokio::sync::RwLock;
 
@@ -11,10 +11,10 @@ use crate::FewShotExample;
 #[async_trait]
 pub trait ExampleSelector: Send + Sync {
     /// Select examples most relevant to the input.
-    async fn select_examples(&self, input: &str) -> Result<Vec<FewShotExample>, SynapseError>;
+    async fn select_examples(&self, input: &str) -> Result<Vec<FewShotExample>, SynapticError>;
 
     /// Add a new example to the selector's pool.
-    async fn add_example(&self, example: FewShotExample) -> Result<(), SynapseError>;
+    async fn add_example(&self, example: FewShotExample) -> Result<(), SynapticError>;
 }
 
 /// Selects examples based on semantic similarity using embeddings.
@@ -38,14 +38,14 @@ impl SemanticSimilarityExampleSelector {
 
 #[async_trait]
 impl ExampleSelector for SemanticSimilarityExampleSelector {
-    async fn add_example(&self, example: FewShotExample) -> Result<(), SynapseError> {
+    async fn add_example(&self, example: FewShotExample) -> Result<(), SynapticError> {
         let embedding = self.embeddings.embed_query(&example.input).await?;
         let mut examples = self.examples.write().await;
         examples.push((example, embedding));
         Ok(())
     }
 
-    async fn select_examples(&self, input: &str) -> Result<Vec<FewShotExample>, SynapseError> {
+    async fn select_examples(&self, input: &str) -> Result<Vec<FewShotExample>, SynapticError> {
         let query_embedding = self.embeddings.embed_query(input).await?;
         let examples = self.examples.read().await;
 

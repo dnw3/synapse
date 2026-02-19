@@ -86,15 +86,31 @@ let graph = StateGraph::new()
     .add_edge("tools", END)
     .compile()?;
 
-let result = graph.invoke(MessageState::new()).await?;
+let result = graph.invoke(MessageState::new()).await?.into_state();
 // State now contains:
 //   [0] AI message with tool_calls
 //   [1] Tool message with "Result: 2+2"
 ```
 
+## `tools_condition` -- Standard Routing Function
+
+Synaptic provides a `tools_condition` function that implements the standard routing logic: returns `"tools"` if the last message has tool calls, otherwise returns `END`. This replaces the need to write a custom routing closure:
+
+```rust
+use synaptic_graph::{StateGraph, MessageState, tools_condition, END};
+
+let graph = StateGraph::new()
+    .add_node("agent", agent_node)
+    .add_node("tools", tool_node)
+    .set_entry_point("agent")
+    .add_conditional_edges("agent", tools_condition)
+    .add_edge("tools", "agent")  // tool results go back to agent
+    .compile()?;
+```
+
 ## Agent Loop Pattern
 
-In a typical ReAct agent, the tool node feeds results back to the agent node, which decides whether to call more tools or produce a final answer. Use conditional edges to implement this loop:
+In a typical ReAct agent, the tool node feeds results back to the agent node, which decides whether to call more tools or produce a final answer. Use `tools_condition` or conditional edges to implement this loop:
 
 ```rust
 use std::collections::HashMap;
@@ -124,7 +140,7 @@ let graph = StateGraph::new()
     .compile()?;
 ```
 
-This is exactly the pattern that `create_react_agent()` implements automatically.
+This is exactly the pattern that `create_react_agent()` implements automatically (using `tools_condition` internally).
 
 ## `create_react_agent`
 
@@ -137,3 +153,18 @@ let graph = create_react_agent(model, tools);
 ```
 
 This creates a compiled graph with `"agent"` and `"tools"` nodes wired in a conditional loop, equivalent to the manual setup shown above.
+
+## RuntimeAwareTool Injection
+
+`ToolNode` supports `RuntimeAwareTool` instances that receive the current graph state, store reference, and tool call ID via `ToolRuntime`. Register runtime-aware tools with `with_runtime_tool()`:
+
+```rust
+use synaptic_graph::ToolNode;
+use synaptic_core::{RuntimeAwareTool, ToolRuntime};
+
+let tool_node = ToolNode::new(executor)
+    .with_store(store)            // inject store into ToolRuntime
+    .with_runtime_tool(my_tool);  // register a RuntimeAwareTool
+```
+
+When `create_agent` is called with `AgentOptions { store: Some(store), .. }`, the store is automatically wired into the `ToolNode`.

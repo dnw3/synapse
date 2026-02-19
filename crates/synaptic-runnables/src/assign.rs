@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::runnable::{BoxRunnable, Runnable};
 
@@ -18,11 +18,11 @@ impl RunnableAssign {
 
 #[async_trait]
 impl Runnable<Value, Value> for RunnableAssign {
-    async fn invoke(&self, input: Value, config: &RunnableConfig) -> Result<Value, SynapseError> {
+    async fn invoke(&self, input: Value, config: &RunnableConfig) -> Result<Value, SynapticError> {
         let mut base = match input {
             Value::Object(map) => map,
             other => {
-                return Err(SynapseError::Validation(format!(
+                return Err(SynapticError::Validation(format!(
                     "RunnableAssign expects a JSON object, got {}",
                     other
                 )))
@@ -37,7 +37,7 @@ impl Runnable<Value, Value> for RunnableAssign {
                 let key = key.clone();
                 async move {
                     let result = runnable.invoke(input_clone, config).await?;
-                    Ok::<_, SynapseError>((key, result))
+                    Ok::<_, SynapticError>((key, result))
                 }
             })
             .collect();

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::Document;
 
 use crate::Loader;
@@ -22,7 +22,7 @@ impl TextLoader {
 
 #[async_trait]
 impl Loader for TextLoader {
-    async fn load(&self) -> Result<Vec<Document>, SynapseError> {
+    async fn load(&self) -> Result<Vec<Document>, SynapticError> {
         Ok(vec![Document::new(self.id.clone(), self.content.clone())])
     }
 }

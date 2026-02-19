@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use synaptic::callbacks::{CompositeCallback, RecordingCallback, TracingCallback};
-use synaptic::core::{CallbackHandler, RunEvent, SynapseError};
+use synaptic::core::{CallbackHandler, RunEvent, SynapticError};
 
 #[tokio::main]
-async fn main() -> Result<(), SynapseError> {
+async fn main() -> Result<(), SynapticError> {
     // Initialize tracing subscriber for TracingCallback output
     tracing_subscriber::fmt::init();
 

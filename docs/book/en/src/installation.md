@@ -42,7 +42,15 @@ synaptic = { version = "0.1", features = ["models", "graph", "cache"] }
 | **`rag`** | `default` + `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores` |
 | **`full`** | All features enabled |
 
-Individual features: `models`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`.
+Individual features: `models`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`.
+
+| Feature | Description |
+|---------|-------------|
+| `store` | Key-value store with namespace hierarchy and optional semantic search |
+| `middleware` | Agent middleware chain (tool call limits, HITL, summarization, context editing) |
+| `mcp` | Model Context Protocol client (Stdio/SSE/HTTP transports) |
+| `macros` | Proc macros (`#[tool]`, `#[chain]`, `#[entrypoint]`, `#[traceable]`) |
+| `deep` | Deep agent harness (backends, filesystem tools, sub-agents, skills) |
 
 The `core` module (traits and types) is always available regardless of feature selection.
 

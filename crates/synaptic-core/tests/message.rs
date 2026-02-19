@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use serde_json::json;
 use synaptic_core::{
-    AIMessageChunk, ChatModel, ChatRequest, ChatResponse, Message, SynapseError, TokenUsage,
+    AIMessageChunk, ChatModel, ChatRequest, ChatResponse, Message, SynapticError, TokenUsage,
     ToolCall,
 };
 
@@ -230,7 +230,7 @@ struct FakeModel;
 
 #[async_trait::async_trait]
 impl ChatModel for FakeModel {
-    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         Ok(ChatResponse {
             message: Message::ai("streamed response"),
             usage: None,

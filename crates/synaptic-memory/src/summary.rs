@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use synaptic_core::{ChatModel, ChatRequest, MemoryStore, Message, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, MemoryStore, Message, SynapticError};
 use tokio::sync::RwLock;
 
 /// A memory strategy that summarizes older messages using a ChatModel.
@@ -32,7 +32,7 @@ impl ConversationSummaryMemory {
     }
 
     /// Generate a summary of the given messages using the ChatModel.
-    async fn summarize(&self, messages: &[Message]) -> Result<String, SynapseError> {
+    async fn summarize(&self, messages: &[Message]) -> Result<String, SynapticError> {
         let conversation = messages
             .iter()
             .map(|m| format!("{}: {}", m.role(), m.content()))
@@ -49,7 +49,7 @@ impl ConversationSummaryMemory {
 
 #[async_trait]
 impl MemoryStore for ConversationSummaryMemory {
-    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapseError> {
+    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapticError> {
         self.store.append(session_id, message).await?;
 
         // Check if we need to trigger summarization
@@ -93,7 +93,7 @@ impl MemoryStore for ConversationSummaryMemory {
         Ok(())
     }
 
-    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapseError> {
+    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapticError> {
         let messages = self.store.load(session_id).await?;
         let summaries = self.summary.read().await;
 
@@ -108,7 +108,7 @@ impl MemoryStore for ConversationSummaryMemory {
         }
     }
 
-    async fn clear(&self, session_id: &str) -> Result<(), SynapseError> {
+    async fn clear(&self, session_id: &str) -> Result<(), SynapticError> {
         self.store.clear(session_id).await?;
         let mut summaries = self.summary.write().await;
         summaries.remove(session_id);

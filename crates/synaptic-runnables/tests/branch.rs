@@ -1,4 +1,4 @@
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::{Runnable, RunnableBranch, RunnableLambda};
 
 #[tokio::test]
@@ -68,7 +68,7 @@ async fn branch_propagates_error() {
         vec![(
             Box::new(|_s: &String| true) as Box<dyn Fn(&String) -> bool + Send + Sync>,
             RunnableLambda::new(|_s: String| async move {
-                Err::<String, _>(SynapseError::Validation("bad".to_string()))
+                Err::<String, _>(SynapticError::Validation("bad".to_string()))
             })
             .boxed(),
         )],

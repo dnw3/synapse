@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{ChatModel, ChatRequest, Message, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, Message, SynapticError};
 
 use crate::{Document, Retriever};
 
@@ -61,7 +61,7 @@ Respond with ONLY the JSON object, no explanation."#
         )
     }
 
-    async fn parse_query(&self, query: &str) -> Result<(String, Vec<Filter>), SynapseError> {
+    async fn parse_query(&self, query: &str) -> Result<(String, Vec<Filter>), SynapticError> {
         let prompt = self.build_prompt(query);
         let request = ChatRequest::new(vec![Message::human(prompt)]);
         let response = self.model.chat(request).await?;
@@ -69,7 +69,7 @@ Respond with ONLY the JSON object, no explanation."#
 
         // Try to parse as JSON
         let parsed: Value = serde_json::from_str(content.trim()).map_err(|_| {
-            SynapseError::Retriever(format!("Failed to parse self-query response: {content}"))
+            SynapticError::Retriever(format!("Failed to parse self-query response: {content}"))
         })?;
 
         let search_query = parsed["query"].as_str().unwrap_or(query).to_string();
@@ -147,7 +147,7 @@ fn compare_values(a: &Value, b: &Value) -> Option<i32> {
 
 #[async_trait]
 impl Retriever for SelfQueryRetriever {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError> {
         let (search_query, filters) = self.parse_query(query).await?;
 
         let docs = self.base.retrieve(&search_query, top_k * 2).await?;

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{MemoryStore, Message, RunnableConfig, SynapseError};
+use synaptic_core::{MemoryStore, Message, RunnableConfig, SynapticError};
 use synaptic_runnables::{BoxRunnable, Runnable};
 
 /// Wraps a `Runnable<Vec<Message>, String>` with automatic message history
@@ -28,7 +28,11 @@ impl RunnableWithMessageHistory {
 
 #[async_trait]
 impl Runnable<String, String> for RunnableWithMessageHistory {
-    async fn invoke(&self, input: String, config: &RunnableConfig) -> Result<String, SynapseError> {
+    async fn invoke(
+        &self,
+        input: String,
+        config: &RunnableConfig,
+    ) -> Result<String, SynapticError> {
         // Extract session_id from config metadata
         let session_id = config
             .metadata

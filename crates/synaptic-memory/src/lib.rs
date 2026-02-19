@@ -17,7 +17,7 @@ pub use window::ConversationWindowMemory;
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use synaptic_core::{MemoryStore, Message, SynapseError};
+use synaptic_core::{MemoryStore, Message, SynapticError};
 use tokio::sync::RwLock;
 
 /// In-memory implementation of `MemoryStore`, storing messages keyed by session ID.
@@ -34,19 +34,19 @@ impl InMemoryStore {
 
 #[async_trait]
 impl MemoryStore for InMemoryStore {
-    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapseError> {
+    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapticError> {
         let mut sessions = self.sessions.write().await;
         let session = sessions.entry(session_id.to_string()).or_default();
         session.push(message);
         Ok(())
     }
 
-    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapseError> {
+    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapticError> {
         let sessions = self.sessions.read().await;
         Ok(sessions.get(session_id).cloned().unwrap_or_default())
     }
 
-    async fn clear(&self, session_id: &str) -> Result<(), SynapseError> {
+    async fn clear(&self, session_id: &str) -> Result<(), SynapticError> {
         let mut sessions = self.sessions.write().await;
         sessions.remove(session_id);
         Ok(())

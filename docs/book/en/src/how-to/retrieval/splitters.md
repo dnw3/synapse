@@ -123,6 +123,26 @@ let chunks = splitter.split_text("long text...");
 
 This is consistent with the token estimation used in `ConversationTokenBufferMemory`.
 
+## HtmlHeaderTextSplitter
+
+Splits HTML text by header tags (`<h1>`, `<h2>`, etc.), adding header hierarchy to each chunk's metadata. Similar to `MarkdownHeaderTextSplitter` but for HTML content.
+
+```rust
+use synaptic_splitters::HtmlHeaderTextSplitter;
+
+let splitter = HtmlHeaderTextSplitter::new(vec![
+    ("h1".to_string(), "Header 1".to_string()),
+    ("h2".to_string(), "Header 2".to_string()),
+]);
+
+let html = "<h1>Title</h1><p>Intro text</p><h2>Section</h2><p>Body text</p>";
+let docs = splitter.split_html(html);
+// docs[0].metadata contains {"Header 1": "Title"}
+// docs[1].metadata contains {"Header 1": "Title", "Header 2": "Section"}
+```
+
+The constructor takes a list of `(tag_name, metadata_key)` pairs. Only the specified tags are treated as split points; all other HTML content is treated as body text within the current section.
+
 ## Splitting documents
 
 All splitters can split a `Vec<Document>` into smaller chunks. Each chunk inherits the parent's metadata and gets a `chunk_index` field. The chunk ID is formatted as `"{original_id}-chunk-{index}"`.

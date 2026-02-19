@@ -159,6 +159,37 @@ let retriever = VectorStoreRetriever::new(store, embeddings, 5);
 let results = retriever.retrieve("query", 5).await?;
 ```
 
+## MultiVectorRetriever
+
+`MultiVectorRetriever` stores small child chunks in a vector store for precise retrieval, but returns the larger parent documents they came from. This gives you the best of both worlds: small chunks for accurate embedding search and full documents for LLM context.
+
+```rust
+use std::sync::Arc;
+use synaptic_vectorstores::{InMemoryVectorStore, MultiVectorRetriever};
+use synaptic_embeddings::FakeEmbeddings;
+use synaptic_retrieval::{Document, Retriever};
+
+let embeddings = Arc::new(FakeEmbeddings::new(128));
+let store = Arc::new(InMemoryVectorStore::new());
+
+let retriever = MultiVectorRetriever::new(store, embeddings, 3);
+
+// Add parent documents with their child chunks
+let parent = Document::new("parent-1", "Full article about Rust ownership...");
+let children = vec![
+    Document::new("child-1", "Ownership rules in Rust"),
+    Document::new("child-2", "Borrowing and references"),
+];
+
+retriever.add_documents(parent, children).await?;
+
+// Search finds child chunks but returns the parent
+let results = retriever.retrieve("ownership", 1).await?;
+assert_eq!(results[0].id, Some("parent-1".to_string()));
+```
+
+The `id_key` metadata field links children to their parent. By default it is `"doc_id"`.
+
 ### Score threshold filtering
 
 Set a minimum similarity score. Only documents meeting the threshold are returned:

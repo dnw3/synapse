@@ -2,23 +2,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic::core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapseError, Tool};
-use synaptic::graph::{MessageState, Node, StateGraph, END};
+use synaptic::core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapticError, Tool};
+use synaptic::graph::{MessageState, Node, NodeOutput, StateGraph, END};
+use synaptic_macros::tool;
 
-/// A dummy tool for demonstration.
-struct DummyTool;
-
-#[async_trait]
-impl Tool for DummyTool {
-    fn name(&self) -> &'static str {
-        "search"
-    }
-    fn description(&self) -> &'static str {
-        "Search the web"
-    }
-    async fn call(&self, _input: serde_json::Value) -> Result<serde_json::Value, SynapseError> {
-        Ok(serde_json::json!("result"))
-    }
+/// Search the web
+#[tool(name = "search")]
+async fn dummy_search() -> Result<String, SynapticError> {
+    Ok("result".to_string())
 }
 
 /// A dummy ChatModel for demonstration.
@@ -26,7 +17,7 @@ struct DummyModel;
 
 #[async_trait]
 impl ChatModel for DummyModel {
-    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         unimplemented!("demo only")
     }
     fn stream_chat(&self, _request: ChatRequest) -> ChatStream<'_> {
@@ -39,8 +30,11 @@ struct PassthroughNode;
 
 #[async_trait]
 impl Node<MessageState> for PassthroughNode {
-    async fn process(&self, state: MessageState) -> Result<MessageState, SynapseError> {
-        Ok(state)
+    async fn process(
+        &self,
+        state: MessageState,
+    ) -> Result<NodeOutput<MessageState>, SynapticError> {
+        Ok(state.into())
     }
 }
 
@@ -49,7 +43,7 @@ async fn main() {
     println!("=== ReAct Agent Graph ===\n");
 
     let model: Arc<dyn ChatModel> = Arc::new(DummyModel);
-    let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(DummyTool)];
+    let tools: Vec<Arc<dyn Tool>> = vec![dummy_search()];
     let react_graph = synaptic::graph::create_react_agent(model, tools).unwrap();
 
     println!("--- Mermaid ---");

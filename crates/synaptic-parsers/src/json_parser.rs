@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 use crate::FormatInstructions;
@@ -16,8 +16,12 @@ impl FormatInstructions for JsonOutputParser {
 
 #[async_trait]
 impl Runnable<String, Value> for JsonOutputParser {
-    async fn invoke(&self, input: String, _config: &RunnableConfig) -> Result<Value, SynapseError> {
+    async fn invoke(
+        &self,
+        input: String,
+        _config: &RunnableConfig,
+    ) -> Result<Value, SynapticError> {
         serde_json::from_str(&input)
-            .map_err(|e| SynapseError::Parsing(format!("invalid JSON: {e}")))
+            .map_err(|e| SynapticError::Parsing(format!("invalid JSON: {e}")))
     }
 }

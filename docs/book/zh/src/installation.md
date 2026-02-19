@@ -43,7 +43,15 @@ synaptic = { version = "0.1", features = ["models", "graph", "cache"] }
 | **`rag`** | `default` + `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores` |
 | **`full`** | 启用全部 features |
 
-单独可用的 features：`models`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`。
+单独可用的 features：`models`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`。
+
+| Feature | 说明 |
+|---------|------|
+| `store` | 支持命名空间层次和可选语义搜索的键值存储 |
+| `middleware` | Agent 中间件链（工具调用限制、人机协作、摘要、上下文编辑） |
+| `mcp` | Model Context Protocol 客户端（Stdio/SSE/HTTP 传输） |
+| `macros` | 过程宏（`#[tool]`、`#[chain]`、`#[entrypoint]`、`#[traceable]`） |
+| `deep` | Deep Agent 框架（Backend、文件系统工具、子 Agent、技能） |
 
 `core` 模块（核心 trait 和类型）始终可用，不受 feature 选择影响。
 

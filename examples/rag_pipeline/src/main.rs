@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use synaptic::core::SynapseError;
+use synaptic::core::SynapticError;
 use synaptic::embeddings::FakeEmbeddings;
 use synaptic::loaders::{Loader, TextLoader};
 use synaptic::retrieval::Retriever;
@@ -8,7 +8,7 @@ use synaptic::splitters::{RecursiveCharacterTextSplitter, TextSplitter};
 use synaptic::vectorstores::{InMemoryVectorStore, VectorStore, VectorStoreRetriever};
 
 #[tokio::main]
-async fn main() -> Result<(), SynapseError> {
+async fn main() -> Result<(), SynapticError> {
     let embeddings = FakeEmbeddings::default();
 
     // --- Load documents ---

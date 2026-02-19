@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use synaptic::cache::{CachedChatModel, InMemoryCache, LlmCache};
-use synaptic::core::{ChatModel, ChatRequest, ChatResponse, Message, SynapseError};
+use synaptic::core::{ChatModel, ChatRequest, ChatResponse, Message, SynapticError};
 use synaptic::models::ScriptedChatModel;
 
 #[tokio::main]
-async fn main() -> Result<(), SynapseError> {
+async fn main() -> Result<(), SynapticError> {
     // --- Setup: model with limited responses + cache ---
     // ScriptedChatModel has only 2 responses; after that it errors.
     // With caching, repeated requests are served from cache.

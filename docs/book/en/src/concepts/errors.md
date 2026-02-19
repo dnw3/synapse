@@ -26,10 +26,11 @@ pub enum SynapticError {
     #[error("graph error: {0}")]            Graph(String),
     #[error("cache error: {0}")]            Cache(String),
     #[error("config error: {0}")]           Config(String),
+    #[error("mcp error: {0}")]             Mcp(String),
 }
 ```
 
-Nineteen variants, one for each subsystem. The design is intentional:
+Twenty variants, one for each subsystem. The design is intentional:
 
 - **Single type everywhere**: You never need to convert between error types. Any function in any crate can return `SynapticError`, and the caller can propagate it with `?` without conversion.
 - **String payloads**: Most variants carry a `String` message. This keeps the error type simple and avoids nested error hierarchies. The message provides context about what went wrong.
@@ -78,8 +79,9 @@ Nineteen variants, one for each subsystem. The design is intentional:
 
 | Variant | When It Occurs |
 |---------|----------------|
-| `Graph(String)` | Graph execution error, including interrupts for human-in-the-loop |
+| `Graph(String)` | Graph execution error (compilation, routing, missing nodes) |
 | `MaxStepsExceeded { max_steps }` | Agent loop exceeded the maximum iteration count |
+| `Mcp(String)` | MCP server connection, transport, or protocol error |
 
 ## Error Propagation
 
@@ -138,22 +140,22 @@ If `primary` fails, `fallback_1` is tried with the same input. If that also fail
 
 ### RunnableRetry
 
-Retries a runnable with configurable backoff:
+Retries a runnable with configurable exponential backoff:
 
 ```rust
+use std::time::Duration;
 use synaptic::runnables::{RunnableRetry, RetryPolicy};
 
 let retry = RunnableRetry::new(
     flaky_step.boxed(),
-    RetryPolicy {
-        max_retries: 3,
-        delay: Duration::from_millis(200),
-        backoff_factor: 2.0,
-    },
+    RetryPolicy::default()
+        .with_max_attempts(4)
+        .with_base_delay(Duration::from_millis(200))
+        .with_max_delay(Duration::from_secs(5)),
 );
 ```
 
-The delay doubles after each attempt (200ms, 400ms, 800ms). This is useful for any step in an LCEL chain, not just model calls.
+The delay doubles after each attempt (200ms, 400ms, 800ms, ...) up to `max_delay`. You can also set a `retry_on` predicate to only retry specific error types. This is useful for any step in an LCEL chain, not just model calls.
 
 ### HandleErrorTool
 
@@ -167,26 +169,41 @@ let safe_tool = HandleErrorTool::new(risky_tool);
 
 When the inner tool fails, the error message becomes the tool's output. The LLM sees the error and can decide to retry with different arguments or take a different approach. This prevents a single tool failure from crashing the entire agent loop.
 
-## Graph Interrupts as Errors
+## Graph Interrupts (Not Errors)
 
-Human-in-the-loop interrupts in the graph system are implemented as `SynapticError::Graph` errors with descriptive messages:
-
-```rust
-Err(SynapticError::Graph("interrupted before node 'tools'"))
-Err(SynapticError::Graph("interrupted after node 'agent'"))
-```
-
-This is a deliberate design choice. An interrupt is not a failure -- it is a control flow signal. The graph has checkpointed its state and is waiting for human input. Application code can match on the error message to distinguish interrupts from true errors:
+Human-in-the-loop interrupts in the graph system are **not** errors. Graph `invoke()` returns `GraphResult<S>`, which is either `Complete(state)` or `Interrupted(state)`:
 
 ```rust
-match graph.invoke(state).await {
-    Ok(final_state) => handle_result(final_state),
-    Err(SynapticError::Graph(msg)) if msg.starts_with("interrupted") => {
-        // Human-in-the-loop: inspect state, get approval, resume
+use synaptic::graph::GraphResult;
+
+match graph.invoke(state).await? {
+    GraphResult::Complete(final_state) => {
+        // Graph finished normally
+        handle_result(final_state);
     }
-    Err(e) => return Err(e),
+    GraphResult::Interrupted(partial_state) => {
+        // Human-in-the-loop: inspect state, get approval, resume
+        // The graph has checkpointed its state automatically
+    }
 }
 ```
+
+To extract the state regardless of completion status, use `.into_state()`:
+
+```rust
+let state = graph.invoke(initial).await?.into_state();
+```
+
+Interrupts can also be triggered programmatically via `Command::interrupt()` from within a node:
+
+```rust
+use synaptic::graph::Command;
+
+// Inside a node's process() method:
+Command::interrupt(updated_state)
+```
+
+`SynapticError::Graph` is reserved for true errors: compilation failures, missing nodes, routing errors, and recursion limit violations.
 
 ## Matching on Error Variants
 
@@ -212,3 +229,9 @@ match result {
 ```
 
 This pattern is especially useful in agent loops where some errors are recoverable (the model can try again) and others are not (network is down, API key is invalid).
+
+## See Also
+
+- [Retry & Rate Limiting](../how-to/chat-models/retry-rate-limit.md) -- automatic retry for model errors
+- [Fallbacks](../how-to/runnables/fallbacks.md) -- fallback chains for error recovery
+- [Interrupt & Resume](../how-to/graph/interrupt-resume.md) -- graph interrupts (not errors)

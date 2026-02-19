@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use futures::StreamExt;
 use synaptic_core::{
-    AIMessageChunk, ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapseError,
+    AIMessageChunk, ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapticError,
 };
 use synaptic_models::RateLimitedChatModel;
 use tokio::sync::Mutex;
@@ -22,7 +22,7 @@ impl SlowModel {
 
 #[async_trait::async_trait]
 impl ChatModel for SlowModel {
-    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         {
             let mut count = self.call_count.lock().await;
             *count += 1;

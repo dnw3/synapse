@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 use crate::evaluator::{EvalResult, Evaluator};
 
@@ -33,7 +33,7 @@ impl Evaluator for ExactMatchEvaluator {
         prediction: &str,
         reference: &str,
         _input: &str,
-    ) -> Result<EvalResult, SynapseError> {
+    ) -> Result<EvalResult, SynapticError> {
         let matches = if self.ignore_case {
             prediction.to_lowercase() == reference.to_lowercase()
         } else {

@@ -101,6 +101,7 @@ async fn chat_with_tool_definitions() {
         name: "search".to_string(),
         description: "Search the web".to_string(),
         parameters: json!({"type": "object", "properties": {"q": {"type": "string"}}}),
+        extras: None,
     }];
     let request = ChatRequest::new(vec![Message::human("search")]).with_tools(tools);
     let response = model.chat(request).await.unwrap();

@@ -1,32 +1,17 @@
-use std::sync::Arc;
-
-use async_trait::async_trait;
 use serde_json::json;
-use synaptic_core::{SynapseError, Tool};
+use synaptic_core::{SynapticError, Tool};
+use synaptic_macros::tool;
 use synaptic_tools::ReturnDirectTool;
 
-struct CalculatorTool;
-
-#[async_trait]
-impl Tool for CalculatorTool {
-    fn name(&self) -> &'static str {
-        "calculator"
-    }
-
-    fn description(&self) -> &'static str {
-        "A simple calculator"
-    }
-
-    async fn call(&self, args: serde_json::Value) -> Result<serde_json::Value, SynapseError> {
-        let a = args["a"].as_f64().unwrap_or(0.0);
-        let b = args["b"].as_f64().unwrap_or(0.0);
-        Ok(json!({"result": a + b}))
-    }
+/// A simple calculator
+#[tool(name = "calculator")]
+async fn calc(a: f64, b: f64) -> Result<serde_json::Value, SynapticError> {
+    Ok(json!({"result": a + b}))
 }
 
 #[tokio::test]
 async fn return_direct_delegates_to_inner() {
-    let inner = Arc::new(CalculatorTool);
+    let inner = calc();
     let wrapper = ReturnDirectTool::new(inner);
 
     assert_eq!(wrapper.name(), "calculator");
@@ -39,7 +24,10 @@ async fn return_direct_delegates_to_inner() {
 
 #[tokio::test]
 async fn return_direct_tool_implements_tool_trait() {
-    let inner = Arc::new(CalculatorTool);
+    use std::sync::Arc;
+    use synaptic_core::Tool;
+
+    let inner = calc();
     let wrapper: Arc<dyn Tool> = Arc::new(ReturnDirectTool::new(inner));
 
     let result = wrapper.call(json!({"a": 10, "b": 20})).await.unwrap();

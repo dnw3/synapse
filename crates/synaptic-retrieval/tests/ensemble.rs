@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::{Document, EnsembleRetriever, InMemoryRetriever, Retriever};
 
 #[tokio::test]
-async fn ensemble_combines_results_from_multiple_retrievers() -> Result<(), SynapseError> {
+async fn ensemble_combines_results_from_multiple_retrievers() -> Result<(), SynapticError> {
     let retriever1 = Arc::new(InMemoryRetriever::new(vec![
         Document::new("1", "rust async tokio"),
         Document::new("2", "rust ownership"),
@@ -33,7 +33,7 @@ async fn ensemble_combines_results_from_multiple_retrievers() -> Result<(), Syna
 }
 
 #[tokio::test]
-async fn ensemble_rrf_ranks_shared_docs_higher() -> Result<(), SynapseError> {
+async fn ensemble_rrf_ranks_shared_docs_higher() -> Result<(), SynapticError> {
     // Doc "1" appears in both retrievers, so it should get a higher RRF score
     let retriever1 = Arc::new(InMemoryRetriever::new(vec![
         Document::new("1", "rust async"),
@@ -59,7 +59,7 @@ async fn ensemble_rrf_ranks_shared_docs_higher() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn ensemble_respects_weights() -> Result<(), SynapseError> {
+async fn ensemble_respects_weights() -> Result<(), SynapticError> {
     // Retriever1 has doc "A" at rank 1, weight = 0.1
     // Retriever2 has doc "B" at rank 1, weight = 10.0
     // Doc B should rank higher due to much higher weight
@@ -89,7 +89,7 @@ async fn ensemble_respects_weights() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn ensemble_respects_top_k() -> Result<(), SynapseError> {
+async fn ensemble_respects_top_k() -> Result<(), SynapticError> {
     let retriever1 = Arc::new(InMemoryRetriever::new(vec![
         Document::new("1", "rust async"),
         Document::new("2", "rust ownership"),
@@ -113,7 +113,7 @@ async fn ensemble_respects_top_k() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn ensemble_single_retriever() -> Result<(), SynapseError> {
+async fn ensemble_single_retriever() -> Result<(), SynapticError> {
     let retriever = Arc::new(InMemoryRetriever::new(vec![
         Document::new("1", "rust async"),
         Document::new("2", "python web"),
@@ -130,7 +130,7 @@ async fn ensemble_single_retriever() -> Result<(), SynapseError> {
 }
 
 #[tokio::test]
-async fn ensemble_no_results() -> Result<(), SynapseError> {
+async fn ensemble_no_results() -> Result<(), SynapticError> {
     let retriever = Arc::new(InMemoryRetriever::new(vec![Document::new(
         "1",
         "python web",

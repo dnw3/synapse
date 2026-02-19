@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{SynapseError, Tool};
+use synaptic_core::{SynapticError, Tool};
 
 /// A tool wrapper that signals the agent should return the tool's output directly
 /// to the user without further LLM processing.
@@ -32,7 +32,7 @@ impl Tool for ReturnDirectTool {
         self.inner.description()
     }
 
-    async fn call(&self, args: Value) -> Result<Value, SynapseError> {
+    async fn call(&self, args: Value) -> Result<Value, SynapticError> {
         self.inner.call(args).await
     }
 }

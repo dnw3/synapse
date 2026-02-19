@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 
 use crate::runnable::{BoxRunnable, Runnable};
 
@@ -18,7 +18,7 @@ impl<I: Send + Clone + 'static> RunnableParallel<I> {
 
 #[async_trait]
 impl<I: Send + Clone + 'static> Runnable<I, Value> for RunnableParallel<I> {
-    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<Value, SynapseError> {
+    async fn invoke(&self, input: I, config: &RunnableConfig) -> Result<Value, SynapticError> {
         let futures: Vec<_> = self
             .branches
             .iter()
@@ -27,7 +27,7 @@ impl<I: Send + Clone + 'static> Runnable<I, Value> for RunnableParallel<I> {
                 let key = key.clone();
                 async move {
                     let result = runnable.invoke(input_clone, config).await?;
-                    Ok::<_, SynapseError>((key, result))
+                    Ok::<_, SynapticError>((key, result))
                 }
             })
             .collect();

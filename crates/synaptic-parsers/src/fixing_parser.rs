@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{ChatModel, ChatRequest, Message, RunnableConfig, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, Message, RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 /// A parser that uses an LLM to fix outputs that fail to parse.
@@ -34,7 +34,7 @@ impl<O: Send + Sync + 'static> OutputFixingParser<O> {
 
 #[async_trait]
 impl<O: Send + Sync + 'static> Runnable<String, O> for OutputFixingParser<O> {
-    async fn invoke(&self, input: String, config: &RunnableConfig) -> Result<O, SynapseError> {
+    async fn invoke(&self, input: String, config: &RunnableConfig) -> Result<O, SynapticError> {
         // First attempt with the original input.
         match self.inner.invoke(input.clone(), config).await {
             Ok(value) => return Ok(value),

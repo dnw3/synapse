@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapticError};
 use tokio::sync::Semaphore;
 
 pub struct RateLimitedChatModel {
@@ -20,12 +20,12 @@ impl RateLimitedChatModel {
 
 #[async_trait]
 impl ChatModel for RateLimitedChatModel {
-    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         let _permit = self
             .semaphore
             .acquire()
             .await
-            .map_err(|e| SynapseError::Model(format!("semaphore error: {e}")))?;
+            .map_err(|e| SynapticError::Model(format!("semaphore error: {e}")))?;
         self.inner.chat(request).await
     }
 
@@ -37,7 +37,7 @@ impl ChatModel for RateLimitedChatModel {
             let _permit = match semaphore.acquire_owned().await {
                 Ok(p) => p,
                 Err(e) => {
-                    yield Err(SynapseError::Model(format!("semaphore error: {e}")));
+                    yield Err(SynapticError::Model(format!("semaphore error: {e}")));
                     return;
                 }
             };

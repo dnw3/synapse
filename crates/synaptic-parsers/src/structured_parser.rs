@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 use crate::FormatInstructions;
@@ -37,8 +37,8 @@ impl<T> Runnable<String, T> for StructuredOutputParser<T>
 where
     T: DeserializeOwned + Send + Sync + 'static,
 {
-    async fn invoke(&self, input: String, _config: &RunnableConfig) -> Result<T, SynapseError> {
+    async fn invoke(&self, input: String, _config: &RunnableConfig) -> Result<T, SynapticError> {
         serde_json::from_str(&input)
-            .map_err(|e| SynapseError::Parsing(format!("structured parse error: {e}")))
+            .map_err(|e| SynapticError::Parsing(format!("structured parse error: {e}")))
     }
 }

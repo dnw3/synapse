@@ -1,4 +1,4 @@
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::{Runnable, RunnableLambda};
 
 #[tokio::test]
@@ -12,7 +12,7 @@ async fn lambda_transforms_input() {
 #[tokio::test]
 async fn lambda_can_return_error() {
     let failing = RunnableLambda::new(|_s: String| async move {
-        Err::<String, _>(SynapseError::Validation("bad input".to_string()))
+        Err::<String, _>(SynapticError::Validation("bad input".to_string()))
     });
     let config = RunnableConfig::default();
     let err = failing

@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Synaptic is organized as a Cargo workspace with 17 library crates, 1 facade crate, and several example binaries. The crates form a layered architecture where each layer builds on the one below it.
+Synaptic is organized as a Cargo workspace with 22 library crates, 1 facade crate, and several example binaries. The crates form a layered architecture where each layer builds on the one below it.
 
 ## Crate Layers
 
@@ -8,9 +8,9 @@ Synaptic is organized as a Cargo workspace with 17 library crates, 1 facade crat
 
 **`synaptic-core`** defines all shared traits and types. Every other crate depends on it.
 
-- Traits: `ChatModel`, `Tool`, `MemoryStore`, `CallbackHandler`
-- Types: `Message`, `ChatRequest`, `ChatResponse`, `ToolCall`, `ToolDefinition`, `ToolChoice`, `AIMessageChunk`, `TokenUsage`, `RunEvent`, `RunnableConfig`
-- Error type: `SynapticError` (19 variants covering all subsystems)
+- Traits: `ChatModel`, `Tool`, `RuntimeAwareTool`, `MemoryStore`, `CallbackHandler`, `Store`, `Embeddings`
+- Types: `Message`, `ChatRequest`, `ChatResponse`, `ToolCall`, `ToolDefinition`, `ToolChoice`, `AIMessageChunk`, `TokenUsage`, `RunEvent`, `RunnableConfig`, `Runtime`, `ToolRuntime`, `ModelProfile`, `Item`, `ContentBlock`
+- Error type: `SynapticError` (20 variants covering all subsystems)
 - Stream type: `ChatStream` (`Pin<Box<dyn Stream<Item = Result<AIMessageChunk, SynapticError>> + Send>>`)
 
 ### Implementation Crates
@@ -20,7 +20,7 @@ Each crate implements one core trait or provides a focused capability:
 | Crate | Purpose |
 |---|---|
 | `synaptic-models` | Provider adapters (OpenAI, Anthropic, Gemini, Ollama) + `ScriptedChatModel` test double + wrappers (retry, rate limit, caching, structured output) |
-| `synaptic-tools` | `ToolRegistry` and `SerialToolExecutor` |
+| `synaptic-tools` | `ToolRegistry`, `SerialToolExecutor`, `ParallelToolExecutor` |
 | `synaptic-memory` | Memory strategies: buffer, window, summary, token buffer, summary buffer, `RunnableWithMessageHistory` |
 | `synaptic-callbacks` | `RecordingCallback`, `TracingCallback`, `CompositeCallback` |
 | `synaptic-prompts` | `PromptTemplate`, `ChatPromptTemplate`, `FewShotChatMessagePromptTemplate` |
@@ -34,7 +34,7 @@ These crates provide higher-level orchestration:
 | Crate | Purpose |
 |---|---|
 | `synaptic-runnables` | `Runnable` trait with `invoke()`/`batch()`/`stream()`, `BoxRunnable` with pipe operator, `RunnableLambda`, `RunnableParallel`, `RunnableBranch`, `RunnableAssign`, `RunnablePick`, `RunnableWithFallbacks` |
-| `synaptic-graph` | LangGraph-style state machines: `StateGraph`, `CompiledGraph`, `ToolNode`, `create_react_agent`, `Checkpointer`, `MemorySaver`, graph streaming |
+| `synaptic-graph` | LangGraph-style state machines: `StateGraph`, `CompiledGraph`, `ToolNode`, `create_react_agent`, `create_supervisor`, `create_swarm`, `Command`, `GraphResult`, `Checkpointer`, `MemorySaver`, multi-mode streaming |
 
 ### Retrieval Pipeline
 
@@ -54,6 +54,18 @@ These crates form the document ingestion and retrieval pipeline:
 |---|---|
 | `synaptic-eval` | `Evaluator` trait, `ExactMatchEvaluator`, `RegexMatchEvaluator`, `JsonValidityEvaluator`, `EmbeddingDistanceEvaluator`, `LLMJudgeEvaluator`, `Dataset`, batch evaluation pipeline |
 
+### Advanced Crates
+
+These crates provide specialized capabilities for production agent systems:
+
+| Crate | Purpose |
+|---|---|
+| `synaptic-store` | `Store` trait implementation, `InMemoryStore` with semantic search (optional embeddings) |
+| `synaptic-middleware` | `AgentMiddleware` trait, `MiddlewareChain`, built-in middleware: model retry, PII filtering, prompt caching, summarization, human-in-the-loop approval, tool call limiting |
+| `synaptic-mcp` | Model Context Protocol adapters: `MultiServerMcpClient`, Stdio/SSE/HTTP transports for tool discovery and invocation |
+| `synaptic-macros` | Procedural macros: `#[tool]`, `#[chain]`, `#[entrypoint]`, `#[task]`, `#[traceable]`, middleware macros |
+| `synaptic-deep` | Deep Agent harness: `Backend` trait (State/Store/Filesystem), 7 filesystem tools, 6 middleware, `create_deep_agent()` factory |
+
 ### Facade
 
 **`synaptic`** re-exports all sub-crates for convenient single-import usage:
@@ -70,29 +82,32 @@ use synaptic::graph::{StateGraph, create_react_agent};
 All crates depend on `synaptic-core` for shared traits and types. Higher-level crates depend on the layer below:
 
 ```text
-                         ┌─────────┐
-                         │synaptic│  (facade: re-exports all)
-                         └────┬────┘
-                              │
-       ┌──────────────────────┼──────────────────────┐
-       │                      │                      │
-  ┌────┴─────┐          ┌────┴─────┐          ┌─────┴────┐
-  │  graph   │          │runnables │          │   eval   │
-  └────┬─────┘          └────┬─────┘          └─────┬────┘
-       │                     │                      │
-  ┌────┼────────┬────────────┼──────────┬───────────┤
-  │    │        │            │          │           │
-┌─┴──┐┌┴───┐┌──┴──┐┌───────┐┌┴──────┐┌─┴────┐┌────┴───┐
-│mod-││too- ││mem- ││promp- ││pars- ││cache ││callba- │
-│els ││ls  ││ory  ││ts    ││ers   ││     ││cks    │
-└─┬──┘└─┬──┘└──┬──┘└───┬───┘└──┬───┘└──┬──┘└───┬───┘
-  │      │      │       │       │       │       │
-  │  ┌───┼──────┼───────┼───────┼───────┤       │
-  │  │   │      │       │       │       │       │
-  ┌──┴───┴──────┴───────┴───────┴───────┴───────┴──┐
-  │             synaptic-core                       │
-  │  (ChatModel, Tool, Message, SynapticError, ...) │
-  └─────────────────────────────────────────────────┘
+                            ┌──────────┐
+                            │ synaptic │  (facade: re-exports all)
+                            └─────┬────┘
+                                  │
+     ┌──────────────┬─────────────┼──────────────┬───────────────┐
+     │              │             │              │               │
+ ┌───┴───┐   ┌─────┴────┐  ┌────┴─────┐  ┌─────┴────┐   ┌─────┴───┐
+ │ deep  │   │middleware│  │  graph   │  │runnables │   │  eval   │
+ └───┬───┘   └─────┬────┘  └────┬─────┘  └────┬─────┘   └─────┬───┘
+     │              │            │              │               │
+     ├──────────────┴────┬───────┴──────────────┤               │
+     │                   │                      │               │
+┌────┴──┐ ┌─────┐ ┌─────┴──┐ ┌──────┐ ┌───────┐│┌──────┐┌─────┴──┐
+│models │ │tools│ │memory  │ │store │ │prompts│││parsers││cache   │
+└───┬───┘ └──┬──┘ └───┬────┘ └──┬───┘ └───┬───┘│└───┬───┘└───┬────┘
+    │        │        │         │         │    │    │        │
+    │  ┌─────┴─┬──────┤    ┌────┘         │    │    │        │
+    │  │       │      │    │              │    │    │        │
+    ├──┤  ┌────┴──┐   │  ┌─┴────┐  ┌─────┴────┴────┴────────┤
+    │  │  │macros │   │  │ mcp  │  │    callbacks            │
+    │  │  └───┬───┘   │  └──┬───┘  └────────┬────────────────┘
+    │  │      │       │     │               │
+  ┌─┴──┴──────┴───────┴─────┴───────────────┴──┐
+  │              synaptic-core                  │
+  │  (ChatModel, Tool, Store, Embeddings, ...) │
+  └─────────────────────────────────────────────┘
 
   Retrieval pipeline:
 

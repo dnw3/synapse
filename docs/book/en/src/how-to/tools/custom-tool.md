@@ -122,6 +122,62 @@ let result = executor.execute("get_weather", json!({"location": "Tokyo"})).await
 
 See the [Tool Registry](registry.md) page for more on registration and execution.
 
+## Full ReAct Agent Loop
+
+Here is a complete offline example that defines tools, registers them, and wires them into a ReAct agent with `ScriptedChatModel`:
+
+```rust,ignore
+use std::sync::Arc;
+use serde_json::{json, Value};
+use synaptic_core::{ChatModel, ChatResponse, Message, Tool, ToolCall, SynapticError};
+use synaptic_models::ScriptedChatModel;
+use synaptic_graph::{create_react_agent, MessageState};
+
+// 1. Define tools (using the trait)
+struct AddTool;
+
+#[async_trait::async_trait]
+impl Tool for AddTool {
+    fn name(&self) -> &'static str { "add" }
+    fn description(&self) -> &'static str { "Add two numbers" }
+    async fn call(&self, args: Value) -> Result<Value, SynapticError> {
+        let a = args["a"].as_f64().unwrap_or(0.0);
+        let b = args["b"].as_f64().unwrap_or(0.0);
+        Ok(json!({"result": a + b}))
+    }
+}
+
+// 2. Script the model to call the tool and then respond
+let model: Arc<dyn ChatModel> = Arc::new(ScriptedChatModel::new(vec![
+    ChatResponse {
+        message: Message::ai_with_tool_calls(
+            "",
+            vec![ToolCall {
+                id: "call_1".into(),
+                name: "add".into(),
+                arguments: r#"{"a": 3, "b": 4}"#.into(),
+            }],
+        ),
+        usage: None,
+    },
+    ChatResponse {
+        message: Message::ai("The sum is 7."),
+        usage: None,
+    },
+]));
+
+// 3. Build the agent
+let tools: Vec<Arc<dyn Tool>> = vec![Arc::new(AddTool)];
+let agent = create_react_agent(model, tools)?;
+
+// 4. Run it
+let state = MessageState::with_messages(vec![
+    Message::human("What is 3 + 4?"),
+]);
+let result = agent.invoke(state).await?.into_state();
+assert_eq!(result.messages.last().unwrap().content(), "The sum is 7.");
+```
+
 ## Tool Definitions for Models
 
 To tell a chat model about available tools, create `ToolDefinition` values and attach them to a `ChatRequest`:
@@ -152,3 +208,79 @@ let request = ChatRequest::new(vec![
 ```
 
 The `parameters` field follows the JSON Schema format that LLM providers expect.
+
+## Using the `#[tool]` Macro
+
+Instead of manually implementing the `Tool` trait, you can use the `#[tool]`
+attribute macro from `synaptic-macros` to generate the boilerplate:
+
+```rust,ignore
+use synaptic_macros::tool;
+use synaptic_core::SynapticError;
+use serde_json::{json, Value};
+
+/// Get the current weather for a location.
+#[tool]
+async fn get_weather(
+    /// The city name
+    location: String,
+) -> Result<Value, SynapticError> {
+    Ok(json!({
+        "location": location,
+        "temperature": 22,
+        "condition": "sunny"
+    }))
+}
+
+// `get_weather()` returns Arc<dyn Tool>
+let tool = get_weather();
+assert_eq!(tool.name(), "get_weather");
+```
+
+The macro generates the struct, `impl Tool`, JSON Schema from parameter types,
+and a factory function — all from a single annotated function. Doc comments on
+the function become the tool description; doc comments on parameters become
+schema descriptions.
+
+### Optional and Default Parameters
+
+```rust,ignore
+#[tool]
+async fn search(
+    /// The search query
+    query: String,
+    /// Maximum results (default 10)
+    #[default = 10]
+    max_results: i64,
+    /// Language filter
+    language: Option<String>,
+) -> Result<String, SynapticError> {
+    let lang = language.unwrap_or_else(|| "en".into());
+    Ok(format!("Searching '{}' (max {}, lang {})", query, max_results, lang))
+}
+```
+
+### Stateful Tools with `#[field]`
+
+Tools that need to hold state (database connections, API clients, etc.) can use
+`#[field]` to create struct fields that are hidden from the LLM schema:
+
+```rust,ignore
+use std::sync::Arc;
+
+#[tool]
+async fn db_query(
+    #[field] pool: Arc<DbPool>,
+    /// SQL query to execute
+    query: String,
+) -> Result<Value, SynapticError> {
+    let result = pool.execute(&query).await?;
+    Ok(serde_json::to_value(result).unwrap())
+}
+
+// Factory requires the field parameter
+let tool = db_query(pool.clone());
+```
+
+For the full macro reference including `#[inject]`, `#[default]`, and middleware
+macros, see the [Procedural Macros](../macros.md) page.

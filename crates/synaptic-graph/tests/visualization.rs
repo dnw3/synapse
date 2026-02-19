@@ -1,16 +1,19 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use synaptic_core::SynapseError;
-use synaptic_graph::{MessageState, Node, StateGraph, END};
+use synaptic_core::SynapticError;
+use synaptic_graph::{MessageState, Node, NodeOutput, StateGraph, END};
 
 /// A simple passthrough node for testing.
 struct PassthroughNode;
 
 #[async_trait]
 impl Node<MessageState> for PassthroughNode {
-    async fn process(&self, state: MessageState) -> Result<MessageState, SynapseError> {
-        Ok(state)
+    async fn process(
+        &self,
+        state: MessageState,
+    ) -> Result<NodeOutput<MessageState>, SynapticError> {
+        Ok(state.into())
     }
 }
 

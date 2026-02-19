@@ -41,22 +41,25 @@ A node is a unit of computation within the graph:
 ```rust
 #[async_trait]
 pub trait Node<S: State>: Send + Sync {
-    async fn process(&self, state: S) -> Result<S, SynapticError>;
+    async fn process(&self, state: S) -> Result<NodeOutput<S>, SynapticError>;
 }
 ```
 
-A node receives the current state, does work, and returns a new state. The graph runtime merges the returned state into the running state.
+A node receives the current state, does work, and returns a `NodeOutput<S>`:
+
+- **`NodeOutput::State(S)`** -- a regular state update. The `From<S>` impl lets you write `Ok(state.into())`.
+- **`NodeOutput::Command(Command<S>)`** -- a control flow command: dynamic routing (`Command::goto`), early termination (`Command::end`), or interrupts (`interrupt()`).
 
 `FnNode` wraps an async closure into a node, which is the most common way to define nodes:
 
 ```rust
 let my_node = FnNode::new(|state: MessageState| async move {
     // Process state, add messages, etc.
-    Ok(state)
+    Ok(state.into())
 });
 ```
 
-`ToolNode` is a pre-built node that extracts tool calls from the last AI message, executes them, and appends the results.
+`ToolNode` is a pre-built node that extracts tool calls from the last AI message, executes them, and appends the results. The `tools_condition` function provides standard routing: returns `"tools"` if the last message has tool calls, else `END`.
 
 ## Building a Graph
 
@@ -114,11 +117,21 @@ Validates the graph (checks that all referenced nodes exist, that the entry poin
 
 ### invoke(state)
 
-Runs the graph to completion and returns the final state:
+Runs the graph and returns a `GraphResult<S>`:
 
 ```rust
-let initial = MessageState::from_messages(vec![Message::human("Hello")]);
-let final_state = graph.invoke(initial).await?;
+let initial = MessageState::with_messages(vec![Message::human("Hello")]);
+let result = graph.invoke(initial).await?;
+
+match result {
+    GraphResult::Complete(state) => println!("Done: {} messages", state.messages.len()),
+    GraphResult::Interrupted { state, interrupt_value } => {
+        println!("Paused: {interrupt_value}");
+    }
+}
+
+// Or use convenience methods:
+let state = result.into_state(); // works for both Complete and Interrupted
 ```
 
 ### stream(state, mode)
@@ -173,7 +186,7 @@ Two mechanisms pause graph execution for human intervention:
 
 ### interrupt_before(nodes)
 
-The graph pauses **before** executing the named nodes. The current state is checkpointed, and the graph returns a `SynapticError::Graph("interrupted before node '...'")`.
+The graph pauses **before** executing the named nodes. The current state is checkpointed, and the graph returns `GraphResult::Interrupted`.
 
 ```rust
 let graph = StateGraph::new()
@@ -192,42 +205,71 @@ let state = graph.get_state(&config).await?.unwrap();
 graph.update_state(&config, updated_state).await?;
 
 // Resume execution
-let final_state = graph.invoke_with_config(
+let result = graph.invoke_with_config(
     MessageState::default(),
     Some(config),
 ).await?;
+let final_state = result.into_state();
 ```
 
 ### interrupt_after(nodes)
 
 The graph pauses **after** executing the named nodes. The node's output is already in the state, and the next node is recorded in the checkpoint. Useful for reviewing a node's output before proceeding.
 
-## Dynamic Control Flow
+### Programmatic interrupt()
 
-Nodes can override normal edge-based routing using the `GraphContext`:
+Nodes can also interrupt programmatically using the `interrupt()` function:
 
-### GraphCommand::Goto(target)
+```rust
+use synaptic_graph::{interrupt, NodeOutput};
+
+// Inside a node's process() method:
+Ok(interrupt(serde_json::json!({"question": "Approve?"})))
+```
+
+This returns `GraphResult::Interrupted` with the specified value, which the caller can inspect via `result.interrupt_value()`.
+
+## Dynamic Control Flow with Command
+
+Nodes can override normal edge-based routing by returning `NodeOutput::Command(...)`:
+
+### Command::goto(target)
 
 Redirects execution to a specific node, skipping normal edge resolution:
 
 ```rust
-// Inside a node:
-context.goto("summary").await;
+Ok(NodeOutput::Command(Command::goto("summary")))
 ```
 
-### GraphCommand::End
+### Command::goto_with_update(target, state_delta)
+
+Routes to a node while also applying a state update:
+
+```rust
+Ok(NodeOutput::Command(Command::goto_with_update("next", delta)))
+```
+
+### Command::end()
 
 Ends graph execution immediately:
 
 ```rust
-context.end().await;
+Ok(NodeOutput::Command(Command::end()))
+```
+
+### Command::update(state_delta)
+
+Applies a state update without overriding routing (uses normal edges):
+
+```rust
+Ok(NodeOutput::Command(Command::update(delta)))
 ```
 
 Commands take priority over edges. After a node executes, the graph checks for a command before consulting edges. This enables dynamic, state-dependent control flow that goes beyond what static edge definitions can express.
 
 ## Send (Fan-out)
 
-The `Send` mechanism allows a node to dispatch work to multiple target nodes in parallel, enabling fan-out patterns within the graph.
+The `Send` mechanism allows a node to dispatch work to multiple target nodes via `Command::send()`, enabling fan-out (map-reduce) patterns within the graph.
 
 ## Visualization
 
@@ -258,6 +300,53 @@ graph TD
     agent -.-> |__end__| __end__
 ```
 
+## Prebuilt Multi-Agent Patterns
+
+Beyond `create_react_agent`, Synaptic provides two multi-agent graph constructors:
+
+### create_supervisor
+
+Builds a supervisor graph where a central LLM orchestrates sub-agents. The supervisor decides which agent to delegate to by calling handoff tools (`transfer_to_<agent_name>`). Each sub-agent is itself a compiled react agent graph.
+
+```rust
+use synaptic::graph::{create_supervisor, SupervisorOptions};
+
+let agents = vec![
+    ("researcher".to_string(), researcher_graph),
+    ("writer".to_string(), writer_graph),
+];
+let graph = create_supervisor(supervisor_model, agents, SupervisorOptions::default())?;
+```
+
+The supervisor loop: supervisor calls LLM → if handoff tool call, route to sub-agent → sub-agent runs to completion → return to supervisor → repeat until supervisor produces a final answer (no tool calls).
+
+### create_swarm
+
+Builds a swarm graph where agents hand off to each other peer-to-peer, without a central coordinator. Each agent has its own model, tools, and system prompt. Handoff is done via `transfer_to_<agent_name>` tool calls.
+
+```rust
+use synaptic::graph::{create_swarm, SwarmAgent, SwarmOptions};
+
+let agents = vec![
+    SwarmAgent { name: "triage".into(), model, tools, system_prompt: Some("...".into()) },
+    SwarmAgent { name: "support".into(), model, tools, system_prompt: Some("...".into()) },
+];
+let graph = create_swarm(agents, SwarmOptions::default())?;
+```
+
+The first agent in the list is the entry point. Each agent runs until it either produces a final answer or hands off to another agent.
+
 ## Safety Limits
 
 The graph runtime enforces a maximum of 100 iterations per execution to prevent infinite loops. If a graph cycles more than 100 times, it returns `SynapticError::Graph("max iterations (100) exceeded")`. This is a safety guard, not a configurable limit -- if your workflow legitimately needs more iterations, the graph structure should be reconsidered.
+
+## See Also
+
+- [State & Nodes](../how-to/graph/state-nodes.md) -- building custom nodes and state types
+- [Command & Routing](../how-to/graph/command.md) -- dynamic control flow with Command
+- [Interrupt & Resume](../how-to/graph/interrupt-resume.md) -- programmatic interrupts
+- [Human-in-the-Loop](../how-to/graph/human-in-the-loop.md) -- pausing for human input
+- [Streaming](../how-to/graph/streaming.md) -- graph streaming with StreamMode
+- [Supervisor](../how-to/multi-agent/supervisor.md) -- supervisor pattern how-to
+- [Swarm](../how-to/multi-agent/swarm.md) -- swarm pattern how-to
+- [Tool Node](../how-to/graph/tool-node.md) -- ToolNode and tools_condition

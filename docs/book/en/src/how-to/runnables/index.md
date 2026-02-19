@@ -60,3 +60,5 @@ Synaptic provides the following LCEL building blocks:
 - [Fallbacks](fallbacks.md) -- provide alternative runnables when the primary one fails
 - [Bind](bind.md) -- attach config transforms to a runnable
 - [Retry](retry.md) -- retry with exponential backoff on transient failures
+- [Generator](generator.md) -- wrap a streaming generator function as a runnable
+- [Each](each.md) -- map a runnable over each element in a list

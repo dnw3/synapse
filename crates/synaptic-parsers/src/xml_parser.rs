@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use synaptic_core::{RunnableConfig, SynapseError};
+use synaptic_core::{RunnableConfig, SynapticError};
 use synaptic_runnables::Runnable;
 
 use crate::FormatInstructions;
@@ -61,15 +61,15 @@ impl Runnable<String, XmlElement> for XmlOutputParser {
         &self,
         input: String,
         _config: &RunnableConfig,
-    ) -> Result<XmlElement, SynapseError> {
+    ) -> Result<XmlElement, SynapticError> {
         let xml = if let Some(root_tag) = &self.root_tag {
             let open = format!("<{}", root_tag);
             let close = format!("</{}>", root_tag);
             let start = input.find(&open).ok_or_else(|| {
-                SynapseError::Parsing(format!("root tag <{}> not found in input", root_tag))
+                SynapticError::Parsing(format!("root tag <{}> not found in input", root_tag))
             })?;
             let end = input.find(&close).ok_or_else(|| {
-                SynapseError::Parsing(format!("closing tag </{}> not found in input", root_tag))
+                SynapticError::Parsing(format!("closing tag </{}> not found in input", root_tag))
             })?;
             &input[start..end + close.len()]
         } else {
@@ -90,11 +90,11 @@ fn skip_whitespace(input: &str, pos: &mut usize) {
 }
 
 /// Parse a single XML element starting at `pos`.
-fn parse_element(input: &str, pos: &mut usize) -> Result<XmlElement, SynapseError> {
+fn parse_element(input: &str, pos: &mut usize) -> Result<XmlElement, SynapticError> {
     skip_whitespace(input, pos);
 
     if *pos >= input.len() || input.as_bytes()[*pos] != b'<' {
-        return Err(SynapseError::Parsing(format!(
+        return Err(SynapticError::Parsing(format!(
             "expected '<' at position {pos}",
             pos = *pos
         )));
@@ -112,7 +112,7 @@ fn parse_element(input: &str, pos: &mut usize) -> Result<XmlElement, SynapseErro
     }
     let tag = input[tag_start..*pos].to_string();
     if tag.is_empty() {
-        return Err(SynapseError::Parsing("empty tag name".to_string()));
+        return Err(SynapticError::Parsing("empty tag name".to_string()));
     }
 
     // Parse attributes
@@ -124,7 +124,7 @@ fn parse_element(input: &str, pos: &mut usize) -> Result<XmlElement, SynapseErro
     if *pos < input.len() && input.as_bytes()[*pos] == b'/' {
         *pos += 1; // skip '/'
         if *pos >= input.len() || input.as_bytes()[*pos] != b'>' {
-            return Err(SynapseError::Parsing(
+            return Err(SynapticError::Parsing(
                 "expected '>' after '/' in self-closing tag".to_string(),
             ));
         }
@@ -139,7 +139,7 @@ fn parse_element(input: &str, pos: &mut usize) -> Result<XmlElement, SynapseErro
 
     // Expect '>'
     if *pos >= input.len() || input.as_bytes()[*pos] != b'>' {
-        return Err(SynapseError::Parsing(format!(
+        return Err(SynapticError::Parsing(format!(
             "expected '>' for tag <{tag}>"
         )));
     }
@@ -151,7 +151,7 @@ fn parse_element(input: &str, pos: &mut usize) -> Result<XmlElement, SynapseErro
 
     loop {
         if *pos >= input.len() {
-            return Err(SynapseError::Parsing(format!(
+            return Err(SynapticError::Parsing(format!(
                 "unexpected end of input, missing closing tag </{tag}>"
             )));
         }
@@ -167,7 +167,7 @@ fn parse_element(input: &str, pos: &mut usize) -> Result<XmlElement, SynapseErro
         if input.as_bytes()[*pos] == b'<' {
             // Make sure it's not a closing tag for something else
             if *pos + 1 < input.len() && input.as_bytes()[*pos + 1] == b'/' {
-                return Err(SynapseError::Parsing(format!(
+                return Err(SynapticError::Parsing(format!(
                     "unexpected closing tag at position {pos}, expected </{tag}>",
                     pos = *pos
                 )));
@@ -203,7 +203,10 @@ fn parse_element(input: &str, pos: &mut usize) -> Result<XmlElement, SynapseErro
 }
 
 /// Parse attributes inside an opening tag. `pos` should be right after the tag name.
-fn parse_attributes(input: &str, pos: &mut usize) -> Result<HashMap<String, String>, SynapseError> {
+fn parse_attributes(
+    input: &str,
+    pos: &mut usize,
+) -> Result<HashMap<String, String>, SynapticError> {
     let mut attributes = HashMap::new();
 
     loop {
@@ -229,14 +232,14 @@ fn parse_attributes(input: &str, pos: &mut usize) -> Result<HashMap<String, Stri
         }
         let name = input[name_start..*pos].to_string();
         if name.is_empty() {
-            return Err(SynapseError::Parsing("empty attribute name".to_string()));
+            return Err(SynapticError::Parsing("empty attribute name".to_string()));
         }
 
         skip_whitespace(input, pos);
 
         // Expect '='
         if *pos >= input.len() || input.as_bytes()[*pos] != b'=' {
-            return Err(SynapseError::Parsing(format!(
+            return Err(SynapticError::Parsing(format!(
                 "expected '=' after attribute name '{name}'"
             )));
         }
@@ -246,14 +249,14 @@ fn parse_attributes(input: &str, pos: &mut usize) -> Result<HashMap<String, Stri
 
         // Expect quoted value
         if *pos >= input.len() {
-            return Err(SynapseError::Parsing(
+            return Err(SynapticError::Parsing(
                 "unexpected end of input in attribute value".to_string(),
             ));
         }
 
         let quote = input.as_bytes()[*pos] as char;
         if quote != '"' && quote != '\'' {
-            return Err(SynapseError::Parsing(format!(
+            return Err(SynapticError::Parsing(format!(
                 "expected quote for attribute '{name}' value, got '{quote}'"
             )));
         }
@@ -264,7 +267,7 @@ fn parse_attributes(input: &str, pos: &mut usize) -> Result<HashMap<String, Stri
             *pos += 1;
         }
         if *pos >= input.len() {
-            return Err(SynapseError::Parsing(format!(
+            return Err(SynapticError::Parsing(format!(
                 "unterminated attribute value for '{name}'"
             )));
         }

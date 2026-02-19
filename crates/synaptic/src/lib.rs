@@ -1,6 +1,6 @@
-//! Synapse — A Rust agent framework with LangChain-compatible architecture.
+//! Synaptic — A Rust agent framework with LangChain-compatible architecture.
 //!
-//! This crate re-exports all Synapse sub-crates for convenient single-import usage.
+//! This crate re-exports all Synaptic sub-crates for convenient single-import usage.
 //! Enable features to control which modules are available.
 //!
 //! # Feature Flags
@@ -20,7 +20,7 @@
 //! use synaptic::runnables::{Runnable, RunnableLambda, RunnableAssign, RunnablePick};
 //! ```
 
-/// Core traits and types: ChatModel, Message, ToolChoice, SynapseError, RunnableConfig, etc.
+/// Core traits and types: ChatModel, Message, ToolChoice, SynapticError, RunnableConfig, etc.
 /// Always available.
 pub use synaptic_core as core;
 
@@ -77,6 +77,14 @@ pub use synaptic_vectorstores as vectorstores;
 #[cfg(feature = "graph")]
 pub use synaptic_graph as graph;
 
+/// Middleware system: AgentMiddleware trait, lifecycle hooks, built-in middlewares.
+#[cfg(feature = "middleware")]
+pub use synaptic_middleware as middleware;
+
+/// Key-value storage: Store trait, InMemoryStore.
+#[cfg(feature = "store")]
+pub use synaptic_store as store;
+
 /// LLM caching: InMemory, Semantic, CachedChatModel.
 #[cfg(feature = "cache")]
 pub use synaptic_cache as cache;
@@ -84,3 +92,19 @@ pub use synaptic_cache as cache;
 /// Evaluation: Evaluator trait, evaluators, Dataset.
 #[cfg(feature = "eval")]
 pub use synaptic_eval as eval;
+
+/// MCP (Model Context Protocol) adapters for external tool servers.
+#[cfg(feature = "mcp")]
+pub use synaptic_mcp as mcp;
+
+/// Procedural macros for ergonomic tool, chain, and middleware definitions.
+#[cfg(feature = "macros")]
+pub use synaptic_macros as macros;
+/// Re-export proc macros at crate root for ergonomic use:
+/// `use synaptic::tool;` instead of `use synaptic::macros::tool;`
+#[cfg(feature = "macros")]
+pub use synaptic_macros::*;
+
+/// Deep agent harness: filesystem, subagents, skills, memory, auto-summarization.
+#[cfg(feature = "deep")]
+pub use synaptic_deep as deep;

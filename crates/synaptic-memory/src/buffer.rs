@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{MemoryStore, Message, SynapseError};
+use synaptic_core::{MemoryStore, Message, SynapticError};
 
 /// A memory strategy that stores the full conversation buffer.
 ///
@@ -20,15 +20,15 @@ impl ConversationBufferMemory {
 
 #[async_trait]
 impl MemoryStore for ConversationBufferMemory {
-    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapseError> {
+    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapticError> {
         self.store.append(session_id, message).await
     }
 
-    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapseError> {
+    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapticError> {
         self.store.load(session_id).await
     }
 
-    async fn clear(&self, session_id: &str) -> Result<(), SynapseError> {
+    async fn clear(&self, session_id: &str) -> Result<(), SynapticError> {
         self.store.clear(session_id).await
     }
 }

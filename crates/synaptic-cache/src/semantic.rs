@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{ChatResponse, SynapseError};
+use synaptic_core::{ChatResponse, SynapticError};
 use synaptic_embeddings::Embeddings;
 use tokio::sync::RwLock;
 
@@ -39,10 +39,10 @@ impl SemanticCache {
 
 #[async_trait]
 impl LlmCache for SemanticCache {
-    async fn get(&self, key: &str) -> Result<Option<ChatResponse>, SynapseError> {
+    async fn get(&self, key: &str) -> Result<Option<ChatResponse>, SynapticError> {
         let query_embedding =
             self.embeddings.embed_query(key).await.map_err(|e| {
-                SynapseError::Cache(format!("embedding error during cache get: {e}"))
+                SynapticError::Cache(format!("embedding error during cache get: {e}"))
             })?;
 
         let entries = self.entries.read().await;
@@ -60,10 +60,10 @@ impl LlmCache for SemanticCache {
         Ok(best_response)
     }
 
-    async fn put(&self, key: &str, response: &ChatResponse) -> Result<(), SynapseError> {
+    async fn put(&self, key: &str, response: &ChatResponse) -> Result<(), SynapticError> {
         let embedding =
             self.embeddings.embed_query(key).await.map_err(|e| {
-                SynapseError::Cache(format!("embedding error during cache put: {e}"))
+                SynapticError::Cache(format!("embedding error during cache put: {e}"))
             })?;
 
         let mut entries = self.entries.write().await;
@@ -75,7 +75,7 @@ impl LlmCache for SemanticCache {
         Ok(())
     }
 
-    async fn clear(&self) -> Result<(), SynapseError> {
+    async fn clear(&self) -> Result<(), SynapticError> {
         let mut entries = self.entries.write().await;
         entries.clear();
         Ok(())

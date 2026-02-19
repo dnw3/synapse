@@ -1,14 +1,14 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use synaptic_core::{ChatModel, ChatRequest, ChatResponse, Message, SynapseError};
+use synaptic_core::{ChatModel, ChatRequest, ChatResponse, Message, SynapticError};
 use synaptic_models::TokenBucketChatModel;
 
 struct InstantModel;
 
 #[async_trait::async_trait]
 impl ChatModel for InstantModel {
-    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapseError> {
+    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         Ok(ChatResponse {
             message: Message::ai("ok"),
             usage: None,

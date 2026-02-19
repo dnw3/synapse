@@ -42,6 +42,7 @@ fn chat_request_with_tool_choice() {
             name: "search".to_string(),
             description: "Search".to_string(),
             parameters: serde_json::json!({"type": "object"}),
+            extras: None,
         }])
         .with_tool_choice(ToolChoice::Required);
 

@@ -1,4 +1,4 @@
-// Language switcher for Synapse documentation
+// Language switcher for Synaptic documentation
 // Injects an EN/ZH toggle into the mdBook menu bar.
 (function () {
   "use strict";

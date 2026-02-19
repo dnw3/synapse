@@ -1,11 +1,16 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
+
+#[cfg(feature = "schemars")]
+pub use schemars;
 
 // ---------------------------------------------------------------------------
 // ContentBlock — multimodal message content
@@ -776,6 +781,9 @@ pub struct ToolDefinition {
     pub name: String,
     pub description: String,
     pub parameters: Value,
+    /// Provider-specific parameters (e.g., Anthropic's `cache_control`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extras: Option<HashMap<String, Value>>,
 }
 
 /// Controls how the model selects tools: Auto, Required, None, or a Specific named tool.
@@ -899,9 +907,9 @@ pub enum RunEvent {
 // Errors
 // ---------------------------------------------------------------------------
 
-/// Unified error type for the Synapse framework with variants covering all subsystems.
+/// Unified error type for the Synaptic framework with variants covering all subsystems.
 #[derive(Debug, Error)]
-pub enum SynapseError {
+pub enum SynapticError {
     #[error("prompt error: {0}")]
     Prompt(String),
     #[error("model error: {0}")]
@@ -940,6 +948,8 @@ pub enum SynapseError {
     Cache(String),
     #[error("config error: {0}")]
     Config(String),
+    #[error("mcp error: {0}")]
+    Mcp(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -948,12 +958,29 @@ pub enum SynapseError {
 
 /// Type alias for a pinned, boxed async stream of `AIMessageChunk` results.
 pub type ChatStream<'a> =
-    Pin<Box<dyn Stream<Item = Result<AIMessageChunk, SynapseError>> + Send + 'a>>;
+    Pin<Box<dyn Stream<Item = Result<AIMessageChunk, SynapticError>> + Send + 'a>>;
+
+/// Describes a model's capabilities and limits.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelProfile {
+    pub name: String,
+    pub provider: String,
+    pub supports_tool_calling: bool,
+    pub supports_structured_output: bool,
+    pub supports_streaming: bool,
+    pub max_input_tokens: Option<usize>,
+    pub max_output_tokens: Option<usize>,
+}
 
 /// The core trait for language model providers. Implementations provide `chat()` for single responses and optionally `stream_chat()` for streaming.
 #[async_trait]
 pub trait ChatModel: Send + Sync {
-    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapseError>;
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError>;
+
+    /// Return the model's capability profile, if known.
+    fn profile(&self) -> Option<ModelProfile> {
+        None
+    }
 
     fn stream_chat(&self, request: ChatRequest) -> ChatStream<'_> {
         Box::pin(async_stream::stream! {
@@ -977,21 +1004,104 @@ pub trait ChatModel: Send + Sync {
 pub trait Tool: Send + Sync {
     fn name(&self) -> &'static str;
     fn description(&self) -> &'static str;
-    async fn call(&self, args: Value) -> Result<Value, SynapseError>;
+
+    fn parameters(&self) -> Option<Value> {
+        None
+    }
+
+    async fn call(&self, args: Value) -> Result<Value, SynapticError>;
+
+    fn as_tool_definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: self.name().to_string(),
+            description: self.description().to_string(),
+            parameters: self
+                .parameters()
+                .unwrap_or(serde_json::json!({"type": "object", "properties": {}})),
+            extras: None,
+        }
+    }
 }
+
+// ---------------------------------------------------------------------------
+// ToolContext — context-aware tool execution
+// ---------------------------------------------------------------------------
+
+/// Context passed to tools during graph execution.
+///
+/// Provides access to the current graph state (serialized as JSON),
+/// the tool call ID, and an optional key-value store reference.
+#[derive(Debug, Clone, Default)]
+pub struct ToolContext {
+    /// The current graph state, serialized as JSON.
+    pub state: Option<Value>,
+    /// The ID of the tool call being executed.
+    pub tool_call_id: String,
+}
+
+/// A tool that receives execution context from the graph.
+///
+/// This extends the basic `Tool` trait with graph-level context
+/// (current state, store, tool call ID). Implement this for tools
+/// that need to read or modify graph state.
+#[async_trait]
+pub trait ContextAwareTool: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn description(&self) -> &'static str;
+    async fn call_with_context(
+        &self,
+        args: Value,
+        ctx: ToolContext,
+    ) -> Result<Value, SynapticError>;
+}
+
+/// Wrapper that adapts a `ContextAwareTool` into a standard `Tool`.
+///
+/// When used outside a graph context, the tool receives a default
+/// (empty) `ToolContext`.
+pub struct ContextAwareToolAdapter {
+    inner: Arc<dyn ContextAwareTool>,
+}
+
+impl ContextAwareToolAdapter {
+    pub fn new(inner: Arc<dyn ContextAwareTool>) -> Self {
+        Self { inner }
+    }
+}
+
+#[async_trait]
+impl Tool for ContextAwareToolAdapter {
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+
+    fn description(&self) -> &'static str {
+        self.inner.description()
+    }
+
+    async fn call(&self, args: Value) -> Result<Value, SynapticError> {
+        self.inner
+            .call_with_context(args, ToolContext::default())
+            .await
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MemoryStore
+// ---------------------------------------------------------------------------
 
 /// Persistent storage for conversation message history, keyed by session ID.
 #[async_trait]
 pub trait MemoryStore: Send + Sync {
-    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapseError>;
-    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapseError>;
-    async fn clear(&self, session_id: &str) -> Result<(), SynapseError>;
+    async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapticError>;
+    async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapticError>;
+    async fn clear(&self, session_id: &str) -> Result<(), SynapticError>;
 }
 
 /// Handler for lifecycle events during agent execution. Receives `RunEvent` notifications at each stage.
 #[async_trait]
 pub trait CallbackHandler: Send + Sync {
-    async fn on_event(&self, event: RunEvent) -> Result<(), SynapseError>;
+    async fn on_event(&self, event: RunEvent) -> Result<(), SynapticError>;
 }
 
 // ---------------------------------------------------------------------------
@@ -1044,5 +1154,204 @@ impl RunnableConfig {
     pub fn with_metadata(mut self, key: impl Into<String>, value: Value) -> Self {
         self.metadata.insert(key.into(), value);
         self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Store trait (forward-declared in core, implemented in synaptic-store)
+// ---------------------------------------------------------------------------
+
+/// A stored item in the key-value store.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Item {
+    pub namespace: Vec<String>,
+    pub key: String,
+    pub value: Value,
+    pub created_at: String,
+    pub updated_at: String,
+    /// Relevance score from a search operation (e.g., similarity score).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
+}
+
+/// Persistent key-value store trait for cross-invocation state.
+///
+/// Namespaces are hierarchical (represented as slices of strings) and
+/// keys are strings within a namespace. Values are arbitrary JSON.
+#[async_trait]
+pub trait Store: Send + Sync {
+    /// Get an item by namespace and key.
+    async fn get(&self, namespace: &[&str], key: &str) -> Result<Option<Item>, SynapticError>;
+
+    /// Search items within a namespace.
+    async fn search(
+        &self,
+        namespace: &[&str],
+        query: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<Item>, SynapticError>;
+
+    /// Put (upsert) an item.
+    async fn put(&self, namespace: &[&str], key: &str, value: Value) -> Result<(), SynapticError>;
+
+    /// Delete an item.
+    async fn delete(&self, namespace: &[&str], key: &str) -> Result<(), SynapticError>;
+
+    /// List all namespaces, optionally filtered by prefix.
+    async fn list_namespaces(&self, prefix: &[&str]) -> Result<Vec<Vec<String>>, SynapticError>;
+}
+
+// ---------------------------------------------------------------------------
+// Embeddings trait (forward-declared here, implemented in synaptic-embeddings)
+// ---------------------------------------------------------------------------
+
+/// Trait for embedding text into vectors.
+#[async_trait]
+pub trait Embeddings: Send + Sync {
+    /// Embed multiple texts (for batch document embedding).
+    async fn embed_documents(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SynapticError>;
+
+    /// Embed a single query text.
+    async fn embed_query(&self, text: &str) -> Result<Vec<f32>, SynapticError>;
+}
+
+// ---------------------------------------------------------------------------
+// StreamWriter
+// ---------------------------------------------------------------------------
+
+/// Custom stream writer that nodes can use to emit custom events.
+pub type StreamWriter = Arc<dyn Fn(Value) + Send + Sync>;
+
+// ---------------------------------------------------------------------------
+// Runtime types
+// ---------------------------------------------------------------------------
+
+/// Graph execution runtime context passed to nodes and middleware.
+#[derive(Clone)]
+pub struct Runtime {
+    pub store: Option<Arc<dyn Store>>,
+    pub stream_writer: Option<StreamWriter>,
+}
+
+/// Tool execution runtime context.
+#[derive(Clone)]
+pub struct ToolRuntime {
+    pub store: Option<Arc<dyn Store>>,
+    pub stream_writer: Option<StreamWriter>,
+    pub state: Option<Value>,
+    pub tool_call_id: String,
+    pub config: Option<RunnableConfig>,
+}
+
+// ---------------------------------------------------------------------------
+// RuntimeAwareTool
+// ---------------------------------------------------------------------------
+
+/// Context-aware tool that receives runtime information.
+///
+/// This extends the basic `Tool` trait with runtime context
+/// (current state, store, stream writer, tool call ID). Implement this
+/// for tools that need to read or modify graph state.
+#[async_trait]
+pub trait RuntimeAwareTool: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn description(&self) -> &'static str;
+
+    fn parameters(&self) -> Option<Value> {
+        None
+    }
+
+    async fn call_with_runtime(
+        &self,
+        args: Value,
+        runtime: ToolRuntime,
+    ) -> Result<Value, SynapticError>;
+
+    fn as_tool_definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: self.name().to_string(),
+            description: self.description().to_string(),
+            parameters: self
+                .parameters()
+                .unwrap_or(serde_json::json!({"type": "object", "properties": {}})),
+            extras: None,
+        }
+    }
+}
+
+/// Adapter that wraps a `RuntimeAwareTool` into a standard `Tool`.
+///
+/// When used outside a graph context, the tool receives a default
+/// (empty) `ToolRuntime`.
+pub struct RuntimeAwareToolAdapter {
+    inner: Arc<dyn RuntimeAwareTool>,
+    runtime: Arc<tokio::sync::RwLock<Option<ToolRuntime>>>,
+}
+
+impl RuntimeAwareToolAdapter {
+    pub fn new(tool: Arc<dyn RuntimeAwareTool>) -> Self {
+        Self {
+            inner: tool,
+            runtime: Arc::new(tokio::sync::RwLock::new(None)),
+        }
+    }
+
+    pub async fn set_runtime(&self, runtime: ToolRuntime) {
+        *self.runtime.write().await = Some(runtime);
+    }
+}
+
+#[async_trait]
+impl Tool for RuntimeAwareToolAdapter {
+    fn name(&self) -> &'static str {
+        self.inner.name()
+    }
+
+    fn description(&self) -> &'static str {
+        self.inner.description()
+    }
+
+    fn parameters(&self) -> Option<Value> {
+        self.inner.parameters()
+    }
+
+    async fn call(&self, args: Value) -> Result<Value, SynapticError> {
+        let runtime = self.runtime.read().await.clone().unwrap_or(ToolRuntime {
+            store: None,
+            stream_writer: None,
+            state: None,
+            tool_call_id: String::new(),
+            config: None,
+        });
+        self.inner.call_with_runtime(args, runtime).await
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Entrypoint / Task metadata (used by proc macros)
+// ---------------------------------------------------------------------------
+
+/// Configuration for an `#[entrypoint]`-decorated function.
+#[derive(Debug, Clone)]
+pub struct EntrypointConfig {
+    pub name: &'static str,
+    pub checkpointer: Option<&'static str>,
+}
+
+/// An entrypoint wrapping an async function as a runnable workflow.
+///
+/// The `invoke_fn` field is a type-erased async function (`Value -> Result<Value, SynapticError>`).
+pub struct Entrypoint {
+    pub config: EntrypointConfig,
+    pub invoke_fn: Box<
+        dyn Fn(Value) -> Pin<Box<dyn Future<Output = Result<Value, SynapticError>> + Send>>
+            + Send
+            + Sync,
+    >,
+}
+
+impl Entrypoint {
+    pub async fn invoke(&self, input: Value) -> Result<Value, SynapticError> {
+        (self.invoke_fn)(input).await
     }
 }

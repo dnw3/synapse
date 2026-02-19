@@ -12,14 +12,21 @@ mod visualization;
 
 pub use builder::StateGraph;
 pub use checkpoint::{Checkpoint, CheckpointConfig, Checkpointer, MemorySaver};
-pub use command::{GraphCommand, GraphContext};
-pub use compiled::{CompiledGraph, GraphEvent, GraphStream, StreamMode};
+pub use command::{interrupt, Command, CommandGoto, GraphResult, Interrupt, NodeOutput};
+pub use compiled::{
+    CachePolicy, CompiledGraph, GraphEvent, GraphStream, MultiGraphEvent, MultiGraphStream,
+    StreamMode,
+};
 pub use edge::{ConditionalEdge, Edge, RouterFn};
 pub use node::{FnNode, Node};
-pub use prebuilt::{create_react_agent, create_react_agent_with_options, ReactAgentOptions};
+pub use prebuilt::{
+    create_agent, create_handoff_tool, create_react_agent, create_react_agent_with_options,
+    create_supervisor, create_swarm, AgentOptions, PostModelHook, PreModelHook, ReactAgentOptions,
+    SupervisorOptions, SwarmAgent, SwarmOptions,
+};
 pub use send::Send;
 pub use state::{MessageState, State};
-pub use tool_node::ToolNode;
+pub use tool_node::{tools_condition, ToolNode};
 
 /// Sentinel name for the graph start point.
 pub const START: &str = "__start__";

@@ -2,7 +2,7 @@ use std::fmt;
 use std::io::Write;
 use std::path::Path;
 
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 use crate::compiled::CompiledGraph;
 use crate::state::State;
@@ -206,7 +206,7 @@ impl<S: State> CompiledGraph<S> {
     ///
     /// Note: mermaid.ink returns JPEG from the `/img/` endpoint. For SVG output,
     /// use [`draw_mermaid_svg`](Self::draw_mermaid_svg) instead.
-    pub async fn draw_mermaid_png(&self, path: impl AsRef<Path>) -> Result<(), SynapseError> {
+    pub async fn draw_mermaid_png(&self, path: impl AsRef<Path>) -> Result<(), SynapticError> {
         self.fetch_mermaid_ink("img", path).await
     }
 
@@ -215,7 +215,7 @@ impl<S: State> CompiledGraph<S> {
     /// Requires internet access. The generated Mermaid text is URL-safe base64-encoded
     /// and sent to `https://mermaid.ink/svg/{encoded}`. The SVG response is written
     /// to the specified file path.
-    pub async fn draw_mermaid_svg(&self, path: impl AsRef<Path>) -> Result<(), SynapseError> {
+    pub async fn draw_mermaid_svg(&self, path: impl AsRef<Path>) -> Result<(), SynapticError> {
         self.fetch_mermaid_ink("svg", path).await
     }
 
@@ -223,7 +223,7 @@ impl<S: State> CompiledGraph<S> {
         &self,
         endpoint: &str,
         path: impl AsRef<Path>,
-    ) -> Result<(), SynapseError> {
+    ) -> Result<(), SynapticError> {
         use base64::Engine;
 
         let mermaid = self.draw_mermaid();
@@ -232,21 +232,21 @@ impl<S: State> CompiledGraph<S> {
 
         let response = reqwest::get(&url)
             .await
-            .map_err(|e| SynapseError::Graph(format!("mermaid.ink request failed: {e}")))?;
+            .map_err(|e| SynapticError::Graph(format!("mermaid.ink request failed: {e}")))?;
 
         if !response.status().is_success() {
-            return Err(SynapseError::Graph(format!(
+            return Err(SynapticError::Graph(format!(
                 "mermaid.ink returned status {}",
                 response.status()
             )));
         }
 
         let bytes = response.bytes().await.map_err(|e| {
-            SynapseError::Graph(format!("failed to read mermaid.ink response: {e}"))
+            SynapticError::Graph(format!("failed to read mermaid.ink response: {e}"))
         })?;
 
         std::fs::write(path, &bytes)
-            .map_err(|e| SynapseError::Graph(format!("failed to write image file: {e}")))?;
+            .map_err(|e| SynapticError::Graph(format!("failed to write image file: {e}")))?;
 
         Ok(())
     }
@@ -256,7 +256,7 @@ impl<S: State> CompiledGraph<S> {
     /// Requires `dot` (Graphviz) to be installed and available in `$PATH`.
     /// The DOT output is piped to `dot -Tpng` and the resulting PNG is written
     /// to the specified file path.
-    pub fn draw_png(&self, path: impl AsRef<Path>) -> Result<(), SynapseError> {
+    pub fn draw_png(&self, path: impl AsRef<Path>) -> Result<(), SynapticError> {
         let dot = self.draw_dot();
 
         let mut child = std::process::Command::new("dot")
@@ -266,7 +266,7 @@ impl<S: State> CompiledGraph<S> {
             .stderr(std::process::Stdio::piped())
             .spawn()
             .map_err(|e| {
-                SynapseError::Graph(format!(
+                SynapticError::Graph(format!(
                     "failed to run 'dot' command (is Graphviz installed?): {e}"
                 ))
             })?;
@@ -276,19 +276,21 @@ impl<S: State> CompiledGraph<S> {
             .take()
             .unwrap()
             .write_all(dot.as_bytes())
-            .map_err(|e| SynapseError::Graph(format!("failed to write to dot stdin: {e}")))?;
+            .map_err(|e| SynapticError::Graph(format!("failed to write to dot stdin: {e}")))?;
 
         let output = child
             .wait_with_output()
-            .map_err(|e| SynapseError::Graph(format!("dot command failed: {e}")))?;
+            .map_err(|e| SynapticError::Graph(format!("dot command failed: {e}")))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(SynapseError::Graph(format!("dot command failed: {stderr}")));
+            return Err(SynapticError::Graph(format!(
+                "dot command failed: {stderr}"
+            )));
         }
 
         std::fs::write(path, &output.stdout)
-            .map_err(|e| SynapseError::Graph(format!("failed to write PNG file: {e}")))?;
+            .map_err(|e| SynapticError::Graph(format!("failed to write PNG file: {e}")))?;
 
         Ok(())
     }

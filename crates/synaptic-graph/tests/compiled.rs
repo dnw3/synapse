@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use synaptic_core::SynapseError;
-use synaptic_graph::{CheckpointConfig, Checkpointer, MemorySaver, Node, State, StateGraph, END};
+use synaptic_core::SynapticError;
+use synaptic_graph::{
+    CheckpointConfig, Checkpointer, MemorySaver, Node, NodeOutput, State, StateGraph, END,
+};
 
 /// A simple test state with a counter and a log of visited nodes.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -26,10 +28,13 @@ struct IncrementNode {
 
 #[async_trait]
 impl Node<CounterState> for IncrementNode {
-    async fn process(&self, mut state: CounterState) -> Result<CounterState, SynapseError> {
+    async fn process(
+        &self,
+        mut state: CounterState,
+    ) -> Result<NodeOutput<CounterState>, SynapticError> {
         state.counter += 1;
         state.visited.push(self.name.clone());
-        Ok(state)
+        Ok(state.into())
     }
 }
 
@@ -44,7 +49,11 @@ async fn simple_linear_graph() {
         .compile()
         .unwrap();
 
-    let result = graph.invoke(CounterState::default()).await.unwrap();
+    let result = graph
+        .invoke(CounterState::default())
+        .await
+        .unwrap()
+        .into_state();
     assert_eq!(result.counter, 2);
     assert_eq!(result.visited, vec!["a", "b"]);
 }
@@ -85,7 +94,11 @@ async fn conditional_routing() {
         .unwrap();
 
     // counter starts at 0, start increments to 1 => route to "left"
-    let result = graph.invoke(CounterState::default()).await.unwrap();
+    let result = graph
+        .invoke(CounterState::default())
+        .await
+        .unwrap()
+        .into_state();
     assert_eq!(result.visited, vec!["start", "left"]);
 
     // counter starts at 5, start increments to 6 => route to "right"
@@ -93,7 +106,7 @@ async fn conditional_routing() {
         counter: 5,
         visited: vec![],
     };
-    let result = graph.invoke(state).await.unwrap();
+    let result = graph.invoke(state).await.unwrap().into_state();
     assert_eq!(result.visited, vec!["start", "right"]);
 }
 
@@ -115,12 +128,17 @@ async fn interrupt_before_stops_execution() {
     let config = CheckpointConfig::new("thread-1");
     let result = graph
         .invoke_with_config(CounterState::default(), Some(config.clone()))
-        .await;
+        .await
+        .unwrap();
 
-    // Should fail with interrupt error
-    let err = result.unwrap_err();
-    let msg = format!("{err}");
-    assert!(msg.contains("interrupted before node 'b'"), "got: {msg}");
+    // Should be interrupted
+    assert!(result.is_interrupted());
+    let interrupt_val = result.interrupt_value().unwrap();
+    let reason = interrupt_val["reason"].as_str().unwrap();
+    assert!(
+        reason.contains("interrupted before node 'b'"),
+        "got: {reason}"
+    );
 
     // Checkpoint should have been saved
     let cp = saver.get(&config).await.unwrap().unwrap();
@@ -145,11 +163,16 @@ async fn interrupt_after_stops_execution() {
     let config = CheckpointConfig::new("thread-2");
     let result = graph
         .invoke_with_config(CounterState::default(), Some(config.clone()))
-        .await;
+        .await
+        .unwrap();
 
-    let err = result.unwrap_err();
-    let msg = format!("{err}");
-    assert!(msg.contains("interrupted after node 'a'"), "got: {msg}");
+    assert!(result.is_interrupted());
+    let interrupt_val = result.interrupt_value().unwrap();
+    let reason = interrupt_val["reason"].as_str().unwrap();
+    assert!(
+        reason.contains("interrupted after node 'a'"),
+        "got: {reason}"
+    );
 }
 
 #[tokio::test]
@@ -191,7 +214,8 @@ async fn resume_from_checkpoint() {
     let result = graph2
         .invoke_with_config(CounterState::default(), Some(config))
         .await
-        .unwrap();
+        .unwrap()
+        .into_state();
 
     // The checkpoint state had counter=1, visited=["a"], then "b" runs
     assert_eq!(result.counter, 2);

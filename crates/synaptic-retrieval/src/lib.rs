@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 
 /// A document with content and metadata, used throughout the retrieval pipeline.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -53,7 +53,7 @@ impl Document {
 /// Trait for retrieving relevant documents given a query string.
 #[async_trait]
 pub trait Retriever: Send + Sync {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError>;
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError>;
 }
 
 /// A simple retriever that stores documents in memory and returns all of them for any query.
@@ -70,7 +70,7 @@ impl InMemoryRetriever {
 
 #[async_trait]
 impl Retriever for InMemoryRetriever {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapseError> {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError> {
         let query_terms = tokenize(query);
         let mut scored: Vec<(usize, &Document)> = self
             .documents

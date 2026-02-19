@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::SynapseError;
+use synaptic_core::SynapticError;
 use synaptic_retrieval::Document;
 
 use crate::Loader;
@@ -40,25 +40,25 @@ impl CsvLoader {
 
 #[async_trait]
 impl Loader for CsvLoader {
-    async fn load(&self) -> Result<Vec<Document>, SynapseError> {
+    async fn load(&self) -> Result<Vec<Document>, SynapticError> {
         let mut reader = csv::Reader::from_reader(self.data.as_bytes());
         let headers = reader
             .headers()
-            .map_err(|e| SynapseError::Loader(format!("CSV header error: {e}")))?
+            .map_err(|e| SynapticError::Loader(format!("CSV header error: {e}")))?
             .clone();
 
         let mut docs = Vec::new();
 
         for (i, result) in reader.records().enumerate() {
             let record =
-                result.map_err(|e| SynapseError::Loader(format!("CSV row {i} error: {e}")))?;
+                result.map_err(|e| SynapticError::Loader(format!("CSV row {i} error: {e}")))?;
 
             let id = if let Some(id_col) = &self.id_column {
                 let idx = headers
                     .iter()
                     .position(|h| h == id_col.as_str())
                     .ok_or_else(|| {
-                        SynapseError::Loader(format!("id column '{id_col}' not found"))
+                        SynapticError::Loader(format!("id column '{id_col}' not found"))
                     })?;
                 record.get(idx).unwrap_or("").to_string()
             } else {
@@ -70,7 +70,7 @@ impl Loader for CsvLoader {
                     .iter()
                     .position(|h| h == content_col.as_str())
                     .ok_or_else(|| {
-                        SynapseError::Loader(format!("content column '{content_col}' not found"))
+                        SynapticError::Loader(format!("content column '{content_col}' not found"))
                     })?;
                 record.get(idx).unwrap_or("").to_string()
             } else {

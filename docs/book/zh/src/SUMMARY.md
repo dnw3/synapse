@@ -120,6 +120,8 @@
     - [评估器](how-to/evaluation/evaluators.md)
     - [数据集](how-to/evaluation/dataset.md)
 - [宏](how-to/macros.md)
+    - [中间件宏](how-to/macros-middleware.md)
+    - [宏使用示例](how-to/macros-examples.md)
 
 # 核心概念
 

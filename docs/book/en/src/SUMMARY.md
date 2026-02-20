@@ -120,6 +120,8 @@
     - [Evaluators](how-to/evaluation/evaluators.md)
     - [Datasets](how-to/evaluation/dataset.md)
 - [Macros](how-to/macros.md)
+    - [Middleware Macros](how-to/macros-middleware.md)
+    - [Macro Examples](how-to/macros-examples.md)
 
 # Concepts
 

@@ -92,7 +92,7 @@ tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
 [dependencies]
 synaptic = { version = "0.2", features = ["agent"] }
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
-async-trait = "0.2"
+async-trait = "0.1"
 ```
 
 **RAG 应用：**

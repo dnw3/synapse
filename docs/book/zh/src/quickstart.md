@@ -15,8 +15,7 @@ cd synaptic-quickstart
 
 ```toml
 [dependencies]
-synaptic-core = "0.2"
-synaptic-models = "0.2"
+synaptic = { version = "0.2", features = ["models"] }
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
 ```
 

@@ -128,7 +128,7 @@ on your parameter types.
 
 ```toml
 [dependencies]
-synaptic = { version = "0.1", features = ["macros", "schemars"] }
+synaptic = { version = "0.2", features = ["macros", "schemars"] }
 schemars = { version = "0.8", features = ["derive"] }
 ```
 
@@ -1115,7 +1115,7 @@ shared store and tool call ID are injected transparently by the agent runtime.
 
 ```toml
 [dependencies]
-synaptic = { version = "0.1", features = ["agent", "store", "schemars"] }
+synaptic = { version = "0.2", features = ["agent", "store", "schemars"] }
 schemars = { version = "0.8", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

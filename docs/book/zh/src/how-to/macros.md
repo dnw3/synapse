@@ -131,7 +131,7 @@ async fn analyze(
 
 ```toml
 [dependencies]
-synaptic = { version = "0.1", features = ["macros", "schemars"] }
+synaptic = { version = "0.2", features = ["macros", "schemars"] }
 schemars = { version = "0.8", features = ["derive"] }
 ```
 
@@ -1087,7 +1087,7 @@ fn build_middleware_stack() -> Vec<Arc<dyn AgentMiddleware>> {
 
 ```toml
 [dependencies]
-synaptic = { version = "0.1", features = ["agent", "store", "schemars"] }
+synaptic = { version = "0.2", features = ["agent", "store", "schemars"] }
 schemars = { version = "0.8", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

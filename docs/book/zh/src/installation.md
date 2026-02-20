@@ -18,22 +18,22 @@ Synaptic 提供类似 tokio 的细粒度 feature flags：
 ```toml
 [dependencies]
 # 全量引入（等同之前的默认行为）
-synaptic = { version = "0.1", features = ["full"] }
+synaptic = { version = "0.2", features = ["full"] }
 
 # Agent 开发（自动包含 models, tools, graph, memory 等）
-synaptic = { version = "0.1", features = ["agent"] }
+synaptic = { version = "0.2", features = ["agent"] }
 
 # RAG 应用（自动包含 retrieval, loaders, splitters, embeddings, vectorstores 等）
-synaptic = { version = "0.1", features = ["rag"] }
+synaptic = { version = "0.2", features = ["rag"] }
 
 # Agent + RAG
-synaptic = { version = "0.1", features = ["agent", "rag"] }
+synaptic = { version = "0.2", features = ["agent", "rag"] }
 
 # 最小化 — 只要模型调用
-synaptic = { version = "0.1", features = ["models"] }
+synaptic = { version = "0.2", features = ["models"] }
 
 # 精细控制
-synaptic = { version = "0.1", features = ["models", "graph", "cache"] }
+synaptic = { version = "0.2", features = ["models", "graph", "cache"] }
 ```
 
 | Feature | 说明 |
@@ -68,9 +68,9 @@ use synaptic::models::OpenAiChatModel;
 
 ```toml
 [dependencies]
-synaptic-core = "0.1"
-synaptic-models = "0.1"
-synaptic-runnables = "0.1"
+synaptic-core = "0.2"
+synaptic-models = "0.2"
+synaptic-runnables = "0.2"
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -82,7 +82,7 @@ tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
 
 ```toml
 [dependencies]
-synaptic = { version = "0.1", features = ["models"] }
+synaptic = { version = "0.2", features = ["models"] }
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -90,16 +90,16 @@ tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
 
 ```toml
 [dependencies]
-synaptic = { version = "0.1", features = ["agent"] }
+synaptic = { version = "0.2", features = ["agent"] }
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
-async-trait = "0.1"
+async-trait = "0.2"
 ```
 
 **RAG 应用：**
 
 ```toml
 [dependencies]
-synaptic = { version = "0.1", features = ["rag"] }
+synaptic = { version = "0.2", features = ["rag"] }
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread"] }
 ```
 

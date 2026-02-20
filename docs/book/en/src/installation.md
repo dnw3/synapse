@@ -17,22 +17,22 @@ Synaptic provides fine-grained feature flags, similar to tokio:
 ```toml
 [dependencies]
 # Full — everything enabled (equivalent to previous default)
-synaptic = { version = "0.1", features = ["full"] }
+synaptic = { version = "0.2", features = ["full"] }
 
 # Agent development (models, tools, graph, memory, etc.)
-synaptic = { version = "0.1", features = ["agent"] }
+synaptic = { version = "0.2", features = ["agent"] }
 
 # RAG applications (retrieval, loaders, splitters, embeddings, vectorstores, etc.)
-synaptic = { version = "0.1", features = ["rag"] }
+synaptic = { version = "0.2", features = ["rag"] }
 
 # Agent + RAG
-synaptic = { version = "0.1", features = ["agent", "rag"] }
+synaptic = { version = "0.2", features = ["agent", "rag"] }
 
 # Minimal — just model calls
-synaptic = { version = "0.1", features = ["models"] }
+synaptic = { version = "0.2", features = ["models"] }
 
 # Fine-grained control
-synaptic = { version = "0.1", features = ["models", "graph", "cache"] }
+synaptic = { version = "0.2", features = ["models", "graph", "cache"] }
 ```
 
 | Feature | Description |

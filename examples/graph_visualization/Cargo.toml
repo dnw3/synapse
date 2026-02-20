@@ -9,6 +9,4 @@ async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-synaptic = { version = "0.2", path = "../../crates/synaptic", features = ["agent"] }
-synaptic-core = { workspace = true }
-synaptic-macros = { workspace = true }
+synaptic = { version = "0.2", path = "../../crates/synaptic", features = ["agent", "macros"] }

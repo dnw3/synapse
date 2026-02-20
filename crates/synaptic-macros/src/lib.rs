@@ -26,6 +26,7 @@ extern crate proc_macro;
 mod chain;
 mod entrypoint;
 mod middleware;
+mod paths;
 mod task;
 mod tool;
 mod traceable;

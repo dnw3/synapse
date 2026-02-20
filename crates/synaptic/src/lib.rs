@@ -20,6 +20,18 @@
 //! use synaptic::runnables::{Runnable, RunnableLambda, RunnableAssign, RunnablePick};
 //! ```
 
+// Re-export internal crates under their original names so proc-macro generated code
+// (which references `::synaptic::synaptic_core`, etc. via `proc-macro-crate` detection)
+// can resolve correctly when downstream crates only depend on the `synaptic` facade.
+#[doc(hidden)]
+pub extern crate synaptic_core;
+#[cfg(feature = "middleware")]
+#[doc(hidden)]
+pub extern crate synaptic_middleware;
+#[cfg(feature = "runnables")]
+#[doc(hidden)]
+pub extern crate synaptic_runnables;
+
 /// Core traits and types: ChatModel, Message, ToolChoice, SynapticError, RunnableConfig, etc.
 /// Always available.
 pub use synaptic_core as core;

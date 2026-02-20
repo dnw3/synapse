@@ -4,7 +4,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use synaptic::core::{ChatModel, ChatRequest, ChatResponse, ChatStream, SynapticError, Tool};
 use synaptic::graph::{MessageState, Node, NodeOutput, StateGraph, END};
-use synaptic_macros::tool;
+use synaptic::macros::tool;
 
 /// Search the web
 #[tool(name = "search")]

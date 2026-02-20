@@ -5,6 +5,8 @@ use syn::{
     PatType, ReturnType, Token, Type,
 };
 
+use crate::paths;
+
 // ---------------------------------------------------------------------------
 // Attribute-level config: #[tool(name = "...", description = "...")]
 // ---------------------------------------------------------------------------
@@ -252,9 +254,10 @@ fn type_to_json_schema(ty: &Type) -> TokenStream {
 
 #[cfg(feature = "schemars")]
 fn unknown_type_schema(inner: &Type) -> TokenStream {
+    let core_crate = paths::core_path();
     quote! {
         {
-            let __root = ::synaptic_core::schemars::gen::SchemaGenerator::default()
+            let __root = #core_crate::schemars::gen::SchemaGenerator::default()
                 .into_root_schema_for::<#inner>();
             let mut __val = ::serde_json::to_value(&__root.schema)
                 .unwrap_or(::serde_json::json!({"type": "object"}));
@@ -284,6 +287,7 @@ fn gen_param_deser(param: &ParamInfo) -> TokenStream {
     let name_str = &param.name;
     let ident = format_ident!("{}", &param.name);
     let ty = &param.ty;
+    let core_crate = paths::core_path();
 
     if param.is_option {
         let inner_ty = inner_option_type(ty).unwrap();
@@ -292,7 +296,7 @@ fn gen_param_deser(param: &ParamInfo) -> TokenStream {
                 Some(::serde_json::Value::Null) | None => None,
                 Some(__v) => Some(
                     ::serde_json::from_value::<#inner_ty>(__v.clone())
-                        .map_err(|__e| ::synaptic_core::SynapticError::Tool(
+                        .map_err(|__e| #core_crate::SynapticError::Tool(
                             format!("invalid parameter '{}': {}", #name_str, __e)
                         ))?
                 ),
@@ -303,7 +307,7 @@ fn gen_param_deser(param: &ParamInfo) -> TokenStream {
             let #ident: #ty = match __args.get(#name_str) {
                 Some(::serde_json::Value::Null) | None => #default_expr,
                 Some(__v) => ::serde_json::from_value(__v.clone())
-                    .map_err(|__e| ::synaptic_core::SynapticError::Tool(
+                    .map_err(|__e| #core_crate::SynapticError::Tool(
                         format!("invalid parameter '{}': {}", #name_str, __e)
                     ))?,
             };
@@ -313,10 +317,10 @@ fn gen_param_deser(param: &ParamInfo) -> TokenStream {
             let #ident: #ty = ::serde_json::from_value(
                 __args.get(#name_str)
                     .cloned()
-                    .ok_or_else(|| ::synaptic_core::SynapticError::Tool(
+                    .ok_or_else(|| #core_crate::SynapticError::Tool(
                         format!("missing required parameter: {}", #name_str)
                     ))?
-            ).map_err(|__e| ::synaptic_core::SynapticError::Tool(
+            ).map_err(|__e| #core_crate::SynapticError::Tool(
                 format!("invalid parameter '{}': {}", #name_str, __e)
             ))?;
         }
@@ -326,13 +330,14 @@ fn gen_param_deser(param: &ParamInfo) -> TokenStream {
 fn gen_inject_deser(param: &ParamInfo) -> TokenStream {
     let ident = format_ident!("{}", &param.name);
     let ty = &param.ty;
+    let core_crate = paths::core_path();
 
     match param.inject.as_ref().unwrap() {
         InjectKind::State => {
             quote! {
                 let #ident: #ty = ::serde_json::from_value(
                     __runtime.state.clone().unwrap_or(::serde_json::Value::Null)
-                ).map_err(|__e| ::synaptic_core::SynapticError::Tool(
+                ).map_err(|__e| #core_crate::SynapticError::Tool(
                     format!("failed to inject state: {}", __e)
                 ))?;
             }
@@ -340,7 +345,7 @@ fn gen_inject_deser(param: &ParamInfo) -> TokenStream {
         InjectKind::Store => {
             quote! {
                 let #ident: #ty = __runtime.store.clone()
-                    .ok_or_else(|| ::synaptic_core::SynapticError::Tool(
+                    .ok_or_else(|| #core_crate::SynapticError::Tool(
                         "inject(store): no store in runtime".into()
                     ))?;
             }
@@ -562,6 +567,8 @@ pub fn expand_tool(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStr
         }
     };
 
+    let core_crate = paths::core_path();
+
     if has_inject {
         // Generate RuntimeAwareTool impl
         Ok(quote! {
@@ -571,7 +578,7 @@ pub fn expand_tool(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStr
             #struct_def
 
             #[::async_trait::async_trait]
-            impl ::synaptic_core::RuntimeAwareTool for #struct_name {
+            impl #core_crate::RuntimeAwareTool for #struct_name {
                 fn name(&self) -> &'static str {
                     #tool_name_str
                 }
@@ -587,18 +594,18 @@ pub fn expand_tool(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStr
                 async fn call_with_runtime(
                     &self,
                     __args: ::serde_json::Value,
-                    __runtime: ::synaptic_core::ToolRuntime,
-                ) -> Result<::serde_json::Value, ::synaptic_core::SynapticError> {
+                    __runtime: #core_crate::ToolRuntime,
+                ) -> Result<::serde_json::Value, #core_crate::SynapticError> {
                     #(#deser_stmts)*
                     let __result = #impl_fn_name(#(#param_idents),*).await?;
                     ::serde_json::to_value(__result)
-                        .map_err(|__e| ::synaptic_core::SynapticError::Tool(
+                        .map_err(|__e| #core_crate::SynapticError::Tool(
                             format!("failed to serialize result: {}", __e)
                         ))
                 }
             }
 
-            #vis fn #fn_name(#(#factory_params),*) -> ::std::sync::Arc<dyn ::synaptic_core::RuntimeAwareTool> {
+            #vis fn #fn_name(#(#factory_params),*) -> ::std::sync::Arc<dyn #core_crate::RuntimeAwareTool> {
                 ::std::sync::Arc::new(#factory_construction)
             }
         })
@@ -611,7 +618,7 @@ pub fn expand_tool(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStr
             #struct_def
 
             #[::async_trait::async_trait]
-            impl ::synaptic_core::Tool for #struct_name {
+            impl #core_crate::Tool for #struct_name {
                 fn name(&self) -> &'static str {
                     #tool_name_str
                 }
@@ -624,17 +631,17 @@ pub fn expand_tool(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStr
                     #parameters_body
                 }
 
-                async fn call(&self, __args: ::serde_json::Value) -> Result<::serde_json::Value, ::synaptic_core::SynapticError> {
+                async fn call(&self, __args: ::serde_json::Value) -> Result<::serde_json::Value, #core_crate::SynapticError> {
                     #(#deser_stmts)*
                     let __result = #impl_fn_name(#(#param_idents),*).await?;
                     ::serde_json::to_value(__result)
-                        .map_err(|__e| ::synaptic_core::SynapticError::Tool(
+                        .map_err(|__e| #core_crate::SynapticError::Tool(
                             format!("failed to serialize result: {}", __e)
                         ))
                 }
             }
 
-            #vis fn #fn_name(#(#factory_params),*) -> ::std::sync::Arc<dyn ::synaptic_core::Tool> {
+            #vis fn #fn_name(#(#factory_params),*) -> ::std::sync::Arc<dyn #core_crate::Tool> {
                 ::std::sync::Arc::new(#factory_construction)
             }
         })

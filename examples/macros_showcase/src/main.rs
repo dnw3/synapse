@@ -27,13 +27,13 @@
 use std::sync::Arc;
 
 use serde_json::{json, Value};
-use synaptic_core::{Message, RunnableConfig, RuntimeAwareTool, SynapticError, ToolRuntime};
-use synaptic_macros::{
+use synaptic::core::{Message, RunnableConfig, RuntimeAwareTool, SynapticError, ToolRuntime};
+use synaptic::macros::{
     after_agent, after_model, before_agent, before_model, chain, dynamic_prompt, entrypoint, task,
     tool, traceable,
 };
-use synaptic_middleware::{AgentMiddleware, ModelRequest, ModelResponse};
-use synaptic_runnables::Runnable;
+use synaptic::middleware::{AgentMiddleware, ModelRequest, ModelResponse};
+use synaptic::runnables::Runnable;
 
 // ============================================================================
 // 1. #[tool] -- Basic tool

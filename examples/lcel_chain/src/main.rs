@@ -1,9 +1,9 @@
 use serde_json::{json, Value};
 use synaptic::core::{RunnableConfig, SynapticError};
+use synaptic::macros::chain;
 use synaptic::runnables::{
     BoxRunnable, Runnable, RunnableLambda, RunnableParallel, RunnablePassthrough,
 };
-use synaptic_macros::chain;
 
 // ---------------------------------------------------------------------------
 // #[chain] functions used in RunnableParallel (Value output)

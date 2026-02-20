@@ -2,6 +2,8 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse::Parser, parse2, punctuated::Punctuated, Expr, ItemFn, Lit, Meta, Token};
 
+use crate::paths;
+
 // ---------------------------------------------------------------------------
 // Attribute-level config: #[entrypoint(name = "...", checkpointer = "...")]
 // ---------------------------------------------------------------------------
@@ -105,10 +107,12 @@ pub fn expand_entrypoint(attr: TokenStream, item: TokenStream) -> syn::Result<To
 
     let (param_ident, param_ty) = &params[0];
 
+    let core_crate = paths::core_path();
+
     Ok(quote! {
-        #vis fn #fn_name() -> ::synaptic_core::Entrypoint {
-            ::synaptic_core::Entrypoint {
-                config: ::synaptic_core::EntrypointConfig {
+        #vis fn #fn_name() -> #core_crate::Entrypoint {
+            #core_crate::Entrypoint {
+                config: #core_crate::EntrypointConfig {
                     name: #ep_name_str,
                     checkpointer: #checkpointer_expr,
                 },

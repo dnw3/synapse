@@ -10,7 +10,7 @@ build-dir = "../../dist/zh"
 create-missing = false
 
 [output.html]
-default-theme = "navy"
+default-theme = "light"
 preferred-dark-theme = "ayu"
 git-repository-url = "https://github.com/dnw3/synaptic"
 git-repository-icon = "fa-github"

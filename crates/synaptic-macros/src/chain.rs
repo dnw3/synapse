@@ -2,6 +2,8 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse2, GenericArgument, ItemFn, PathArguments, ReturnType, Type};
 
+use crate::paths;
+
 /// Check if a type is `Value` or `serde_json::Value`.
 fn is_value_type(ty: &Type) -> bool {
     if let Type::Path(tp) = ty {
@@ -108,6 +110,9 @@ pub fn expand_chain(attr: TokenStream, item: TokenStream) -> syn::Result<TokenSt
     let ok_type = extract_result_ok_type(&func.sig.output);
     let needs_serialize = ok_type.is_none_or(is_value_type);
 
+    let core_crate = paths::core_path();
+    let runnables_crate = paths::runnables_path();
+
     // For a single-parameter function, generate a simple RunnableLambda
     if param_idents.len() == 1 {
         let p_ident = &param_idents[0];
@@ -117,12 +122,12 @@ pub fn expand_chain(attr: TokenStream, item: TokenStream) -> syn::Result<TokenSt
             Ok(quote! {
                 #impl_func
 
-                #vis fn #fn_name() -> ::synaptic_runnables::BoxRunnable<#p_type, ::serde_json::Value> {
-                    ::synaptic_runnables::RunnableLambda::new(
+                #vis fn #fn_name() -> #runnables_crate::BoxRunnable<#p_type, ::serde_json::Value> {
+                    #runnables_crate::RunnableLambda::new(
                         |#p_ident: #p_type| async move {
                             let __result = #impl_fn_name(#p_ident).await?;
                             ::serde_json::to_value(__result)
-                                .map_err(|__e| ::synaptic_core::SynapticError::Parsing(
+                                .map_err(|__e| #core_crate::SynapticError::Parsing(
                                     format!("chain serialization error: {}", __e)
                                 ))
                         }
@@ -134,8 +139,8 @@ pub fn expand_chain(attr: TokenStream, item: TokenStream) -> syn::Result<TokenSt
             Ok(quote! {
                 #impl_func
 
-                #vis fn #fn_name() -> ::synaptic_runnables::BoxRunnable<#p_type, #out_type> {
-                    ::synaptic_runnables::RunnableLambda::new(
+                #vis fn #fn_name() -> #runnables_crate::BoxRunnable<#p_type, #out_type> {
+                    #runnables_crate::RunnableLambda::new(
                         |#p_ident: #p_type| async move {
                             #impl_fn_name(#p_ident).await
                         }
@@ -149,12 +154,12 @@ pub fn expand_chain(attr: TokenStream, item: TokenStream) -> syn::Result<TokenSt
             Ok(quote! {
                 #impl_func
 
-                #vis fn #fn_name() -> ::synaptic_runnables::BoxRunnable<::serde_json::Value, ::serde_json::Value> {
-                    ::synaptic_runnables::RunnableLambda::new(
+                #vis fn #fn_name() -> #runnables_crate::BoxRunnable<::serde_json::Value, ::serde_json::Value> {
+                    #runnables_crate::RunnableLambda::new(
                         |__input: ::serde_json::Value| async move {
                             let __result = #impl_fn_name(__input).await?;
                             ::serde_json::to_value(__result)
-                                .map_err(|__e| ::synaptic_core::SynapticError::Parsing(
+                                .map_err(|__e| #core_crate::SynapticError::Parsing(
                                     format!("chain serialization error: {}", __e)
                                 ))
                         }
@@ -166,8 +171,8 @@ pub fn expand_chain(attr: TokenStream, item: TokenStream) -> syn::Result<TokenSt
             Ok(quote! {
                 #impl_func
 
-                #vis fn #fn_name() -> ::synaptic_runnables::BoxRunnable<::serde_json::Value, #out_type> {
-                    ::synaptic_runnables::RunnableLambda::new(
+                #vis fn #fn_name() -> #runnables_crate::BoxRunnable<::serde_json::Value, #out_type> {
+                    #runnables_crate::RunnableLambda::new(
                         |__input: ::serde_json::Value| async move {
                             #impl_fn_name(__input).await
                         }

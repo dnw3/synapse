@@ -70,26 +70,49 @@ th {
     font-weight: 600;
 }
 
-/* Admonition-style info boxes */
+/* Admonition-style info boxes — light themes */
+.light .warning, .rust .warning {
+    border-left: 4px solid #d97706;
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.light .info, .rust .info {
+    border-left: 4px solid #2563eb;
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.light .tip, .rust .tip {
+    border-left: 4px solid #059669;
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+/* Admonition-style info boxes — dark themes */
+.coal .warning, .navy .warning, .ayu .warning {
+    border-left: 4px solid #e6a700;
+    background-color: rgba(230, 167, 0, 0.12);
+    color: #fbbf24;
+}
+
+.coal .info, .navy .info, .ayu .info {
+    border-left: 4px solid #3b82f6;
+    background-color: rgba(59, 130, 246, 0.12);
+    color: #93c5fd;
+}
+
+.coal .tip, .navy .tip, .ayu .tip {
+    border-left: 4px solid #10b981;
+    background-color: rgba(16, 185, 129, 0.12);
+    color: #6ee7b7;
+}
+
+/* Shared admonition layout */
 .warning, .info, .tip {
     padding: 12px 16px;
     border-radius: 4px;
     margin: 1em 0;
-}
-
-.warning {
-    border-left: 4px solid #e6a700;
-    background-color: rgba(230, 167, 0, 0.1);
-}
-
-.info {
-    border-left: 4px solid #3b82f6;
-    background-color: rgba(59, 130, 246, 0.1);
-}
-
-.tip {
-    border-left: 4px solid #10b981;
-    background-color: rgba(16, 185, 129, 0.1);
 }
 
 /* Badge styling for introduction page */

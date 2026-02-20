@@ -2,6 +2,8 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse2, FnArg, ItemFn, Pat, Type};
 
+use crate::paths;
+
 // ---------------------------------------------------------------------------
 // Helper: PascalCase
 // ---------------------------------------------------------------------------
@@ -89,9 +91,10 @@ fn gen_middleware_factory(
     struct_name: &syn::Ident,
     fields: &[FieldParam],
 ) -> TokenStream {
+    let mw_crate = paths::middleware_path();
     if fields.is_empty() {
         quote! {
-            #vis fn #fn_name() -> ::std::sync::Arc<dyn ::synaptic_middleware::AgentMiddleware> {
+            #vis fn #fn_name() -> ::std::sync::Arc<dyn #mw_crate::AgentMiddleware> {
                 ::std::sync::Arc::new(#struct_name)
             }
         }
@@ -106,7 +109,7 @@ fn gen_middleware_factory(
             .collect();
         let inits: Vec<&syn::Ident> = fields.iter().map(|f| &f.ident).collect();
         quote! {
-            #vis fn #fn_name(#(#params),*) -> ::std::sync::Arc<dyn ::synaptic_middleware::AgentMiddleware> {
+            #vis fn #fn_name(#(#params),*) -> ::std::sync::Arc<dyn #mw_crate::AgentMiddleware> {
                 ::std::sync::Arc::new(#struct_name { #(#inits),* })
             }
         }
@@ -163,17 +166,20 @@ pub fn expand_before_agent(attr: TokenStream, item: TokenStream) -> syn::Result<
     let field_clones = gen_field_clones(&fields);
     let fidents = field_idents(&fields);
 
+    let core_crate = paths::core_path();
+    let mw_crate = paths::middleware_path();
+
     Ok(quote! {
         #impl_func
 
         #struct_def
 
         #[::async_trait::async_trait]
-        impl ::synaptic_middleware::AgentMiddleware for #struct_name {
+        impl #mw_crate::AgentMiddleware for #struct_name {
             async fn before_agent(
                 &self,
-                messages: &mut Vec<::synaptic_core::Message>,
-            ) -> Result<(), ::synaptic_core::SynapticError> {
+                messages: &mut Vec<#core_crate::Message>,
+            ) -> Result<(), #core_crate::SynapticError> {
                 #(#field_clones)*
                 #impl_fn_name(#(#fidents,)* messages).await
             }
@@ -217,17 +223,20 @@ pub fn expand_before_model(attr: TokenStream, item: TokenStream) -> syn::Result<
     let field_clones = gen_field_clones(&fields);
     let fidents = field_idents(&fields);
 
+    let core_crate = paths::core_path();
+    let mw_crate = paths::middleware_path();
+
     Ok(quote! {
         #impl_func
 
         #struct_def
 
         #[::async_trait::async_trait]
-        impl ::synaptic_middleware::AgentMiddleware for #struct_name {
+        impl #mw_crate::AgentMiddleware for #struct_name {
             async fn before_model(
                 &self,
-                request: &mut ::synaptic_middleware::ModelRequest,
-            ) -> Result<(), ::synaptic_core::SynapticError> {
+                request: &mut #mw_crate::ModelRequest,
+            ) -> Result<(), #core_crate::SynapticError> {
                 #(#field_clones)*
                 #impl_fn_name(#(#fidents,)* request).await
             }
@@ -271,18 +280,21 @@ pub fn expand_after_model(attr: TokenStream, item: TokenStream) -> syn::Result<T
     let field_clones = gen_field_clones(&fields);
     let fidents = field_idents(&fields);
 
+    let core_crate = paths::core_path();
+    let mw_crate = paths::middleware_path();
+
     Ok(quote! {
         #impl_func
 
         #struct_def
 
         #[::async_trait::async_trait]
-        impl ::synaptic_middleware::AgentMiddleware for #struct_name {
+        impl #mw_crate::AgentMiddleware for #struct_name {
             async fn after_model(
                 &self,
-                request: &::synaptic_middleware::ModelRequest,
-                response: &mut ::synaptic_middleware::ModelResponse,
-            ) -> Result<(), ::synaptic_core::SynapticError> {
+                request: &#mw_crate::ModelRequest,
+                response: &mut #mw_crate::ModelResponse,
+            ) -> Result<(), #core_crate::SynapticError> {
                 #(#field_clones)*
                 #impl_fn_name(#(#fidents,)* request, response).await
             }
@@ -326,17 +338,20 @@ pub fn expand_after_agent(attr: TokenStream, item: TokenStream) -> syn::Result<T
     let field_clones = gen_field_clones(&fields);
     let fidents = field_idents(&fields);
 
+    let core_crate = paths::core_path();
+    let mw_crate = paths::middleware_path();
+
     Ok(quote! {
         #impl_func
 
         #struct_def
 
         #[::async_trait::async_trait]
-        impl ::synaptic_middleware::AgentMiddleware for #struct_name {
+        impl #mw_crate::AgentMiddleware for #struct_name {
             async fn after_agent(
                 &self,
-                messages: &mut Vec<::synaptic_core::Message>,
-            ) -> Result<(), ::synaptic_core::SynapticError> {
+                messages: &mut Vec<#core_crate::Message>,
+            ) -> Result<(), #core_crate::SynapticError> {
                 #(#field_clones)*
                 #impl_fn_name(#(#fidents,)* messages).await
             }
@@ -380,18 +395,21 @@ pub fn expand_wrap_model_call(attr: TokenStream, item: TokenStream) -> syn::Resu
     let field_clones = gen_field_clones(&fields);
     let fidents = field_idents(&fields);
 
+    let core_crate = paths::core_path();
+    let mw_crate = paths::middleware_path();
+
     Ok(quote! {
         #impl_func
 
         #struct_def
 
         #[::async_trait::async_trait]
-        impl ::synaptic_middleware::AgentMiddleware for #struct_name {
+        impl #mw_crate::AgentMiddleware for #struct_name {
             async fn wrap_model_call(
                 &self,
-                request: ::synaptic_middleware::ModelRequest,
-                next: &dyn ::synaptic_middleware::ModelCaller,
-            ) -> Result<::synaptic_middleware::ModelResponse, ::synaptic_core::SynapticError> {
+                request: #mw_crate::ModelRequest,
+                next: &dyn #mw_crate::ModelCaller,
+            ) -> Result<#mw_crate::ModelResponse, #core_crate::SynapticError> {
                 #(#field_clones)*
                 #impl_fn_name(#(#fidents,)* request, next).await
             }
@@ -435,18 +453,21 @@ pub fn expand_wrap_tool_call(attr: TokenStream, item: TokenStream) -> syn::Resul
     let field_clones = gen_field_clones(&fields);
     let fidents = field_idents(&fields);
 
+    let core_crate = paths::core_path();
+    let mw_crate = paths::middleware_path();
+
     Ok(quote! {
         #impl_func
 
         #struct_def
 
         #[::async_trait::async_trait]
-        impl ::synaptic_middleware::AgentMiddleware for #struct_name {
+        impl #mw_crate::AgentMiddleware for #struct_name {
             async fn wrap_tool_call(
                 &self,
-                request: ::synaptic_middleware::ToolCallRequest,
-                next: &dyn ::synaptic_middleware::ToolCaller,
-            ) -> Result<::serde_json::Value, ::synaptic_core::SynapticError> {
+                request: #mw_crate::ToolCallRequest,
+                next: &dyn #mw_crate::ToolCaller,
+            ) -> Result<::serde_json::Value, #core_crate::SynapticError> {
                 #(#field_clones)*
                 #impl_fn_name(#(#fidents,)* request, next).await
             }
@@ -492,6 +513,9 @@ pub fn expand_dynamic_prompt(attr: TokenStream, item: TokenStream) -> syn::Resul
     let field_clones = gen_field_clones(&fields);
     let fidents = field_idents(&fields);
 
+    let core_crate = paths::core_path();
+    let mw_crate = paths::middleware_path();
+
     // dynamic_prompt is special: the user function takes &[Message]
     // but the trait method receives &mut ModelRequest. We bind
     // `messages` from `request.messages` so the impl_fn gets &[Message].
@@ -501,11 +525,11 @@ pub fn expand_dynamic_prompt(attr: TokenStream, item: TokenStream) -> syn::Resul
         #struct_def
 
         #[::async_trait::async_trait]
-        impl ::synaptic_middleware::AgentMiddleware for #struct_name {
+        impl #mw_crate::AgentMiddleware for #struct_name {
             async fn before_model(
                 &self,
-                request: &mut ::synaptic_middleware::ModelRequest,
-            ) -> Result<(), ::synaptic_core::SynapticError> {
+                request: &mut #mw_crate::ModelRequest,
+            ) -> Result<(), #core_crate::SynapticError> {
                 #(#field_clones)*
                 let prompt = #impl_fn_name(#(#fidents,)* &request.messages);
                 request.system_prompt = Some(prompt);

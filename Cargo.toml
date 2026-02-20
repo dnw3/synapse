@@ -41,10 +41,10 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.2.1"
+version = "0.2.2"
 license = "MIT"
 authors = ["Synaptic Contributors"]
-rust-version = "1.82"
+rust-version = "1.83"
 description = "A Rust agent framework with LangChain-compatible architecture"
 repository = "https://github.com/dnw3/synaptic"
 homepage = "https://dnw3.github.io/synaptic/"

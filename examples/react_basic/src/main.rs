@@ -6,7 +6,7 @@ use synaptic::core::{
     ChatModel, ChatRequest, ChatResponse, Message, SynapticError, Tool, ToolCall,
 };
 use synaptic::graph::{create_react_agent, MessageState};
-use synaptic_macros::{tool, traceable};
+use synaptic::macros::{tool, traceable};
 
 struct DemoModel;
 

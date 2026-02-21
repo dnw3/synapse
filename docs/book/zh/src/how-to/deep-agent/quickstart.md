@@ -37,7 +37,7 @@ let backend = Arc::new(StateBackend::new());
 
 ```rust,ignore
 use synaptic::deep::{create_deep_agent, DeepAgentOptions};
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 use std::sync::Arc;
 
 let model = Arc::new(OpenAiChatModel::new("gpt-4o"));
@@ -110,7 +110,7 @@ use std::sync::Arc;
 use synaptic::core::Message;
 use synaptic::deep::{create_deep_agent, DeepAgentOptions, backend::FilesystemBackend};
 use synaptic::graph::MessageState;
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

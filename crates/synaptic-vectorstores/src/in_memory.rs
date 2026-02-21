@@ -2,9 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::SynapticError;
-use synaptic_embeddings::Embeddings;
-use synaptic_retrieval::{Document, Retriever};
+use synaptic_core::{Document, Embeddings, Retriever, SynapticError};
 use tokio::sync::RwLock;
 
 use crate::VectorStore;

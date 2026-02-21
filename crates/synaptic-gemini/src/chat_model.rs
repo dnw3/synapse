@@ -6,8 +6,7 @@ use synaptic_core::{
     AIMessageChunk, ChatModel, ChatRequest, ChatResponse, ChatStream, Message, SynapticError,
     TokenUsage, ToolCall, ToolChoice, ToolDefinition,
 };
-
-use crate::backend::{ProviderBackend, ProviderRequest, ProviderResponse};
+use synaptic_models::{ProviderBackend, ProviderRequest, ProviderResponse};
 
 #[derive(Debug, Clone)]
 pub struct GeminiConfig {
@@ -97,7 +96,6 @@ impl GeminiChatModel {
                     tool_call_id: _,
                     ..
                 } => {
-                    // Gemini uses functionResponse in parts
                     let result: Value =
                         serde_json::from_str(content).unwrap_or(json!({"result": content}));
                     contents.push(json!({
@@ -116,7 +114,7 @@ impl GeminiChatModel {
                         "parts": [{"text": content}],
                     }));
                 }
-                Message::Remove { .. } => { /* skip Remove messages */ }
+                Message::Remove { .. } => {}
             }
         }
 

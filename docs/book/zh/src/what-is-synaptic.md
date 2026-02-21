@@ -10,9 +10,9 @@ Synaptic 是一个用于构建 AI Agent、链式调用和检索管道的 Rust �
 
 | LangChain (Python) | Synaptic (Rust) | 所在 Crate |
 |---|---|---|
-| `ChatOpenAI` | `OpenAiChatModel` | `synaptic-models` |
-| `ChatAnthropic` | `AnthropicChatModel` | `synaptic-models` |
-| `ChatGoogleGenerativeAI` | `GeminiChatModel` | `synaptic-models` |
+| `ChatOpenAI` | `OpenAiChatModel` | `synaptic-openai` |
+| `ChatAnthropic` | `AnthropicChatModel` | `synaptic-anthropic` |
+| `ChatGoogleGenerativeAI` | `GeminiChatModel` | `synaptic-gemini` |
 | `HumanMessage` / `AIMessage` | `Message::human()` / `Message::ai()` | `synaptic-core` |
 | `RunnableSequence` / LCEL `\|` | `BoxRunnable` / `\|` 管道运算符 | `synaptic-runnables` |
 | `RunnableLambda` | `RunnableLambda` | `synaptic-runnables` |
@@ -28,7 +28,7 @@ Synaptic 是一个用于构建 AI Agent、链式调用和检索管道的 Rust �
 | `JsonOutputParser` | `JsonOutputParser` | `synaptic-parsers` |
 | `VectorStoreRetriever` | `VectorStoreRetriever` | `synaptic-vectorstores` |
 | `RecursiveCharacterTextSplitter` | `RecursiveCharacterTextSplitter` | `synaptic-splitters` |
-| `OpenAIEmbeddings` | `OpenAiEmbeddings` | `synaptic-embeddings` |
+| `OpenAIEmbeddings` | `OpenAiEmbeddings` | `synaptic-openai` |
 
 ## 与 LangChain Python 的关键差异
 

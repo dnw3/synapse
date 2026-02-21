@@ -19,13 +19,24 @@ Synaptic 采用 Cargo workspace 组织，包含 22 个库 crate、1 个门面 cr
 
 | Crate | 职责 |
 |---|---|
-| `synaptic-models` | 提供商适配器（OpenAI、Anthropic、Gemini、Ollama）+ `ScriptedChatModel` 测试替身 + 包装器（重试、速率限制、缓存、结构化输出） |
+| `synaptic-models` | `ProviderBackend` 抽象、`ScriptedChatModel` 测试替身、ChatModel 包装器（重试、速率限制、缓存、结构化输出、BoundTools） |
 | `synaptic-tools` | `ToolRegistry`、`SerialToolExecutor`、`ParallelToolExecutor` |
 | `synaptic-memory` | 记忆策略：buffer、window、summary、token buffer、summary buffer、`RunnableWithMessageHistory` |
 | `synaptic-callbacks` | `RecordingCallback`、`TracingCallback`、`CompositeCallback` |
 | `synaptic-prompts` | `PromptTemplate`、`ChatPromptTemplate`、`FewShotChatMessagePromptTemplate` |
 | `synaptic-parsers` | 输出解析器：string、JSON、structured、list、enum、boolean、XML、markdown list、numbered list |
 | `synaptic-cache` | `InMemoryCache`、`SemanticCache`、`CachedChatModel` |
+
+### 提供商层
+
+每个 LLM 提供商由独立的 crate 提供，可按需启用：
+
+| Crate | 职责 |
+|---|---|
+| `synaptic-openai` | `OpenAiChatModel`、`OpenAiEmbeddings` |
+| `synaptic-anthropic` | `AnthropicChatModel` |
+| `synaptic-gemini` | `GeminiChatModel` |
+| `synaptic-ollama` | `OllamaChatModel`、`OllamaEmbeddings` |
 
 ### 组合层
 
@@ -44,7 +55,7 @@ Synaptic 采用 Cargo workspace 组织，包含 22 个库 crate、1 个门面 cr
 |---|---|
 | `synaptic-loaders` | `TextLoader`、`JsonLoader`、`CsvLoader`、`DirectoryLoader` |
 | `synaptic-splitters` | `CharacterTextSplitter`、`RecursiveCharacterTextSplitter`、`MarkdownHeaderTextSplitter`、`TokenTextSplitter` |
-| `synaptic-embeddings` | `Embeddings` trait、`OpenAiEmbeddings`、`OllamaEmbeddings`、`FakeEmbeddings` |
+| `synaptic-embeddings` | `Embeddings` trait、`FakeEmbeddings`、`CacheBackedEmbeddings` |
 | `synaptic-vectorstores` | `VectorStore` trait、`InMemoryVectorStore`、`VectorStoreRetriever` |
 | `synaptic-retrieval` | `Retriever` trait、`BM25Retriever`、`MultiQueryRetriever`、`EnsembleRetriever`、`ContextualCompressionRetriever`、`SelfQueryRetriever`、`ParentDocumentRetriever` |
 
@@ -66,13 +77,24 @@ Synaptic 采用 Cargo workspace 组织，包含 22 个库 crate、1 个门面 cr
 | `synaptic-macros` | 过程宏：`#[tool]`、`#[chain]`、`#[entrypoint]`、`#[task]`、`#[traceable]`、中间件宏 |
 | `synaptic-deep` | Deep Agent 运行框架：`Backend` trait（State/Store/Filesystem）、7 个文件系统工具、6 个中间件、`create_deep_agent()` 工厂函数 |
 
+### 集成层
+
+这些 crate 提供外部系统的集成：
+
+| Crate | 职责 |
+|---|---|
+| `synaptic-qdrant` | Qdrant 向量存储（`QdrantVectorStore`） |
+| `synaptic-pgvector` | PostgreSQL pgvector 向量存储（`PgVectorStore`） |
+| `synaptic-redis` | Redis 存储和缓存（`RedisStore`、`RedisCache`） |
+| `synaptic-pdf` | PDF 文档加载器（`PdfLoader`） |
+
 ### 门面层
 
 **`synaptic`** 重新导出所有子 crate，提供便捷的单一导入方式：
 
 ```rust
 use synaptic::core::{ChatModel, Message, ChatRequest};
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 use synaptic::runnables::{Runnable, RunnableLambda};
 use synaptic::graph::{StateGraph, create_react_agent};
 ```

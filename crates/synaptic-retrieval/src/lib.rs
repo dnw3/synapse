@@ -12,49 +12,13 @@ pub use multi_query::MultiQueryRetriever;
 pub use parent_document::ParentDocumentRetriever;
 pub use self_query::{MetadataFieldInfo, SelfQueryRetriever};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use synaptic_core::SynapticError;
 
-/// A document with content and metadata, used throughout the retrieval pipeline.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Document {
-    pub id: String,
-    pub content: String,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub metadata: HashMap<String, Value>,
-}
-
-impl Document {
-    pub fn new(id: impl Into<String>, content: impl Into<String>) -> Self {
-        Self {
-            id: id.into(),
-            content: content.into(),
-            metadata: HashMap::new(),
-        }
-    }
-
-    pub fn with_metadata(
-        id: impl Into<String>,
-        content: impl Into<String>,
-        metadata: HashMap<String, Value>,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            content: content.into(),
-            metadata,
-        }
-    }
-}
-
-/// Trait for retrieving relevant documents given a query string.
-#[async_trait]
-pub trait Retriever: Send + Sync {
-    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError>;
-}
+// Re-export Document and Retriever from core for backward compatibility
+pub use synaptic_core::{Document, Retriever};
 
 /// A simple retriever that stores documents in memory and returns all of them for any query.
 #[derive(Debug, Clone)]

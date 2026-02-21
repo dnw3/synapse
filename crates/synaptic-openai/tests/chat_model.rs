@@ -3,7 +3,8 @@ use std::sync::Arc;
 use futures::StreamExt;
 use serde_json::json;
 use synaptic_core::{ChatModel, ChatRequest, Message, ToolCall, ToolDefinition};
-use synaptic_models::{FakeBackend, OpenAiChatModel, OpenAiConfig, ProviderResponse};
+use synaptic_models::{FakeBackend, ProviderResponse};
+use synaptic_openai::{OpenAiChatModel, OpenAiConfig};
 
 fn setup(backend: Arc<FakeBackend>) -> OpenAiChatModel {
     let config = OpenAiConfig::new("test-key", "gpt-4")

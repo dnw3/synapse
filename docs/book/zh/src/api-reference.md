@@ -16,7 +16,7 @@ cargo doc --workspace --open
 |---|---|
 | [`synaptic`](https://docs.rs/synaptic) | 统一 facade crate，重新导出所有子 crate |
 | [`synaptic-core`](https://docs.rs/synaptic-core) | 核心 trait 和类型：`ChatModel`、`Message`、`Tool`、`SynapticError`、`RunnableConfig` 等 |
-| [`synaptic-models`](https://docs.rs/synaptic-models) | LLM 提供商适配器（OpenAI、Anthropic、Gemini、Ollama）及装饰器（重试、速率限制、结构化输出） |
+| [`synaptic-models`](https://docs.rs/synaptic-models) | `ProviderBackend` 抽象、`ScriptedChatModel` 测试替身、ChatModel 包装器（重试、速率限制、结构化输出、BoundTools） |
 | [`synaptic-prompts`](https://docs.rs/synaptic-prompts) | 提示模板：`PromptTemplate`、`ChatPromptTemplate`、`FewShotChatMessagePromptTemplate` |
 | [`synaptic-parsers`](https://docs.rs/synaptic-parsers) | 输出解析器：`StrOutputParser`、`JsonOutputParser`、`StructuredOutputParser`、`ListOutputParser`、`EnumOutputParser` 等 |
 | [`synaptic-runnables`](https://docs.rs/synaptic-runnables) | LCEL 组合原语：`Runnable` trait、`BoxRunnable`、管道运算符、`RunnableParallel`、`RunnableBranch` 等 |
@@ -27,9 +27,17 @@ cargo doc --workspace --open
 | [`synaptic-cache`](https://docs.rs/synaptic-cache) | LLM 缓存：`InMemoryCache`（可选 TTL）、`SemanticCache`（嵌入相似度匹配） |
 | [`synaptic-loaders`](https://docs.rs/synaptic-loaders) | 文档加载器：`TextLoader`、`JsonLoader`、`CsvLoader`、`DirectoryLoader` |
 | [`synaptic-splitters`](https://docs.rs/synaptic-splitters) | 文本分割器：`CharacterTextSplitter`、`RecursiveCharacterTextSplitter`、`MarkdownHeaderTextSplitter`、`TokenTextSplitter` |
-| [`synaptic-embeddings`](https://docs.rs/synaptic-embeddings) | 嵌入模型：`OpenAiEmbeddings`、`OllamaEmbeddings`、`FakeEmbeddings` |
+| [`synaptic-embeddings`](https://docs.rs/synaptic-embeddings) | 嵌入模型：`Embeddings` trait、`FakeEmbeddings`、`CacheBackedEmbeddings` |
 | [`synaptic-vectorstores`](https://docs.rs/synaptic-vectorstores) | 向量存储：`InMemoryVectorStore`（cosine 相似度）、`VectorStoreRetriever` |
 | [`synaptic-retrieval`](https://docs.rs/synaptic-retrieval) | 检索器：`BM25Retriever`、`MultiQueryRetriever`、`EnsembleRetriever`、`SelfQueryRetriever`、`ParentDocumentRetriever` 等 |
+| [`synaptic-openai`](https://docs.rs/synaptic-openai) | OpenAI 提供商：`OpenAiChatModel`、`OpenAiEmbeddings` |
+| [`synaptic-anthropic`](https://docs.rs/synaptic-anthropic) | Anthropic 提供商：`AnthropicChatModel` |
+| [`synaptic-gemini`](https://docs.rs/synaptic-gemini) | Google Gemini 提供商：`GeminiChatModel` |
+| [`synaptic-ollama`](https://docs.rs/synaptic-ollama) | Ollama 提供商：`OllamaChatModel`、`OllamaEmbeddings` |
+| [`synaptic-qdrant`](https://docs.rs/synaptic-qdrant) | Qdrant 向量存储：`QdrantVectorStore` |
+| [`synaptic-pgvector`](https://docs.rs/synaptic-pgvector) | PostgreSQL pgvector 向量存储：`PgVectorStore` |
+| [`synaptic-redis`](https://docs.rs/synaptic-redis) | Redis 存储和缓存：`RedisStore`、`RedisCache` |
+| [`synaptic-pdf`](https://docs.rs/synaptic-pdf) | PDF 文档加载器：`PdfLoader` |
 | [`synaptic-eval`](https://docs.rs/synaptic-eval) | 评估器：`ExactMatchEvaluator`、`RegexMatchEvaluator`、`LLMJudgeEvaluator` 等 |
 
 ## 常用导入
@@ -43,8 +51,13 @@ use synaptic::core::{Tool, ToolCall, ToolChoice, ToolDefinition};
 use synaptic::core::{RunnableConfig, TokenUsage, RunEvent};
 use synaptic::core::{AIMessageChunk, ChatStream};
 
-// 模型
-use synaptic::models::{OpenAiChatModel, AnthropicChatModel, GeminiChatModel, OllamaChatModel};
+// 提供商模型
+use synaptic::openai::OpenAiChatModel;
+use synaptic::anthropic::AnthropicChatModel;
+use synaptic::gemini::GeminiChatModel;
+use synaptic::ollama::OllamaChatModel;
+
+// 模型工具
 use synaptic::models::{ScriptedChatModel, RetryChatModel, RateLimitedChatModel};
 use synaptic::models::StructuredOutputChatModel;
 
@@ -68,7 +81,8 @@ use synaptic::graph::MemorySaver;
 // Retrieval
 use synaptic::retrieval::{Retriever, InMemoryRetriever, BM25Retriever};
 use synaptic::vectorstores::{InMemoryVectorStore, VectorStoreRetriever};
-use synaptic::embeddings::{OpenAiEmbeddings, FakeEmbeddings};
+use synaptic::embeddings::FakeEmbeddings;
+use synaptic::openai::OpenAiEmbeddings;
 ```
 
 ## 构建文档

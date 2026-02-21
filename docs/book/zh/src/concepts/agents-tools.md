@@ -36,7 +36,7 @@ pub struct ToolDefinition {
 
 `parameters` 字段是一个 JSON Schema，描述了 Tool 期望的参数格式。LLM 提供商使用此 Schema 来生成有效的 Tool 调用。`ToolDefinition` 是关于 Tool 的元数据——它本身不执行任何操作。
 
-可选的 `extras` 字段携带提供商特定的参数（例如 Anthropic 的 `cache_control`）。`synaptic-models` 中的提供商适配器在存在该字段时会将其转发给 API。
+可选的 `extras` 字段携带提供商特定的参数（例如 Anthropic 的 `cache_control`）。各提供商 crate（`synaptic-openai`、`synaptic-anthropic` 等）中的适配器在存在该字段时会将其转发给 API。
 
 ## ToolCall 和 ToolChoice
 

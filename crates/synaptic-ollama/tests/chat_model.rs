@@ -3,7 +3,8 @@ use std::sync::Arc;
 use futures::StreamExt;
 use serde_json::json;
 use synaptic_core::{ChatModel, ChatRequest, Message, ToolDefinition};
-use synaptic_models::{FakeBackend, OllamaChatModel, OllamaConfig, ProviderResponse};
+use synaptic_models::{FakeBackend, ProviderResponse};
+use synaptic_ollama::{OllamaChatModel, OllamaConfig};
 
 fn setup(backend: Arc<FakeBackend>) -> OllamaChatModel {
     let config = OllamaConfig::new("llama3");

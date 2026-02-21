@@ -1,0 +1,21 @@
+[package]
+name = "synaptic-qdrant"
+description = "Qdrant vector store integration for Synaptic"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+readme.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+serde_json.workspace = true
+synaptic-core = { version = "0.2", path = "../synaptic-core" }
+qdrant-client = "1.12"
+uuid = { version = "1", features = ["v4", "v5"] }
+
+[dev-dependencies]
+tokio.workspace = true

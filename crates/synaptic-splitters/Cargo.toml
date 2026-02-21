@@ -12,7 +12,6 @@ homepage.workspace = true
 
 [dependencies]
 synaptic-core = { version = "0.2", path = "../synaptic-core" }
-synaptic-retrieval = { version = "0.2", path = "../synaptic-retrieval" }
 serde_json.workspace = true
 
 [dev-dependencies]

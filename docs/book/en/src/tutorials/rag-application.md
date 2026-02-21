@@ -131,7 +131,7 @@ println!("Indexed {} chunks", ids.len());
 let store = InMemoryVectorStore::from_documents(chunks, embeddings.as_ref()).await?;
 ```
 
-For production use, replace `FakeEmbeddings` with `OpenAiEmbeddings` or `OllamaEmbeddings`, which call real embedding APIs.
+For production use, replace `FakeEmbeddings` with `OpenAiEmbeddings` (from `synaptic::openai`) or `OllamaEmbeddings` (from `synaptic::ollama`), which call real embedding APIs.
 
 ## Step 4: Retrieve Relevant Documents
 
@@ -245,7 +245,7 @@ async fn main() -> Result<(), SynapticError> {
 }
 ```
 
-In production, you would replace `ScriptedChatModel` with a real provider like `OpenAiChatModel` or `AnthropicChatModel`.
+In production, you would replace `ScriptedChatModel` with a real provider like `OpenAiChatModel` (from `synaptic::openai`) or `AnthropicChatModel` (from `synaptic::anthropic`).
 
 ## Building RAG with LCEL Chains
 

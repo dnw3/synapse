@@ -28,6 +28,7 @@ let mw = SummarizationMiddleware::new(
 use std::sync::Arc;
 use synaptic::graph::{create_agent, AgentOptions};
 use synaptic::middleware::SummarizationMiddleware;
+use synaptic::openai::OpenAiChatModel;
 
 let summarizer = Arc::new(OpenAiChatModel::new("gpt-4o-mini"));
 
@@ -63,6 +64,8 @@ let graph = create_agent(model, tools, options)?;
 使用更便宜的模型进行摘要以降低成本：
 
 ```rust,ignore
+use synaptic::openai::OpenAiChatModel;
+
 let agent_model = Arc::new(OpenAiChatModel::new("gpt-4o"));
 let cheap_model = Arc::new(OpenAiChatModel::new("gpt-4o-mini"));
 

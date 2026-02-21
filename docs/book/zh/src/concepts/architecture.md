@@ -1,6 +1,6 @@
 # 架构
 
-Synaptic 采用分层的 Cargo 工作区架构，由 17 个库 crate、1 个门面 crate 和若干示例二进制程序组成。每一层都在下层的基础上构建，职责清晰、边界明确。
+Synaptic 采用分层的 Cargo 工作区架构，由多个库 crate、1 个门面 crate 和若干示例二进制程序组成。每一层都在下层的基础上构建，职责清晰、边界明确。
 
 ## Crate 分层结构
 
@@ -12,8 +12,12 @@ Synaptic 采用分层的 Cargo 工作区架构，由 17 个库 crate、1 个门�
 +------------------------------------------+
 |  组合层: graph, runnables, eval           |
 +------------------------------------------+
+|  提供商: openai, anthropic, gemini, ollama |
++------------------------------------------+
 |  实现层: models, memory, callbacks,       |
 |         prompts, parsers, tools, cache    |
++------------------------------------------+
+|  集成层: qdrant, pgvector, redis, pdf     |
 +------------------------------------------+
 |  检索管道: loaders, splitters, embeddings,|
 |           vectorstores, retrieval         |
@@ -43,13 +47,24 @@ Synaptic 采用分层的 Cargo 工作区架构，由 17 个库 crate、1 个门�
 
 | Crate | 职责 |
 |---|---|
-| `synaptic-models` | 模型提供商适配器（OpenAI、Anthropic、Gemini、Ollama）+ `ScriptedChatModel` 测试替身 + 包装器（重试、速率限制、缓存、结构化输出） |
+| `synaptic-models` | `ProviderBackend` 抽象、`ScriptedChatModel` 测试替身、ChatModel 包装器（重试、速率限制、缓存、结构化输出、BoundTools） |
 | `synaptic-tools` | `ToolRegistry` 工具注册表和 `SerialToolExecutor` 串行执行器 |
 | `synaptic-memory` | 记忆策略：Buffer、Window、Summary、Token Buffer、Summary Buffer，以及 `RunnableWithMessageHistory` |
 | `synaptic-callbacks` | `RecordingCallback`（录制回调）、`TracingCallback`（链路追踪回调）、`CompositeCallback`（组合回调） |
 | `synaptic-prompts` | `PromptTemplate`（模板插值）、`ChatPromptTemplate`（聊天提示模板）、`FewShotChatMessagePromptTemplate`（少样本提示模板） |
 | `synaptic-parsers` | 输出解析器：字符串、JSON、结构化、列表、枚举、布尔、XML、Markdown 列表、编号列表 |
 | `synaptic-cache` | `InMemoryCache`（内存缓存）、`SemanticCache`（语义缓存）、`CachedChatModel`（缓存模型包装器） |
+
+### 提供商层
+
+每个 LLM 提供商由独立的 crate 提供：
+
+| Crate | 职责 |
+|---|---|
+| `synaptic-openai` | `OpenAiChatModel`、`OpenAiEmbeddings` |
+| `synaptic-anthropic` | `AnthropicChatModel` |
+| `synaptic-gemini` | `GeminiChatModel` |
+| `synaptic-ollama` | `OllamaChatModel`、`OllamaEmbeddings` |
 
 ### 组合层
 
@@ -68,7 +83,7 @@ Synaptic 采用分层的 Cargo 工作区架构，由 17 个库 crate、1 个门�
 |---|---|
 | `synaptic-loaders` | 文档加载器：`TextLoader`、`JsonLoader`、`CsvLoader`、`DirectoryLoader`、`FileLoader`、`MarkdownLoader`、`WebBaseLoader` |
 | `synaptic-splitters` | 文本分割器：`CharacterTextSplitter`、`RecursiveCharacterTextSplitter`、`MarkdownHeaderTextSplitter`、`TokenTextSplitter` |
-| `synaptic-embeddings` | 嵌入模型：`Embeddings` trait，`OpenAiEmbeddings`、`OllamaEmbeddings`、`FakeEmbeddings` |
+| `synaptic-embeddings` | 嵌入模型：`Embeddings` trait、`FakeEmbeddings`、`CacheBackedEmbeddings`（提供商嵌入模型已拆分到 `synaptic-openai` 和 `synaptic-ollama`） |
 | `synaptic-vectorstores` | 向量存储：`VectorStore` trait，`InMemoryVectorStore`、`VectorStoreRetriever`、`MultiVectorRetriever` |
 | `synaptic-retrieval` | 检索器：`Retriever` trait，`BM25Retriever`、`MultiQueryRetriever`、`EnsembleRetriever`、`ContextualCompressionRetriever`、`SelfQueryRetriever`、`ParentDocumentRetriever` |
 
@@ -84,13 +99,24 @@ loaders --> splitters --> embeddings --> vectorstores --> retrieval
 |---|---|
 | `synaptic-eval` | `Evaluator` trait，提供 `ExactMatchEvaluator`、`RegexMatchEvaluator`、`JsonValidityEvaluator`、`EmbeddingDistanceEvaluator`、`LLMJudgeEvaluator` 评估器，以及 `Dataset` 和批量评估管道 |
 
+### 集成层
+
+这些 crate 提供外部系统的集成：
+
+| Crate | 职责 |
+|---|---|
+| `synaptic-qdrant` | Qdrant 向量存储（`QdrantVectorStore`） |
+| `synaptic-pgvector` | PostgreSQL pgvector 向量存储（`PgVectorStore`） |
+| `synaptic-redis` | Redis 存储和缓存（`RedisStore`、`RedisCache`） |
+| `synaptic-pdf` | PDF 文档加载器（`PdfLoader`） |
+
 ### 门面
 
 **`synaptic`** 重新导出所有子 crate，提供便捷的单入口导入方式：
 
 ```rust
 use synaptic::core::{ChatModel, Message, ChatRequest};
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 use synaptic::runnables::{Runnable, RunnableLambda};
 use synaptic::graph::{StateGraph, create_react_agent};
 ```

@@ -56,7 +56,7 @@ TTL 过期后，该条目的缓存查找将返回 `None`，下一次请求将重
 ```rust
 use std::sync::Arc;
 use synaptic::cache::{SemanticCache, CachedChatModel};
-use synaptic::embeddings::OpenAiEmbeddings;
+use synaptic::openai::OpenAiEmbeddings;
 
 let embeddings: Arc<dyn synaptic::embeddings::Embeddings> = Arc::new(embeddings_provider);
 

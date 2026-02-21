@@ -88,7 +88,7 @@ impl ChatModel for DemoModel {
 }
 ```
 
-In a real application you would use one of the provider adapters (`OpenAiChatModel`, `AnthropicChatModel`, etc.) instead of a scripted model.
+In a real application you would use one of the provider adapters (`OpenAiChatModel` from `synaptic::openai`, `AnthropicChatModel` from `synaptic::anthropic`, etc.) instead of a scripted model.
 
 ## Step 3: Build the Agent Graph
 

@@ -581,9 +581,9 @@ Tool Message back into conversation
 | `Tool` / `RuntimeAwareTool` traits | `crates/synaptic-core/src/lib.rs` |
 | `ToolDefinition`, `ToolCall` types | `crates/synaptic-core/src/lib.rs` |
 | `ToolNode` (dispatches calls) | `crates/synaptic-graph/src/tool_node.rs` |
-| OpenAI adapter | `crates/synaptic-models/src/openai.rs` |
-| Anthropic adapter | `crates/synaptic-models/src/anthropic.rs` |
-| Gemini adapter | `crates/synaptic-models/src/gemini.rs` |
+| OpenAI adapter | `crates/synaptic-openai/src/lib.rs` |
+| Anthropic adapter | `crates/synaptic-anthropic/src/lib.rs` |
+| Gemini adapter | `crates/synaptic-gemini/src/lib.rs` |
 
 ## Testing Macro-Generated Code
 

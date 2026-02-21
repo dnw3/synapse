@@ -3,9 +3,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::json;
 use synaptic_core::SynapticError;
-use synaptic_models::backend::{ProviderBackend, ProviderRequest};
+use synaptic_models::{ProviderBackend, ProviderRequest};
 
-use crate::Embeddings;
+use synaptic_core::Embeddings;
 
 pub struct OllamaEmbeddingsConfig {
     pub model: String,

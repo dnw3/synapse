@@ -1,6 +1,6 @@
-use synaptic_retrieval::Document;
 use synaptic_splitters::{
-    CharacterTextSplitter, RecursiveCharacterTextSplitter, TextSplitter, TokenTextSplitter,
+    CharacterTextSplitter, Document, RecursiveCharacterTextSplitter, TextSplitter,
+    TokenTextSplitter,
 };
 
 // --- CharacterTextSplitter edge cases ---

@@ -47,7 +47,7 @@ let item = store.get(&["users", "prefs"], "theme").await?;
 
 ```rust,ignore
 use synaptic::store::InMemoryStore;
-use synaptic::embeddings::OpenAiEmbeddings;
+use synaptic::openai::OpenAiEmbeddings;
 
 let embeddings = Arc::new(OpenAiEmbeddings::new("text-embedding-3-small"));
 let store = InMemoryStore::new().with_embeddings(embeddings);

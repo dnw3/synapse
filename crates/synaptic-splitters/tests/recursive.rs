@@ -47,7 +47,7 @@ fn small_text_single_chunk() {
 
 #[test]
 fn split_documents_preserves_metadata() {
-    use synaptic_retrieval::Document;
+    use synaptic_splitters::Document;
 
     let splitter = RecursiveCharacterTextSplitter::new(20);
     let doc = Document::new(

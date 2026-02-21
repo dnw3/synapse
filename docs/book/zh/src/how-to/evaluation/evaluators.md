@@ -93,7 +93,7 @@ println!("Passed (>= 0.8): {}", result.passed);
 
 ```rust
 use synaptic::eval::{LLMJudgeEvaluator, Evaluator};
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 use std::sync::Arc;
 
 let model = Arc::new(OpenAiChatModel::new("gpt-4o"));

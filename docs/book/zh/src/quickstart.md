@@ -15,7 +15,7 @@ cd synaptic-quickstart
 
 ```toml
 [dependencies]
-synaptic = { version = "0.2", features = ["models"] }
+synaptic = { version = "0.2", features = ["model-utils"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -81,10 +81,10 @@ cargo run
 
 ## 使用真实模型
 
-要连接 OpenAI 等真实 LLM 提供商，只需替换模型实例：
+要连接 OpenAI 等真实 LLM 提供商，在 `Cargo.toml` 中将 feature 替换为 `"openai"`，然后替换模型实例：
 
 ```rust
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 
 let model = OpenAiChatModel::new("gpt-4o");
 ```

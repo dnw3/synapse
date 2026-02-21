@@ -13,6 +13,10 @@ homepage.workspace = true
 [dependencies]
 synaptic-core = { version = "0.2", path = "../synaptic-core" }
 synaptic-models = { version = "0.2", path = "../synaptic-models", optional = true }
+synaptic-openai = { version = "0.2", path = "../synaptic-openai", optional = true }
+synaptic-anthropic = { version = "0.2", path = "../synaptic-anthropic", optional = true }
+synaptic-gemini = { version = "0.2", path = "../synaptic-gemini", optional = true }
+synaptic-ollama = { version = "0.2", path = "../synaptic-ollama", optional = true }
 synaptic-runnables = { version = "0.2", path = "../synaptic-runnables", optional = true }
 synaptic-prompts = { version = "0.2", path = "../synaptic-prompts", optional = true }
 synaptic-parsers = { version = "0.2", path = "../synaptic-parsers", optional = true }
@@ -32,13 +36,17 @@ synaptic-eval = { version = "0.2", path = "../synaptic-eval", optional = true }
 synaptic-mcp = { version = "0.2", path = "../synaptic-mcp", optional = true }
 synaptic-macros = { version = "0.2", path = "../synaptic-macros", optional = true }
 synaptic-deep = { version = "0.2", path = "../synaptic-deep", optional = true }
+synaptic-qdrant = { version = "0.2", path = "../synaptic-qdrant", optional = true }
+synaptic-pgvector = { version = "0.2", path = "../synaptic-pgvector", optional = true }
+synaptic-redis = { version = "0.2", path = "../synaptic-redis", optional = true }
+synaptic-pdf = { version = "0.2", path = "../synaptic-pdf", optional = true }
 schemars = { workspace = true, optional = true }
 
 [features]
-default = ["models", "runnables", "prompts", "parsers", "tools", "callbacks"]
+default = ["runnables", "prompts", "parsers", "tools", "callbacks"]
 
-# Fine-grained features (one per sub-crate)
-models = ["dep:synaptic-models"]
+# Infrastructure (provider-agnostic)
+model-utils = ["dep:synaptic-models"]
 runnables = ["dep:synaptic-runnables"]
 prompts = ["runnables", "embeddings", "dep:synaptic-prompts"]
 parsers = ["runnables", "dep:synaptic-parsers"]
@@ -46,24 +54,36 @@ tools = ["dep:synaptic-tools"]
 memory = ["runnables", "dep:synaptic-memory"]
 callbacks = ["dep:synaptic-callbacks"]
 retrieval = ["embeddings", "dep:synaptic-retrieval"]
-loaders = ["retrieval", "dep:synaptic-loaders"]
-splitters = ["retrieval", "dep:synaptic-splitters"]
-embeddings = ["models", "dep:synaptic-embeddings"]
-vectorstores = ["embeddings", "retrieval", "dep:synaptic-vectorstores"]
+loaders = ["dep:synaptic-loaders"]
+splitters = ["dep:synaptic-splitters"]
+embeddings = ["dep:synaptic-embeddings"]
+vectorstores = ["dep:synaptic-vectorstores"]
 graph = ["tools", "dep:synaptic-graph"]
 middleware = ["graph", "dep:synaptic-middleware"]
 store = ["dep:synaptic-store"]
-cache = ["embeddings", "dep:synaptic-cache"]
+cache = ["dep:synaptic-cache"]
 eval = ["embeddings", "dep:synaptic-eval"]
 mcp = ["dep:synaptic-mcp"]
 macros = ["dep:synaptic-macros"]
 schemars = ["synaptic-macros/schemars", "synaptic-core/schemars", "dep:schemars"]
 deep = ["agent", "dep:synaptic-deep"]
 
-# Composite features (by use-case)
-agent = ["default", "graph", "memory", "middleware", "store"]
-rag = ["default", "retrieval", "loaders", "splitters", "embeddings", "vectorstores"]
-full = ["default", "agent", "rag", "cache", "eval", "mcp", "macros", "deep", "schemars"]
+# Provider integrations (each pulls model-utils for Backend + wrappers)
+openai = ["model-utils", "dep:synaptic-openai"]
+anthropic = ["model-utils", "dep:synaptic-anthropic"]
+gemini = ["model-utils", "dep:synaptic-gemini"]
+ollama = ["model-utils", "dep:synaptic-ollama"]
+qdrant = ["dep:synaptic-qdrant"]
+pgvector = ["dep:synaptic-pgvector"]
+redis = ["dep:synaptic-redis"]
+pdf = ["dep:synaptic-pdf"]
+
+# Convenience combinations
+models = ["openai", "anthropic", "gemini", "ollama"]
+agent = ["default", "openai", "model-utils", "graph", "memory", "middleware", "store"]
+rag = ["default", "openai", "embeddings", "retrieval", "loaders", "splitters", "vectorstores"]
+full = ["default", "agent", "rag", "cache", "eval", "mcp", "macros", "deep", "schemars",
+        "models", "qdrant", "pgvector", "redis", "pdf"]
 
 [dev-dependencies]
 tokio.workspace = true

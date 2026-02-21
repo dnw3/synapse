@@ -15,7 +15,8 @@ Synaptic 通过 `synaptic_core` 中定义的 `ChatModel` trait 支持多种 LLM 
 
 ```rust
 use std::sync::Arc;
-use synaptic::models::{OpenAiChatModel, OpenAiConfig, HttpBackend};
+use synaptic::openai::{OpenAiChatModel, OpenAiConfig};
+use synaptic::models::HttpBackend;
 
 let config = OpenAiConfig::new("sk-...", "gpt-4o");
 let backend = Arc::new(HttpBackend::new());

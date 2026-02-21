@@ -20,30 +20,58 @@ Synaptic 提供类似 tokio 的细粒度 feature flags：
 # 全量引入（等同之前的默认行为）
 synaptic = { version = "0.2", features = ["full"] }
 
-# Agent 开发（自动包含 models, tools, graph, memory 等）
+# Agent 开发（自动包含 openai, tools, graph, memory 等）
 synaptic = { version = "0.2", features = ["agent"] }
 
-# RAG 应用（自动包含 retrieval, loaders, splitters, embeddings, vectorstores 等）
+# RAG 应用（自动包含 openai, retrieval, loaders, splitters, embeddings, vectorstores 等）
 synaptic = { version = "0.2", features = ["rag"] }
 
 # Agent + RAG
 synaptic = { version = "0.2", features = ["agent", "rag"] }
 
-# 最小化 — 只要模型调用
+# 最小化 — 只要 OpenAI 模型调用
+synaptic = { version = "0.2", features = ["openai"] }
+
+# 使用 Anthropic
+synaptic = { version = "0.2", features = ["anthropic"] }
+
+# 全部四个提供商
 synaptic = { version = "0.2", features = ["models"] }
 
 # 精细控制
-synaptic = { version = "0.2", features = ["models", "graph", "cache"] }
+synaptic = { version = "0.2", features = ["openai", "graph", "cache"] }
 ```
 
 | Feature | 说明 |
 |---------|------|
-| **`default`** | `models`, `runnables`, `prompts`, `parsers`, `tools`, `callbacks` |
-| **`agent`** | `default` + `graph`, `memory` |
-| **`rag`** | `default` + `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores` |
+| **`default`** | `runnables`, `prompts`, `parsers`, `tools`, `callbacks`（不包含任何提供商） |
+| **`agent`** | `default` + `openai`, `graph`, `memory` |
+| **`rag`** | `default` + `openai`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores` |
 | **`full`** | 启用全部 features |
 
-单独可用的 features：`models`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`。
+**提供商 features：**
+
+| Feature | 说明 |
+|---------|------|
+| `openai` | OpenAI 提供商（`OpenAiChatModel`、`OpenAiEmbeddings`） |
+| `anthropic` | Anthropic 提供商（`AnthropicChatModel`） |
+| `gemini` | Google Gemini 提供商（`GeminiChatModel`） |
+| `ollama` | Ollama 提供商（`OllamaChatModel`、`OllamaEmbeddings`） |
+| `models` | 全部四个提供商（openai + anthropic + gemini + ollama） |
+| `model-utils` | `ProviderBackend` 抽象 + 包装器（`ScriptedChatModel`、`RetryChatModel` 等） |
+
+**集成 features：**
+
+| Feature | 说明 |
+|---------|------|
+| `qdrant` | Qdrant 向量存储（`QdrantVectorStore`） |
+| `pgvector` | PostgreSQL pgvector 向量存储（`PgVectorStore`） |
+| `redis` | Redis 存储和缓存（`RedisStore`、`RedisCache`） |
+| `pdf` | PDF 文档加载器（`PdfLoader`） |
+
+单独可用的 features：`openai`, `anthropic`, `gemini`, `ollama`, `models`, `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`, `qdrant`, `pgvector`, `redis`, `pdf`。
+
+**高级 features：**
 
 | Feature | 说明 |
 |---------|------|
@@ -59,7 +87,7 @@ synaptic = { version = "0.2", features = ["models", "graph", "cache"] }
 
 ```rust
 use synaptic::core::{ChatModel, Message, ChatRequest};
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 ```
 
 ### 按需引入单个 crate
@@ -78,11 +106,11 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 以下是几种常见场景的依赖配置：
 
-**基础 LLM 调用：**
+**基础 LLM 调用（OpenAI）：**
 
 ```toml
 [dependencies]
-synaptic = { version = "0.2", features = ["models"] }
+synaptic = { version = "0.2", features = ["openai"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -121,7 +149,7 @@ export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-> **注意：** 使用 `ScriptedChatModel`（测试替身）时不需要任何 API 密钥，非常适合本地开发和测试。
+> **注意：** 使用 `ScriptedChatModel`（测试替身，需启用 `model-utils` feature）时不需要任何 API 密钥，非常适合本地开发和测试。
 
 ## 验证安装
 

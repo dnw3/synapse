@@ -20,7 +20,8 @@ let mw = ModelFallbackMiddleware::new(vec![
 ```rust,ignore
 use std::sync::Arc;
 use synaptic::graph::{create_agent, AgentOptions};
-use synaptic::models::{OpenAiChatModel, AnthropicChatModel};
+use synaptic::openai::OpenAiChatModel;
+use synaptic::anthropic::AnthropicChatModel;
 use synaptic::middleware::ModelFallbackMiddleware;
 
 let primary = Arc::new(OpenAiChatModel::new("gpt-4o"));
@@ -49,9 +50,9 @@ let graph = create_agent(primary, tools, options)?;
 ## 示例：多层级回退
 
 ```rust,ignore
-let primary = Arc::new(OpenAiChatModel::new("gpt-4o"));
-let tier2 = Arc::new(OpenAiChatModel::new("gpt-4o-mini"));
-let tier3 = Arc::new(AnthropicChatModel::new("claude-sonnet-4-20250514"));
+let primary: Arc<dyn ChatModel> = Arc::new(OpenAiChatModel::new("gpt-4o"));
+let tier2: Arc<dyn ChatModel> = Arc::new(OpenAiChatModel::new("gpt-4o-mini"));
+let tier3: Arc<dyn ChatModel> = Arc::new(AnthropicChatModel::new("claude-sonnet-4-20250514"));
 
 let options = AgentOptions {
     middleware: vec![

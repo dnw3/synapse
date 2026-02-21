@@ -25,7 +25,7 @@ Add dependencies to `Cargo.toml`:
 
 ```toml
 [dependencies]
-synaptic = { version = "0.2", features = ["deep"] }
+synaptic = { version = "0.2", features = ["deep", "openai"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -66,7 +66,7 @@ use synaptic::deep::{create_deep_agent, DeepAgentOptions};
 use synaptic::deep::backend::StateBackend;
 use synaptic::core::{ChatModel, Message};
 use synaptic::graph::MessageState;
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -309,7 +309,7 @@ use synaptic::deep::{create_deep_agent, DeepAgentOptions, SubAgentDef};
 use synaptic::deep::backend::StateBackend;
 use synaptic::core::{ChatModel, Message};
 use synaptic::graph::MessageState;
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -380,7 +380,7 @@ For production use, enable the `filesystem` feature to work with real files:
 
 ```toml
 [dependencies]
-synaptic = { version = "0.2", features = ["deep"] }
+synaptic = { version = "0.2", features = ["deep", "openai"] }
 synaptic-deep = { version = "0.2", features = ["filesystem"] }
 ```
 

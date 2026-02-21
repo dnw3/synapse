@@ -19,38 +19,65 @@ Synaptic provides fine-grained feature flags, similar to tokio:
 # Full — everything enabled (equivalent to previous default)
 synaptic = { version = "0.2", features = ["full"] }
 
-# Agent development (models, tools, graph, memory, etc.)
+# Agent development (OpenAI + tools + graph + memory, etc.)
 synaptic = { version = "0.2", features = ["agent"] }
 
-# RAG applications (retrieval, loaders, splitters, embeddings, vectorstores, etc.)
+# RAG applications (OpenAI + retrieval + loaders + splitters + embeddings + vectorstores, etc.)
 synaptic = { version = "0.2", features = ["rag"] }
 
 # Agent + RAG
 synaptic = { version = "0.2", features = ["agent", "rag"] }
 
-# Minimal — just model calls
+# Just OpenAI model calls
+synaptic = { version = "0.2", features = ["openai"] }
+
+# All 4 providers (OpenAI + Anthropic + Gemini + Ollama)
 synaptic = { version = "0.2", features = ["models"] }
 
-# Fine-grained control
-synaptic = { version = "0.2", features = ["models", "graph", "cache"] }
+# Fine-grained: one provider + specific modules
+synaptic = { version = "0.2", features = ["anthropic", "graph", "cache"] }
 ```
 
+**Composite features:**
+
 | Feature | Description |
 |---------|-------------|
-| **`default`** | `models`, `runnables`, `prompts`, `parsers`, `tools`, `callbacks` |
-| **`agent`** | `default` + `graph`, `memory` |
-| **`rag`** | `default` + `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores` |
+| **`default`** | `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, `callbacks` |
+| **`agent`** | `default` + `openai`, `graph`, `memory` |
+| **`rag`** | `default` + `openai`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores` |
+| **`models`** | All 4 providers: `openai` + `anthropic` + `gemini` + `ollama` |
 | **`full`** | All features enabled |
 
-Individual features: `models`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`.
+**Provider features** (each enables one provider crate):
 
 | Feature | Description |
 |---------|-------------|
+| `openai` | `OpenAiChatModel` + `OpenAiEmbeddings` (`synaptic-openai`) |
+| `anthropic` | `AnthropicChatModel` (`synaptic-anthropic`) |
+| `gemini` | `GeminiChatModel` (`synaptic-gemini`) |
+| `ollama` | `OllamaChatModel` + `OllamaEmbeddings` (`synaptic-ollama`) |
+
+**Module features:**
+
+Individual features: `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`.
+
+| Feature | Description |
+|---------|-------------|
+| `model-utils` | `ProviderBackend` abstraction, `ScriptedChatModel`, wrappers (`RetryChatModel`, `RateLimitedChatModel`, `StructuredOutputChatModel`, etc.) |
 | `store` | Key-value store with namespace hierarchy and optional semantic search |
 | `middleware` | Agent middleware chain (tool call limits, HITL, summarization, context editing) |
 | `mcp` | Model Context Protocol client (Stdio/SSE/HTTP transports) |
 | `macros` | Proc macros (`#[tool]`, `#[chain]`, `#[entrypoint]`, `#[traceable]`) |
 | `deep` | Deep agent harness (backends, filesystem tools, sub-agents, skills) |
+
+**Integration features:**
+
+| Feature | Description |
+|---------|-------------|
+| `qdrant` | Qdrant vector store (`synaptic-qdrant`) |
+| `pgvector` | PostgreSQL pgvector store (`synaptic-pgvector`) |
+| `redis` | Redis store + cache (`synaptic-redis`) |
+| `pdf` | PDF document loader (`synaptic-pdf`) |
 
 The `core` module (traits and types) is always available regardless of feature selection.
 
@@ -68,7 +95,9 @@ The facade crate provides namespaced re-exports for all sub-crates. You access t
 
 ```rust
 use synaptic::core::{ChatModel, ChatRequest, ChatResponse, Message, SynapticError};
-use synaptic::models::{OpenAiChatModel, ScriptedChatModel};
+use synaptic::openai::{OpenAiChatModel, OpenAiEmbeddings};  // requires "openai" feature
+use synaptic::anthropic::AnthropicChatModel;                  // requires "anthropic" feature
+use synaptic::models::ScriptedChatModel;                      // requires "model-utils" feature
 use synaptic::runnables::{Runnable, BoxRunnable, RunnableLambda};
 use synaptic::prompts::ChatPromptTemplate;
 use synaptic::parsers::StrOutputParser;
@@ -76,7 +105,6 @@ use synaptic::tools::ToolRegistry;
 use synaptic::memory::InMemoryStore;
 use synaptic::graph::{StateGraph, create_react_agent};
 use synaptic::retrieval::Retriever;
-use synaptic::embeddings::OpenAiEmbeddings;
 use synaptic::vectorstores::InMemoryVectorStore;
 ```
 

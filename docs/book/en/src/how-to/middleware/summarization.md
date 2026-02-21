@@ -28,6 +28,7 @@ let mw = SummarizationMiddleware::new(
 use std::sync::Arc;
 use synaptic::graph::{create_agent, AgentOptions};
 use synaptic::middleware::SummarizationMiddleware;
+use synaptic::openai::OpenAiChatModel;
 
 let summarizer = Arc::new(OpenAiChatModel::new("gpt-4o-mini"));
 
@@ -63,6 +64,8 @@ This approach preserves the most recent context verbatim while compressing older
 Use a cheaper model for summaries to reduce costs:
 
 ```rust,ignore
+use synaptic::openai::OpenAiChatModel;
+
 let agent_model = Arc::new(OpenAiChatModel::new("gpt-4o"));
 let cheap_model = Arc::new(OpenAiChatModel::new("gpt-4o-mini"));
 

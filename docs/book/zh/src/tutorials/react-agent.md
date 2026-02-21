@@ -175,7 +175,7 @@ let result = graph.invoke(state).await?;
 在实际应用中，将 `DemoModel` 替换为真实的模型适配器：
 
 ```rust
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 
 let model = Arc::new(OpenAiChatModel::new("gpt-4o"));
 ```

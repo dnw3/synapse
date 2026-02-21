@@ -43,7 +43,7 @@ Assistant: Hello! I'm a Synaptic assistant. How can I help you today?
 
 ## What is Happening
 
-1. **`ScriptedChatModel::new(vec![...])`** creates a chat model that returns the given `ChatResponse` values in sequence. This is useful for testing and examples without requiring a live API. In production, you would replace this with `OpenAiChatModel`, `AnthropicChatModel`, or another provider adapter.
+1. **`ScriptedChatModel::new(vec![...])`** creates a chat model that returns the given `ChatResponse` values in sequence. This is useful for testing and examples without requiring a live API. In production, you would replace this with `OpenAiChatModel` (from `synaptic::openai`), `AnthropicChatModel` (from `synaptic::anthropic`), or another provider adapter.
 
 2. **`ChatRequest::new(messages)`** constructs a chat request from a vector of messages. Messages are created with factory methods: `Message::system()` for system prompts, `Message::human()` for user input, and `Message::ai()` for assistant responses.
 
@@ -56,10 +56,17 @@ Assistant: Hello! I'm a Synaptic assistant. How can I help you today?
 To use OpenAI instead of the scripted model, replace the model creation:
 
 ```rust
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 
 // Reads OPENAI_API_KEY from the environment automatically.
 let model = OpenAiChatModel::new("gpt-4o");
+```
+
+You will also need the `"openai"` feature enabled in your `Cargo.toml`:
+
+```toml
+[dependencies]
+synaptic = { version = "0.2", features = ["openai"] }
 ```
 
 The rest of the code stays the same -- `ChatModel::chat()` has the same signature regardless of provider.

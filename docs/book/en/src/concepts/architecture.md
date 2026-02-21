@@ -6,7 +6,7 @@ Synaptic is organized as a workspace of focused Rust crates. Each crate owns exa
 
 **Async-first.** Every trait in Synaptic is async via `#[async_trait]`, and the runtime is tokio. This is not an afterthought bolted onto a synchronous API -- async is the foundation. LLM calls, tool execution, memory access, and embedding queries are all naturally asynchronous operations, and Synaptic models them as such from the start.
 
-**One crate, one concern.** The `synaptic-models` crate knows how to talk to LLM providers. The `synaptic-tools` crate knows how to register and execute tools. The `synaptic-memory` crate knows how to store and retrieve conversation history. No crate does two jobs. This keeps compile times manageable, makes it possible to use only what you need, and ensures that changes to one subsystem do not cascade across the codebase.
+**One crate, one concern.** Each provider has its own crate: `synaptic-openai`, `synaptic-anthropic`, `synaptic-gemini`, `synaptic-ollama`. The `synaptic-tools` crate knows how to register and execute tools. The `synaptic-memory` crate knows how to store and retrieve conversation history. No crate does two jobs. This keeps compile times manageable, makes it possible to use only what you need, and ensures that changes to one subsystem do not cascade across the codebase.
 
 **Shared traits in core.** The `synaptic-core` crate defines every trait and type that crosses crate boundaries: `ChatModel`, `Tool`, `MemoryStore`, `CallbackHandler`, `Message`, `ChatRequest`, `ChatResponse`, `ToolCall`, `SynapticError`, `RunnableConfig`, and more. Implementation crates depend on core, never on each other (unless composition requires it).
 
@@ -40,7 +40,11 @@ Each crate implements one core concern:
 
 | Crate | Purpose |
 |-------|---------|
-| `synaptic-models` | Provider adapters (OpenAI, Anthropic, Gemini, Ollama), test doubles (`ScriptedChatModel`), wrappers (`RetryChatModel`, `RateLimitedChatModel`, `StructuredOutputChatModel<T>`) |
+| `synaptic-models` | `ProviderBackend` abstraction, test doubles (`ScriptedChatModel`), wrappers (`RetryChatModel`, `RateLimitedChatModel`, `StructuredOutputChatModel<T>`, `BoundToolsChatModel`) |
+| `synaptic-openai` | `OpenAiChatModel` + `OpenAiEmbeddings` |
+| `synaptic-anthropic` | `AnthropicChatModel` |
+| `synaptic-gemini` | `GeminiChatModel` |
+| `synaptic-ollama` | `OllamaChatModel` + `OllamaEmbeddings` |
 | `synaptic-tools` | `ToolRegistry`, `SerialToolExecutor`, `ParallelToolExecutor`, `HandleErrorTool`, `ReturnDirectTool` |
 | `synaptic-memory` | `InMemoryStore` and strategy types: Buffer, Window, Summary, TokenBuffer, SummaryBuffer, `RunnableWithMessageHistory`, `FileChatMessageHistory` |
 | `synaptic-callbacks` | `RecordingCallback`, `TracingCallback`, `CompositeCallback` |
@@ -59,9 +63,13 @@ These crates combine the implementation crates into higher-level abstractions:
 | `synaptic-graph` | LangGraph-style state machines: `StateGraph` builder, `CompiledGraph`, `Node` trait, `ToolNode`, `create_react_agent()`, checkpointing, streaming, visualization |
 | `synaptic-loaders` | Document loaders: `TextLoader`, `JsonLoader`, `CsvLoader`, `DirectoryLoader`, `FileLoader`, `MarkdownLoader`, `WebLoader` |
 | `synaptic-splitters` | Text splitters: `CharacterTextSplitter`, `RecursiveCharacterTextSplitter`, `MarkdownHeaderTextSplitter`, `HtmlHeaderTextSplitter`, `LanguageTextSplitter`, `TokenTextSplitter` |
-| `synaptic-embeddings` | `Embeddings` trait, `FakeEmbeddings`, `OpenAiEmbeddings`, `OllamaEmbeddings`, `CachedEmbeddings` |
+| `synaptic-embeddings` | `Embeddings` trait, `FakeEmbeddings`, `CacheBackedEmbeddings` |
 | `synaptic-vectorstores` | `VectorStore` trait, `InMemoryVectorStore`, `MultiVectorRetriever` |
 | `synaptic-retrieval` | `Retriever` trait and seven implementations: InMemory, BM25, MultiQuery, Ensemble, ContextualCompression, SelfQuery, ParentDocument |
+| `synaptic-qdrant` | `QdrantVectorStore` (Qdrant integration) |
+| `synaptic-pgvector` | `PgVectorStore` (PostgreSQL pgvector integration) |
+| `synaptic-redis` | `RedisStore` + `RedisCache` (Redis integration) |
+| `synaptic-pdf` | `PdfLoader` (PDF document loading) |
 
 ### Layer 4: Facade
 
@@ -76,7 +84,8 @@ And then import from organized modules:
 
 ```rust
 use synaptic::core::{Message, ChatRequest};
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;       // requires "openai" feature
+use synaptic::anthropic::AnthropicChatModel; // requires "anthropic" feature
 use synaptic::graph::{create_react_agent, MessageState};
 use synaptic::runnables::{BoxRunnable, Runnable};
 ```
@@ -94,14 +103,14 @@ use synaptic::runnables::{BoxRunnable, Runnable};
         |                    ^                    |
    synaptic-core              |               synaptic-core
                              |
-        +--------+-----------+-----------+--------+
-        |        |           |           |        |
-   synap-   synap-    synap-    synap-   synap-
-   tic-     tic-      tic-      tic-     tic-
-   models   memory    callbacks prompts  parsers
-        |        |           |           |        |
-        +--------+-----------+-----------+--------+
-                             |
+        +--------+-----------+-----------+--------+--------+
+        |        |           |           |        |        |
+   synap-   synap-    synap-    synap-   synap-  Provider
+   tic-     tic-      tic-      tic-     tic-    crates:
+   models   memory    callbacks prompts  parsers openai,
+        |        |           |           |        | anthropic,
+        +--------+-----------+-----------+--------+ gemini,
+                             |                      ollama
                         synaptic-core
 
    Retrieval pipeline (all depend on synaptic-core):
@@ -111,13 +120,17 @@ use synaptic::runnables::{BoxRunnable, Runnable};
                                             synaptic-vectorstores
                                                    |
                                             synaptic-retrieval
+
+   Integration crates (each depends on synaptic-core):
+
+   synaptic-qdrant, synaptic-pgvector, synaptic-redis, synaptic-pdf
 ```
 
 The arrows point downward toward dependencies. Every crate ultimately depends on `synaptic-core`. The composition crates (`synaptic-graph`, `synaptic-runnables`) additionally depend on the implementation crates they orchestrate.
 
 ## Provider Abstraction
 
-Model adapters in `synaptic-models` use the `ProviderBackend` trait to separate HTTP concerns from protocol mapping. `HttpBackend` makes real HTTP requests; `FakeBackend` returns scripted responses for testing. This means you can test any code that uses `ChatModel` without network access and without mocking at the HTTP level.
+Each LLM provider lives in its own crate (`synaptic-openai`, `synaptic-anthropic`, `synaptic-gemini`, `synaptic-ollama`). They all use the `ProviderBackend` trait from `synaptic-models` to separate HTTP concerns from protocol mapping. `HttpBackend` makes real HTTP requests; `FakeBackend` returns scripted responses for testing. This means you can test any code that uses `ChatModel` without network access and without mocking at the HTTP level. You only compile the providers you actually use.
 
 ## The Runnable Abstraction
 

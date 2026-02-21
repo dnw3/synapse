@@ -10,9 +10,9 @@ The table below shows how core LangChain Python concepts map to their Synaptic R
 
 | LangChain (Python) | Synaptic (Rust) | Crate |
 |---|---|---|
-| `ChatOpenAI` | `OpenAiChatModel` | `synaptic-models` |
-| `ChatAnthropic` | `AnthropicChatModel` | `synaptic-models` |
-| `ChatGoogleGenerativeAI` | `GeminiChatModel` | `synaptic-models` |
+| `ChatOpenAI` | `OpenAiChatModel` | `synaptic-openai` |
+| `ChatAnthropic` | `AnthropicChatModel` | `synaptic-anthropic` |
+| `ChatGoogleGenerativeAI` | `GeminiChatModel` | `synaptic-gemini` |
 | `HumanMessage` / `AIMessage` | `Message::human()` / `Message::ai()` | `synaptic-core` |
 | `RunnableSequence` / LCEL `\|` | `BoxRunnable` / `\|` pipe operator | `synaptic-runnables` |
 | `RunnableLambda` | `RunnableLambda` | `synaptic-runnables` |
@@ -28,7 +28,7 @@ The table below shows how core LangChain Python concepts map to their Synaptic R
 | `JsonOutputParser` | `JsonOutputParser` | `synaptic-parsers` |
 | `VectorStoreRetriever` | `VectorStoreRetriever` | `synaptic-vectorstores` |
 | `RecursiveCharacterTextSplitter` | `RecursiveCharacterTextSplitter` | `synaptic-splitters` |
-| `OpenAIEmbeddings` | `OpenAiEmbeddings` | `synaptic-embeddings` |
+| `OpenAIEmbeddings` | `OpenAiEmbeddings` | `synaptic-openai` |
 
 ## Key Differences from LangChain Python
 

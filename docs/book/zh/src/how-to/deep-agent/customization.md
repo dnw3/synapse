@@ -252,7 +252,7 @@ use std::sync::Arc;
 use synaptic::core::Message;
 use synaptic::deep::{create_deep_agent, DeepAgentOptions, backend::FilesystemBackend};
 use synaptic::graph::MessageState;
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 
 let model = Arc::new(OpenAiChatModel::new("gpt-4o"));
 let backend = Arc::new(FilesystemBackend::new("/home/user/project"));

@@ -1,0 +1,24 @@
+[package]
+name = "synaptic-gemini"
+description = "Google Gemini integration for Synaptic: ChatModel"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+readme.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+async-stream.workspace = true
+eventsource-stream.workspace = true
+futures.workspace = true
+serde_json.workspace = true
+synaptic-core = { version = "0.2", path = "../synaptic-core" }
+synaptic-models = { version = "0.2", path = "../synaptic-models" }
+
+[dev-dependencies]
+tokio.workspace = true
+bytes.workspace = true

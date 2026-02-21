@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use serde_json::json;
-use synaptic_embeddings::{Embeddings, OpenAiEmbeddings, OpenAiEmbeddingsConfig};
-use synaptic_models::backend::{FakeBackend, ProviderResponse};
+use synaptic_core::Embeddings;
+use synaptic_models::{FakeBackend, ProviderResponse};
+use synaptic_openai::{OpenAiEmbeddings, OpenAiEmbeddingsConfig};
 
 #[tokio::test]
 async fn openai_embed_query() {

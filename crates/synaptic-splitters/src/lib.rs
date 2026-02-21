@@ -12,7 +12,8 @@ pub use markdown::{HeaderType, MarkdownHeaderTextSplitter};
 pub use recursive::RecursiveCharacterTextSplitter;
 pub use token::TokenTextSplitter;
 
-use synaptic_retrieval::Document;
+// Re-export Document from core for backward compatibility
+pub use synaptic_core::Document;
 
 /// Trait for splitting text into chunks.
 pub trait TextSplitter: Send + Sync {

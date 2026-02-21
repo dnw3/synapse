@@ -6,6 +6,10 @@ members = [
   "crates/synaptic-memory",
   "crates/synaptic-callbacks",
   "crates/synaptic-models",
+  "crates/synaptic-openai",
+  "crates/synaptic-anthropic",
+  "crates/synaptic-gemini",
+  "crates/synaptic-ollama",
   "crates/synaptic-runnables",
   "crates/synaptic-retrieval",
   "crates/synaptic-loaders",
@@ -21,6 +25,10 @@ members = [
   "crates/synaptic-mcp",
   "crates/synaptic-macros",
   "crates/synaptic-deep",
+  "crates/synaptic-qdrant",
+  "crates/synaptic-pgvector",
+  "crates/synaptic-redis",
+  "crates/synaptic-pdf",
   "crates/synaptic",
   "examples/react_basic",
   "examples/tool_calling_basic",
@@ -41,7 +49,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.2.2"
+version = "0.2.3"
 license = "MIT"
 authors = ["Synaptic Contributors"]
 rust-version = "1.83"

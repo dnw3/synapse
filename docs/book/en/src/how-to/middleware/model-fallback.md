@@ -20,7 +20,8 @@ The fallback list is tried in order. The first successful response is returned.
 ```rust,ignore
 use std::sync::Arc;
 use synaptic::graph::{create_agent, AgentOptions};
-use synaptic::models::{OpenAiChatModel, AnthropicChatModel};
+use synaptic::openai::OpenAiChatModel;
+use synaptic::anthropic::AnthropicChatModel;
 use synaptic::middleware::ModelFallbackMiddleware;
 
 let primary = Arc::new(OpenAiChatModel::new("gpt-4o"));

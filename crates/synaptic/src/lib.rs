@@ -7,16 +7,22 @@
 //!
 //! | Feature | Description |
 //! |---------|-------------|
-//! | `default` | `models`, `runnables`, `prompts`, `parsers`, `tools`, `callbacks` |
-//! | `agent` | `default` + `graph`, `memory` |
-//! | `rag` | `default` + `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores` |
+//! | `default` | `runnables`, `prompts`, `parsers`, `tools`, `callbacks` |
+//! | `model-utils` | `ProviderBackend`, `ScriptedChatModel`, wrappers (Retry, RateLimit, etc.) |
+//! | `openai` | OpenAI ChatModel + Embeddings |
+//! | `anthropic` | Anthropic ChatModel |
+//! | `gemini` | Gemini ChatModel |
+//! | `ollama` | Ollama ChatModel + Embeddings |
+//! | `models` | All providers: openai + anthropic + gemini + ollama |
+//! | `agent` | `default` + openai + graph + memory + middleware + store |
+//! | `rag` | `default` + openai + retrieval + loaders + splitters + embeddings + vectorstores |
 //! | `full` | All features enabled |
 //!
 //! # Quick Start
 //!
 //! ```rust,ignore
 //! use synaptic::core::{ChatModel, Message, ChatRequest, ToolChoice};
-//! use synaptic::models::OpenAiChatModel;
+//! use synaptic::openai::OpenAiChatModel;
 //! use synaptic::runnables::{Runnable, RunnableLambda, RunnableAssign, RunnablePick};
 //! ```
 
@@ -36,9 +42,26 @@ pub extern crate synaptic_runnables;
 /// Always available.
 pub use synaptic_core as core;
 
-/// Chat model adapters: OpenAI, Anthropic, Gemini, Ollama, plus test doubles and wrappers.
-#[cfg(feature = "models")]
+/// ProviderBackend abstraction, ScriptedChatModel, and ChatModel wrappers
+/// (Retry, RateLimit, TokenBucket, StructuredOutput, BoundTools).
+#[cfg(feature = "model-utils")]
 pub use synaptic_models as models;
+
+/// OpenAI ChatModel and Embeddings.
+#[cfg(feature = "openai")]
+pub use synaptic_openai as openai;
+
+/// Anthropic ChatModel.
+#[cfg(feature = "anthropic")]
+pub use synaptic_anthropic as anthropic;
+
+/// Google Gemini ChatModel.
+#[cfg(feature = "gemini")]
+pub use synaptic_gemini as gemini;
+
+/// Ollama ChatModel and Embeddings.
+#[cfg(feature = "ollama")]
+pub use synaptic_ollama as ollama;
 
 /// LCEL composition: Runnable trait (with stream), BoxRunnable (with bind), pipe operator,
 /// Lambda, Parallel, Branch, Assign, Pick, Fallbacks, etc.
@@ -77,7 +100,7 @@ pub use synaptic_loaders as loaders;
 #[cfg(feature = "splitters")]
 pub use synaptic_splitters as splitters;
 
-/// Embeddings: trait, Fake, OpenAI, Ollama.
+/// Embeddings: trait, Fake, CacheBacked.
 #[cfg(feature = "embeddings")]
 pub use synaptic_embeddings as embeddings;
 
@@ -120,3 +143,19 @@ pub use synaptic_macros::*;
 /// Deep agent harness: filesystem, subagents, skills, memory, auto-summarization.
 #[cfg(feature = "deep")]
 pub use synaptic_deep as deep;
+
+/// Qdrant vector store integration.
+#[cfg(feature = "qdrant")]
+pub use synaptic_qdrant as qdrant;
+
+/// PostgreSQL + pgvector integration.
+#[cfg(feature = "pgvector")]
+pub use synaptic_pgvector as pgvector;
+
+/// Redis store and cache integration.
+#[cfg(feature = "redis")]
+pub use synaptic_redis as redis;
+
+/// PDF document loader.
+#[cfg(feature = "pdf")]
+pub use synaptic_pdf as pdf;

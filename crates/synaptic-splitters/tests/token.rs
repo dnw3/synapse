@@ -1,5 +1,4 @@
-use synaptic_retrieval::Document;
-use synaptic_splitters::{TextSplitter, TokenTextSplitter};
+use synaptic_splitters::{Document, TextSplitter, TokenTextSplitter};
 
 #[test]
 fn basic_split_by_token_count() {

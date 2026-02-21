@@ -7,7 +7,11 @@ Synaptic is organized as a workspace of focused crates. Each crate has its own A
 | Crate | Description | Docs |
 |-------|-------------|------|
 | `synaptic-core` | Shared traits and types (`ChatModel`, `Tool`, `Message`, `SynapticError`, etc.) | [docs.rs](https://docs.rs/synaptic-core) |
-| `synaptic-models` | LLM provider adapters (OpenAI, Anthropic, Gemini, Ollama) plus retry, rate limiting, and structured output wrappers | [docs.rs](https://docs.rs/synaptic-models) |
+| `synaptic-models` | `ProviderBackend` abstraction, `ScriptedChatModel` test double, wrappers (retry, rate limit, structured output, bound tools) | [docs.rs](https://docs.rs/synaptic-models) |
+| `synaptic-openai` | OpenAI provider (`OpenAiChatModel`, `OpenAiEmbeddings`) | [docs.rs](https://docs.rs/synaptic-openai) |
+| `synaptic-anthropic` | Anthropic provider (`AnthropicChatModel`) | [docs.rs](https://docs.rs/synaptic-anthropic) |
+| `synaptic-gemini` | Google Gemini provider (`GeminiChatModel`) | [docs.rs](https://docs.rs/synaptic-gemini) |
+| `synaptic-ollama` | Ollama provider (`OllamaChatModel`, `OllamaEmbeddings`) | [docs.rs](https://docs.rs/synaptic-ollama) |
 | `synaptic-runnables` | LCEL composition (`Runnable` trait, `BoxRunnable`, pipe operator, parallel, branch, fallbacks, assign, pick) | [docs.rs](https://docs.rs/synaptic-runnables) |
 | `synaptic-prompts` | Prompt templates (`PromptTemplate`, `ChatPromptTemplate`, `FewShotChatMessagePromptTemplate`) | [docs.rs](https://docs.rs/synaptic-prompts) |
 | `synaptic-parsers` | Output parsers (string, JSON, structured, list, enum, boolean, XML, fixing, retry) | [docs.rs](https://docs.rs/synaptic-parsers) |
@@ -17,8 +21,12 @@ Synaptic is organized as a workspace of focused crates. Each crate has its own A
 | `synaptic-retrieval` | Retriever implementations (in-memory, BM25, multi-query, ensemble, contextual compression, self-query, parent document) | [docs.rs](https://docs.rs/synaptic-retrieval) |
 | `synaptic-loaders` | Document loaders (text, JSON, CSV, directory, file, markdown, web) | [docs.rs](https://docs.rs/synaptic-loaders) |
 | `synaptic-splitters` | Text splitters (character, recursive character, markdown header, token, HTML header, language) | [docs.rs](https://docs.rs/synaptic-splitters) |
-| `synaptic-embeddings` | Embedding providers (`OpenAiEmbeddings`, `OllamaEmbeddings`, `FakeEmbeddings`, `CachedEmbeddings`) | [docs.rs](https://docs.rs/synaptic-embeddings) |
+| `synaptic-embeddings` | Embeddings trait, `FakeEmbeddings`, `CacheBackedEmbeddings` | [docs.rs](https://docs.rs/synaptic-embeddings) |
 | `synaptic-vectorstores` | Vector store implementations (`InMemoryVectorStore`, `VectorStoreRetriever`, `MultiVectorRetriever`) | [docs.rs](https://docs.rs/synaptic-vectorstores) |
+| `synaptic-qdrant` | Qdrant vector store (`QdrantVectorStore`) | [docs.rs](https://docs.rs/synaptic-qdrant) |
+| `synaptic-pgvector` | PostgreSQL pgvector store (`PgVectorStore`) | [docs.rs](https://docs.rs/synaptic-pgvector) |
+| `synaptic-redis` | Redis store and cache (`RedisStore`, `RedisCache`) | [docs.rs](https://docs.rs/synaptic-redis) |
+| `synaptic-pdf` | PDF document loader (`PdfLoader`) | [docs.rs](https://docs.rs/synaptic-pdf) |
 | `synaptic-graph` | Graph orchestration (`StateGraph`, `CompiledGraph`, `ToolNode`, `create_react_agent`, checkpointing, streaming) | [docs.rs](https://docs.rs/synaptic-graph) |
 | `synaptic-cache` | LLM caching (`InMemoryCache`, `SemanticCache`, `CachedChatModel`) | [docs.rs](https://docs.rs/synaptic-cache) |
 | `synaptic-eval` | Evaluation framework (exact match, regex, JSON validity, embedding distance, LLM judge evaluators; `Dataset` and `evaluate()`) | [docs.rs](https://docs.rs/synaptic-eval) |
@@ -55,7 +63,8 @@ Then import through the unified namespace:
 
 ```rust
 use synaptic::core::Message;
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;   // requires "openai" feature
+use synaptic::models::ScriptedChatModel; // requires "model-utils" feature
 use synaptic::graph::create_react_agent;
 use synaptic::runnables::Runnable;
 ```

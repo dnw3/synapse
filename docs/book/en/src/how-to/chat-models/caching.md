@@ -56,7 +56,7 @@ Semantic caching uses embeddings to find similar queries, even when the exact wo
 ```rust
 use std::sync::Arc;
 use synaptic::cache::{SemanticCache, CachedChatModel};
-use synaptic::embeddings::OpenAiEmbeddings;
+use synaptic::openai::OpenAiEmbeddings;
 
 let embeddings: Arc<dyn synaptic::embeddings::Embeddings> = Arc::new(embeddings_provider);
 

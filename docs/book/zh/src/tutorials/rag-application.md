@@ -119,7 +119,7 @@ println!("已索引 {} 个文档块", ids.len());
 在生产环境中，你会使用真实的嵌入模型：
 
 ```rust
-use synaptic::embeddings::OpenAiEmbeddings;
+use synaptic::openai::OpenAiEmbeddings;
 
 let embeddings = OpenAiEmbeddings::new("text-embedding-3-small");
 ```

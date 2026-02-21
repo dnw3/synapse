@@ -7,7 +7,7 @@ use synaptic_core::{
     TokenUsage, ToolCall, ToolChoice, ToolDefinition,
 };
 
-use crate::backend::{ProviderBackend, ProviderRequest, ProviderResponse};
+use synaptic_models::{ProviderBackend, ProviderRequest, ProviderResponse};
 
 #[derive(Debug, Clone)]
 pub struct AnthropicConfig {

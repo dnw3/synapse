@@ -1,6 +1,6 @@
 [package]
 name = "synaptic-models"
-description = "LLM provider adapters (OpenAI, Anthropic, Gemini, Ollama) with streaming and wrappers"
+description = "ProviderBackend abstraction and ChatModel wrappers (Retry, RateLimit, StructuredOutput, BoundTools)"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
@@ -15,7 +15,6 @@ async-trait.workspace = true
 bytes.workspace = true
 futures.workspace = true
 async-stream.workspace = true
-eventsource-stream.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

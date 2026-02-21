@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use synaptic_embeddings::{Embeddings, FakeEmbeddings};
-use synaptic_retrieval::{Document, Retriever};
+use synaptic_embeddings::FakeEmbeddings;
 use synaptic_vectorstores::{
-    InMemoryVectorStore, MultiVectorRetriever, VectorStore, VectorStoreRetriever,
+    Document, Embeddings, InMemoryVectorStore, MultiVectorRetriever, Retriever, VectorStore,
+    VectorStoreRetriever,
 };
 
 #[tokio::test]

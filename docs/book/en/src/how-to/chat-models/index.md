@@ -1,25 +1,23 @@
 # Chat Models
 
-Synaptic supports multiple LLM providers through the `ChatModel` trait defined in `synaptic_core`. Every provider adapter implements this trait, giving you a uniform interface for sending messages and receiving responses -- whether you are using OpenAI, Anthropic, Gemini, or a local Ollama instance.
+Synaptic supports multiple LLM providers through the `ChatModel` trait defined in `synaptic-core`. Each provider lives in its own crate, giving you a uniform interface for sending messages and receiving responses -- whether you are using OpenAI, Anthropic, Gemini, or a local Ollama instance.
 
 ## Providers
 
-Each provider adapter takes a configuration struct and a `ProviderBackend`:
+Each provider adapter lives in its own crate. You enable only the providers you need via feature flags:
 
-| Provider | Adapter | Config |
-|----------|---------|--------|
-| OpenAI | `OpenAiChatModel` | `OpenAiConfig::new(api_key, model)` |
-| Anthropic | `AnthropicChatModel` | `AnthropicConfig::new(api_key, model)` |
-| Google Gemini | `GeminiChatModel` | `GeminiConfig::new(api_key, model)` |
-| Ollama (local) | `OllamaChatModel` | `OllamaConfig::new(model)` |
+| Provider | Adapter | Crate | Feature |
+|----------|---------|-------|---------|
+| OpenAI | `OpenAiChatModel` | `synaptic-openai` | `"openai"` |
+| Anthropic | `AnthropicChatModel` | `synaptic-anthropic` | `"anthropic"` |
+| Google Gemini | `GeminiChatModel` | `synaptic-gemini` | `"gemini"` |
+| Ollama (local) | `OllamaChatModel` | `synaptic-ollama` | `"ollama"` |
 
 ```rust
 use std::sync::Arc;
-use synaptic::models::{OpenAiChatModel, OpenAiConfig, HttpBackend};
+use synaptic::openai::OpenAiChatModel;
 
-let config = OpenAiConfig::new("sk-...", "gpt-4o");
-let backend = Arc::new(HttpBackend::new());
-let model = OpenAiChatModel::new(config, backend);
+let model = OpenAiChatModel::new("gpt-4o");
 ```
 
 For testing, use `ScriptedChatModel` (returns pre-defined responses) or `FakeBackend` (simulates HTTP responses without network calls).

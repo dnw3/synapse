@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use serde_json::Value;
 use synaptic_core::SynapticError;
-use synaptic_retrieval::Document;
+use crate::Document;
 
 use crate::Loader;
 

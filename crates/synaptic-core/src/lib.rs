@@ -946,6 +946,8 @@ pub enum SynapticError {
     Graph(String),
     #[error("cache error: {0}")]
     Cache(String),
+    #[error("store error: {0}")]
+    Store(String),
     #[error("config error: {0}")]
     Config(String),
     #[error("mcp error: {0}")]
@@ -1325,6 +1327,134 @@ impl Tool for RuntimeAwareToolAdapter {
         });
         self.inner.call_with_runtime(args, runtime).await
     }
+}
+
+// ---------------------------------------------------------------------------
+// Document
+// ---------------------------------------------------------------------------
+
+/// A document with content and metadata, used throughout the retrieval pipeline.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Document {
+    pub id: String,
+    pub content: String,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub metadata: HashMap<String, Value>,
+}
+
+impl Document {
+    pub fn new(id: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            content: content.into(),
+            metadata: HashMap::new(),
+        }
+    }
+
+    pub fn with_metadata(
+        id: impl Into<String>,
+        content: impl Into<String>,
+        metadata: HashMap<String, Value>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            content: content.into(),
+            metadata,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Retriever trait (forward-declared here, implementations in synaptic-retrieval)
+// ---------------------------------------------------------------------------
+
+/// Trait for retrieving relevant documents given a query string.
+#[async_trait]
+pub trait Retriever: Send + Sync {
+    async fn retrieve(&self, query: &str, top_k: usize) -> Result<Vec<Document>, SynapticError>;
+}
+
+// ---------------------------------------------------------------------------
+// VectorStore trait (forward-declared here, implementations in synaptic-vectorstores)
+// ---------------------------------------------------------------------------
+
+/// Trait for vector storage backends.
+#[async_trait]
+pub trait VectorStore: Send + Sync {
+    /// Add documents to the store, computing their embeddings.
+    async fn add_documents(
+        &self,
+        docs: Vec<Document>,
+        embeddings: &dyn Embeddings,
+    ) -> Result<Vec<String>, SynapticError>;
+
+    /// Search for similar documents by query string.
+    async fn similarity_search(
+        &self,
+        query: &str,
+        k: usize,
+        embeddings: &dyn Embeddings,
+    ) -> Result<Vec<Document>, SynapticError>;
+
+    /// Search with similarity scores (higher = more similar).
+    async fn similarity_search_with_score(
+        &self,
+        query: &str,
+        k: usize,
+        embeddings: &dyn Embeddings,
+    ) -> Result<Vec<(Document, f32)>, SynapticError>;
+
+    /// Search by pre-computed embedding vector instead of text query.
+    async fn similarity_search_by_vector(
+        &self,
+        embedding: &[f32],
+        k: usize,
+    ) -> Result<Vec<Document>, SynapticError>;
+
+    /// Delete documents by ID.
+    async fn delete(&self, ids: &[&str]) -> Result<(), SynapticError>;
+}
+
+// ---------------------------------------------------------------------------
+// Loader trait (forward-declared here, implementations in synaptic-loaders)
+// ---------------------------------------------------------------------------
+
+/// Trait for loading documents from various sources.
+#[async_trait]
+pub trait Loader: Send + Sync {
+    /// Load all documents from this source.
+    async fn load(&self) -> Result<Vec<Document>, SynapticError>;
+
+    /// Stream documents lazily. Default implementation wraps load().
+    fn lazy_load(
+        &self,
+    ) -> Pin<Box<dyn Stream<Item = Result<Document, SynapticError>> + Send + '_>> {
+        Box::pin(async_stream::stream! {
+            match self.load().await {
+                Ok(docs) => {
+                    for doc in docs {
+                        yield Ok(doc);
+                    }
+                }
+                Err(e) => yield Err(e),
+            }
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LlmCache trait (forward-declared here, implementations in synaptic-cache)
+// ---------------------------------------------------------------------------
+
+/// Trait for caching LLM responses.
+#[async_trait]
+pub trait LlmCache: Send + Sync {
+    /// Look up a cached response by cache key.
+    async fn get(&self, key: &str) -> Result<Option<ChatResponse>, SynapticError>;
+    /// Store a response in the cache.
+    async fn put(&self, key: &str, response: &ChatResponse) -> Result<(), SynapticError>;
+    /// Clear all entries from the cache.
+    async fn clear(&self) -> Result<(), SynapticError>;
 }
 
 // ---------------------------------------------------------------------------

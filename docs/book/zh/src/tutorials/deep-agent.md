@@ -66,7 +66,7 @@ use synaptic::deep::{create_deep_agent, DeepAgentOptions};
 use synaptic::deep::backend::StateBackend;
 use synaptic::core::{ChatModel, Message};
 use synaptic::graph::MessageState;
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -309,7 +309,7 @@ use synaptic::deep::{create_deep_agent, DeepAgentOptions, SubAgentDef};
 use synaptic::deep::backend::StateBackend;
 use synaptic::core::{ChatModel, Message};
 use synaptic::graph::MessageState;
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

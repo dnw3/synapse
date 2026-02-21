@@ -15,7 +15,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 ## Step 1: Create a Chat Model
 
-Every LLM interaction in Synaptic goes through a type that implements the `ChatModel` trait. For production use you would reach for `OpenAiChatModel`, `AnthropicChatModel`, or one of the other provider adapters. For this tutorial we use `ScriptedChatModel`, which returns pre-configured responses -- perfect for offline development and testing.
+Every LLM interaction in Synaptic goes through a type that implements the `ChatModel` trait. For production use you would reach for `OpenAiChatModel` (from `synaptic::openai`), `AnthropicChatModel` (from `synaptic::anthropic`), or one of the other provider adapters. For this tutorial we use `ScriptedChatModel`, which returns pre-configured responses -- perfect for offline development and testing.
 
 ```rust
 use synaptic::core::{ChatModel, ChatRequest, ChatResponse, Message};

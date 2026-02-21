@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic_core::{ChatResponse, SynapticError};
-use synaptic_embeddings::Embeddings;
+use synaptic_core::{ChatResponse, Embeddings, SynapticError};
 use tokio::sync::RwLock;
 
 use crate::LlmCache;

@@ -119,6 +119,11 @@
 - [Evaluation](how-to/evaluation/index.md)
     - [Evaluators](how-to/evaluation/evaluators.md)
     - [Datasets](how-to/evaluation/dataset.md)
+- [Integrations](how-to/integrations/index.md)
+    - [Qdrant Vector Store](how-to/integrations/qdrant.md)
+    - [PostgreSQL pgvector](how-to/integrations/pgvector.md)
+    - [Redis Store & Cache](how-to/integrations/redis.md)
+    - [PDF Loader](how-to/integrations/pdf.md)
 - [Macros](how-to/macros.md)
     - [Middleware Macros](how-to/macros-middleware.md)
     - [Macro Examples](how-to/macros-examples.md)
@@ -135,6 +140,7 @@
 - [Streaming](concepts/streaming.md)
 - [Middleware](concepts/middleware.md)
 - [Key-Value Store](concepts/store.md)
+- [Integrations](concepts/integrations.md)
 - [Error Handling](concepts/errors.md)
 
 # Reference

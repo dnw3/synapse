@@ -7,28 +7,22 @@ use synaptic_core::{
     TokenUsage, ToolCall, ToolChoice, ToolDefinition,
 };
 
-use crate::backend::{ProviderBackend, ProviderRequest, ProviderResponse};
+use synaptic_models::{ProviderBackend, ProviderRequest, ProviderResponse};
 
 #[derive(Debug, Clone)]
-pub struct OpenAiConfig {
-    pub api_key: String,
+pub struct OllamaConfig {
     pub model: String,
     pub base_url: String,
-    pub max_tokens: Option<u32>,
-    pub temperature: Option<f64>,
     pub top_p: Option<f64>,
     pub stop: Option<Vec<String>>,
     pub seed: Option<u64>,
 }
 
-impl OpenAiConfig {
-    pub fn new(api_key: impl Into<String>, model: impl Into<String>) -> Self {
+impl OllamaConfig {
+    pub fn new(model: impl Into<String>) -> Self {
         Self {
-            api_key: api_key.into(),
             model: model.into(),
-            base_url: "https://api.openai.com/v1".to_string(),
-            max_tokens: None,
-            temperature: None,
+            base_url: "http://localhost:11434".to_string(),
             top_p: None,
             stop: None,
             seed: None,
@@ -37,16 +31,6 @@ impl OpenAiConfig {
 
     pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
         self.base_url = url.into();
-        self
-    }
-
-    pub fn with_max_tokens(mut self, max_tokens: u32) -> Self {
-        self.max_tokens = Some(max_tokens);
-        self
-    }
-
-    pub fn with_temperature(mut self, temperature: f64) -> Self {
-        self.temperature = Some(temperature);
         self
     }
 
@@ -66,18 +50,18 @@ impl OpenAiConfig {
     }
 }
 
-pub struct OpenAiChatModel {
-    config: OpenAiConfig,
+pub struct OllamaChatModel {
+    config: OllamaConfig,
     backend: Arc<dyn ProviderBackend>,
 }
 
-impl OpenAiChatModel {
-    pub fn new(config: OpenAiConfig, backend: Arc<dyn ProviderBackend>) -> Self {
+impl OllamaChatModel {
+    pub fn new(config: OllamaConfig, backend: Arc<dyn ProviderBackend>) -> Self {
         Self { config, backend }
     }
 
     fn build_request(&self, request: &ChatRequest, stream: bool) -> ProviderRequest {
-        let messages: Vec<Value> = request.messages.iter().map(message_to_openai).collect();
+        let messages: Vec<Value> = request.messages.iter().map(message_to_ollama).collect();
 
         let mut body = json!({
             "model": self.config.model,
@@ -85,26 +69,11 @@ impl OpenAiChatModel {
             "stream": stream,
         });
 
-        if let Some(max_tokens) = self.config.max_tokens {
-            body["max_tokens"] = json!(max_tokens);
-        }
-        if let Some(temp) = self.config.temperature {
-            body["temperature"] = json!(temp);
-        }
-        if let Some(top_p) = self.config.top_p {
-            body["top_p"] = json!(top_p);
-        }
-        if let Some(ref stop) = self.config.stop {
-            body["stop"] = json!(stop);
-        }
-        if let Some(seed) = self.config.seed {
-            body["seed"] = json!(seed);
-        }
         if !request.tools.is_empty() {
             body["tools"] = json!(request
                 .tools
                 .iter()
-                .map(tool_def_to_openai)
+                .map(tool_def_to_ollama)
                 .collect::<Vec<_>>());
         }
         if let Some(ref choice) = request.tool_choice {
@@ -119,21 +88,35 @@ impl OpenAiChatModel {
             };
         }
 
+        {
+            let mut options = json!({});
+            let mut has_options = false;
+            if let Some(top_p) = self.config.top_p {
+                options["top_p"] = json!(top_p);
+                has_options = true;
+            }
+            if let Some(ref stop) = self.config.stop {
+                options["stop"] = json!(stop);
+                has_options = true;
+            }
+            if let Some(seed) = self.config.seed {
+                options["seed"] = json!(seed);
+                has_options = true;
+            }
+            if has_options {
+                body["options"] = options;
+            }
+        }
+
         ProviderRequest {
-            url: format!("{}/chat/completions", self.config.base_url),
-            headers: vec![
-                (
-                    "Authorization".to_string(),
-                    format!("Bearer {}", self.config.api_key),
-                ),
-                ("Content-Type".to_string(), "application/json".to_string()),
-            ],
+            url: format!("{}/api/chat", self.config.base_url),
+            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
             body,
         }
     }
 }
 
-fn message_to_openai(msg: &Message) -> Value {
+fn message_to_ollama(msg: &Message) -> Value {
     match msg {
         Message::System { content, .. } => json!({
             "role": "system",
@@ -156,11 +139,9 @@ fn message_to_openai(msg: &Message) -> Value {
                 obj["tool_calls"] = json!(tool_calls
                     .iter()
                     .map(|tc| json!({
-                        "id": tc.id,
-                        "type": "function",
                         "function": {
                             "name": tc.name,
-                            "arguments": tc.arguments.to_string(),
+                            "arguments": tc.arguments,
                         }
                     }))
                     .collect::<Vec<_>>());
@@ -169,12 +150,11 @@ fn message_to_openai(msg: &Message) -> Value {
         }
         Message::Tool {
             content,
-            tool_call_id,
+            tool_call_id: _,
             ..
         } => json!({
             "role": "tool",
             "content": content,
-            "tool_call_id": tool_call_id,
         }),
         Message::Chat {
             custom_role,
@@ -188,7 +168,7 @@ fn message_to_openai(msg: &Message) -> Value {
     }
 }
 
-fn tool_def_to_openai(def: &ToolDefinition) -> Value {
+fn tool_def_to_ollama(def: &ToolDefinition) -> Value {
     json!({
         "type": "function",
         "function": {
@@ -202,11 +182,11 @@ fn tool_def_to_openai(def: &ToolDefinition) -> Value {
 fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapticError> {
     check_error_status(resp)?;
 
-    let choice = &resp.body["choices"][0]["message"];
-    let content = choice["content"].as_str().unwrap_or("").to_string();
-    let tool_calls = parse_tool_calls(choice);
+    let message_val = &resp.body["message"];
+    let content = message_val["content"].as_str().unwrap_or("").to_string();
+    let tool_calls = parse_tool_calls(message_val);
 
-    let usage = parse_usage(&resp.body["usage"]);
+    let usage = parse_usage(&resp.body);
 
     let message = if tool_calls.is_empty() {
         Message::ai(content)
@@ -218,20 +198,13 @@ fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapticError
 }
 
 fn check_error_status(resp: &ProviderResponse) -> Result<(), SynapticError> {
-    if resp.status == 429 {
-        let msg = resp.body["error"]["message"]
-            .as_str()
-            .unwrap_or("rate limited")
-            .to_string();
-        return Err(SynapticError::RateLimit(msg));
-    }
     if resp.status >= 400 {
-        let msg = resp.body["error"]["message"]
+        let msg = resp.body["error"]
             .as_str()
-            .unwrap_or("unknown API error")
+            .unwrap_or("unknown Ollama error")
             .to_string();
         return Err(SynapticError::Model(format!(
-            "OpenAI API error ({}): {}",
+            "Ollama API error ({}): {}",
             resp.status, msg
         )));
     }
@@ -243,14 +216,12 @@ fn parse_tool_calls(message: &Value) -> Vec<ToolCall> {
         .as_array()
         .map(|arr| {
             arr.iter()
-                .filter_map(|tc| {
-                    let id = tc["id"].as_str()?.to_string();
+                .enumerate()
+                .filter_map(|(i, tc)| {
                     let name = tc["function"]["name"].as_str()?.to_string();
-                    let args_str = tc["function"]["arguments"].as_str().unwrap_or("{}");
-                    let arguments =
-                        serde_json::from_str(args_str).unwrap_or(Value::Object(Default::default()));
+                    let arguments = tc["function"]["arguments"].clone();
                     Some(ToolCall {
-                        id,
+                        id: format!("ollama-{i}"),
                         name,
                         arguments,
                     })
@@ -260,26 +231,30 @@ fn parse_tool_calls(message: &Value) -> Vec<ToolCall> {
         .unwrap_or_default()
 }
 
-fn parse_usage(usage: &Value) -> Option<TokenUsage> {
-    if usage.is_null() {
-        return None;
+fn parse_usage(body: &Value) -> Option<TokenUsage> {
+    let prompt = body["prompt_eval_count"].as_u64();
+    let completion = body["eval_count"].as_u64();
+    match (prompt, completion) {
+        (Some(p), Some(c)) => Some(TokenUsage {
+            input_tokens: p as u32,
+            output_tokens: c as u32,
+            total_tokens: (p + c) as u32,
+            input_details: None,
+            output_details: None,
+        }),
+        _ => None,
     }
-    Some(TokenUsage {
-        input_tokens: usage["prompt_tokens"].as_u64().unwrap_or(0) as u32,
-        output_tokens: usage["completion_tokens"].as_u64().unwrap_or(0) as u32,
-        total_tokens: usage["total_tokens"].as_u64().unwrap_or(0) as u32,
-        input_details: None,
-        output_details: None,
-    })
 }
 
-fn parse_stream_chunk(data: &str) -> Option<AIMessageChunk> {
-    let v: Value = serde_json::from_str(data).ok()?;
-    let delta = &v["choices"][0]["delta"];
+fn parse_ndjson_chunk(line: &str) -> Option<AIMessageChunk> {
+    let v: Value = serde_json::from_str(line).ok()?;
 
-    let content = delta["content"].as_str().unwrap_or("").to_string();
-    let tool_calls = parse_tool_calls(delta);
-    let usage = parse_usage(&v["usage"]);
+    // Ollama streaming: each line has {"message":{"role":"assistant","content":"..."}, "done":false}
+    let content = v["message"]["content"].as_str().unwrap_or("").to_string();
+    let tool_calls = parse_tool_calls(&v["message"]);
+    let done = v["done"].as_bool().unwrap_or(false);
+
+    let usage = if done { parse_usage(&v) } else { None };
 
     Some(AIMessageChunk {
         content,
@@ -290,7 +265,7 @@ fn parse_stream_chunk(data: &str) -> Option<AIMessageChunk> {
 }
 
 #[async_trait]
-impl ChatModel for OpenAiChatModel {
+impl ChatModel for OllamaChatModel {
     async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         let provider_req = self.build_request(&request, false);
         let resp = self.backend.send(provider_req).await?;
@@ -310,27 +285,39 @@ impl ChatModel for OpenAiChatModel {
                 }
             };
 
-            use eventsource_stream::Eventsource;
             use futures::StreamExt;
 
-            let mut event_stream = byte_stream
-                .map(|result| result.map_err(|e| std::io::Error::other(e.to_string())))
-                .eventsource();
+            // NDJSON: accumulate bytes and split on newlines
+            let mut buffer = String::new();
+            let mut byte_stream = std::pin::pin!(byte_stream);
 
-            while let Some(event) = event_stream.next().await {
-                match event {
-                    Ok(ev) => {
-                        if ev.data == "[DONE]" {
-                            break;
-                        }
-                        if let Some(chunk) = parse_stream_chunk(&ev.data) {
-                            yield Ok(chunk);
+            while let Some(result) = byte_stream.next().await {
+                match result {
+                    Ok(bytes) => {
+                        buffer.push_str(&String::from_utf8_lossy(&bytes));
+                        while let Some(pos) = buffer.find('\n') {
+                            let line = buffer[..pos].trim().to_string();
+                            buffer = buffer[pos + 1..].to_string();
+                            if line.is_empty() {
+                                continue;
+                            }
+                            if let Some(chunk) = parse_ndjson_chunk(&line) {
+                                yield Ok(chunk);
+                            }
                         }
                     }
                     Err(e) => {
-                        yield Err(SynapticError::Model(format!("SSE parse error: {e}")));
+                        yield Err(e);
                         break;
                     }
+                }
+            }
+
+            // Process remaining buffer
+            let remaining = buffer.trim().to_string();
+            if !remaining.is_empty() {
+                if let Some(chunk) = parse_ndjson_chunk(&remaining) {
+                    yield Ok(chunk);
                 }
             }
         })

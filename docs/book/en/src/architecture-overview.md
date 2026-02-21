@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Synaptic is organized as a Cargo workspace with 22 library crates, 1 facade crate, and several example binaries. The crates form a layered architecture where each layer builds on the one below it.
+Synaptic is organized as a Cargo workspace with 26 library crates, 1 facade crate, and several example binaries. The crates form a layered architecture where each layer builds on the one below it.
 
 ## Crate Layers
 
@@ -19,7 +19,11 @@ Each crate implements one core trait or provides a focused capability:
 
 | Crate | Purpose |
 |---|---|
-| `synaptic-models` | Provider adapters (OpenAI, Anthropic, Gemini, Ollama) + `ScriptedChatModel` test double + wrappers (retry, rate limit, caching, structured output) |
+| `synaptic-models` | `ProviderBackend` abstraction, `ScriptedChatModel` test double, wrappers (retry, rate limit, structured output, bound tools) |
+| `synaptic-openai` | `OpenAiChatModel` + `OpenAiEmbeddings` |
+| `synaptic-anthropic` | `AnthropicChatModel` |
+| `synaptic-gemini` | `GeminiChatModel` |
+| `synaptic-ollama` | `OllamaChatModel` + `OllamaEmbeddings` |
 | `synaptic-tools` | `ToolRegistry`, `SerialToolExecutor`, `ParallelToolExecutor` |
 | `synaptic-memory` | Memory strategies: buffer, window, summary, token buffer, summary buffer, `RunnableWithMessageHistory` |
 | `synaptic-callbacks` | `RecordingCallback`, `TracingCallback`, `CompositeCallback` |
@@ -44,7 +48,7 @@ These crates form the document ingestion and retrieval pipeline:
 |---|---|
 | `synaptic-loaders` | `TextLoader`, `JsonLoader`, `CsvLoader`, `DirectoryLoader` |
 | `synaptic-splitters` | `CharacterTextSplitter`, `RecursiveCharacterTextSplitter`, `MarkdownHeaderTextSplitter`, `TokenTextSplitter` |
-| `synaptic-embeddings` | `Embeddings` trait, `OpenAiEmbeddings`, `OllamaEmbeddings`, `FakeEmbeddings` |
+| `synaptic-embeddings` | `Embeddings` trait, `FakeEmbeddings`, `CacheBackedEmbeddings` |
 | `synaptic-vectorstores` | `VectorStore` trait, `InMemoryVectorStore`, `VectorStoreRetriever` |
 | `synaptic-retrieval` | `Retriever` trait, `BM25Retriever`, `MultiQueryRetriever`, `EnsembleRetriever`, `ContextualCompressionRetriever`, `SelfQueryRetriever`, `ParentDocumentRetriever` |
 
@@ -66,13 +70,25 @@ These crates provide specialized capabilities for production agent systems:
 | `synaptic-macros` | Procedural macros: `#[tool]`, `#[chain]`, `#[entrypoint]`, `#[task]`, `#[traceable]`, middleware macros |
 | `synaptic-deep` | Deep Agent harness: `Backend` trait (State/Store/Filesystem), 7 filesystem tools, 6 middleware, `create_deep_agent()` factory |
 
+### Integration Crates
+
+These crates provide third-party service integrations:
+
+| Crate | Purpose |
+|---|---|
+| `synaptic-qdrant` | `QdrantVectorStore` (Qdrant vector database) |
+| `synaptic-pgvector` | `PgVectorStore` (PostgreSQL pgvector extension) |
+| `synaptic-redis` | `RedisStore` + `RedisCache` (Redis key-value store and LLM cache) |
+| `synaptic-pdf` | `PdfLoader` (PDF document loading) |
+
 ### Facade
 
 **`synaptic`** re-exports all sub-crates for convenient single-import usage:
 
 ```rust
 use synaptic::core::{ChatModel, Message, ChatRequest};
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;     // requires "openai" feature
+use synaptic::models::ScriptedChatModel;   // requires "model-utils" feature
 use synaptic::runnables::{Runnable, RunnableLambda};
 use synaptic::graph::{StateGraph, create_react_agent};
 ```
@@ -107,13 +123,16 @@ All crates depend on `synaptic-core` for shared traits and types. Higher-level c
   ┌─┴──┴──────┴───────┴─────┴───────────────┴──┐
   │              synaptic-core                  │
   │  (ChatModel, Tool, Store, Embeddings, ...) │
-  └─────────────────────────────────────────────┘
+  └──────────────────┬──────────────────────────┘
+                     │
+  Provider crates (each depends on synaptic-core + synaptic-models):
+  openai, anthropic, gemini, ollama
 
   Retrieval pipeline:
 
   loaders ──► splitters ──► embeddings ──► vectorstores ──► retrieval
-                                                              │
-                                                        synaptic-core
+
+  Integration crates: qdrant, pgvector, redis, pdf
 ```
 
 ## Design Principles

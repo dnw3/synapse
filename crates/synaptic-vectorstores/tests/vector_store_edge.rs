@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use synaptic_embeddings::FakeEmbeddings;
-use synaptic_retrieval::Document;
-use synaptic_vectorstores::{InMemoryVectorStore, VectorStore};
+use synaptic_vectorstores::{Document, InMemoryVectorStore, VectorStore};
 
 #[tokio::test]
 async fn add_and_delete_then_search_empty() {

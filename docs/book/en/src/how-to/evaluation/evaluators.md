@@ -84,7 +84,7 @@ println!("Passed (>= 0.8): {}", result.passed);
 
 Parameters:
 
-- **`embeddings`** -- any type implementing `Arc<dyn Embeddings>` (e.g., `OpenAiEmbeddings`, `OllamaEmbeddings`, `FakeEmbeddings`).
+- **`embeddings`** -- any type implementing `Arc<dyn Embeddings>` (e.g., `OpenAiEmbeddings` from `synaptic::openai`, `OllamaEmbeddings` from `synaptic::ollama`, `FakeEmbeddings` from `synaptic::embeddings`).
 - **`threshold`** -- minimum cosine similarity to pass. A typical value is `0.8` for semantic similarity checks.
 
 ## LLMJudgeEvaluator
@@ -93,7 +93,7 @@ Uses an LLM to judge the quality of a prediction on a 0-10 scale. The score is n
 
 ```rust
 use synaptic::eval::{LLMJudgeEvaluator, Evaluator};
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 use std::sync::Arc;
 
 let model = Arc::new(OpenAiChatModel::new("gpt-4o"));

@@ -2,10 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::json;
-use synaptic_core::SynapticError;
-use synaptic_models::backend::{ProviderBackend, ProviderRequest};
-
-use crate::Embeddings;
+use synaptic_core::{Embeddings, SynapticError};
+use synaptic_models::{ProviderBackend, ProviderRequest};
 
 pub struct OpenAiEmbeddingsConfig {
     pub api_key: String,

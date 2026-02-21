@@ -48,7 +48,7 @@ A Deep Agent is assembled from layers that wrap a core ReAct agent graph:
 ```rust,ignore
 use synaptic::deep::{create_deep_agent, DeepAgentOptions, backend::FilesystemBackend};
 use synaptic::graph::MessageState;
-use synaptic::models::OpenAiChatModel;
+use synaptic::openai::OpenAiChatModel;
 use synaptic::core::Message;
 use std::sync::Arc;
 

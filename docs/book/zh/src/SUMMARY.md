@@ -119,6 +119,11 @@
 - [评估](how-to/evaluation/index.md)
     - [评估器](how-to/evaluation/evaluators.md)
     - [数据集](how-to/evaluation/dataset.md)
+- [集成](how-to/integrations/index.md)
+    - [Qdrant 向量存储](how-to/integrations/qdrant.md)
+    - [PostgreSQL pgvector](how-to/integrations/pgvector.md)
+    - [Redis 存储与缓存](how-to/integrations/redis.md)
+    - [PDF 加载器](how-to/integrations/pdf.md)
 - [宏](how-to/macros.md)
     - [中间件宏](how-to/macros-middleware.md)
     - [宏使用示例](how-to/macros-examples.md)
@@ -135,9 +140,12 @@
 - [流式处理](concepts/streaming.md)
 - [中间件](concepts/middleware.md)
 - [键值存储](concepts/store.md)
+- [集成](concepts/integrations.md)
 - [错误处理](concepts/errors.md)
 
 # 参考
+
+- [迁移指南 (0.2 → 0.3)](migration-0.3.md)
 
 - [API 参考](api-reference.md)
 - [贡献指南](contributing.md)

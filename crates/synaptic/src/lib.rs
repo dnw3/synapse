@@ -159,3 +159,35 @@ pub use synaptic_redis as redis;
 /// PDF document loader.
 #[cfg(feature = "pdf")]
 pub use synaptic_pdf as pdf;
+
+/// AWS Bedrock ChatModel.
+#[cfg(feature = "bedrock")]
+pub use synaptic_bedrock as bedrock;
+
+/// Cohere Reranker.
+#[cfg(feature = "cohere")]
+pub use synaptic_cohere as cohere;
+
+/// Pinecone vector store.
+#[cfg(feature = "pinecone")]
+pub use synaptic_pinecone as pinecone;
+
+/// Chroma vector store.
+#[cfg(feature = "chroma")]
+pub use synaptic_chroma as chroma;
+
+/// MongoDB Atlas vector search.
+#[cfg(feature = "mongodb")]
+pub use synaptic_mongodb as mongodb;
+
+/// Elasticsearch vector store.
+#[cfg(feature = "elasticsearch")]
+pub use synaptic_elasticsearch as elasticsearch;
+
+/// SQLite LLM cache.
+#[cfg(feature = "sqlite")]
+pub use synaptic_sqlite as sqlite;
+
+/// Tavily search tool.
+#[cfg(feature = "tavily")]
+pub use synaptic_tavily as tavily;

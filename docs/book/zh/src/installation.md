@@ -57,7 +57,7 @@ synaptic = { version = "0.2", features = ["openai", "graph", "cache"] }
 | `anthropic` | Anthropic 提供商（`AnthropicChatModel`） |
 | `gemini` | Google Gemini 提供商（`GeminiChatModel`） |
 | `ollama` | Ollama 提供商（`OllamaChatModel`、`OllamaEmbeddings`） |
-| `models` | 全部四个提供商（openai + anthropic + gemini + ollama） |
+| `models` | 全部六个提供商（openai + anthropic + gemini + ollama + bedrock + cohere） |
 | `model-utils` | `ProviderBackend` 抽象 + 包装器（`ScriptedChatModel`、`RetryChatModel` 等） |
 
 **集成 features：**
@@ -68,8 +68,16 @@ synaptic = { version = "0.2", features = ["openai", "graph", "cache"] }
 | `pgvector` | PostgreSQL pgvector 向量存储（`PgVectorStore`） |
 | `redis` | Redis 存储和缓存（`RedisStore`、`RedisCache`） |
 | `pdf` | PDF 文档加载器（`PdfLoader`） |
+| `bedrock` | AWS Bedrock ChatModel（`synaptic-bedrock`） |
+| `cohere` | Cohere Reranker（`synaptic-cohere`） |
+| `pinecone` | Pinecone 向量存储（`synaptic-pinecone`） |
+| `chroma` | Chroma 向量存储（`synaptic-chroma`） |
+| `mongodb` | MongoDB Atlas 向量搜索（`synaptic-mongodb`） |
+| `elasticsearch` | Elasticsearch 向量存储（`synaptic-elasticsearch`） |
+| `sqlite` | SQLite LLM 缓存（`synaptic-sqlite`） |
+| `tavily` | Tavily 搜索工具（`synaptic-tavily`） |
 
-单独可用的 features：`openai`, `anthropic`, `gemini`, `ollama`, `models`, `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`, `qdrant`, `pgvector`, `redis`, `pdf`。
+单独可用的 features：`openai`, `anthropic`, `gemini`, `ollama`, `bedrock`, `cohere`, `models`, `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`, `qdrant`, `pgvector`, `redis`, `pdf`, `pinecone`, `chroma`, `mongodb`, `elasticsearch`, `sqlite`, `tavily`。
 
 **高级 features：**
 

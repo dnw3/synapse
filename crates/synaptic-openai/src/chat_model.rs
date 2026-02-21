@@ -132,7 +132,7 @@ impl OpenAiChatModel {
     }
 }
 
-fn message_to_openai(msg: &Message) -> Value {
+pub(crate) fn message_to_openai(msg: &Message) -> Value {
     match msg {
         Message::System { content, .. } => json!({
             "role": "system",
@@ -187,7 +187,7 @@ fn message_to_openai(msg: &Message) -> Value {
     }
 }
 
-fn tool_def_to_openai(def: &ToolDefinition) -> Value {
+pub(crate) fn tool_def_to_openai(def: &ToolDefinition) -> Value {
     json!({
         "type": "function",
         "function": {
@@ -198,7 +198,7 @@ fn tool_def_to_openai(def: &ToolDefinition) -> Value {
     })
 }
 
-fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapticError> {
+pub(crate) fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapticError> {
     check_error_status(resp)?;
 
     let choice = &resp.body["choices"][0]["message"];
@@ -216,7 +216,7 @@ fn parse_response(resp: &ProviderResponse) -> Result<ChatResponse, SynapticError
     Ok(ChatResponse { message, usage })
 }
 
-fn check_error_status(resp: &ProviderResponse) -> Result<(), SynapticError> {
+pub(crate) fn check_error_status(resp: &ProviderResponse) -> Result<(), SynapticError> {
     if resp.status == 429 {
         let msg = resp.body["error"]["message"]
             .as_str()
@@ -237,7 +237,7 @@ fn check_error_status(resp: &ProviderResponse) -> Result<(), SynapticError> {
     Ok(())
 }
 
-fn parse_tool_calls(message: &Value) -> Vec<ToolCall> {
+pub(crate) fn parse_tool_calls(message: &Value) -> Vec<ToolCall> {
     message["tool_calls"]
         .as_array()
         .map(|arr| {
@@ -259,7 +259,7 @@ fn parse_tool_calls(message: &Value) -> Vec<ToolCall> {
         .unwrap_or_default()
 }
 
-fn parse_usage(usage: &Value) -> Option<TokenUsage> {
+pub(crate) fn parse_usage(usage: &Value) -> Option<TokenUsage> {
     if usage.is_null() {
         return None;
     }
@@ -272,7 +272,7 @@ fn parse_usage(usage: &Value) -> Option<TokenUsage> {
     })
 }
 
-fn parse_stream_chunk(data: &str) -> Option<AIMessageChunk> {
+pub(crate) fn parse_stream_chunk(data: &str) -> Option<AIMessageChunk> {
     let v: Value = serde_json::from_str(data).ok()?;
     let delta = &v["choices"][0]["delta"];
 

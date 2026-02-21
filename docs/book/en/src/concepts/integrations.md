@@ -6,14 +6,22 @@ Synaptic uses a **provider-centric** architecture for external service integrati
 
 ```text
 synaptic-core (defines traits)
-  ├── synaptic-openai     (ChatModel + Embeddings)
-  ├── synaptic-anthropic  (ChatModel)
-  ├── synaptic-gemini     (ChatModel)
-  ├── synaptic-ollama     (ChatModel + Embeddings)
-  ├── synaptic-qdrant     (VectorStore)
-  ├── synaptic-pgvector   (VectorStore)
-  ├── synaptic-redis      (Store + LlmCache)
-  └── synaptic-pdf        (Loader)
+  ├── synaptic-openai          (ChatModel + Embeddings)
+  ├── synaptic-anthropic       (ChatModel)
+  ├── synaptic-gemini          (ChatModel)
+  ├── synaptic-ollama          (ChatModel + Embeddings)
+  ├── synaptic-bedrock         (ChatModel)
+  ├── synaptic-cohere          (DocumentCompressor)
+  ├── synaptic-qdrant          (VectorStore)
+  ├── synaptic-pgvector        (VectorStore)
+  ├── synaptic-pinecone        (VectorStore)
+  ├── synaptic-chroma          (VectorStore)
+  ├── synaptic-mongodb         (VectorStore)
+  ├── synaptic-elasticsearch   (VectorStore)
+  ├── synaptic-redis           (Store + LlmCache)
+  ├── synaptic-sqlite          (LlmCache)
+  ├── synaptic-pdf             (Loader)
+  └── synaptic-tavily          (Tool)
 ```
 
 All integration crates share a common pattern:
@@ -27,12 +35,14 @@ All integration crates share a common pattern:
 
 | Trait | Purpose | Crate Implementations |
 |-------|---------|----------------------|
-| `ChatModel` | LLM chat completion | openai, anthropic, gemini, ollama |
+| `ChatModel` | LLM chat completion | openai, anthropic, gemini, ollama, bedrock |
 | `Embeddings` | Text embedding vectors | openai, ollama |
-| `VectorStore` | Vector similarity search | qdrant, pgvector, (+ in-memory) |
+| `VectorStore` | Vector similarity search | qdrant, pgvector, pinecone, chroma, mongodb, elasticsearch, (+ in-memory) |
 | `Store` | Key-value storage | redis, (+ in-memory) |
-| `LlmCache` | LLM response caching | redis, (+ in-memory) |
+| `LlmCache` | LLM response caching | redis, sqlite, (+ in-memory) |
 | `Loader` | Document loading | pdf, (+ text, json, csv, directory) |
+| `DocumentCompressor` | Document reranking/filtering | cohere, (+ embeddings filter) |
+| `Tool` | Agent tool | tavily, (+ custom tools) |
 
 ## LLM Provider Pattern
 
@@ -79,16 +89,24 @@ synaptic = { version = "0.3", features = ["openai", "qdrant"] }
 
 | Feature | Integration |
 |---------|------------|
-| `openai` | OpenAI ChatModel + Embeddings |
+| `openai` | OpenAI ChatModel + Embeddings (+ OpenAI-compatible providers + Azure) |
 | `anthropic` | Anthropic ChatModel |
 | `gemini` | Google Gemini ChatModel |
 | `ollama` | Ollama ChatModel + Embeddings |
+| `bedrock` | AWS Bedrock ChatModel |
+| `cohere` | Cohere Reranker |
 | `qdrant` | Qdrant vector store |
 | `pgvector` | PostgreSQL pgvector store |
+| `pinecone` | Pinecone vector store |
+| `chroma` | Chroma vector store |
+| `mongodb` | MongoDB Atlas vector search |
+| `elasticsearch` | Elasticsearch vector store |
 | `redis` | Redis store + cache |
+| `sqlite` | SQLite LLM cache |
 | `pdf` | PDF document loader |
+| `tavily` | Tavily search tool |
 
-Convenience combinations: `models` (all LLM providers), `agent` (includes openai), `rag` (includes openai + retrieval stack), `full` (everything).
+Convenience combinations: `models` (all 6 LLM providers including bedrock and cohere), `agent` (includes openai), `rag` (includes openai + retrieval stack), `full` (everything).
 
 ## Adding a New Integration
 

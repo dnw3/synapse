@@ -6,19 +6,27 @@ Synaptic 采用**以 Provider 为中心**的集成架构。每个集成位于独
 
 ```text
 synaptic-core（定义 trait）
-  ├── synaptic-openai     (ChatModel + Embeddings)
-  ├── synaptic-anthropic  (ChatModel)
-  ├── synaptic-gemini     (ChatModel)
-  ├── synaptic-ollama     (ChatModel + Embeddings)
-  ├── synaptic-qdrant     (VectorStore)
-  ├── synaptic-pgvector   (VectorStore)
-  ├── synaptic-redis      (Store + LlmCache)
-  └── synaptic-pdf        (Loader)
+  ├── synaptic-openai         (ChatModel + Embeddings)
+  ├── synaptic-anthropic      (ChatModel)
+  ├── synaptic-gemini         (ChatModel)
+  ├── synaptic-ollama         (ChatModel + Embeddings)
+  ├── synaptic-bedrock        (ChatModel)
+  ├── synaptic-cohere         (Reranker / DocumentCompressor)
+  ├── synaptic-qdrant         (VectorStore)
+  ├── synaptic-pgvector       (VectorStore)
+  ├── synaptic-pinecone       (VectorStore)
+  ├── synaptic-chroma         (VectorStore)
+  ├── synaptic-mongodb        (VectorStore)
+  ├── synaptic-elasticsearch  (VectorStore)
+  ├── synaptic-redis          (Store + LlmCache)
+  ├── synaptic-sqlite         (LlmCache)
+  ├── synaptic-pdf            (Loader)
+  └── synaptic-tavily         (Tool)
 ```
 
 所有集成 crate 遵循统一模式：
 
-1. **核心 trait** — `ChatModel`、`Embeddings`、`VectorStore`、`Store`、`LlmCache`、`Loader` 定义在 `synaptic-core`
+1. **核心 trait** — `ChatModel`、`Embeddings`、`VectorStore`、`Store`、`LlmCache`、`Loader`、`Tool`、`DocumentCompressor` 定义在 `synaptic-core`
 2. **独立 crate** — 每个集成是独立的 crate，拥有自己的 feature flag
 3. **零耦合** — 集成 crate 之间互不依赖
 4. **Config 结构体** — 使用 `new()` + `with_*()` 方法的 Builder 模式
@@ -27,12 +35,14 @@ synaptic-core（定义 trait）
 
 | Trait | 用途 | 实现 Crate |
 |-------|------|-----------|
-| `ChatModel` | LLM 聊天补全 | openai, anthropic, gemini, ollama |
+| `ChatModel` | LLM 聊天补全 | openai, anthropic, gemini, ollama, bedrock |
 | `Embeddings` | 文本嵌入向量 | openai, ollama |
-| `VectorStore` | 向量相似度搜索 | qdrant, pgvector, (+ in-memory) |
+| `VectorStore` | 向量相似度搜索 | qdrant, pgvector, pinecone, chroma, mongodb, elasticsearch, (+ in-memory) |
 | `Store` | 键值存储 | redis, (+ in-memory) |
-| `LlmCache` | LLM 响应缓存 | redis, (+ in-memory) |
+| `LlmCache` | LLM 响应缓存 | redis, sqlite, (+ in-memory) |
 | `Loader` | 文档加载 | pdf, (+ text, json, csv, directory) |
+| `Tool` | Agent 工具 | tavily, (+ 自定义工具) |
+| `DocumentCompressor` | 文档压缩/重排序 | cohere, (+ embeddings-filter) |
 
 ## LLM Provider 模式
 
@@ -54,6 +64,8 @@ let model = OpenAiChatModel::new(config, Arc::new(FakeBackend::with_responses(ve
 - `HttpBackend` — 生产环境中的真实 HTTP 调用
 - `FakeBackend` — 测试中的确定性响应
 
+> **注意：** AWS Bedrock 是例外，它直接使用 AWS SDK 而非 `ProviderBackend`。
+
 ## 存储与检索模式
 
 向量存储、键值存储和缓存实现核心 trait，支持即插即用的替换：
@@ -74,7 +86,7 @@ let results = store.similarity_search("query", 5, &embeddings).await?;
 
 ```toml
 [dependencies]
-synaptic = { version = "0.3", features = ["openai", "qdrant"] }
+synaptic = { version = "0.2", features = ["openai", "qdrant"] }
 ```
 
 | Feature | 集成 |
@@ -83,10 +95,18 @@ synaptic = { version = "0.3", features = ["openai", "qdrant"] }
 | `anthropic` | Anthropic ChatModel |
 | `gemini` | Google Gemini ChatModel |
 | `ollama` | Ollama ChatModel + Embeddings |
+| `bedrock` | AWS Bedrock ChatModel |
+| `cohere` | Cohere Reranker |
 | `qdrant` | Qdrant 向量存储 |
 | `pgvector` | PostgreSQL pgvector 存储 |
+| `pinecone` | Pinecone 向量存储 |
+| `chroma` | Chroma 向量存储 |
+| `mongodb` | MongoDB Atlas 向量搜索 |
+| `elasticsearch` | Elasticsearch 向量存储 |
 | `redis` | Redis 存储 + 缓存 |
+| `sqlite` | SQLite LLM 缓存 |
 | `pdf` | PDF 文档加载器 |
+| `tavily` | Tavily 搜索工具 |
 
 便捷组合：`models`（所有 LLM provider）、`agent`（包含 openai）、`rag`（包含 openai + 检索栈）、`full`（全部）。
 

@@ -40,6 +40,14 @@ synaptic-qdrant = { version = "0.2", path = "../synaptic-qdrant", optional = tru
 synaptic-pgvector = { version = "0.2", path = "../synaptic-pgvector", optional = true }
 synaptic-redis = { version = "0.2", path = "../synaptic-redis", optional = true }
 synaptic-pdf = { version = "0.2", path = "../synaptic-pdf", optional = true }
+synaptic-bedrock = { version = "0.2", path = "../synaptic-bedrock", optional = true }
+synaptic-cohere = { version = "0.2", path = "../synaptic-cohere", optional = true }
+synaptic-pinecone = { version = "0.2", path = "../synaptic-pinecone", optional = true }
+synaptic-chroma = { version = "0.2", path = "../synaptic-chroma", optional = true }
+synaptic-mongodb = { version = "0.2", path = "../synaptic-mongodb", optional = true }
+synaptic-elasticsearch = { version = "0.2", path = "../synaptic-elasticsearch", optional = true }
+synaptic-sqlite = { version = "0.2", path = "../synaptic-sqlite", optional = true }
+synaptic-tavily = { version = "0.2", path = "../synaptic-tavily", optional = true }
 schemars = { workspace = true, optional = true }
 
 [features]
@@ -73,17 +81,26 @@ openai = ["model-utils", "dep:synaptic-openai"]
 anthropic = ["model-utils", "dep:synaptic-anthropic"]
 gemini = ["model-utils", "dep:synaptic-gemini"]
 ollama = ["model-utils", "dep:synaptic-ollama"]
+bedrock = ["dep:synaptic-bedrock"]
+cohere = ["dep:synaptic-cohere"]
 qdrant = ["dep:synaptic-qdrant"]
 pgvector = ["dep:synaptic-pgvector"]
 redis = ["dep:synaptic-redis"]
 pdf = ["dep:synaptic-pdf"]
+pinecone = ["dep:synaptic-pinecone"]
+chroma = ["dep:synaptic-chroma"]
+mongodb = ["dep:synaptic-mongodb"]
+elasticsearch = ["dep:synaptic-elasticsearch"]
+sqlite = ["dep:synaptic-sqlite"]
+tavily = ["dep:synaptic-tavily"]
 
 # Convenience combinations
-models = ["openai", "anthropic", "gemini", "ollama"]
+models = ["openai", "anthropic", "gemini", "ollama", "bedrock", "cohere"]
 agent = ["default", "openai", "model-utils", "graph", "memory", "middleware", "store"]
 rag = ["default", "openai", "embeddings", "retrieval", "loaders", "splitters", "vectorstores"]
 full = ["default", "agent", "rag", "cache", "eval", "mcp", "macros", "deep", "schemars",
-        "models", "qdrant", "pgvector", "redis", "pdf"]
+        "models", "qdrant", "pgvector", "redis", "pdf",
+        "pinecone", "chroma", "mongodb", "elasticsearch", "sqlite", "tavily"]
 
 [dev-dependencies]
 tokio.workspace = true

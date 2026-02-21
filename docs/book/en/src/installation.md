@@ -45,7 +45,7 @@ synaptic = { version = "0.2", features = ["anthropic", "graph", "cache"] }
 | **`default`** | `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, `callbacks` |
 | **`agent`** | `default` + `openai`, `graph`, `memory` |
 | **`rag`** | `default` + `openai`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores` |
-| **`models`** | All 4 providers: `openai` + `anthropic` + `gemini` + `ollama` |
+| **`models`** | All 6 providers: `openai` + `anthropic` + `gemini` + `ollama` + `bedrock` + `cohere` |
 | **`full`** | All features enabled |
 
 **Provider features** (each enables one provider crate):
@@ -78,6 +78,14 @@ Individual features: `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, 
 | `pgvector` | PostgreSQL pgvector store (`synaptic-pgvector`) |
 | `redis` | Redis store + cache (`synaptic-redis`) |
 | `pdf` | PDF document loader (`synaptic-pdf`) |
+| `bedrock` | AWS Bedrock ChatModel (`synaptic-bedrock`) |
+| `cohere` | Cohere Reranker (`synaptic-cohere`) |
+| `pinecone` | Pinecone vector store (`synaptic-pinecone`) |
+| `chroma` | Chroma vector store (`synaptic-chroma`) |
+| `mongodb` | MongoDB Atlas vector search (`synaptic-mongodb`) |
+| `elasticsearch` | Elasticsearch vector store (`synaptic-elasticsearch`) |
+| `sqlite` | SQLite LLM cache (`synaptic-sqlite`) |
+| `tavily` | Tavily search tool (`synaptic-tavily`) |
 
 The `core` module (traits and types) is always available regardless of feature selection.
 

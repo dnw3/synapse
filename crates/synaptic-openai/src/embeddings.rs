@@ -59,24 +59,30 @@ impl OpenAiEmbeddings {
     }
 
     fn parse_response(&self, body: &serde_json::Value) -> Result<Vec<Vec<f32>>, SynapticError> {
-        let data = body.get("data").and_then(|d| d.as_array()).ok_or_else(|| {
-            SynapticError::Embedding("missing 'data' field in response".to_string())
-        })?;
-
-        let mut embeddings = Vec::with_capacity(data.len());
-        for item in data {
-            let embedding = item
-                .get("embedding")
-                .and_then(|e| e.as_array())
-                .ok_or_else(|| SynapticError::Embedding("missing 'embedding' field".to_string()))?
-                .iter()
-                .map(|v| v.as_f64().unwrap_or(0.0) as f32)
-                .collect();
-            embeddings.push(embedding);
-        }
-
-        Ok(embeddings)
+        parse_embeddings_response(body)
     }
+}
+
+pub(crate) fn parse_embeddings_response(
+    body: &serde_json::Value,
+) -> Result<Vec<Vec<f32>>, SynapticError> {
+    let data = body.get("data").and_then(|d| d.as_array()).ok_or_else(|| {
+        SynapticError::Embedding("missing 'data' field in response".to_string())
+    })?;
+
+    let mut embeddings = Vec::with_capacity(data.len());
+    for item in data {
+        let embedding = item
+            .get("embedding")
+            .and_then(|e| e.as_array())
+            .ok_or_else(|| SynapticError::Embedding("missing 'embedding' field".to_string()))?
+            .iter()
+            .map(|v| v.as_f64().unwrap_or(0.0) as f32)
+            .collect();
+        embeddings.push(embedding);
+    }
+
+    Ok(embeddings)
 }
 
 #[async_trait]

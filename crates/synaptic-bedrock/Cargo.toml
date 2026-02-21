@@ -1,0 +1,24 @@
+[package]
+name = "synaptic-bedrock"
+description = "AWS Bedrock integration for Synaptic: ChatModel via Converse API"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+readme.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+async-stream.workspace = true
+futures.workspace = true
+serde_json.workspace = true
+synaptic-core = { version = "0.2", path = "../synaptic-core" }
+aws-sdk-bedrockruntime = ">=1.80, <1.124"
+aws-config = { version = ">=1.5, <1.8.11", features = ["behavior-version-latest"] }
+aws-smithy-types = ">=1, <1.4"
+
+[dev-dependencies]
+tokio.workspace = true

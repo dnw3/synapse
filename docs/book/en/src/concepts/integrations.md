@@ -104,4 +104,3 @@ To add a new integration:
 
 - [Installation](../installation.md) — Feature flag reference
 - [Architecture](architecture.md) — Overall system design
-- [Migration Guide (0.2 → 0.3)](../migration-0.3.md) — Import path changes

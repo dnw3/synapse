@@ -145,8 +145,6 @@
 
 # Reference
 
-- [Migration Guide (0.2 → 0.3)](migration-0.3.md)
-
 - [API Reference](api-reference.md)
 - [Contributing](contributing.md)
 - [Development Setup](dev-setup.md)

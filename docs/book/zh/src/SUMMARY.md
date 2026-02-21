@@ -145,8 +145,6 @@
 
 # 参考
 
-- [迁移指南 (0.2 → 0.3)](migration-0.3.md)
-
 - [API 参考](api-reference.md)
 - [贡献指南](contributing.md)
 - [开发环境搭建](dev-setup.md)

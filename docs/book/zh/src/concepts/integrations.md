@@ -104,4 +104,3 @@ synaptic = { version = "0.3", features = ["openai", "qdrant"] }
 
 - [安装](../installation.md) — Feature flag 参考
 - [架构](architecture.md) — 整体系统设计
-- [迁移指南 (0.2 → 0.3)](../migration-0.3.md) — 导入路径变更

@@ -1,6 +1,6 @@
 [package]
 name = "synaptic-mongodb"
-description = "MongoDB Atlas Vector Search integration for Synaptic"
+description = "MongoDB Atlas Vector Search and graph checkpointer integration for Synaptic"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
@@ -14,10 +14,13 @@ homepage.workspace = true
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+futures.workspace = true
 synaptic-core = { version = "0.2", path = "../synaptic-core" }
+synaptic-graph = { version = "0.2", path = "../synaptic-graph" }
 mongodb = "3"
 bson = "2"
-futures.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
+serde_json.workspace = true
+synaptic-graph = { version = "0.2", path = "../synaptic-graph" }

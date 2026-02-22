@@ -52,8 +52,23 @@ synaptic-groq = { version = "0.2", path = "../synaptic-groq", optional = true }
 synaptic-mistral = { version = "0.2", path = "../synaptic-mistral", optional = true }
 synaptic-deepseek = { version = "0.2", path = "../synaptic-deepseek", optional = true }
 synaptic-huggingface = { version = "0.2", path = "../synaptic-huggingface", optional = true }
+synaptic-voyage = { version = "0.2", path = "../synaptic-voyage", optional = true }
+synaptic-nomic = { version = "0.2", path = "../synaptic-nomic", optional = true }
+synaptic-jina = { version = "0.2", path = "../synaptic-jina", optional = true }
 synaptic-weaviate = { version = "0.2", path = "../synaptic-weaviate", optional = true }
 synaptic-sqltoolkit = { version = "0.2", path = "../synaptic-sqltoolkit", optional = true }
+synaptic-e2b = { version = "0.2", path = "../synaptic-e2b", optional = true }
+synaptic-milvus = { version = "0.2", path = "../synaptic-milvus", optional = true }
+synaptic-opensearch = { version = "0.2", path = "../synaptic-opensearch", optional = true }
+synaptic-lancedb = { version = "0.2", path = "../synaptic-lancedb", optional = true }
+synaptic-confluence = { version = "0.2", path = "../synaptic-confluence", optional = true }
+synaptic-slack = { version = "0.2", path = "../synaptic-slack", optional = true }
+synaptic-langfuse = { version = "0.2", path = "../synaptic-langfuse", optional = true }
+synaptic-together = { version = "0.2", path = "../synaptic-together", optional = true }
+synaptic-fireworks = { version = "0.2", path = "../synaptic-fireworks", optional = true }
+synaptic-xai = { version = "0.2", path = "../synaptic-xai", optional = true }
+synaptic-perplexity = { version = "0.2", path = "../synaptic-perplexity", optional = true }
+synaptic-flashrank = { version = "0.2", path = "../synaptic-flashrank", optional = true }
 schemars = { workspace = true, optional = true }
 
 [features]
@@ -67,6 +82,8 @@ parsers = ["runnables", "dep:synaptic-parsers"]
 tools = ["dep:synaptic-tools"]
 memory = ["runnables", "dep:synaptic-memory"]
 callbacks = ["dep:synaptic-callbacks"]
+otel = ["callbacks", "synaptic-callbacks/otel"]
+langfuse = ["dep:synaptic-langfuse"]
 retrieval = ["embeddings", "dep:synaptic-retrieval"]
 loaders = ["dep:synaptic-loaders"]
 splitters = ["dep:synaptic-splitters"]
@@ -103,17 +120,33 @@ groq = ["model-utils", "dep:synaptic-groq"]
 mistral = ["model-utils", "dep:synaptic-mistral"]
 deepseek = ["model-utils", "dep:synaptic-deepseek"]
 huggingface = ["dep:synaptic-huggingface"]
+voyage = ["dep:synaptic-voyage"]
+nomic = ["dep:synaptic-nomic"]
+jina = ["dep:synaptic-jina"]
 weaviate = ["dep:synaptic-weaviate"]
 sqltoolkit = ["dep:synaptic-sqltoolkit"]
+e2b = ["dep:synaptic-e2b"]
+milvus = ["dep:synaptic-milvus"]
+opensearch = ["dep:synaptic-opensearch"]
+lancedb = ["dep:synaptic-lancedb"]
+confluence = ["dep:synaptic-confluence"]
+slack = ["dep:synaptic-slack"]
+together = ["model-utils", "dep:synaptic-together"]
+fireworks = ["model-utils", "dep:synaptic-fireworks"]
+xai = ["model-utils", "dep:synaptic-xai"]
+perplexity = ["model-utils", "dep:synaptic-perplexity"]
+flashrank = ["dep:synaptic-flashrank"]
 
 # Convenience combinations
-models = ["openai", "anthropic", "gemini", "ollama", "bedrock", "cohere", "groq", "mistral", "deepseek"]
+models = ["openai", "anthropic", "gemini", "ollama", "bedrock", "cohere", "groq", "mistral", "deepseek", "together", "fireworks", "xai", "perplexity"]
 agent = ["default", "openai", "model-utils", "graph", "memory", "middleware", "store"]
 rag = ["default", "openai", "embeddings", "retrieval", "loaders", "splitters", "vectorstores"]
 full = ["default", "agent", "rag", "cache", "eval", "mcp", "macros", "deep", "schemars",
         "models", "qdrant", "pgvector", "redis", "pdf",
         "pinecone", "chroma", "mongodb", "elasticsearch", "sqlite", "tavily",
-        "huggingface", "weaviate", "sqltoolkit"]
+        "huggingface", "voyage", "nomic", "jina", "weaviate", "sqltoolkit",
+        "together", "fireworks", "xai", "perplexity", "e2b", "confluence", "slack",
+        "milvus", "opensearch", "lancedb", "flashrank"]
 
 [dev-dependencies]
 tokio.workspace = true

@@ -35,3 +35,8 @@ impl CallbackHandler for RecordingCallback {
         Ok(())
     }
 }
+
+#[cfg(feature = "otel")]
+mod opentelemetry_cb;
+#[cfg(feature = "otel")]
+pub use opentelemetry_cb::OpenTelemetryCallback;

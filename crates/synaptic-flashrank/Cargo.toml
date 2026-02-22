@@ -1,0 +1,18 @@
+[package]
+name = "synaptic-flashrank"
+description = "Fast local cross-encoder reranker for Synaptic (BM25-based, zero external dependencies)"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+readme.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+synaptic-core = { version = "0.2", path = "../synaptic-core" }
+
+[dev-dependencies]
+tokio.workspace = true

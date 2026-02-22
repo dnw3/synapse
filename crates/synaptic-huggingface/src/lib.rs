@@ -1,3 +1,6 @@
+pub mod reranker;
+pub use reranker::{BgeRerankerModel, HuggingFaceReranker};
+
 use async_trait::async_trait;
 use synaptic_core::{Embeddings, SynapticError};
 

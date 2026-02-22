@@ -1,11 +1,17 @@
+pub mod brave;
+pub mod calculator;
 pub mod duckduckgo;
 mod handle_error;
+pub mod jina_reader;
 mod parallel_executor;
 mod return_direct;
 pub mod wikipedia;
 
+pub use brave::BraveSearchTool;
+pub use calculator::CalculatorTool;
 pub use duckduckgo::DuckDuckGoTool;
 pub use handle_error::HandleErrorTool;
+pub use jina_reader::JinaReaderTool;
 pub use parallel_executor::ParallelToolExecutor;
 pub use return_direct::ReturnDirectTool;
 pub use wikipedia::WikipediaTool;

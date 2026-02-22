@@ -1,8 +1,11 @@
 //! SQLite integration for the Synaptic framework.
 //!
-//! This crate provides [`SqliteCache`], a SQLite-backed implementation of the
-//! [`LlmCache`](synaptic_core::LlmCache) trait for caching LLM responses with
-//! optional TTL expiration.
+//! This crate provides:
+//! - [`SqliteCache`]: A SQLite-backed implementation of the [`LlmCache`](synaptic_core::LlmCache)
+//!   trait for caching LLM responses with optional TTL expiration.
+//! - [`SqliteCheckpointer`]: A SQLite-backed implementation of the
+//!   [`Checkpointer`](synaptic_graph::Checkpointer) trait for persisting graph
+//!   state between executions.
 //!
 //! # Quick start
 //!
@@ -21,8 +24,11 @@
 //! ```
 
 mod cache;
+pub mod checkpointer;
 
 pub use cache::{SqliteCache, SqliteCacheConfig};
+pub use checkpointer::SqliteCheckpointer;
 
 // Re-export core traits for convenience.
 pub use synaptic_core::{ChatResponse, LlmCache};
+pub use synaptic_graph::Checkpointer;

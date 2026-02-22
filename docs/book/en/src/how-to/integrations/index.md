@@ -23,6 +23,10 @@ Synaptic provides optional integration crates that connect to external services.
 | [SQLite Cache](sqlite.md) | `sqlite` | Persistent LLM response cache backed by SQLite |
 | [PDF Loader](pdf.md) | `pdf` | Document loader for PDF files |
 | [Tavily Search](tavily.md) | `tavily` | Web search tool for agents |
+| [Together AI](together.md) | `together` | Serverless open-source models (Llama, DeepSeek, Qwen, Mixtral) |
+| [Fireworks AI](fireworks.md) | `fireworks` | Fastest open-source model inference (sub-100ms TTFT) |
+| [xAI Grok](xai.md) | `xai` | xAI Grok models with real-time reasoning |
+| [Perplexity AI](perplexity.md) | `perplexity` | Search-augmented LLMs with cited sources |
 
 ## Enabling integrations
 
@@ -57,6 +61,10 @@ Every integration implements a core Synaptic trait, so it plugs directly into th
 - [Google Gemini](gemini.md) -- Google Gemini models
 - [Ollama](ollama.md) -- Local LLM inference (chat + embeddings)
 - [AWS Bedrock](bedrock.md) -- AWS Bedrock foundation models
+- [Together AI](together.md) -- Serverless open-source models (Llama, DeepSeek, Qwen, Mixtral)
+- [Fireworks AI](fireworks.md) -- Fastest open-source model inference
+- [xAI Grok](xai.md) -- xAI Grok models with real-time reasoning
+- [Perplexity AI](perplexity.md) -- Search-augmented LLMs with cited sources
 
 ### Reranking
 - [Cohere Reranker](cohere.md) -- document reranking for improved retrieval

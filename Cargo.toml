@@ -31,6 +31,7 @@ members = [
   "crates/synaptic-pdf",
   "crates/synaptic-bedrock",
   "crates/synaptic-cohere",
+  "crates/synaptic-perplexity",
   "crates/synaptic-pinecone",
   "crates/synaptic-chroma",
   "crates/synaptic-mongodb",
@@ -38,11 +39,25 @@ members = [
   "crates/synaptic-sqlite",
   "crates/synaptic-tavily",
   "crates/synaptic-groq",
+  "crates/synaptic-together",
+  "crates/synaptic-fireworks",
   "crates/synaptic-mistral",
   "crates/synaptic-deepseek",
   "crates/synaptic-huggingface",
+  "crates/synaptic-voyage",
+  "crates/synaptic-nomic",
+  "crates/synaptic-jina",
   "crates/synaptic-weaviate",
+  "crates/synaptic-xai",
   "crates/synaptic-sqltoolkit",
+  "crates/synaptic-e2b",
+  "crates/synaptic-confluence",
+  "crates/synaptic-slack",
+  "crates/synaptic-milvus",
+  "crates/synaptic-opensearch",
+  "crates/synaptic-lancedb",
+  "crates/synaptic-flashrank",
+  "crates/synaptic-langfuse",
   "crates/synaptic",
   "examples/react_basic",
   "examples/tool_calling_basic",
@@ -82,7 +97,7 @@ thiserror = "2.0"
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread", "sync", "time", "fs"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt"] }
-reqwest = { version = "0.13", features = ["json", "stream"] }
+reqwest = { version = "0.13", features = ["json", "stream", "query"] }
 futures = "0.3"
 async-stream = "0.3"
 eventsource-stream = "0.2"
@@ -90,6 +105,7 @@ bytes = "1"
 csv = "1.3"
 regex = "1"
 base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
 schemars = { version = "1", features = ["derive"] }
 synaptic-core = { version = "0.2", path = "crates/synaptic-core" }
 synaptic-mcp = { version = "0.2", path = "crates/synaptic-mcp" }

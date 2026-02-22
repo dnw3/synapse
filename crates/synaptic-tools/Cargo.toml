@@ -17,6 +17,7 @@ tokio.workspace = true
 futures.workspace = true
 reqwest.workspace = true
 urlencoding = "2"
+meval = "0.2"
 synaptic-core = { version = "0.2", path = "../synaptic-core" }
 
 [dev-dependencies]

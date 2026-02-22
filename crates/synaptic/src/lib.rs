@@ -208,6 +208,18 @@ pub use synaptic_deepseek as deepseek;
 #[cfg(feature = "huggingface")]
 pub use synaptic_huggingface as huggingface;
 
+/// Voyage AI embeddings (voyage-3-large, voyage-code-3, etc.).
+#[cfg(feature = "voyage")]
+pub use synaptic_voyage as voyage;
+
+/// Nomic AI embeddings (nomic-embed-text-v1.5, open weights).
+#[cfg(feature = "nomic")]
+pub use synaptic_nomic as nomic;
+
+/// Jina AI embeddings and reranker.
+#[cfg(feature = "jina")]
+pub use synaptic_jina as jina;
+
 /// Weaviate vector database integration.
 #[cfg(feature = "weaviate")]
 pub use synaptic_weaviate as weaviate;
@@ -215,3 +227,51 @@ pub use synaptic_weaviate as weaviate;
 /// SQL database toolkit: ListTables, DescribeTable, ExecuteQuery (read-only).
 #[cfg(feature = "sqltoolkit")]
 pub use synaptic_sqltoolkit as sqltoolkit;
+
+/// Together AI ChatModel (OpenAI-compatible, open-source model marketplace).
+#[cfg(feature = "together")]
+pub use synaptic_together as together;
+
+/// Fireworks AI ChatModel (OpenAI-compatible, fastest open model inference).
+#[cfg(feature = "fireworks")]
+pub use synaptic_fireworks as fireworks;
+
+/// xAI Grok ChatModel (OpenAI-compatible).
+#[cfg(feature = "xai")]
+pub use synaptic_xai as xai;
+
+/// Perplexity AI ChatModel (OpenAI-compatible, online search-augmented).
+#[cfg(feature = "perplexity")]
+pub use synaptic_perplexity as perplexity;
+
+/// E2B cloud code execution sandbox.
+#[cfg(feature = "e2b")]
+pub use synaptic_e2b as e2b;
+
+/// Milvus vector store.
+#[cfg(feature = "milvus")]
+pub use synaptic_milvus as milvus;
+
+/// OpenSearch vector store.
+#[cfg(feature = "opensearch")]
+pub use synaptic_opensearch as opensearch;
+
+/// LanceDB embedded vector store.
+#[cfg(feature = "lancedb")]
+pub use synaptic_lancedb as lancedb;
+
+/// Confluence wiki page loader.
+#[cfg(feature = "confluence")]
+pub use synaptic_confluence as confluence;
+
+/// Slack channel message loader.
+#[cfg(feature = "slack")]
+pub use synaptic_slack as slack;
+
+/// Fast local cross-encoder reranker (BM25-based, zero external dependencies).
+#[cfg(feature = "flashrank")]
+pub use synaptic_flashrank as flashrank;
+
+/// Langfuse observability integration: LangfuseCallback, LangfuseConfig.
+#[cfg(feature = "langfuse")]
+pub use synaptic_langfuse as langfuse;

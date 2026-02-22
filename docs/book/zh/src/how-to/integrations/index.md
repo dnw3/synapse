@@ -14,6 +14,10 @@ Synaptic 通过可选的 feature flag 提供与外部服务和数据源的集成
 | [Google Gemini](gemini.md) | `gemini` | Google Gemini 模型（Generative Language API） |
 | [Ollama](ollama.md) | `ollama` | 本地 LLM 推理（对话 + 嵌入） |
 | [AWS Bedrock](bedrock.md) | `bedrock` | AWS Bedrock 托管模型（Claude、Llama、Mistral 等） |
+| [Together AI](together.md) | `together` | Serverless 开源模型推理（Llama、DeepSeek、Qwen、Mixtral） |
+| [Fireworks AI](fireworks.md) | `fireworks` | 最快的开源模型推理（首 token 延迟 <100ms） |
+| [xAI Grok](xai.md) | `xai` | xAI Grok 模型，支持实时推理 |
+| [Perplexity AI](perplexity.md) | `perplexity` | 联网搜索增强 LLM，返回引用来源 |
 
 ### 向量存储
 
@@ -81,6 +85,10 @@ synaptic = { version = "0.2", features = ["qdrant", "pinecone", "redis", "tavily
 - [Google Gemini](gemini.md) -- 使用 Google Gemini 模型
 - [Ollama](ollama.md) -- 本地 LLM 推理（对话 + 嵌入）
 - [AWS Bedrock](bedrock.md) -- 接入 AWS Bedrock 托管模型
+- [Together AI](together.md) -- Serverless 开源模型（Llama、DeepSeek、Qwen、Mixtral）
+- [Fireworks AI](fireworks.md) -- 最快的开源模型推理
+- [xAI Grok](xai.md) -- xAI Grok 实时推理模型
+- [Perplexity AI](perplexity.md) -- 联网搜索增强 LLM
 - [Cohere Reranker](cohere.md) -- 使用 Cohere 重排序模型
 - [Qdrant 向量存储](qdrant.md) -- 使用 Qdrant 存储和搜索嵌入向量
 - [PgVector](pgvector.md) -- 使用 PostgreSQL + pgvector 存储和搜索嵌入向量

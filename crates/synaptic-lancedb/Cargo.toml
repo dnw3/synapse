@@ -1,0 +1,22 @@
+[package]
+name = "synaptic-lancedb"
+description = "LanceDB embedded vector store for Synaptic — serverless embedded vector database"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+readme.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+synaptic-core = { version = "0.2", path = "../synaptic-core" }
+tokio.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+tempfile = "3"

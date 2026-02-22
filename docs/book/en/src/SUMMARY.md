@@ -165,6 +165,7 @@
     - [Graph Checkpointers](how-to/integrations/graph-checkpointer.md)
     - [OpenTelemetry](how-to/integrations/opentelemetry.md)
     - [Langfuse](how-to/integrations/langfuse.md)
+    - [Feishu / Lark](how-to/integrations/lark.md)
 - [Macros](how-to/macros.md)
     - [Middleware Macros](how-to/macros-middleware.md)
     - [Macro Examples](how-to/macros-examples.md)

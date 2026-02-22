@@ -165,6 +165,7 @@
     - [Graph 检查点持久化](how-to/integrations/graph-checkpointer.md)
     - [OpenTelemetry](how-to/integrations/opentelemetry.md)
     - [Langfuse](how-to/integrations/langfuse.md)
+    - [飞书 / Lark](how-to/integrations/lark.md)
 - [宏](how-to/macros.md)
     - [中间件宏](how-to/macros-middleware.md)
     - [宏使用示例](how-to/macros-examples.md)

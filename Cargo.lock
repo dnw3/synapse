@@ -4030,6 +4030,7 @@ dependencies = [
  "synaptic-jina",
  "synaptic-lancedb",
  "synaptic-langfuse",
+ "synaptic-lark",
  "synaptic-loaders",
  "synaptic-macros",
  "synaptic-mcp",
@@ -4378,6 +4379,19 @@ dependencies = [
  "synaptic-core",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "synaptic-lark"
+version = "0.2.6"
+dependencies = [
+ "async-trait",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
+ "synaptic-core",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

@@ -69,6 +69,7 @@ synaptic-fireworks = { version = "0.2", path = "../synaptic-fireworks", optional
 synaptic-xai = { version = "0.2", path = "../synaptic-xai", optional = true }
 synaptic-perplexity = { version = "0.2", path = "../synaptic-perplexity", optional = true }
 synaptic-flashrank = { version = "0.2", path = "../synaptic-flashrank", optional = true }
+synaptic-lark = { version = "0.2", path = "../synaptic-lark", optional = true }
 schemars = { workspace = true, optional = true }
 
 [features]
@@ -136,6 +137,7 @@ fireworks = ["model-utils", "dep:synaptic-fireworks"]
 xai = ["model-utils", "dep:synaptic-xai"]
 perplexity = ["model-utils", "dep:synaptic-perplexity"]
 flashrank = ["dep:synaptic-flashrank"]
+lark = ["dep:synaptic-lark"]
 
 # Convenience combinations
 models = ["openai", "anthropic", "gemini", "ollama", "bedrock", "cohere", "groq", "mistral", "deepseek", "together", "fireworks", "xai", "perplexity"]
@@ -146,7 +148,7 @@ full = ["default", "agent", "rag", "cache", "eval", "mcp", "macros", "deep", "sc
         "pinecone", "chroma", "mongodb", "elasticsearch", "sqlite", "tavily",
         "huggingface", "voyage", "nomic", "jina", "weaviate", "sqltoolkit",
         "together", "fireworks", "xai", "perplexity", "e2b", "confluence", "slack",
-        "milvus", "opensearch", "lancedb", "flashrank"]
+        "milvus", "opensearch", "lancedb", "flashrank", "lark"]
 
 [dev-dependencies]
 tokio.workspace = true

@@ -275,3 +275,7 @@ pub use synaptic_flashrank as flashrank;
 /// Langfuse observability integration: LangfuseCallback, LangfuseConfig.
 #[cfg(feature = "langfuse")]
 pub use synaptic_langfuse as langfuse;
+
+/// Feishu/Lark integration: LarkConfig, LarkDocLoader, LarkMessageTool, LarkBitableTool.
+#[cfg(feature = "lark")]
+pub use synaptic_lark as lark;

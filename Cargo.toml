@@ -58,6 +58,7 @@ members = [
   "crates/synaptic-lancedb",
   "crates/synaptic-flashrank",
   "crates/synaptic-langfuse",
+  "crates/synaptic-lark",
   "crates/synaptic",
   "examples/react_basic",
   "examples/tool_calling_basic",

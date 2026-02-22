@@ -27,8 +27,11 @@
 //! ```
 
 mod auth;
+pub mod events;
 pub mod loaders;
+pub mod store;
 pub mod tools;
+pub mod vector_store;
 
 pub use loaders::doc::LarkDocLoader;
 pub use tools::bitable::LarkBitableTool;

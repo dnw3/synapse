@@ -1,6 +1,7 @@
 log/
 target/
 .claude/
+.worktrees/
 CLAUDE.md
 docs/dist/
 docs/plans/

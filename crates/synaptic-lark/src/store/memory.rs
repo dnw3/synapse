@@ -1,13 +1,11 @@
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::json;
 use synaptic_core::{MemoryStore, Message, SynapticError};
 
-use crate::{auth::TokenCache, LarkConfig};
+use crate::{api::bitable::BitableApi, LarkConfig};
 
 pub struct LarkBitableMemoryStore {
-    token_cache: TokenCache,
-    base_url: String,
-    client: reqwest::Client,
+    api: BitableApi,
     app_token: String,
     table_id: String,
 }
@@ -18,11 +16,8 @@ impl LarkBitableMemoryStore {
         app_token: impl Into<String>,
         table_id: impl Into<String>,
     ) -> Self {
-        let base_url = config.base_url.clone();
         Self {
-            token_cache: config.token_cache(),
-            base_url,
-            client: reqwest::Client::new(),
+            api: BitableApi::new(config),
             app_token: app_token.into(),
             table_id: table_id.into(),
         }
@@ -35,39 +30,11 @@ impl LarkBitableMemoryStore {
     pub fn table_id(&self) -> &str {
         &self.table_id
     }
-
-    fn records_url(&self) -> String {
-        format!(
-            "{}/bitable/v1/apps/{}/tables/{}/records",
-            self.base_url, self.app_token, self.table_id
-        )
-    }
-
-    fn search_url(&self) -> String {
-        format!(
-            "{}/bitable/v1/apps/{}/tables/{}/records/search",
-            self.base_url, self.app_token, self.table_id
-        )
-    }
-
-    fn check(&self, body: &Value, ctx: &str) -> Result<(), SynapticError> {
-        let code = body["code"].as_i64().unwrap_or(-1);
-        if code != 0 {
-            Err(SynapticError::Memory(format!(
-                "Lark Bitable MemoryStore ({ctx}) code={code}: {}",
-                body["msg"].as_str().unwrap_or("unknown")
-            )))
-        } else {
-            Ok(())
-        }
-    }
 }
 
 #[async_trait]
 impl MemoryStore for LarkBitableMemoryStore {
     async fn append(&self, session_id: &str, message: Message) -> Result<(), SynapticError> {
-        let token = self.token_cache.get_token().await?;
-
         let role = message.role().to_string();
         let content = message.content().to_string();
         let tc_slice = message.tool_calls();
@@ -77,42 +44,30 @@ impl MemoryStore for LarkBitableMemoryStore {
             serde_json::to_string(tc_slice).unwrap_or_default()
         };
         let tool_call_id = message.tool_call_id().unwrap_or("").to_string();
-        // seq = current unix ms as string for ordering
         let seq = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis()
             .to_string();
 
-        let body = json!({
-            "records": [{
-                "fields": {
-                    "session_id": session_id,
-                    "role": role,
-                    "content": content,
-                    "tool_calls": tool_calls,
-                    "tool_call_id": tool_call_id,
-                    "seq": seq,
-                }
-            }]
-        });
-        let resp = self
-            .client
-            .post(format!("{}/batch_create", self.records_url()))
-            .bearer_auth(&token)
-            .json(&body)
-            .send()
+        let records = vec![json!({
+            "fields": {
+                "session_id": session_id,
+                "role": role,
+                "content": content,
+                "tool_calls": tool_calls,
+                "tool_call_id": tool_call_id,
+                "seq": seq,
+            }
+        })];
+        self.api
+            .batch_create_records(&self.app_token, &self.table_id, records)
             .await
-            .map_err(|e| SynapticError::Memory(format!("bitable append: {e}")))?;
-        let rb: Value = resp
-            .json()
-            .await
-            .map_err(|e| SynapticError::Memory(format!("bitable append parse: {e}")))?;
-        self.check(&rb, "append")
+            .map_err(|e| SynapticError::Memory(e.to_string()))?;
+        Ok(())
     }
 
     async fn load(&self, session_id: &str) -> Result<Vec<Message>, SynapticError> {
-        let token = self.token_cache.get_token().await?;
         let body = json!({
             "page_size": 500,
             "filter": {
@@ -125,22 +80,14 @@ impl MemoryStore for LarkBitableMemoryStore {
             },
             "sort": [{ "field_name": "seq", "desc": false }]
         });
-        let resp = self
-            .client
-            .post(self.search_url())
-            .bearer_auth(&token)
-            .json(&body)
-            .send()
+        let items = self
+            .api
+            .search_records(&self.app_token, &self.table_id, body)
             .await
-            .map_err(|e| SynapticError::Memory(format!("bitable load: {e}")))?;
-        let rb: Value = resp
-            .json()
-            .await
-            .map_err(|e| SynapticError::Memory(format!("bitable load parse: {e}")))?;
-        self.check(&rb, "load")?;
+            .map_err(|e| SynapticError::Memory(e.to_string()))?;
 
         let mut messages = Vec::new();
-        for item in rb["data"]["items"].as_array().unwrap_or(&vec![]) {
+        for item in &items {
             let f = &item["fields"];
             let role = f["role"].as_str().unwrap_or("human");
             let content = f["content"].as_str().unwrap_or("").to_string();
@@ -169,7 +116,6 @@ impl MemoryStore for LarkBitableMemoryStore {
     }
 
     async fn clear(&self, session_id: &str) -> Result<(), SynapticError> {
-        let token = self.token_cache.get_token().await?;
         let search_body = json!({
             "page_size": 500,
             "filter": {
@@ -181,23 +127,13 @@ impl MemoryStore for LarkBitableMemoryStore {
                 }]
             }
         });
-        let resp = self
-            .client
-            .post(self.search_url())
-            .bearer_auth(&token)
-            .json(&search_body)
-            .send()
+        let items = self
+            .api
+            .search_records(&self.app_token, &self.table_id, search_body)
             .await
-            .map_err(|e| SynapticError::Memory(format!("bitable clear search: {e}")))?;
-        let rb: Value = resp
-            .json()
-            .await
-            .map_err(|e| SynapticError::Memory(format!("bitable clear parse: {e}")))?;
-        self.check(&rb, "clear/search")?;
+            .map_err(|e| SynapticError::Memory(e.to_string()))?;
 
-        let ids: Vec<String> = rb["data"]["items"]
-            .as_array()
-            .unwrap_or(&vec![])
+        let ids: Vec<String> = items
             .iter()
             .filter_map(|r| r["record_id"].as_str().map(String::from))
             .collect();
@@ -206,19 +142,9 @@ impl MemoryStore for LarkBitableMemoryStore {
             return Ok(());
         }
 
-        let del_body = json!({ "records": ids });
-        let resp = self
-            .client
-            .delete(format!("{}/batch_delete", self.records_url()))
-            .bearer_auth(&token)
-            .json(&del_body)
-            .send()
+        self.api
+            .batch_delete_records(&self.app_token, &self.table_id, ids)
             .await
-            .map_err(|e| SynapticError::Memory(format!("bitable clear delete: {e}")))?;
-        let rb: Value = resp
-            .json()
-            .await
-            .map_err(|e| SynapticError::Memory(format!("bitable clear delete parse: {e}")))?;
-        self.check(&rb, "clear/delete")
+            .map_err(|e| SynapticError::Memory(e.to_string()))
     }
 }

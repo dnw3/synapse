@@ -1,4 +1,4 @@
-use crate::{auth::TokenCache, LarkConfig};
+use crate::{api::bitable::BitableApi, LarkConfig};
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -32,9 +32,7 @@ use synaptic_core::{Document, Loader, SynapticError};
 /// # }
 /// ```
 pub struct LarkBitableLoader {
-    token_cache: TokenCache,
-    base_url: String,
-    client: reqwest::Client,
+    api: BitableApi,
     app_token: Option<String>,
     table_id: Option<String>,
     view_id: Option<String>,
@@ -46,11 +44,8 @@ pub struct LarkBitableLoader {
 impl LarkBitableLoader {
     /// Create a new loader using the given config.
     pub fn new(config: LarkConfig) -> Self {
-        let base_url = config.base_url.clone();
         Self {
-            token_cache: config.token_cache(),
-            base_url,
-            client: reqwest::Client::new(),
+            api: BitableApi::new(config),
             app_token: None,
             table_id: None,
             view_id: None,
@@ -107,59 +102,6 @@ impl LarkBitableLoader {
     }
 
     // ── Private helpers ──────────────────────────────────────────────────────
-
-    /// Fetch a single page of records from the Bitable API.
-    ///
-    /// Returns `(items, next_page_token)`. `next_page_token` is `None` when
-    /// there are no more pages.
-    async fn fetch_page(
-        &self,
-        token: &str,
-        app_token: &str,
-        table_id: &str,
-        page_token: Option<&str>,
-    ) -> Result<(Vec<Value>, Option<String>), SynapticError> {
-        let mut url = format!(
-            "{}/bitable/v1/apps/{app_token}/tables/{table_id}/records?page_size=100",
-            self.base_url
-        );
-        if let Some(view) = &self.view_id {
-            url.push_str(&format!("&view_id={view}"));
-        }
-        if let Some(pt) = page_token {
-            url.push_str(&format!("&page_token={pt}"));
-        }
-
-        let resp = self
-            .client
-            .get(&url)
-            .bearer_auth(token)
-            .send()
-            .await
-            .map_err(|e| SynapticError::Loader(format!("bitable page: {e}")))?;
-
-        let body: Value = resp
-            .json()
-            .await
-            .map_err(|e| SynapticError::Loader(format!("bitable page parse: {e}")))?;
-
-        let code = body["code"].as_i64().unwrap_or(-1);
-        if code != 0 {
-            return Err(SynapticError::Loader(format!(
-                "Lark Bitable API error code={code}: {}",
-                body["msg"].as_str().unwrap_or("unknown")
-            )));
-        }
-
-        let items = body["data"]["items"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        let next = body["data"]["page_token"].as_str().map(String::from);
-        let has_more = body["data"]["has_more"].as_bool().unwrap_or(false);
-
-        Ok((items, if has_more { next } else { None }))
-    }
 
     /// Convert a single Bitable record JSON object into a [`Document`].
     fn record_to_document(&self, record: &Value) -> Document {
@@ -234,13 +176,18 @@ impl Loader for LarkBitableLoader {
             SynapticError::Config("LarkBitableLoader: table_id not set".to_string())
         })?;
 
-        let token = self.token_cache.get_token().await?;
         let mut docs = Vec::new();
         let mut page_token: Option<String> = None;
 
         loop {
             let (items, next) = self
-                .fetch_page(&token, app_token, table_id, page_token.as_deref())
+                .api
+                .list_records_page(
+                    app_token,
+                    table_id,
+                    self.view_id.as_deref(),
+                    page_token.as_deref(),
+                )
                 .await?;
             for record in &items {
                 docs.push(self.record_to_document(record));

@@ -1,9 +1,9 @@
 use reqwest::Client;
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::json;
 use synaptic_core::SynapticError;
 
-use crate::{auth::TokenCache, LarkConfig};
+use crate::{api::message::MessageApi, auth::TokenCache, LarkConfig};
 
 /// Feishu bot client: get bot info, send and reply to messages.
 pub struct LarkBotClient {
@@ -11,6 +11,7 @@ pub struct LarkBotClient {
     token_cache: TokenCache,
     base_url: String,
     client: Client,
+    msg_api: MessageApi,
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,11 +26,14 @@ impl LarkBotClient {
     pub fn new(config: LarkConfig) -> Self {
         let app_id = config.app_id.clone();
         let base_url = config.base_url.clone();
+        // MessageApi gets its own token cache (shares the same credentials).
+        let msg_api = MessageApi::new(config.clone());
         Self {
             app_id,
             token_cache: config.token_cache(),
             base_url,
             client: Client::new(),
+            msg_api,
         }
     }
 
@@ -41,7 +45,7 @@ impl LarkBotClient {
     pub async fn get_bot_info(&self) -> Result<BotInfo, SynapticError> {
         let token = self.token_cache.get_token().await?;
         let url = format!("{}/bot/v3/info", self.base_url);
-        let resp: Value = self
+        let resp: serde_json::Value = self
             .client
             .get(&url)
             .bearer_auth(token)
@@ -73,72 +77,22 @@ impl LarkBotClient {
         })
     }
 
-    /// Send a text message to a chat.
+    /// Send a text message to a chat.  Returns `message_id`.
     pub async fn send_text(
         &self,
         receive_id_type: &str,
         receive_id: &str,
         text: &str,
     ) -> Result<String, SynapticError> {
-        let token = self.token_cache.get_token().await?;
-        let url = format!(
-            "{}/im/v1/messages?receive_id_type={receive_id_type}",
-            self.base_url
-        );
-        let resp: Value = self
-            .client
-            .post(&url)
-            .bearer_auth(&token)
-            .json(&json!({
-                "receive_id": receive_id,
-                "msg_type": "text",
-                "content": json!({ "text": text }).to_string()
-            }))
-            .send()
+        let content_json = json!({ "text": text }).to_string();
+        self.msg_api
+            .send(receive_id_type, receive_id, "text", &content_json)
             .await
-            .map_err(|e| SynapticError::Tool(format!("send_text: {e}")))?
-            .json()
-            .await
-            .map_err(|e| SynapticError::Tool(format!("send_text parse: {e}")))?;
-        if resp["code"].as_i64().unwrap_or(-1) != 0 {
-            return Err(SynapticError::Tool(format!(
-                "send_text error: {}",
-                resp["msg"].as_str().unwrap_or("unknown")
-            )));
-        }
-        Ok(resp["data"]["message_id"]
-            .as_str()
-            .unwrap_or("")
-            .to_string())
     }
 
-    /// Reply to a specific message (thread reply).
+    /// Reply to a specific message in its thread.  Returns `message_id`.
     pub async fn reply_text(&self, message_id: &str, text: &str) -> Result<String, SynapticError> {
-        let token = self.token_cache.get_token().await?;
-        let url = format!("{}/im/v1/messages/{message_id}/reply", self.base_url);
-        let resp: Value = self
-            .client
-            .post(&url)
-            .bearer_auth(&token)
-            .json(&json!({
-                "msg_type": "text",
-                "content": json!({ "text": text }).to_string()
-            }))
-            .send()
-            .await
-            .map_err(|e| SynapticError::Tool(format!("reply_text: {e}")))?
-            .json()
-            .await
-            .map_err(|e| SynapticError::Tool(format!("reply_text parse: {e}")))?;
-        if resp["code"].as_i64().unwrap_or(-1) != 0 {
-            return Err(SynapticError::Tool(format!(
-                "reply_text error: {}",
-                resp["msg"].as_str().unwrap_or("unknown")
-            )));
-        }
-        Ok(resp["data"]["message_id"]
-            .as_str()
-            .unwrap_or("")
-            .to_string())
+        let content_json = json!({ "text": text }).to_string();
+        self.msg_api.reply(message_id, "text", &content_json).await
     }
 }

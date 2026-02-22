@@ -26,6 +26,7 @@
 //! # }
 //! ```
 
+mod api;
 mod auth;
 #[cfg(feature = "bot")]
 pub mod bot;

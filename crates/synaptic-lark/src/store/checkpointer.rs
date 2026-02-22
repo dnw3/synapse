@@ -1,7 +1,4 @@
-use serde_json::Value;
-use synaptic_core::SynapticError;
-
-use crate::{auth::TokenCache, LarkConfig};
+use crate::{api::bitable::BitableApi, LarkConfig};
 
 /// Bitable-backed graph checkpoint store.
 ///
@@ -21,9 +18,7 @@ use crate::{auth::TokenCache, LarkConfig};
 /// gated behind `#[cfg(feature = "checkpointer")]`.
 #[allow(dead_code)]
 pub struct LarkBitableCheckpointer {
-    token_cache: TokenCache,
-    base_url: String,
-    client: reqwest::Client,
+    api: BitableApi,
     app_token: String,
     table_id: String,
 }
@@ -39,11 +34,8 @@ impl LarkBitableCheckpointer {
         app_token: impl Into<String>,
         table_id: impl Into<String>,
     ) -> Self {
-        let base_url = config.base_url.clone();
         Self {
-            token_cache: config.token_cache(),
-            base_url,
-            client: reqwest::Client::new(),
+            api: BitableApi::new(config),
             app_token: app_token.into(),
             table_id: table_id.into(),
         }
@@ -53,35 +45,6 @@ impl LarkBitableCheckpointer {
     pub fn app_token(&self) -> &str {
         &self.app_token
     }
-
-    #[allow(dead_code)]
-    fn search_url(&self) -> String {
-        format!(
-            "{}/bitable/v1/apps/{}/tables/{}/records/search",
-            self.base_url, self.app_token, self.table_id
-        )
-    }
-
-    #[allow(dead_code)]
-    fn records_url(&self) -> String {
-        format!(
-            "{}/bitable/v1/apps/{}/tables/{}/records",
-            self.base_url, self.app_token, self.table_id
-        )
-    }
-
-    #[allow(dead_code)]
-    fn check(body: &Value, ctx: &str) -> Result<(), SynapticError> {
-        let code = body["code"].as_i64().unwrap_or(-1);
-        if code != 0 {
-            Err(SynapticError::Graph(format!(
-                "Bitable Checkpointer ({ctx}) code={code}: {}",
-                body["msg"].as_str().unwrap_or("unknown")
-            )))
-        } else {
-            Ok(())
-        }
-    }
 }
 
 #[cfg(feature = "checkpointer")]
@@ -89,6 +52,7 @@ mod checkpointer_impl {
     use super::*;
     use async_trait::async_trait;
     use serde_json::json;
+    use synaptic_core::SynapticError;
     use synaptic_graph::{Checkpoint, CheckpointConfig, Checkpointer};
 
     #[async_trait]
@@ -98,44 +62,32 @@ mod checkpointer_impl {
             config: &CheckpointConfig,
             checkpoint: &Checkpoint,
         ) -> Result<(), SynapticError> {
-            let token = self.token_cache.get_token().await?;
             let state_str = serde_json::to_string(&checkpoint.state)
                 .map_err(|e| SynapticError::Graph(format!("serialize state: {e}")))?;
             let meta_str = serde_json::to_string(&checkpoint.metadata)
                 .map_err(|e| SynapticError::Graph(format!("serialize metadata: {e}")))?;
-            let body = json!({
-                "records": [{
-                    "fields": {
-                        "thread_id": &config.thread_id,
-                        "checkpoint_id": &checkpoint.id,
-                        "parent_id": checkpoint.parent_id.as_deref().unwrap_or(""),
-                        "state": state_str,
-                        "next_node": checkpoint.next_node.as_deref().unwrap_or(""),
-                        "metadata": meta_str,
-                        "created_at": now_ts(),
-                    }
-                }]
-            });
-            let resp = self
-                .client
-                .post(format!("{}/batch_create", self.records_url()))
-                .bearer_auth(&token)
-                .json(&body)
-                .send()
+            let records = vec![json!({
+                "fields": {
+                    "thread_id": &config.thread_id,
+                    "checkpoint_id": &checkpoint.id,
+                    "parent_id": checkpoint.parent_id.as_deref().unwrap_or(""),
+                    "state": state_str,
+                    "next_node": checkpoint.next_node.as_deref().unwrap_or(""),
+                    "metadata": meta_str,
+                    "created_at": now_ts(),
+                }
+            })];
+            self.api
+                .batch_create_records(&self.app_token, &self.table_id, records)
                 .await
-                .map_err(|e| SynapticError::Graph(format!("bitable put: {e}")))?;
-            let rb: Value = resp
-                .json()
-                .await
-                .map_err(|e| SynapticError::Graph(format!("bitable put parse: {e}")))?;
-            Self::check(&rb, "put")
+                .map_err(|e| SynapticError::Graph(e.to_string()))?;
+            Ok(())
         }
 
         async fn get(
             &self,
             config: &CheckpointConfig,
         ) -> Result<Option<Checkpoint>, SynapticError> {
-            let token = self.token_cache.get_token().await?;
             let body = json!({
                 "page_size": 1,
                 "filter": {
@@ -148,28 +100,18 @@ mod checkpointer_impl {
                 },
                 "sort": [{ "field_name": "created_at", "desc": true }]
             });
-            let resp = self
-                .client
-                .post(&self.search_url())
-                .bearer_auth(&token)
-                .json(&body)
-                .send()
+            let items = self
+                .api
+                .search_records(&self.app_token, &self.table_id, body)
                 .await
-                .map_err(|e| SynapticError::Graph(format!("bitable get: {e}")))?;
-            let rb: Value = resp
-                .json()
-                .await
-                .map_err(|e| SynapticError::Graph(format!("bitable get parse: {e}")))?;
-            Self::check(&rb, "get")?;
-            let items = rb["data"]["items"].as_array();
-            match items.and_then(|a| a.first()) {
+                .map_err(|e| SynapticError::Graph(e.to_string()))?;
+            match items.into_iter().next() {
                 None => Ok(None),
-                Some(item) => Ok(Some(record_to_checkpoint(item)?)),
+                Some(item) => Ok(Some(record_to_checkpoint(&item)?)),
             }
         }
 
         async fn list(&self, config: &CheckpointConfig) -> Result<Vec<Checkpoint>, SynapticError> {
-            let token = self.token_cache.get_token().await?;
             let body = json!({
                 "page_size": 100,
                 "filter": {
@@ -182,25 +124,12 @@ mod checkpointer_impl {
                 },
                 "sort": [{ "field_name": "created_at", "desc": false }]
             });
-            let resp = self
-                .client
-                .post(&self.search_url())
-                .bearer_auth(&token)
-                .json(&body)
-                .send()
+            let items = self
+                .api
+                .search_records(&self.app_token, &self.table_id, body)
                 .await
-                .map_err(|e| SynapticError::Graph(format!("bitable list: {e}")))?;
-            let rb: Value = resp
-                .json()
-                .await
-                .map_err(|e| SynapticError::Graph(format!("bitable list parse: {e}")))?;
-            Self::check(&rb, "list")?;
-            rb["data"]["items"]
-                .as_array()
-                .unwrap_or(&vec![])
-                .iter()
-                .map(record_to_checkpoint)
-                .collect()
+                .map_err(|e| SynapticError::Graph(e.to_string()))?;
+            items.iter().map(record_to_checkpoint).collect()
         }
     }
 
@@ -212,11 +141,11 @@ mod checkpointer_impl {
             .to_string()
     }
 
-    fn record_to_checkpoint(item: &Value) -> Result<Checkpoint, SynapticError> {
+    fn record_to_checkpoint(item: &serde_json::Value) -> Result<Checkpoint, SynapticError> {
         let f = &item["fields"];
-        let state: Value = serde_json::from_str(f["state"].as_str().unwrap_or("{}"))
+        let state: serde_json::Value = serde_json::from_str(f["state"].as_str().unwrap_or("{}"))
             .map_err(|e| SynapticError::Graph(format!("deserialize state: {e}")))?;
-        let metadata: std::collections::HashMap<String, Value> =
+        let metadata: std::collections::HashMap<String, serde_json::Value> =
             serde_json::from_str(f["metadata"].as_str().unwrap_or("{}")).unwrap_or_default();
         let next_node = f["next_node"]
             .as_str()

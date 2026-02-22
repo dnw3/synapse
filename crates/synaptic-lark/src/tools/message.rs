@@ -2,16 +2,23 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use synaptic_core::{SynapticError, Tool};
 
-use crate::{auth::TokenCache, LarkConfig};
+use crate::{api::message::MessageApi, LarkConfig};
 
-/// Send messages to Feishu/Lark chats or users as an Agent tool.
+/// Send, update, or delete Feishu/Lark messages as an Agent tool.
 ///
-/// Supports `text`, `post` (rich text), and `interactive` (card JSON) message types.
+/// # Actions
 ///
-/// # Tool call format
+/// | Action   | Description                                         |
+/// |----------|-----------------------------------------------------|
+/// | `send`   | Send a new message (default when `action` omitted)  |
+/// | `update` | Update the content of an existing message           |
+/// | `delete` | Delete (recall) a message                          |
+///
+/// # Tool call format — send
 ///
 /// ```json
 /// {
+///   "action": "send",
 ///   "receive_id_type": "chat_id",
 ///   "receive_id": "oc_xxx",
 ///   "msg_type": "text",
@@ -19,23 +26,38 @@ use crate::{auth::TokenCache, LarkConfig};
 /// }
 /// ```
 ///
+/// # Tool call format — update
+///
+/// ```json
+/// {
+///   "action": "update",
+///   "message_id": "om_xxx",
+///   "msg_type": "interactive",
+///   "content": "{\"config\":{...}}"
+/// }
+/// ```
+///
+/// # Tool call format — delete
+///
+/// ```json
+/// {
+///   "action": "delete",
+///   "message_id": "om_xxx"
+/// }
+/// ```
+///
 /// `receive_id_type` can be `"chat_id"`, `"user_id"`, `"email"`, or `"open_id"`.
 /// `msg_type` can be `"text"`, `"post"`, or `"interactive"`.
 /// For `"text"` the `content` field is a plain string; for other types it must be valid JSON.
 pub struct LarkMessageTool {
-    token_cache: TokenCache,
-    base_url: String,
-    client: reqwest::Client,
+    api: MessageApi,
 }
 
 impl LarkMessageTool {
     /// Create a new message tool.
     pub fn new(config: LarkConfig) -> Self {
-        let base_url = config.base_url.clone();
         Self {
-            token_cache: config.token_cache(),
-            base_url,
-            client: reqwest::Client::new(),
+            api: MessageApi::new(config),
         }
     }
 }
@@ -47,105 +69,125 @@ impl Tool for LarkMessageTool {
     }
 
     fn description(&self) -> &'static str {
-        "Send a message to a Feishu/Lark chat or user. Supports text, rich-text (post), and interactive card formats."
+        "Send, update, or delete a Feishu/Lark message. \
+         Use action='send' (default) to send to a chat or user; \
+         action='update' to patch an existing message; \
+         action='delete' to recall a message."
     }
 
     fn parameters(&self) -> Option<Value> {
         Some(json!({
             "type": "object",
             "properties": {
+                "action": {
+                    "type": "string",
+                    "description": "Operation: send (default) | update | delete",
+                    "enum": ["send", "update", "delete"]
+                },
                 "receive_id_type": {
                     "type": "string",
-                    "description": "Type of receiver ID: chat_id | user_id | email | open_id",
+                    "description": "For 'send': type of receiver ID: chat_id | user_id | email | open_id",
                     "enum": ["chat_id", "user_id", "email", "open_id"]
                 },
                 "receive_id": {
                     "type": "string",
-                    "description": "The receiver ID matching receive_id_type"
+                    "description": "For 'send': the receiver ID matching receive_id_type"
                 },
                 "msg_type": {
                     "type": "string",
-                    "description": "Message type: text | post | interactive",
+                    "description": "For 'send'/'update': message type: text | post | interactive",
                     "enum": ["text", "post", "interactive"]
                 },
                 "content": {
                     "type": "string",
-                    "description": "Message content. For text: plain string. For post/interactive: JSON string."
+                    "description": "For 'send'/'update': message content. For text: plain string. For post/interactive: JSON string."
+                },
+                "message_id": {
+                    "type": "string",
+                    "description": "For 'update'/'delete': the message ID (om_xxx)"
                 }
             },
-            "required": ["receive_id_type", "receive_id", "msg_type", "content"]
+            "required": ["action"]
         }))
     }
 
     async fn call(&self, args: Value) -> Result<Value, SynapticError> {
-        // Validate all required fields before any network call.
-        let receive_id_type = args["receive_id_type"]
-            .as_str()
-            .ok_or_else(|| SynapticError::Tool("missing 'receive_id_type'".to_string()))?;
-        let receive_id = args["receive_id"]
-            .as_str()
-            .ok_or_else(|| SynapticError::Tool("missing 'receive_id'".to_string()))?;
-        let msg_type = args["msg_type"]
-            .as_str()
-            .ok_or_else(|| SynapticError::Tool("missing 'msg_type'".to_string()))?;
-        let content = args["content"]
-            .as_str()
-            .ok_or_else(|| SynapticError::Tool("missing 'content'".to_string()))?;
+        let action = args
+            .get("action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("send");
 
-        // Lark API requires content to be a JSON string of the message body.
-        let content_json = match msg_type {
-            "text" => json!({"text": content}).to_string(),
-            _ => {
-                // For post/interactive, content is already expected to be a JSON string.
-                // Validate it parses, then pass through.
-                serde_json::from_str::<Value>(content)
-                    .map_err(|e| {
-                        SynapticError::Tool(format!(
-                            "content is not valid JSON for msg_type='{msg_type}': {e}"
-                        ))
-                    })?
-                    .to_string()
+        match action {
+            "send" => {
+                let receive_id_type = args["receive_id_type"]
+                    .as_str()
+                    .ok_or_else(|| SynapticError::Tool("missing 'receive_id_type'".to_string()))?;
+                let receive_id = args["receive_id"]
+                    .as_str()
+                    .ok_or_else(|| SynapticError::Tool("missing 'receive_id'".to_string()))?;
+                let msg_type = args["msg_type"]
+                    .as_str()
+                    .ok_or_else(|| SynapticError::Tool("missing 'msg_type'".to_string()))?;
+                let content = args["content"]
+                    .as_str()
+                    .ok_or_else(|| SynapticError::Tool("missing 'content'".to_string()))?;
+
+                let content_json = build_content_json(msg_type, content)?;
+                let message_id = self
+                    .api
+                    .send(receive_id_type, receive_id, msg_type, &content_json)
+                    .await?;
+                tracing::debug!("Lark message sent: {message_id}");
+                Ok(json!({ "message_id": message_id, "status": "sent" }))
             }
-        };
 
-        let token = self.token_cache.get_token().await?;
-        let url = format!(
-            "{}/im/v1/messages?receive_id_type={receive_id_type}",
-            self.base_url
-        );
-        let body = json!({
-            "receive_id": receive_id,
-            "msg_type": msg_type,
-            "content": content_json,
-        });
+            "update" => {
+                let message_id = args["message_id"]
+                    .as_str()
+                    .ok_or_else(|| SynapticError::Tool("missing 'message_id'".to_string()))?;
+                let msg_type = args["msg_type"]
+                    .as_str()
+                    .ok_or_else(|| SynapticError::Tool("missing 'msg_type'".to_string()))?;
+                let content = args["content"]
+                    .as_str()
+                    .ok_or_else(|| SynapticError::Tool("missing 'content'".to_string()))?;
 
-        let resp = self
-            .client
-            .post(&url)
-            .bearer_auth(&token)
-            .json(&body)
-            .send()
-            .await
-            .map_err(|e| SynapticError::Tool(format!("Lark send message: {e}")))?;
+                let content_json = build_content_json(msg_type, content)?;
+                self.api.update(message_id, msg_type, &content_json).await?;
+                Ok(json!({ "message_id": message_id, "status": "updated" }))
+            }
 
-        let resp_body: Value = resp
-            .json()
-            .await
-            .map_err(|e| SynapticError::Tool(format!("Lark message parse: {e}")))?;
+            "delete" => {
+                let message_id = args["message_id"]
+                    .as_str()
+                    .ok_or_else(|| SynapticError::Tool("missing 'message_id'".to_string()))?;
+                self.api.delete(message_id).await?;
+                Ok(json!({ "message_id": message_id, "status": "deleted" }))
+            }
 
-        let code = resp_body["code"].as_i64().unwrap_or(-1);
-        if code != 0 {
-            return Err(SynapticError::Tool(format!(
-                "Lark API error (send_message) code={code}: {}",
-                resp_body["msg"].as_str().unwrap_or("unknown")
-            )));
+            other => Err(SynapticError::Tool(format!(
+                "unknown action '{other}': expected send | update | delete"
+            ))),
         }
+    }
+}
 
-        let message_id = resp_body["data"]["message_id"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
-        tracing::debug!("Lark message sent: {message_id}");
-        Ok(json!({"message_id": message_id, "status": "sent"}))
+/// Serialise message content into the JSON string that Feishu expects.
+///
+/// For `"text"` the content is a plain string; for `"post"`/`"interactive"` the
+/// caller must provide a valid JSON string which is validated here.
+fn build_content_json(msg_type: &str, content: &str) -> Result<String, SynapticError> {
+    match msg_type {
+        "text" => Ok(json!({"text": content}).to_string()),
+        _ => {
+            serde_json::from_str::<Value>(content)
+                .map_err(|e| {
+                    SynapticError::Tool(format!(
+                        "content is not valid JSON for msg_type='{msg_type}': {e}"
+                    ))
+                })?
+                .to_string();
+            Ok(content.to_string())
+        }
     }
 }

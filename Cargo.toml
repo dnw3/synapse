@@ -74,6 +74,7 @@ members = [
   "examples/evaluation",
   "examples/caching",
   "examples/macros_showcase",
+  "examples/lark_rag",
 ]
 resolver = "2"
 

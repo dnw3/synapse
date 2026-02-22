@@ -10,6 +10,9 @@ Synaptic 通过可选的 feature flag 提供与外部服务和数据源的集成
 |------|---------|------|
 | [OpenAI 兼容 Provider](openai-compatible.md) | `openai` | 9 个内置便捷构造器（Groq、DeepSeek、Fireworks、Together、xAI、MistralAI、HuggingFace、Cohere、OpenRouter） |
 | [Azure OpenAI](azure-openai.md) | `openai` | Azure OpenAI Service（基于 deployment 的 URL + `api-key` 认证） |
+| [Anthropic](anthropic.md) | `anthropic` | Anthropic Claude 模型（对话 + 流式 + 工具调用） |
+| [Google Gemini](gemini.md) | `gemini` | Google Gemini 模型（Generative Language API） |
+| [Ollama](ollama.md) | `ollama` | 本地 LLM 推理（对话 + 嵌入） |
 | [AWS Bedrock](bedrock.md) | `bedrock` | AWS Bedrock 托管模型（Claude、Llama、Mistral 等） |
 
 ### 向量存储
@@ -74,6 +77,9 @@ synaptic = { version = "0.2", features = ["qdrant", "pinecone", "redis", "tavily
 
 - [OpenAI 兼容 Provider](openai-compatible.md) -- 使用 Groq、DeepSeek 等 OpenAI 兼容 API
 - [Azure OpenAI](azure-openai.md) -- 接入 Azure OpenAI Service
+- [Anthropic](anthropic.md) -- 使用 Anthropic Claude 模型
+- [Google Gemini](gemini.md) -- 使用 Google Gemini 模型
+- [Ollama](ollama.md) -- 本地 LLM 推理（对话 + 嵌入）
 - [AWS Bedrock](bedrock.md) -- 接入 AWS Bedrock 托管模型
 - [Cohere Reranker](cohere.md) -- 使用 Cohere 重排序模型
 - [Qdrant 向量存储](qdrant.md) -- 使用 Qdrant 存储和搜索嵌入向量

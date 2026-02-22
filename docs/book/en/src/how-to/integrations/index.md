@@ -8,6 +8,9 @@ Synaptic provides optional integration crates that connect to external services.
 |-------------|---------|---------|
 | [OpenAI-Compatible Providers](openai-compatible.md) | `openai` | Groq, DeepSeek, Fireworks, Together, xAI, MistralAI, HuggingFace, Cohere, OpenRouter |
 | [Azure OpenAI](azure-openai.md) | `openai` | Azure-hosted OpenAI models (chat + embeddings) |
+| [Anthropic](anthropic.md) | `anthropic` | Anthropic Claude models (chat + streaming + tool calling) |
+| [Google Gemini](gemini.md) | `gemini` | Google Gemini models via Generative Language API |
+| [Ollama](ollama.md) | `ollama` | Local LLM inference with Ollama (chat + embeddings) |
 | [AWS Bedrock](bedrock.md) | `bedrock` | AWS Bedrock foundation models (Claude, Llama, Mistral, etc.) |
 | [Cohere Reranker](cohere.md) | `cohere` | Document reranking for improved retrieval quality |
 | [Qdrant](qdrant.md) | `qdrant` | Vector store backed by the Qdrant vector database |
@@ -50,6 +53,9 @@ Every integration implements a core Synaptic trait, so it plugs directly into th
 ### LLM Providers
 - [OpenAI-Compatible Providers](openai-compatible.md) -- Groq, DeepSeek, Fireworks, Together, xAI, MistralAI, HuggingFace, Cohere, OpenRouter
 - [Azure OpenAI](azure-openai.md) -- Azure-hosted OpenAI models
+- [Anthropic](anthropic.md) -- Anthropic Claude models
+- [Google Gemini](gemini.md) -- Google Gemini models
+- [Ollama](ollama.md) -- Local LLM inference (chat + embeddings)
 - [AWS Bedrock](bedrock.md) -- AWS Bedrock foundation models
 
 ### Reranking

@@ -15,7 +15,7 @@ async-trait.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 synaptic-core = { version = "0.2", path = "../synaptic-core" }
-redis = { version = "0.27", features = ["tokio-comp", "aio"] }
+redis = { version = "1", features = ["tokio-comp", "aio"] }
 
 [dev-dependencies]
 tokio.workspace = true

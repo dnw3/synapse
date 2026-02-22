@@ -15,7 +15,7 @@ async-trait.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 synaptic-core = { version = "0.2", path = "../synaptic-core" }
-pdf-extract = "0.7"
+pdf-extract = "0.10"
 
 [dev-dependencies]
 tokio.workspace = true

@@ -2,7 +2,7 @@
 
 ## 前置要求
 
-- **Rust 1.85 或更高版本** -- Synaptic 的最低支持 Rust 版本（MSRV）为 1.83。使用 `rustup update` 更新你的工具链。
+- **Rust 1.88 或更高版本** -- Synaptic 的最低支持 Rust 版本（MSRV）为 1.88。使用 `rustup update` 更新你的工具链。
 - **Cargo** -- Rust 的包管理器，随 Rust 一起安装。
 
 ## 添加依赖

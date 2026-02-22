@@ -257,17 +257,12 @@ fn unknown_type_schema(inner: &Type) -> TokenStream {
     let core_crate = paths::core_path();
     quote! {
         {
-            let __root = #core_crate::schemars::gen::SchemaGenerator::default()
+            let __schema = #core_crate::schemars::generate::SchemaGenerator::default()
                 .into_root_schema_for::<#inner>();
-            let mut __val = ::serde_json::to_value(&__root.schema)
+            let mut __val = ::serde_json::to_value(&__schema)
                 .unwrap_or(::serde_json::json!({"type": "object"}));
             if let Some(__obj) = __val.as_object_mut() {
                 __obj.remove("$schema");
-                if !__root.definitions.is_empty() {
-                    if let Ok(__defs) = ::serde_json::to_value(&__root.definitions) {
-                        __obj.insert("$defs".into(), __defs);
-                    }
-                }
             }
             __val
         }

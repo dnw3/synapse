@@ -4,13 +4,13 @@ This page covers everything you need to build, test, and run Synaptic locally.
 
 ## Prerequisites
 
-- **Rust 1.85 or later** -- Install via [rustup](https://rustup.rs/):
+- **Rust 1.88 or later** -- Install via [rustup](https://rustup.rs/):
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
   Verify with:
   ```bash
-  rustc --version   # Should print 1.83.0 or later
+  rustc --version   # Should print 1.88.0 or later
   cargo --version
   ```
 
@@ -94,6 +94,16 @@ If this fails, auto-format with:
 ```bash
 cargo fmt --all
 ```
+
+### Pre-commit Hook
+
+The repository ships a pre-commit hook that runs `cargo fmt --check` automatically before each commit. Enable it once after cloning:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+If formatting fails the hook will run `cargo fmt --all` for you — just re-stage the changes and commit again.
 
 ## Build Documentation Locally
 

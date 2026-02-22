@@ -4,13 +4,13 @@
 
 ## 前置条件
 
-- **Rust 1.85 或更高版本** -- 通过 [rustup](https://rustup.rs/) 安装：
+- **Rust 1.88 或更高版本** -- 通过 [rustup](https://rustup.rs/) 安装：
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
   验证安装：
   ```bash
-  rustc --version   # Should print 1.83.0 or later
+  rustc --version   # Should print 1.88.0 or later
   cargo --version
   ```
 
@@ -94,6 +94,16 @@ cargo fmt --all -- --check
 ```bash
 cargo fmt --all
 ```
+
+### Pre-commit Hook
+
+仓库自带 pre-commit hook，会在每次提交前自动运行 `cargo fmt --check`。克隆后启用一次即可：
+
+```bash
+git config core.hooksPath .githooks
+```
+
+如果格式检查未通过，hook 会自动执行 `cargo fmt --all` — 你只需重新暂存变更并再次提交。
 
 ## 本地构建文档
 

@@ -33,6 +33,7 @@ pub mod store;
 pub mod tools;
 pub mod vector_store;
 
+pub use events::listener::LarkEventListener;
 pub use loaders::bitable::LarkBitableLoader;
 pub use loaders::doc::LarkDocLoader;
 pub use loaders::drive::LarkDriveLoader;

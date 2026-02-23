@@ -5,16 +5,18 @@ use synaptic::core::{
     ChatModel, ChatRequest, ChatResponse, MemoryStore, Message, RunnableConfig, SynapticError,
 };
 use synaptic::memory::{
-    ConversationBufferMemory, ConversationWindowMemory, InMemoryStore, RunnableWithMessageHistory,
+    ChatMessageHistory, ConversationBufferMemory, ConversationWindowMemory,
+    RunnableWithMessageHistory,
 };
 use synaptic::models::ScriptedChatModel;
 use synaptic::runnables::{Runnable, RunnableLambda};
+use synaptic::store::InMemoryStore;
 
 #[tokio::main]
 async fn main() -> Result<(), SynapticError> {
     // --- Buffer Memory (keeps all messages) ---
     println!("=== ConversationBufferMemory ===");
-    let store = Arc::new(InMemoryStore::new());
+    let store = Arc::new(ChatMessageHistory::new(Arc::new(InMemoryStore::new())));
     let buffer = ConversationBufferMemory::new(store.clone());
 
     buffer.append("session1", Message::human("Hello")).await?;
@@ -34,7 +36,7 @@ async fn main() -> Result<(), SynapticError> {
 
     // --- Window Memory (keeps last K messages) ---
     println!("\n=== ConversationWindowMemory (window=2) ===");
-    let store2 = Arc::new(InMemoryStore::new());
+    let store2 = Arc::new(ChatMessageHistory::new(Arc::new(InMemoryStore::new())));
     let window = ConversationWindowMemory::new(store2.clone(), 2);
 
     window
@@ -78,7 +80,8 @@ async fn main() -> Result<(), SynapticError> {
         }
     });
 
-    let memory_store: Arc<dyn MemoryStore> = Arc::new(InMemoryStore::new());
+    let memory_store: Arc<dyn MemoryStore> =
+        Arc::new(ChatMessageHistory::new(Arc::new(InMemoryStore::new())));
     let with_history = RunnableWithMessageHistory::new(inner.boxed(), memory_store.clone());
 
     let config = RunnableConfig::default().with_metadata("session_id", json!("demo-session"));

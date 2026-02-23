@@ -12,9 +12,9 @@ homepage.workspace = true
 
 [dependencies]
 async-trait.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
-synaptic-models = { version = "0.2", path = "../synaptic-models" }
-synaptic-openai = { version = "0.2", path = "../synaptic-openai" }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
+synaptic-models = { version = "0.3", path = "../synaptic-models" }
+synaptic-openai = { version = "0.3", path = "../synaptic-openai" }
 
 [dev-dependencies]
 tokio.workspace = true

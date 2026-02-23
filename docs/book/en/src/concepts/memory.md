@@ -22,29 +22,35 @@ Three operations, keyed by a session identifier:
 
 The `session_id` parameter is central to Synaptic's memory design. Two conversations with different session IDs are completely isolated, even if they share the same memory store instance. This enables multi-tenant applications where many users interact concurrently through a single system.
 
-## InMemoryStore
+## ChatMessageHistory
 
-The simplest implementation -- a `HashMap<String, Vec<Message>>` wrapped in `Arc<RwLock<_>>`:
-
-```rust
-use synaptic::memory::InMemoryStore;
-
-let store = InMemoryStore::new();
-store.append("session_1", Message::human("Hello")).await?;
-let history = store.load("session_1").await?;
-```
-
-`InMemoryStore` is fast, requires no external dependencies, and is suitable for development, testing, and short-lived applications. Data is lost when the process exits.
-
-## FileChatMessageHistory
-
-A persistent store that writes messages to a JSON file on disk. Each session is stored as a separate file. This is useful for applications that need persistence without a database:
+`ChatMessageHistory` is the standard `MemoryStore` implementation. It is backed by any `Store` -- the storage backend is pluggable, so you can swap between in-memory, file-based, or custom stores without changing your memory code:
 
 ```rust
-use synaptic::memory::FileChatMessageHistory;
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 
-let history = FileChatMessageHistory::new("./chat_history")?;
+let store = Arc::new(InMemoryStore::new());
+let memory = ChatMessageHistory::new(store);
+memory.append("session_1", Message::human("Hello")).await?;
+let history = memory.load("session_1").await?;
 ```
+
+`ChatMessageHistory` backed by `InMemoryStore` is fast, requires no external dependencies, and is suitable for development, testing, and short-lived applications. Data is lost when the process exits.
+
+For persistence, swap `InMemoryStore` for `FileStore`:
+
+```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::FileStore;
+
+let store = Arc::new(FileStore::new("./chat_history"));
+let memory = ChatMessageHistory::new(store);
+```
+
+`FileStore` writes data to disk, so conversation history survives process restarts. The rest of your code stays exactly the same -- only the store constructor changes.
 
 ## Memory Strategies
 
@@ -63,9 +69,14 @@ Keeps all messages. The simplest strategy -- everything is sent to the LLM every
 Keeps only the last K message pairs (human + AI). Older messages are dropped:
 
 ```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::memory::ConversationWindowMemory;
 
-let memory = ConversationWindowMemory::new(store, 5); // keep last 5 exchanges
+let store = Arc::new(InMemoryStore::new());
+let history = ChatMessageHistory::new(store);
+let memory = ConversationWindowMemory::new(history, 5); // keep last 5 exchanges
 ```
 
 - **Advantage**: Fixed, predictable token usage.
@@ -77,9 +88,14 @@ let memory = ConversationWindowMemory::new(store, 5); // keep last 5 exchanges
 Summarizes older messages using an LLM, keeping only the summary plus recent messages:
 
 ```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::memory::ConversationSummaryMemory;
 
-let memory = ConversationSummaryMemory::new(store, summarizer_model);
+let store = Arc::new(InMemoryStore::new());
+let history = ChatMessageHistory::new(store);
+let memory = ConversationSummaryMemory::new(history, summarizer_model);
 ```
 
 After each exchange, the strategy uses an LLM to produce a running summary of the conversation. The summary replaces the older messages, so the context sent to the main model includes the summary followed by recent messages.
@@ -93,9 +109,14 @@ After each exchange, the strategy uses an LLM to produce a running summary of th
 Keeps as many recent messages as fit within a token budget:
 
 ```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::memory::ConversationTokenBufferMemory;
 
-let memory = ConversationTokenBufferMemory::new(store, 4096); // max 4096 tokens
+let store = Arc::new(InMemoryStore::new());
+let history = ChatMessageHistory::new(store);
+let memory = ConversationTokenBufferMemory::new(history, 4096); // max 4096 tokens
 ```
 
 Unlike window memory (which counts messages), token buffer memory counts tokens. This is more precise when messages vary significantly in length.
@@ -109,9 +130,14 @@ Unlike window memory (which counts messages), token buffer memory counts tokens.
 A hybrid: summarizes old messages and keeps recent ones, with a token threshold controlling the boundary:
 
 ```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::memory::ConversationSummaryBufferMemory;
 
-let memory = ConversationSummaryBufferMemory::new(store, model, 2000);
+let store = Arc::new(InMemoryStore::new());
+let history = ChatMessageHistory::new(store);
+let memory = ConversationSummaryBufferMemory::new(history, model, 2000);
 // Summarize when recent messages exceed 2000 tokens
 ```
 
@@ -160,7 +186,7 @@ This separates memory management from application logic. The inner runnable does
 
 A key design property: memory is always scoped to a session. The `session_id` is just a string -- it could be a user ID, a conversation ID, a thread ID, or any other identifier meaningful to your application.
 
-Different sessions sharing the same `InMemoryStore` (or any other store) are completely independent. Appending to session "alice" never affects session "bob". This makes it safe to use a single store instance across an entire application serving multiple users.
+Different sessions sharing the same `ChatMessageHistory` (or any other store) are completely independent. Appending to session "alice" never affects session "bob". This makes it safe to use a single store instance across an entire application serving multiple users.
 
 ## See Also
 

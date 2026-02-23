@@ -158,12 +158,14 @@ Graphs support state persistence through the `Checkpointer` trait. After each no
 - **Resumption**: If the process crashes, the graph can resume from the last checkpoint.
 - **Human-in-the-loop**: The graph can pause, persist state, and resume later after human input.
 
-`MemorySaver` is the built-in in-memory checkpointer. For production use, you would implement `Checkpointer` with a database backend.
+`StoreCheckpointer` with an `InMemoryStore` backend is the simplest in-memory checkpointer. For production use, you would implement `Checkpointer` with a database backend.
 
 ```rust
-use synaptic::graph::MemorySaver;
+use synaptic::graph::StoreCheckpointer;
+use synaptic::store::InMemoryStore;
+use std::sync::Arc;
 
-let checkpointer = Arc::new(MemorySaver::new());
+let checkpointer = Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())));
 let graph = graph.with_checkpointer(checkpointer);
 ```
 

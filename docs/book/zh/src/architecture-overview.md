@@ -45,7 +45,7 @@ Synaptic 采用 Cargo workspace 组织，包含 22 个库 crate、1 个门面 cr
 | Crate | 职责 |
 |---|---|
 | `synaptic-runnables` | `Runnable` trait，含 `invoke()`/`batch()`/`stream()`，`BoxRunnable` 管道运算符，`RunnableLambda`、`RunnableParallel`、`RunnableBranch`、`RunnableAssign`、`RunnablePick`、`RunnableWithFallbacks` |
-| `synaptic-graph` | LangGraph 风格状态机：`StateGraph`、`CompiledGraph`、`ToolNode`、`create_react_agent`、`create_supervisor`、`create_swarm`、`Command`、`GraphResult`、`Checkpointer`、`MemorySaver`、多模式流 |
+| `synaptic-graph` | LangGraph 风格状态机：`StateGraph`、`CompiledGraph`、`ToolNode`、`create_react_agent`、`create_supervisor`、`create_swarm`、`Command`、`GraphResult`、`Checkpointer`、`StoreCheckpointer`、多模式流 |
 
 ### 检索流水线
 

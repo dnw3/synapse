@@ -292,10 +292,11 @@ compiled.draw_png("workflow.png")?;
 
 ```rust
 use std::sync::Arc;
-use synaptic::graph::{MemorySaver, CheckpointConfig};
+use synaptic::graph::{StoreCheckpointer, CheckpointConfig};
+use synaptic::store::InMemoryStore;
 
-// 创建内存检查点存储
-let checkpointer = Arc::new(MemorySaver::new());
+// 创建基于 Store 的检查点器
+let checkpointer = Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())));
 let compiled = graph.compile()?.with_checkpointer(checkpointer);
 
 // 使用 thread_id 标识执行线程
@@ -329,7 +330,7 @@ let graph = StateGraph::<WorkflowState>::new()
     // 在执行加急处理前暂停
     .interrupt_before(vec!["escalate".to_string()]);
 
-let compiled = graph.compile()?.with_checkpointer(Arc::new(MemorySaver::new()));
+let compiled = graph.compile()?.with_checkpointer(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new()))));
 
 let config = CheckpointConfig {
     thread_id: "t1".to_string(),

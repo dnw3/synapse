@@ -20,13 +20,26 @@ regex.workspace = true
 synaptic-core.workspace = true
 synaptic-macros.workspace = true
 synaptic-middleware.workspace = true
-synaptic-graph = { version = "0.2", path = "../synaptic-graph" }
-synaptic-tools = { version = "0.2", path = "../synaptic-tools" }
+synaptic-graph = { version = "0.3", path = "../synaptic-graph" }
+synaptic-tools = { version = "0.3", path = "../synaptic-tools" }
+synaptic-config = { version = "0.3", path = "../synaptic-config", optional = true }
+synaptic-models = { version = "0.3", path = "../synaptic-models", optional = true }
+synaptic-openai = { version = "0.3", path = "../synaptic-openai", optional = true }
+synaptic-anthropic = { version = "0.3", path = "../synaptic-anthropic", optional = true }
+synaptic-gemini = { version = "0.3", path = "../synaptic-gemini", optional = true }
+synaptic-ollama = { version = "0.3", path = "../synaptic-ollama", optional = true }
+synaptic-mcp = { version = "0.3", path = "../synaptic-mcp", optional = true }
 
 [features]
 filesystem = []
+openai-provider = ["dep:synaptic-openai"]
+anthropic-provider = ["dep:synaptic-anthropic"]
+gemini-provider = ["dep:synaptic-gemini"]
+ollama-provider = ["dep:synaptic-ollama"]
+all-providers = ["openai-provider", "anthropic-provider", "gemini-provider", "ollama-provider"]
+config-builder = ["dep:synaptic-config", "dep:synaptic-models", "dep:synaptic-mcp", "openai-provider"]
 
 [dev-dependencies]
 tokio.workspace = true
-synaptic-models = { version = "0.2", path = "../synaptic-models" }
-synaptic-store = { version = "0.2", path = "../synaptic-store" }
+synaptic-models = { version = "0.3", path = "../synaptic-models" }
+synaptic-store = { version = "0.3", path = "../synaptic-store" }

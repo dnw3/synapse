@@ -1,0 +1,22 @@
+[package]
+name = "synaptic-config"
+description = "Multi-format configuration layer for the Synaptic AI agent framework"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+readme.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+serde_yml.workspace = true
+dirs.workspace = true
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
+
+[dev-dependencies]
+tokio.workspace = true

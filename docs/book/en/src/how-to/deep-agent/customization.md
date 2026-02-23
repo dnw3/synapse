@@ -91,10 +91,11 @@ options.middleware = vec![
 Optional checkpointer for graph state persistence. When provided, the agent can resume from checkpoints.
 
 ```rust,ignore
-use synaptic::graph::MemorySaver;
+use synaptic::graph::StoreCheckpointer;
+use synaptic::store::InMemoryStore;
 
 let mut options = DeepAgentOptions::new(backend.clone());
-options.checkpointer = Some(Arc::new(MemorySaver::new()));
+options.checkpointer = Some(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new()))));
 ```
 
 ### store

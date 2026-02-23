@@ -1,11 +1,17 @@
 use std::sync::Arc;
 
 use synaptic_core::{MemoryStore, Message};
-use synaptic_memory::{ConversationWindowMemory, InMemoryStore};
+use synaptic_memory::{ChatMessageHistory, ConversationWindowMemory};
+
+fn new_store() -> Arc<ChatMessageHistory> {
+    Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )))
+}
 
 #[tokio::test]
 async fn window_returns_last_n_messages() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let window = ConversationWindowMemory::new(store, 4);
 
     // Append 6 messages
@@ -26,7 +32,7 @@ async fn window_returns_last_n_messages() {
 
 #[tokio::test]
 async fn window_returns_all_when_under_limit() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let window = ConversationWindowMemory::new(store, 10);
 
     window.append("s1", Message::human("hello")).await.unwrap();
@@ -40,7 +46,7 @@ async fn window_returns_all_when_under_limit() {
 
 #[tokio::test]
 async fn window_clear() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let window = ConversationWindowMemory::new(store, 4);
 
     window.append("s1", Message::human("hello")).await.unwrap();

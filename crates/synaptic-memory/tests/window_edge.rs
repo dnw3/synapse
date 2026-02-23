@@ -1,11 +1,17 @@
 use std::sync::Arc;
 
 use synaptic_core::{MemoryStore, Message};
-use synaptic_memory::{ConversationWindowMemory, InMemoryStore};
+use synaptic_memory::{ChatMessageHistory, ConversationWindowMemory};
+
+fn new_store() -> Arc<ChatMessageHistory> {
+    Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )))
+}
 
 #[tokio::test]
 async fn empty_history() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let window = ConversationWindowMemory::new(store, 5);
     let loaded = window.load("empty_session").await.unwrap();
     assert!(loaded.is_empty());
@@ -13,7 +19,7 @@ async fn empty_history() {
 
 #[tokio::test]
 async fn exactly_k_messages() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let window = ConversationWindowMemory::new(store, 3);
 
     window.append("s1", Message::human("a")).await.unwrap();
@@ -28,7 +34,7 @@ async fn exactly_k_messages() {
 
 #[tokio::test]
 async fn more_than_k() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let window = ConversationWindowMemory::new(store, 2);
 
     window.append("s1", Message::human("a")).await.unwrap();
@@ -44,7 +50,7 @@ async fn more_than_k() {
 
 #[tokio::test]
 async fn k_equals_one() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let window = ConversationWindowMemory::new(store, 1);
 
     window.append("s1", Message::human("first")).await.unwrap();
@@ -58,7 +64,7 @@ async fn k_equals_one() {
 
 #[tokio::test]
 async fn multiple_sessions_isolated() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let window = ConversationWindowMemory::new(store, 5);
 
     window
@@ -80,7 +86,7 @@ async fn multiple_sessions_isolated() {
 
 #[tokio::test]
 async fn clear_one_session_preserves_other() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let window = ConversationWindowMemory::new(store, 5);
 
     window.append("s1", Message::human("keep")).await.unwrap();

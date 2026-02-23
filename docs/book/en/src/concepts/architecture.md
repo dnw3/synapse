@@ -46,7 +46,7 @@ Each crate implements one core concern:
 | `synaptic-gemini` | `GeminiChatModel` |
 | `synaptic-ollama` | `OllamaChatModel` + `OllamaEmbeddings` |
 | `synaptic-tools` | `ToolRegistry`, `SerialToolExecutor`, `ParallelToolExecutor`, `HandleErrorTool`, `ReturnDirectTool` |
-| `synaptic-memory` | `InMemoryStore` and strategy types: Buffer, Window, Summary, TokenBuffer, SummaryBuffer, `RunnableWithMessageHistory`, `FileChatMessageHistory` |
+| `synaptic-memory` | `ChatMessageHistory` and strategy types: Buffer, Window, Summary, TokenBuffer, SummaryBuffer, `RunnableWithMessageHistory` |
 | `synaptic-callbacks` | `RecordingCallback`, `TracingCallback`, `CompositeCallback` |
 | `synaptic-prompts` | `PromptTemplate`, `ChatPromptTemplate`, `FewShotChatMessagePromptTemplate`, `ExampleSelector` |
 | `synaptic-parsers` | Output parsers: `StrOutputParser`, `JsonOutputParser`, `StructuredOutputParser<T>`, `ListOutputParser`, `EnumOutputParser`, `BooleanOutputParser`, `MarkdownListOutputParser`, `NumberedListOutputParser`, `XmlOutputParser`, `RetryOutputParser`, `FixingOutputParser` |
@@ -60,7 +60,7 @@ These crates combine the implementation crates into higher-level abstractions:
 | Crate | Purpose |
 |-------|---------|
 | `synaptic-runnables` | The LCEL system: `Runnable` trait, `BoxRunnable` with pipe operator, `RunnableSequence`, `RunnableParallel`, `RunnableBranch`, `RunnableWithFallbacks`, `RunnableAssign`, `RunnablePick`, `RunnableEach`, `RunnableRetry`, `RunnableGenerator` |
-| `synaptic-graph` | LangGraph-style state machines: `StateGraph` builder, `CompiledGraph`, `Node` trait, `ToolNode`, `create_react_agent()`, checkpointing, streaming, visualization |
+| `synaptic-graph` | LangGraph-style state machines: `StateGraph` builder, `CompiledGraph`, `Node` trait, `ToolNode`, `create_react_agent()`, `StoreCheckpointer`, streaming, visualization |
 | `synaptic-loaders` | Document loaders: `TextLoader`, `JsonLoader`, `CsvLoader`, `DirectoryLoader`, `FileLoader`, `MarkdownLoader`, `WebLoader` |
 | `synaptic-splitters` | Text splitters: `CharacterTextSplitter`, `RecursiveCharacterTextSplitter`, `MarkdownHeaderTextSplitter`, `HtmlHeaderTextSplitter`, `LanguageTextSplitter`, `TokenTextSplitter` |
 | `synaptic-embeddings` | `Embeddings` trait, `FakeEmbeddings`, `CacheBackedEmbeddings` |

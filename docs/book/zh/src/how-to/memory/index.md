@@ -21,15 +21,17 @@ pub trait MemoryStore: Send + Sync {
 
 每个操作都通过 `session_id` 字符串进行键控，将不同对话彼此隔离。你可以自行选择 Session 键（用户 ID、线程 ID、UUID——任何适合你应用的标识符）。
 
-## `InMemoryStore`
+## `ChatMessageHistory`
 
-最简单的 `MemoryStore` 实现是 `InMemoryStore`，它将消息存储在由 `Arc<RwLock<_>>` 保护的 `HashMap` 中：
+最简单的 `MemoryStore` 实现是 `ChatMessageHistory`，它基于统一的 `Store` 后端存储消息：
 
 ```rust
-use synaptic::memory::InMemoryStore;
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::core::{MemoryStore, Message};
 
-let store = InMemoryStore::new();
+let store = ChatMessageHistory::new(Arc::new(InMemoryStore::new()));
 
 store.append("session-1", Message::human("Hello")).await?;
 store.append("session-1", Message::ai("Hi there!")).await?;
@@ -42,7 +44,7 @@ let other = store.load("session-2").await?;
 assert!(other.is_empty());
 ```
 
-`InMemoryStore` 通常用作下面描述的高级 Memory 策略的后端存储。
+`ChatMessageHistory` 通常用作下面描述的高级 Memory 策略的后端存储。通过传入不同的 `Store` 实现（如 `InMemoryStore`、`FileStore`），可以灵活选择存储方式。
 
 ## Memory 策略
 

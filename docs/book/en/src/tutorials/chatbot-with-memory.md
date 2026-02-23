@@ -1,6 +1,6 @@
 # Build a Chatbot with Memory
 
-This tutorial walks you through building a session-based chatbot that remembers conversation history. You will learn how to store and retrieve messages with `InMemoryStore`, isolate conversations by session ID, and choose the right memory strategy for your use case.
+This tutorial walks you through building a session-based chatbot that remembers conversation history. You will learn how to store and retrieve messages with `ChatMessageHistory`, isolate conversations by session ID, and choose the right memory strategy for your use case.
 
 ## Prerequisites
 
@@ -8,21 +8,24 @@ Add the required Synaptic crates to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-synaptic = { version = "0.2", features = ["memory"] }
+synaptic = { version = "0.3", features = ["memory", "store"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
 ## Step 1: Store and Load Messages
 
-Every chatbot needs to remember what was said. Synaptic provides the `MemoryStore` trait for this purpose, and `InMemoryStore` as a simple in-process implementation backed by a `HashMap`.
+Every chatbot needs to remember what was said. Synaptic provides the `MemoryStore` trait for this purpose, and `ChatMessageHistory` as the standard implementation backed by any `Store`. Here we use `InMemoryStore` as the underlying storage:
 
 ```rust
+use std::sync::Arc;
 use synaptic::core::{MemoryStore, Message, SynapticError};
-use synaptic::memory::InMemoryStore;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 
 #[tokio::main]
 async fn main() -> Result<(), SynapticError> {
-    let memory = InMemoryStore::new();
+    let store = Arc::new(InMemoryStore::new());
+    let memory = ChatMessageHistory::new(store);
     let session_id = "demo-session";
 
     // Simulate a conversation
@@ -63,12 +66,15 @@ The `MemoryStore` trait defines three methods:
 Each session ID maps to an independent conversation history. This is how you keep multiple users or threads separate:
 
 ```rust
+use std::sync::Arc;
 use synaptic::core::{MemoryStore, Message, SynapticError};
-use synaptic::memory::InMemoryStore;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 
 #[tokio::main]
 async fn main() -> Result<(), SynapticError> {
-    let memory = InMemoryStore::new();
+    let store = Arc::new(InMemoryStore::new());
+    let memory = ChatMessageHistory::new(store);
 
     // Alice's conversation
     memory.append("alice", Message::human("Hi, I'm Alice")).await?;
@@ -104,10 +110,13 @@ Keeps all messages. This is the simplest strategy -- a passthrough wrapper that 
 ```rust
 use std::sync::Arc;
 use synaptic::core::MemoryStore;
-use synaptic::memory::{InMemoryStore, ConversationBufferMemory};
+use synaptic::memory::ChatMessageHistory;
+use synaptic::memory::ConversationBufferMemory;
+use synaptic::store::InMemoryStore;
 
 let store = Arc::new(InMemoryStore::new());
-let memory = ConversationBufferMemory::new(store);
+let history = Arc::new(ChatMessageHistory::new(store));
+let memory = ConversationBufferMemory::new(history);
 // memory.load() returns all messages
 ```
 
@@ -120,10 +129,13 @@ Keeps only the last **K** messages. Older messages are still stored but are not 
 ```rust
 use std::sync::Arc;
 use synaptic::core::MemoryStore;
-use synaptic::memory::{InMemoryStore, ConversationWindowMemory};
+use synaptic::memory::ChatMessageHistory;
+use synaptic::memory::ConversationWindowMemory;
+use synaptic::store::InMemoryStore;
 
 let store = Arc::new(InMemoryStore::new());
-let memory = ConversationWindowMemory::new(store, 10); // keep last 10 messages
+let history = Arc::new(ChatMessageHistory::new(store));
+let memory = ConversationWindowMemory::new(history, 10); // keep last 10 messages
 // memory.load() returns at most 10 messages
 ```
 
@@ -136,11 +148,14 @@ Uses an LLM to summarize older messages. When the stored message count exceeds `
 ```rust
 use std::sync::Arc;
 use synaptic::core::{ChatModel, MemoryStore};
-use synaptic::memory::{InMemoryStore, ConversationSummaryMemory};
+use synaptic::memory::ChatMessageHistory;
+use synaptic::memory::ConversationSummaryMemory;
+use synaptic::store::InMemoryStore;
 
 let store = Arc::new(InMemoryStore::new());
+let history = Arc::new(ChatMessageHistory::new(store));
 let model: Arc<dyn ChatModel> = /* your chat model */;
-let memory = ConversationSummaryMemory::new(store, model, 6);
+let memory = ConversationSummaryMemory::new(history, model, 6);
 // When messages exceed 12, older ones are summarized
 // memory.load() returns: [summary system message] + [recent 6 messages]
 ```
@@ -154,10 +169,13 @@ Keeps messages within a **token budget**. Uses a configurable token estimator to
 ```rust
 use std::sync::Arc;
 use synaptic::core::MemoryStore;
-use synaptic::memory::{InMemoryStore, ConversationTokenBufferMemory};
+use synaptic::memory::ChatMessageHistory;
+use synaptic::memory::ConversationTokenBufferMemory;
+use synaptic::store::InMemoryStore;
 
 let store = Arc::new(InMemoryStore::new());
-let memory = ConversationTokenBufferMemory::new(store, 4000); // 4000 token budget
+let history = Arc::new(ChatMessageHistory::new(store));
+let memory = ConversationTokenBufferMemory::new(history, 4000); // 4000 token budget
 // memory.load() returns as many recent messages as fit within 4000 tokens
 ```
 
@@ -170,11 +188,14 @@ A hybrid of summary and buffer strategies. Keeps the most recent messages verbat
 ```rust
 use std::sync::Arc;
 use synaptic::core::{ChatModel, MemoryStore};
-use synaptic::memory::{InMemoryStore, ConversationSummaryBufferMemory};
+use synaptic::memory::ChatMessageHistory;
+use synaptic::memory::ConversationSummaryBufferMemory;
+use synaptic::store::InMemoryStore;
 
 let store = Arc::new(InMemoryStore::new());
+let history = Arc::new(ChatMessageHistory::new(store));
 let model: Arc<dyn ChatModel> = /* your chat model */;
-let memory = ConversationSummaryBufferMemory::new(store, model, 2000);
+let memory = ConversationSummaryBufferMemory::new(history, model, 2000);
 // Keeps recent messages verbatim; summarizes when total tokens exceed 2000
 ```
 
@@ -194,11 +215,14 @@ In a real chatbot, you want the history load/save to happen automatically on eac
 use std::sync::Arc;
 use std::collections::HashMap;
 use synaptic::core::{MemoryStore, RunnableConfig};
-use synaptic::memory::{InMemoryStore, RunnableWithMessageHistory};
+use synaptic::memory::ChatMessageHistory;
+use synaptic::memory::RunnableWithMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::runnables::Runnable;
 
 // Wrap a model chain with automatic history management
-let memory = Arc::new(InMemoryStore::new());
+let store = Arc::new(InMemoryStore::new());
+let memory = Arc::new(ChatMessageHistory::new(store));
 let chain = /* your model chain (BoxRunnable<Vec<Message>, String>) */;
 let chatbot = RunnableWithMessageHistory::new(chain, memory);
 
@@ -226,23 +250,23 @@ Here is the mental model for Synaptic memory:
                     +-----------+-----------+
                                 |
          +----------------------+----------------------+
-         |                      |                      |
-  InMemoryStore          (other stores)       Memory Strategies
-  (raw storage)                              (wrap a MemoryStore)
-                                                       |
+         |                                             |
+  ChatMessageHistory                            Memory Strategies
+  (backed by any Store:                        (wrap a MemoryStore)
+   InMemoryStore, FileStore)                           |
                                 +----------------------+----------------------+
                                 |         |         |         |              |
                              Buffer    Window   Summary   TokenBuffer   SummaryBuffer
                              (all)    (last K)   (LLM)    (tokens)       (hybrid)
 ```
 
-All memory strategies implement `MemoryStore` themselves, so they are composable -- you could wrap an `InMemoryStore` in a `ConversationWindowMemory`, and everything downstream only sees the `MemoryStore` trait.
+All memory strategies implement `MemoryStore` themselves, so they are composable -- you could wrap a `ChatMessageHistory` in a `ConversationWindowMemory`, and everything downstream only sees the `MemoryStore` trait.
 
 ## Summary
 
 In this tutorial you learned how to:
 
-- Use `InMemoryStore` to store and retrieve conversation messages
+- Use `ChatMessageHistory` backed by `InMemoryStore` to store and retrieve conversation messages
 - Isolate conversations with session IDs
 - Choose a memory strategy based on your conversation length and cost requirements
 - Automate history management with `RunnableWithMessageHistory`

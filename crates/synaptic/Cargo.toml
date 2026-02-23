@@ -11,65 +11,69 @@ repository.workspace = true
 homepage.workspace = true
 
 [dependencies]
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
-synaptic-models = { version = "0.2", path = "../synaptic-models", optional = true }
-synaptic-openai = { version = "0.2", path = "../synaptic-openai", optional = true }
-synaptic-anthropic = { version = "0.2", path = "../synaptic-anthropic", optional = true }
-synaptic-gemini = { version = "0.2", path = "../synaptic-gemini", optional = true }
-synaptic-ollama = { version = "0.2", path = "../synaptic-ollama", optional = true }
-synaptic-runnables = { version = "0.2", path = "../synaptic-runnables", optional = true }
-synaptic-prompts = { version = "0.2", path = "../synaptic-prompts", optional = true }
-synaptic-parsers = { version = "0.2", path = "../synaptic-parsers", optional = true }
-synaptic-tools = { version = "0.2", path = "../synaptic-tools", optional = true }
-synaptic-memory = { version = "0.2", path = "../synaptic-memory", optional = true }
-synaptic-callbacks = { version = "0.2", path = "../synaptic-callbacks", optional = true }
-synaptic-retrieval = { version = "0.2", path = "../synaptic-retrieval", optional = true }
-synaptic-loaders = { version = "0.2", path = "../synaptic-loaders", optional = true }
-synaptic-splitters = { version = "0.2", path = "../synaptic-splitters", optional = true }
-synaptic-embeddings = { version = "0.2", path = "../synaptic-embeddings", optional = true }
-synaptic-vectorstores = { version = "0.2", path = "../synaptic-vectorstores", optional = true }
-synaptic-graph = { version = "0.2", path = "../synaptic-graph", optional = true }
-synaptic-middleware = { version = "0.2", path = "../synaptic-middleware", optional = true }
-synaptic-store = { version = "0.2", path = "../synaptic-store", optional = true }
-synaptic-cache = { version = "0.2", path = "../synaptic-cache", optional = true }
-synaptic-eval = { version = "0.2", path = "../synaptic-eval", optional = true }
-synaptic-mcp = { version = "0.2", path = "../synaptic-mcp", optional = true }
-synaptic-macros = { version = "0.2", path = "../synaptic-macros", optional = true }
-synaptic-deep = { version = "0.2", path = "../synaptic-deep", optional = true }
-synaptic-qdrant = { version = "0.2", path = "../synaptic-qdrant", optional = true }
-synaptic-pgvector = { version = "0.2", path = "../synaptic-pgvector", optional = true }
-synaptic-redis = { version = "0.2", path = "../synaptic-redis", optional = true }
-synaptic-pdf = { version = "0.2", path = "../synaptic-pdf", optional = true }
-synaptic-bedrock = { version = "0.2", path = "../synaptic-bedrock", optional = true }
-synaptic-cohere = { version = "0.2", path = "../synaptic-cohere", optional = true }
-synaptic-pinecone = { version = "0.2", path = "../synaptic-pinecone", optional = true }
-synaptic-chroma = { version = "0.2", path = "../synaptic-chroma", optional = true }
-synaptic-mongodb = { version = "0.2", path = "../synaptic-mongodb", optional = true }
-synaptic-elasticsearch = { version = "0.2", path = "../synaptic-elasticsearch", optional = true }
-synaptic-sqlite = { version = "0.2", path = "../synaptic-sqlite", optional = true }
-synaptic-tavily = { version = "0.2", path = "../synaptic-tavily", optional = true }
-synaptic-groq = { version = "0.2", path = "../synaptic-groq", optional = true }
-synaptic-mistral = { version = "0.2", path = "../synaptic-mistral", optional = true }
-synaptic-deepseek = { version = "0.2", path = "../synaptic-deepseek", optional = true }
-synaptic-huggingface = { version = "0.2", path = "../synaptic-huggingface", optional = true }
-synaptic-voyage = { version = "0.2", path = "../synaptic-voyage", optional = true }
-synaptic-nomic = { version = "0.2", path = "../synaptic-nomic", optional = true }
-synaptic-jina = { version = "0.2", path = "../synaptic-jina", optional = true }
-synaptic-weaviate = { version = "0.2", path = "../synaptic-weaviate", optional = true }
-synaptic-sqltoolkit = { version = "0.2", path = "../synaptic-sqltoolkit", optional = true }
-synaptic-e2b = { version = "0.2", path = "../synaptic-e2b", optional = true }
-synaptic-milvus = { version = "0.2", path = "../synaptic-milvus", optional = true }
-synaptic-opensearch = { version = "0.2", path = "../synaptic-opensearch", optional = true }
-synaptic-lancedb = { version = "0.2", path = "../synaptic-lancedb", optional = true }
-synaptic-confluence = { version = "0.2", path = "../synaptic-confluence", optional = true }
-synaptic-slack = { version = "0.2", path = "../synaptic-slack", optional = true }
-synaptic-langfuse = { version = "0.2", path = "../synaptic-langfuse", optional = true }
-synaptic-together = { version = "0.2", path = "../synaptic-together", optional = true }
-synaptic-fireworks = { version = "0.2", path = "../synaptic-fireworks", optional = true }
-synaptic-xai = { version = "0.2", path = "../synaptic-xai", optional = true }
-synaptic-perplexity = { version = "0.2", path = "../synaptic-perplexity", optional = true }
-synaptic-flashrank = { version = "0.2", path = "../synaptic-flashrank", optional = true }
-synaptic-lark = { version = "0.2", path = "../synaptic-lark", optional = true }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
+synaptic-models = { version = "0.3", path = "../synaptic-models", optional = true }
+synaptic-openai = { version = "0.3", path = "../synaptic-openai", optional = true }
+synaptic-anthropic = { version = "0.3", path = "../synaptic-anthropic", optional = true }
+synaptic-gemini = { version = "0.3", path = "../synaptic-gemini", optional = true }
+synaptic-ollama = { version = "0.3", path = "../synaptic-ollama", optional = true }
+synaptic-runnables = { version = "0.3", path = "../synaptic-runnables", optional = true }
+synaptic-prompts = { version = "0.3", path = "../synaptic-prompts", optional = true }
+synaptic-parsers = { version = "0.3", path = "../synaptic-parsers", optional = true }
+synaptic-tools = { version = "0.3", path = "../synaptic-tools", optional = true }
+synaptic-memory = { version = "0.3", path = "../synaptic-memory", optional = true }
+synaptic-callbacks = { version = "0.3", path = "../synaptic-callbacks", optional = true }
+synaptic-retrieval = { version = "0.3", path = "../synaptic-retrieval", optional = true }
+synaptic-loaders = { version = "0.3", path = "../synaptic-loaders", optional = true }
+synaptic-splitters = { version = "0.3", path = "../synaptic-splitters", optional = true }
+synaptic-embeddings = { version = "0.3", path = "../synaptic-embeddings", optional = true }
+synaptic-vectorstores = { version = "0.3", path = "../synaptic-vectorstores", optional = true }
+synaptic-graph = { version = "0.3", path = "../synaptic-graph", optional = true }
+synaptic-middleware = { version = "0.3", path = "../synaptic-middleware", optional = true }
+synaptic-store = { version = "0.3", path = "../synaptic-store", optional = true }
+synaptic-cache = { version = "0.3", path = "../synaptic-cache", optional = true }
+synaptic-eval = { version = "0.3", path = "../synaptic-eval", optional = true }
+synaptic-mcp = { version = "0.3", path = "../synaptic-mcp", optional = true }
+synaptic-macros = { version = "0.3", path = "../synaptic-macros", optional = true }
+synaptic-deep = { version = "0.3", path = "../synaptic-deep", optional = true }
+synaptic-condenser = { version = "0.3", path = "../synaptic-condenser", optional = true }
+synaptic-secrets = { version = "0.3", path = "../synaptic-secrets", optional = true }
+synaptic-config = { version = "0.3", path = "../synaptic-config", optional = true }
+synaptic-session = { version = "0.3", path = "../synaptic-session", optional = true }
+synaptic-qdrant = { version = "0.3", path = "../synaptic-qdrant", optional = true }
+synaptic-pgvector = { version = "0.3", path = "../synaptic-pgvector", optional = true }
+synaptic-redis = { version = "0.3", path = "../synaptic-redis", optional = true }
+synaptic-pdf = { version = "0.3", path = "../synaptic-pdf", optional = true }
+synaptic-bedrock = { version = "0.3", path = "../synaptic-bedrock", optional = true }
+synaptic-cohere = { version = "0.3", path = "../synaptic-cohere", optional = true }
+synaptic-pinecone = { version = "0.3", path = "../synaptic-pinecone", optional = true }
+synaptic-chroma = { version = "0.3", path = "../synaptic-chroma", optional = true }
+synaptic-mongodb = { version = "0.3", path = "../synaptic-mongodb", optional = true }
+synaptic-elasticsearch = { version = "0.3", path = "../synaptic-elasticsearch", optional = true }
+synaptic-sqlite = { version = "0.3", path = "../synaptic-sqlite", optional = true }
+synaptic-tavily = { version = "0.3", path = "../synaptic-tavily", optional = true }
+synaptic-groq = { version = "0.3", path = "../synaptic-groq", optional = true }
+synaptic-mistral = { version = "0.3", path = "../synaptic-mistral", optional = true }
+synaptic-deepseek = { version = "0.3", path = "../synaptic-deepseek", optional = true }
+synaptic-huggingface = { version = "0.3", path = "../synaptic-huggingface", optional = true }
+synaptic-voyage = { version = "0.3", path = "../synaptic-voyage", optional = true }
+synaptic-nomic = { version = "0.3", path = "../synaptic-nomic", optional = true }
+synaptic-jina = { version = "0.3", path = "../synaptic-jina", optional = true }
+synaptic-weaviate = { version = "0.3", path = "../synaptic-weaviate", optional = true }
+synaptic-sqltoolkit = { version = "0.3", path = "../synaptic-sqltoolkit", optional = true }
+synaptic-e2b = { version = "0.3", path = "../synaptic-e2b", optional = true }
+synaptic-milvus = { version = "0.3", path = "../synaptic-milvus", optional = true }
+synaptic-opensearch = { version = "0.3", path = "../synaptic-opensearch", optional = true }
+synaptic-lancedb = { version = "0.3", path = "../synaptic-lancedb", optional = true }
+synaptic-confluence = { version = "0.3", path = "../synaptic-confluence", optional = true }
+synaptic-slack = { version = "0.3", path = "../synaptic-slack", optional = true }
+synaptic-langfuse = { version = "0.3", path = "../synaptic-langfuse", optional = true }
+synaptic-together = { version = "0.3", path = "../synaptic-together", optional = true }
+synaptic-fireworks = { version = "0.3", path = "../synaptic-fireworks", optional = true }
+synaptic-xai = { version = "0.3", path = "../synaptic-xai", optional = true }
+synaptic-perplexity = { version = "0.3", path = "../synaptic-perplexity", optional = true }
+synaptic-flashrank = { version = "0.3", path = "../synaptic-flashrank", optional = true }
+synaptic-lark = { version = "0.3", path = "../synaptic-lark", optional = true }
 schemars = { workspace = true, optional = true }
 
 [features]
@@ -99,6 +103,12 @@ mcp = ["dep:synaptic-mcp"]
 macros = ["dep:synaptic-macros"]
 schemars = ["synaptic-macros/schemars", "synaptic-core/schemars", "dep:schemars"]
 deep = ["agent", "dep:synaptic-deep"]
+condenser = ["middleware", "dep:synaptic-condenser"]
+secrets = ["middleware", "dep:synaptic-secrets"]
+config = ["dep:synaptic-config"]
+session = ["graph", "memory", "store", "dep:synaptic-session"]
+store-filesystem = ["store", "synaptic-store/filesystem"]
+deep-config = ["deep", "config", "synaptic-deep/config-builder"]
 
 # Provider integrations (each pulls model-utils for Backend + wrappers)
 openai = ["model-utils", "dep:synaptic-openai"]
@@ -142,14 +152,15 @@ lark-bot = ["dep:synaptic-lark", "synaptic-lark/bot"]
 
 # Convenience combinations
 models = ["openai", "anthropic", "gemini", "ollama", "bedrock", "cohere", "groq", "mistral", "deepseek", "together", "fireworks", "xai", "perplexity"]
-agent = ["default", "openai", "model-utils", "graph", "memory", "middleware", "store"]
+agent = ["default", "openai", "model-utils", "graph", "memory", "middleware", "store", "condenser", "secrets", "config", "session"]
 rag = ["default", "openai", "embeddings", "retrieval", "loaders", "splitters", "vectorstores"]
 full = ["default", "agent", "rag", "cache", "eval", "mcp", "macros", "deep", "schemars",
         "models", "qdrant", "pgvector", "redis", "pdf",
         "pinecone", "chroma", "mongodb", "elasticsearch", "sqlite", "tavily",
         "huggingface", "voyage", "nomic", "jina", "weaviate", "sqltoolkit",
         "together", "fireworks", "xai", "perplexity", "e2b", "confluence", "slack",
-        "milvus", "opensearch", "lancedb", "flashrank", "lark"]
+        "milvus", "opensearch", "lancedb", "flashrank", "lark",
+        "store-filesystem", "deep-config"]
 
 [dev-dependencies]
 tokio.workspace = true

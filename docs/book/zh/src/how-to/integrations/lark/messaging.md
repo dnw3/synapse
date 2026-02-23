@@ -120,3 +120,126 @@ LarkLongConnListener::new(config)
     .run()
     .await?;
 ```
+
+---
+
+## 流式卡片输出
+
+对于 AI Agent 场景，一次性文本回复往往太慢——用户期望看到实时流式输出（打字机效果）。飞书通过 **CardKit 卡片实体** 支持此功能：创建卡片，将其作为消息发送，然后渐进式更新卡片内容，没有编辑次数限制。
+
+> **为什么用卡片而不是消息编辑？** 飞书对单条消息的编辑次数有隐性上限（约 20-30 次），而通过 CardKit 的卡片实体更新则没有此限制。
+
+### StreamingCardWriter
+
+`StreamingCardWriter` 管理完整的流式生命周期：创建卡片 → 发送/回复 → 节流更新 → 完成。
+
+```rust,ignore
+use synaptic::lark::{LarkConfig, LarkBotClient};
+use synaptic::lark::bot::StreamingCardOptions;
+
+let config = LarkConfig::new("cli_xxx", "secret_xxx");
+let client = LarkBotClient::new(config);
+
+// 开始流式卡片回复
+let opts = StreamingCardOptions::new().with_title("AI 回复");
+let writer = client.streaming_reply("om_原始消息ID", opts).await?;
+
+// 增量写入内容（更新间隔节流至约 500ms）
+writer.write("思考中").await?;
+writer.write("...").await?;
+writer.write("\n\n答案是：**42**").await?;
+
+// 完成 — 发送最后一次缓冲更新
+writer.finish().await?;
+```
+
+### 配置选项
+
+| 方法 | 默认值 | 说明 |
+|------|--------|------|
+| `with_title(s)` | `""` | 卡片标题（空字符串则不显示标题栏） |
+| `with_throttle(dur)` | 500ms | 卡片更新最小间隔 |
+
+### 发送 vs 回复
+
+```rust,ignore
+// 发送到群聊（新消息）
+let writer = client.streaming_send("chat_id", "oc_xxx", opts).await?;
+
+// 回复某条消息
+let writer = client.streaming_reply("om_xxx", opts).await?;
+```
+
+### 低级卡片 API
+
+对于高级用法，可以直接使用卡片 API：
+
+```rust,ignore
+use synaptic::lark::bot::{build_card_json, build_card_json_streaming};
+
+// ── 静态卡片（无打字机效果）────────────────────────────────────
+let card = build_card_json("标题", "初始内容");
+let card_id = client.create_card(&card).await?;
+
+// 全量卡片更新（递增序列号）
+let updated = build_card_json("标题", "更新后的内容");
+client.update_card(&card_id, 1, &updated).await?;
+
+// ── 流式卡片（打字机动画）──────────────────────────────────────
+let streaming_card = build_card_json_streaming("标题", "", true);
+let card_id = client.create_card(&streaming_card).await?;
+
+// 元素级内容流式更新——产生打字机效果
+// content 必须是完整的累积文本（不是增量 delta）。
+// 如果新文本是旧文本的前缀扩展，只有新增字符会产生动画效果。
+client.stream_card_content(&card_id, "streaming_content", "你好", 1).await?;
+client.stream_card_content(&card_id, "streaming_content", "你好世界", 2).await?;
+
+// 最终：全量卡片更新 + streaming_mode: false 停止 "生成中..." 指示器
+client.update_card(&card_id, 3, &build_card_json_streaming("标题", "你好世界！", false)).await?;
+```
+
+`StreamingCardWriter` 自动管理整个生命周期——以 `streaming_mode: true` 创建卡片，通过元素 API 流式输出内容，最终以 `streaming_mode: false` 结束。
+
+### Card JSON 2.0 结构
+
+卡片使用飞书 Card JSON 2.0 格式：
+
+```json
+{
+  "schema": "2.0",
+  "config": {
+    "update_multi": true,
+    "streaming_mode": true,
+    "streaming_config": {
+      "print_frequency_ms": { "default": 30 },
+      "print_step": { "default": 2 },
+      "print_strategy": "fast"
+    }
+  },
+  "header": {
+    "title": { "tag": "plain_text", "content": "AI 回复" }
+  },
+  "body": {
+    "elements": [
+      {
+        "tag": "markdown",
+        "content": "流式文本内容...",
+        "element_id": "streaming_content"
+      }
+    ]
+  }
+}
+```
+
+关键字段：
+- `update_multi: true` — 开启卡片无限次更新
+- `streaming_mode: true` — 启用客户端打字机动画；最终更新时设为 `false`
+- `streaming_config` — 控制动画速度：`print_frequency_ms`（打印间隔毫秒数）、`print_step`（每步字符数）、`print_strategy`（`"fast"` 或 `"delay"`）
+- `element_id` — 每个组件的唯一标识符，流式更新时必填
+- `body.elements[0].content` — 每次写入时更新的 Markdown 内容
+- `sequence` — 每张卡片严格递增的序列号（由 `StreamingCardWriter` 自动管理）
+
+### 流式 Bot 示例
+
+完整示例请参考 `examples/lark_streaming_bot/`。

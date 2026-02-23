@@ -55,9 +55,10 @@ use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use serde_json::json;
 use synaptic::graph::{
-    interrupt, CheckpointConfig, FnNode, MemorySaver,
+    interrupt, CheckpointConfig, FnNode, StoreCheckpointer,
     NodeOutput, State, StateGraph, END,
 };
+use synaptic::store::InMemoryStore;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct ReviewState {
@@ -88,7 +89,7 @@ let execute = FnNode::new(|mut state: ReviewState| async move {
     Ok(state.into())
 });
 
-let saver = Arc::new(MemorySaver::new());
+let saver = Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())));
 let graph = StateGraph::new()
     .add_node("propose", propose)
     .add_node("gate", gate)
@@ -127,7 +128,7 @@ assert!(result.into_state().done);
 
 ## Notes
 
-- **Checkpointer required.** Without one, state cannot be saved between interrupt and resume. `MemorySaver` works for development; implement `Checkpointer` for production.
+- **Checkpointer required.** Without one, state cannot be saved between interrupt and resume. `StoreCheckpointer` with `InMemoryStore` works for development; swap in a persistent `Store` or implement `Checkpointer` directly for production.
 - **State is not merged on interrupt.** When a node returns `interrupt()`, the node's state update is not applied -- only state from previously executed nodes is preserved.
 - **`Command::resume(value)`** passes a value to the graph on resumption, available via the command's `resume_value` field.
 - **State history.** Call `graph.get_state_history(&config)` to inspect all checkpoints for a thread.

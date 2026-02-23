@@ -14,9 +14,9 @@ homepage.workspace = true
 async-trait.workspace = true
 serde_json.workspace = true
 serde.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
 redis = { version = "1", features = ["tokio-comp", "aio"] }
-synaptic-graph = { version = "0.2", path = "../synaptic-graph", optional = true }
+synaptic-graph = { version = "0.3", path = "../synaptic-graph", optional = true }
 
 [dev-dependencies]
 tokio.workspace = true

@@ -97,13 +97,14 @@ println!("{}", result.messages.last().unwrap().content());
 传入一个 checkpointer 以跨调用持久化 Supervisor 的状态：
 
 ```rust,ignore
-use synaptic::graph::MemorySaver;
+use synaptic::graph::StoreCheckpointer;
+use synaptic::store::InMemoryStore;
 
 let supervisor = create_supervisor(
     model,
     agents,
     SupervisorOptions {
-        checkpointer: Some(Arc::new(MemorySaver::new())),
+        checkpointer: Some(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())))),
         ..Default::default()
     },
 )?;

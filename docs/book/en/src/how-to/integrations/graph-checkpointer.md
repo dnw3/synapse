@@ -1,6 +1,6 @@
 # Graph Checkpointers
 
-By default, `synaptic-graph` uses [`MemorySaver`], which stores graph state only in-process memory. This means state is lost when the process restarts — not suitable for production.
+By default, you can use [`StoreCheckpointer`] with an [`InMemoryStore`] backend, which stores graph state only in-process memory. This means state is lost when the process restarts — not suitable for production.
 
 Synaptic provides four persistent checkpointer backends:
 
@@ -287,7 +287,7 @@ println!("Total checkpoints: {}", all.len());
 
 | Checkpointer | Persistence | External Dep | TTL | Distributed |
 |---|---|---|---|---|
-| `MemorySaver` | No (in-process) | None | No | No |
+| `StoreCheckpointer` | No (in-process) | None | No | No |
 | `SqliteCheckpointer` | Yes (file) | None | No | No |
 | `RedisCheckpointer` | Yes | Redis | Yes | Yes |
 | `PgCheckpointer` | Yes | PostgreSQL | No | Yes |

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use synaptic_core::SynapticError;
-use synaptic_graph::{CheckpointConfig, MemorySaver, Node, State, StateGraph, END};
+use synaptic_graph::{CheckpointConfig, Node, State, StateGraph, StoreCheckpointer, END};
 
 /// Test state with a counter and visited log.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -38,7 +38,9 @@ impl Node<CounterState> for IncrementNode {
 
 #[tokio::test]
 async fn get_state_returns_none_for_empty_thread() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -55,7 +57,9 @@ async fn get_state_returns_none_for_empty_thread() {
 
 #[tokio::test]
 async fn get_state_returns_latest_state() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -80,7 +84,9 @@ async fn get_state_returns_latest_state() {
 
 #[tokio::test]
 async fn get_state_after_interrupt_before() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -124,7 +130,9 @@ async fn get_state_errors_without_checkpointer() {
 
 #[tokio::test]
 async fn get_state_history_returns_empty_for_new_thread() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -142,7 +150,9 @@ async fn get_state_history_returns_empty_for_new_thread() {
 
 #[tokio::test]
 async fn get_state_history_returns_all_checkpoints() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -198,7 +208,9 @@ async fn get_state_history_errors_without_checkpointer() {
 
 #[tokio::test]
 async fn get_state_history_with_interrupt_shows_partial() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })

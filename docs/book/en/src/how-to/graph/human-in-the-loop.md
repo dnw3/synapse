@@ -19,7 +19,8 @@ The `StateGraph` builder provides two interrupt modes:
 A common pattern is to interrupt before a tool execution node so a human can review the tool calls the agent proposed:
 
 ```rust
-use synaptic::graph::{StateGraph, FnNode, MessageState, MemorySaver, CheckpointConfig, END};
+use synaptic::graph::{StateGraph, FnNode, MessageState, StoreCheckpointer, CheckpointConfig, END};
+use synaptic::store::InMemoryStore;
 use synaptic::core::Message;
 use std::sync::Arc;
 
@@ -42,7 +43,7 @@ let graph = StateGraph::new()
     // Pause before the tools node executes
     .interrupt_before(vec!["tools".to_string()])
     .compile()?
-    .with_checkpointer(Arc::new(MemorySaver::new()));
+    .with_checkpointer(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new()))));
 
 let config = CheckpointConfig::new("thread-1");
 let initial = MessageState::with_messages(vec![Message::human("Delete old logs")]);
@@ -180,7 +181,7 @@ let graph = StateGraph::new()
     // Interrupt after the agent node runs (to review its output)
     .interrupt_after(vec!["agent".to_string()])
     .compile()?
-    .with_checkpointer(Arc::new(MemorySaver::new()));
+    .with_checkpointer(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new()))));
 ```
 
 ## `GraphResult`

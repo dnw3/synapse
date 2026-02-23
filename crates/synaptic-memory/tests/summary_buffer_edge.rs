@@ -1,7 +1,13 @@
 use std::sync::Arc;
 
 use synaptic_core::{ChatResponse, MemoryStore, Message};
-use synaptic_memory::{ConversationSummaryBufferMemory, InMemoryStore};
+use synaptic_memory::{ChatMessageHistory, ConversationSummaryBufferMemory};
+
+fn new_store() -> Arc<ChatMessageHistory> {
+    Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )))
+}
 use synaptic_models::ScriptedChatModel;
 
 fn summary_response(text: &str) -> ChatResponse {
@@ -15,7 +21,7 @@ fn summary_response(text: &str) -> ChatResponse {
 async fn below_threshold_no_summary() {
     // Very high limit so no summarization
     let model = Arc::new(ScriptedChatModel::new(vec![]));
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let memory = ConversationSummaryBufferMemory::new(store, model, 10_000);
 
     memory.append("s1", Message::human("hi")).await.unwrap();
@@ -34,7 +40,7 @@ async fn above_threshold_calls_model() {
         summary_response("Extended summary."),
         summary_response("More summary."),
     ]));
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     // Very low limit to force summarization
     let memory = ConversationSummaryBufferMemory::new(store, model, 3);
 
@@ -55,7 +61,7 @@ async fn clear_resets_everything() {
         summary_response("A summary."),
         summary_response("More."),
     ]));
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let memory = ConversationSummaryBufferMemory::new(store, model, 3);
 
     memory.append("s1", Message::human("a")).await.unwrap();
@@ -70,7 +76,7 @@ async fn clear_resets_everything() {
 #[tokio::test]
 async fn multiple_sessions_isolated() {
     let model = Arc::new(ScriptedChatModel::new(vec![]));
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let memory = ConversationSummaryBufferMemory::new(store, model, 10_000);
 
     memory
@@ -93,7 +99,7 @@ async fn multiple_sessions_isolated() {
 #[tokio::test]
 async fn single_message_no_crash() {
     let model = Arc::new(ScriptedChatModel::new(vec![]));
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let memory = ConversationSummaryBufferMemory::new(store, model, 10_000);
 
     memory

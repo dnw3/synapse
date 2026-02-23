@@ -110,7 +110,7 @@ use synaptic::runnables::{Runnable, BoxRunnable, RunnableLambda};
 use synaptic::prompts::ChatPromptTemplate;
 use synaptic::parsers::StrOutputParser;
 use synaptic::tools::ToolRegistry;
-use synaptic::memory::InMemoryStore;
+use synaptic::memory::ChatMessageHistory;
 use synaptic::graph::{StateGraph, create_react_agent};
 use synaptic::retrieval::Retriever;
 use synaptic::vectorstores::InMemoryVectorStore;

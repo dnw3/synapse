@@ -1,8 +1,9 @@
-use synaptic_graph::{Checkpoint, CheckpointConfig, Checkpointer, MemorySaver};
+use std::sync::Arc;
+use synaptic_graph::{Checkpoint, CheckpointConfig, Checkpointer, StoreCheckpointer};
 
 #[tokio::test]
 async fn memory_saver_put_get() {
-    let saver = MemorySaver::new();
+    let saver = StoreCheckpointer::new(Arc::new(synaptic_store::InMemoryStore::new()));
     let config = CheckpointConfig::new("thread-1");
 
     let cp = Checkpoint::new(
@@ -22,7 +23,7 @@ async fn memory_saver_put_get() {
 
 #[tokio::test]
 async fn memory_saver_list() {
-    let saver = MemorySaver::new();
+    let saver = StoreCheckpointer::new(Arc::new(synaptic_store::InMemoryStore::new()));
     let config = CheckpointConfig::new("thread-2");
 
     for i in 0..3 {
@@ -41,7 +42,7 @@ async fn memory_saver_list() {
 
 #[tokio::test]
 async fn memory_saver_returns_latest() {
-    let saver = MemorySaver::new();
+    let saver = StoreCheckpointer::new(Arc::new(synaptic_store::InMemoryStore::new()));
     let config = CheckpointConfig::new("thread-3");
 
     let cp1 = Checkpoint::new(serde_json::json!({"v": 1}), Some("a".to_string()));
@@ -57,7 +58,7 @@ async fn memory_saver_returns_latest() {
 
 #[tokio::test]
 async fn memory_saver_empty_thread() {
-    let saver = MemorySaver::new();
+    let saver = StoreCheckpointer::new(Arc::new(synaptic_store::InMemoryStore::new()));
     let config = CheckpointConfig::new("nonexistent");
 
     let result = saver.get(&config).await.unwrap();
@@ -80,7 +81,7 @@ async fn checkpoint_with_metadata() {
 
 #[tokio::test]
 async fn get_by_checkpoint_id() {
-    let saver = MemorySaver::new();
+    let saver = StoreCheckpointer::new(Arc::new(synaptic_store::InMemoryStore::new()));
     let config = CheckpointConfig::new("thread-travel");
 
     // Save two checkpoints

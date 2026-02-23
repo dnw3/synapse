@@ -174,6 +174,14 @@
 - [Macros](how-to/macros.md)
     - [Middleware Macros](how-to/macros-middleware.md)
     - [Macro Examples](how-to/macros-examples.md)
+- [Context Condensation](how-to/condenser.md)
+- [Token Counting & Budget](how-to/token-budget.md)
+- [Security Analysis](how-to/security.md)
+- [Secret Management](how-to/secrets.md)
+- [Tool Filtering](how-to/tool-filter.md)
+- [Configuration](how-to/config.md)
+- [Session Management](how-to/session.md)
+- [File Persistence](how-to/persistence.md)
 
 # Concepts
 
@@ -187,6 +195,7 @@
 - [Streaming](concepts/streaming.md)
 - [Middleware](concepts/middleware.md)
 - [Key-Value Store](concepts/store.md)
+- [Session, Memory & Store](concepts/session-memory-store.md)
 - [Integrations](concepts/integrations.md)
 - [Error Handling](concepts/errors.md)
 

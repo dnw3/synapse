@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use synaptic_core::SynapticError;
 use synaptic_graph::{
-    CheckpointConfig, Checkpointer, MemorySaver, Node, NodeOutput, State, StateGraph, END,
+    CheckpointConfig, Checkpointer, Node, NodeOutput, State, StateGraph, StoreCheckpointer, END,
 };
 
 /// A simple test state with a counter and a log of visited nodes.
@@ -112,7 +112,9 @@ async fn conditional_routing() {
 
 #[tokio::test]
 async fn interrupt_before_stops_execution() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -147,7 +149,9 @@ async fn interrupt_before_stops_execution() {
 
 #[tokio::test]
 async fn interrupt_after_stops_execution() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -177,7 +181,9 @@ async fn interrupt_after_stops_execution() {
 
 #[tokio::test]
 async fn resume_from_checkpoint() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -224,7 +230,9 @@ async fn resume_from_checkpoint() {
 
 #[tokio::test]
 async fn update_state_modifies_checkpoint() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })

@@ -1,7 +1,13 @@
 use std::sync::Arc;
 
 use synaptic_core::{ChatResponse, MemoryStore, Message};
-use synaptic_memory::{ConversationSummaryMemory, InMemoryStore};
+use synaptic_memory::{ChatMessageHistory, ConversationSummaryMemory};
+
+fn new_store() -> Arc<ChatMessageHistory> {
+    Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )))
+}
 use synaptic_models::ScriptedChatModel;
 
 #[tokio::test]
@@ -12,7 +18,7 @@ async fn summary_keeps_recent_messages() {
         usage: None,
     }]));
 
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let summary = ConversationSummaryMemory::new(store, model, 4);
 
     // Add messages under the threshold (buffer_size * 2 = 8)
@@ -39,7 +45,7 @@ async fn summary_generates_summary_on_overflow() {
         usage: None,
     }]));
 
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     // buffer_size=2, so summarization triggers at > 4 messages
     let summary = ConversationSummaryMemory::new(store, model, 2);
 

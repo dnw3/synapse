@@ -76,7 +76,7 @@ use synaptic::parsers::{StrOutputParser, JsonOutputParser, StructuredOutputParse
 // Graph
 use synaptic::graph::{StateGraph, CompiledGraph, MessageState, ToolNode};
 use synaptic::graph::{create_react_agent, StreamMode, GraphEvent};
-use synaptic::graph::MemorySaver;
+use synaptic::graph::StoreCheckpointer;
 
 // Retrieval
 use synaptic::retrieval::{Retriever, InMemoryRetriever, BM25Retriever};

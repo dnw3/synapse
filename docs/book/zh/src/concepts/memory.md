@@ -22,29 +22,35 @@ pub trait MemoryStore: Send + Sync {
 
 `session_id` 参数是 Synaptic 记忆设计的核心。具有不同 session ID 的两个对话是完全隔离的，即使它们共享相同的记忆存储实例。这使得多租户应用成为可能，多个用户可以通过同一个系统并发交互。
 
-## InMemoryStore
+## ChatMessageHistory
 
-最简单的实现——一个包装在 `Arc<RwLock<_>>` 中的 `HashMap<String, Vec<Message>>`：
-
-```rust
-use synaptic::memory::InMemoryStore;
-
-let store = InMemoryStore::new();
-store.append("session_1", Message::human("Hello")).await?;
-let history = store.load("session_1").await?;
-```
-
-`InMemoryStore` 速度快，不需要外部依赖，适用于开发、测试和短生命周期的应用。进程退出时数据会丢失。
-
-## FileChatMessageHistory
-
-一个持久化存储，将消息写入磁盘上的 JSON 文件。每个会话存储为单独的文件。适用于需要持久化但不需要数据库的应用：
+`ChatMessageHistory` 是标准的 `MemoryStore` 实现。它以任意 `Store` 作为后端——存储后端是可插拔的，因此你可以在内存、文件或自定义存储之间切换，而无需更改记忆代码：
 
 ```rust
-use synaptic::memory::FileChatMessageHistory;
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 
-let history = FileChatMessageHistory::new("./chat_history")?;
+let store = Arc::new(InMemoryStore::new());
+let memory = ChatMessageHistory::new(store);
+memory.append("session_1", Message::human("Hello")).await?;
+let history = memory.load("session_1").await?;
 ```
+
+以 `InMemoryStore` 为后端的 `ChatMessageHistory` 速度快，不需要外部依赖，适用于开发、测试和短生命周期的应用。进程退出时数据会丢失。
+
+如需持久化，可将 `InMemoryStore` 替换为 `FileStore`：
+
+```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::FileStore;
+
+let store = Arc::new(FileStore::new("./chat_history"));
+let memory = ChatMessageHistory::new(store);
+```
+
+`FileStore` 将数据写入磁盘，因此对话历史在进程重启后仍然保留。你的其余代码完全不需要改动——只有 store 构造函数发生了变化。
 
 ## 记忆策略
 
@@ -63,9 +69,14 @@ let history = FileChatMessageHistory::new("./chat_history")?;
 只保留最近的 K 对消息（人类 + AI）。更早的消息会被丢弃：
 
 ```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::memory::ConversationWindowMemory;
 
-let memory = ConversationWindowMemory::new(store, 5); // keep last 5 exchanges
+let store = Arc::new(InMemoryStore::new());
+let history = ChatMessageHistory::new(store);
+let memory = ConversationWindowMemory::new(history, 5); // keep last 5 exchanges
 ```
 
 - **优势**：固定且可预测的 token 使用量。
@@ -77,9 +88,14 @@ let memory = ConversationWindowMemory::new(store, 5); // keep last 5 exchanges
 使用 LLM 对旧消息进行摘要，只保留摘要加上近期消息：
 
 ```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::memory::ConversationSummaryMemory;
 
-let memory = ConversationSummaryMemory::new(store, summarizer_model);
+let store = Arc::new(InMemoryStore::new());
+let history = ChatMessageHistory::new(store);
+let memory = ConversationSummaryMemory::new(history, summarizer_model);
 ```
 
 每次交互后，该策略使用 LLM 生成对话的滚动摘要。摘要替代了旧消息，因此发送给主模型的上下文包含摘要加上近期消息。
@@ -93,9 +109,14 @@ let memory = ConversationSummaryMemory::new(store, summarizer_model);
 在 token 预算内保留尽可能多的近期消息：
 
 ```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::memory::ConversationTokenBufferMemory;
 
-let memory = ConversationTokenBufferMemory::new(store, 4096); // max 4096 tokens
+let store = Arc::new(InMemoryStore::new());
+let history = ChatMessageHistory::new(store);
+let memory = ConversationTokenBufferMemory::new(history, 4096); // max 4096 tokens
 ```
 
 与窗口记忆（按消息数量计算）不同，token 缓冲记忆按 token 数量计算。当消息长度差异较大时，这种方式更精确。
@@ -109,9 +130,14 @@ let memory = ConversationTokenBufferMemory::new(store, 4096); // max 4096 tokens
 一种混合策略：对旧消息进行摘要并保留近期消息，通过 token 阈值控制边界：
 
 ```rust
+use std::sync::Arc;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::memory::ConversationSummaryBufferMemory;
 
-let memory = ConversationSummaryBufferMemory::new(store, model, 2000);
+let store = Arc::new(InMemoryStore::new());
+let history = ChatMessageHistory::new(store);
+let memory = ConversationSummaryBufferMemory::new(history, model, 2000);
 // Summarize when recent messages exceed 2000 tokens
 ```
 
@@ -160,7 +186,7 @@ let chain_with_memory = RunnableWithMessageHistory::new(
 
 一个关键的设计特性：记忆始终以会话为范围。`session_id` 只是一个字符串——它可以是用户 ID、对话 ID、线程 ID，或者对你的应用有意义的任何其他标识符。
 
-共享同一个 `InMemoryStore`（或任何其他存储）的不同会话是完全独立的。向会话 "alice" 追加消息永远不会影响会话 "bob"。这使得在为多个用户提供服务的整个应用中使用单个存储实例是安全的。
+共享同一个 `ChatMessageHistory`（或任何其他存储）的不同会话是完全独立的。向会话 "alice" 追加消息永远不会影响会话 "bob"。这使得在为多个用户提供服务的整个应用中使用单个存储实例是安全的。
 
 ## 参见
 

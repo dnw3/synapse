@@ -18,5 +18,5 @@ otel = ["dep:opentelemetry"]
 async-trait.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
 opentelemetry = { version = "0.27", optional = true, features = ["trace"] }

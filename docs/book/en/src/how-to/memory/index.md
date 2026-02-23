@@ -21,15 +21,17 @@ pub trait MemoryStore: Send + Sync {
 
 Every operation is keyed by a `session_id` string, which isolates conversations from one another. You choose the session key (a user ID, a thread ID, a UUID -- whatever makes sense for your application).
 
-## `InMemoryStore`
+## `ChatMessageHistory`
 
-The simplest `MemoryStore` implementation is `InMemoryStore`, which stores messages in a `HashMap` protected by an `Arc<RwLock<_>>`:
+The simplest `MemoryStore` implementation is `ChatMessageHistory`, which wraps any `Store` backend and stores messages per session:
 
 ```rust
-use synaptic::memory::InMemoryStore;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 use synaptic::core::{MemoryStore, Message};
+use std::sync::Arc;
 
-let store = InMemoryStore::new();
+let store = ChatMessageHistory::new(Arc::new(InMemoryStore::new()));
 
 store.append("session-1", Message::human("Hello")).await?;
 store.append("session-1", Message::ai("Hi there!")).await?;
@@ -42,7 +44,7 @@ let other = store.load("session-2").await?;
 assert!(other.is_empty());
 ```
 
-`InMemoryStore` is often used as the backing store for the higher-level memory strategies described below.
+`ChatMessageHistory` is often used as the backing store for the higher-level memory strategies described below.
 
 ## Memory Strategies
 

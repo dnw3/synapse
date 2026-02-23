@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use synaptic_core::SynapticError;
 use synaptic_graph::{
-    interrupt, CheckpointConfig, Command, MemorySaver, Node, NodeOutput, State, StateGraph, END,
+    interrupt, CheckpointConfig, Command, Node, NodeOutput, State, StateGraph, StoreCheckpointer,
+    END,
 };
 
 /// Test state with a counter and visited log.
@@ -64,7 +65,9 @@ impl Node<CounterState> for InterruptNode {
 
 #[tokio::test]
 async fn interrupt_pauses_graph() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -109,7 +112,9 @@ async fn interrupt_pauses_graph() {
 
 #[tokio::test]
 async fn interrupt_requires_checkpointer_for_resume() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
@@ -167,7 +172,9 @@ async fn graph_result_complete_api() {
 
 #[tokio::test]
 async fn graph_result_interrupted_api() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })

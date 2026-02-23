@@ -15,8 +15,8 @@ async-trait.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
-synaptic-retrieval = { version = "0.2", path = "../synaptic-retrieval", optional = true }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
+synaptic-retrieval = { version = "0.3", path = "../synaptic-retrieval", optional = true }
 
 [features]
 default = []

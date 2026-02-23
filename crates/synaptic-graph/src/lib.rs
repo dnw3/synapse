@@ -7,11 +7,12 @@ mod node;
 mod prebuilt;
 mod send;
 mod state;
+mod store_checkpointer;
 mod tool_node;
 mod visualization;
 
 pub use builder::StateGraph;
-pub use checkpoint::{Checkpoint, CheckpointConfig, Checkpointer, MemorySaver};
+pub use checkpoint::{Checkpoint, CheckpointConfig, Checkpointer};
 pub use command::{interrupt, Command, CommandGoto, GraphResult, Interrupt, NodeOutput};
 pub use compiled::{
     CachePolicy, CompiledGraph, GraphEvent, GraphStream, MultiGraphEvent, MultiGraphStream,
@@ -26,6 +27,7 @@ pub use prebuilt::{
 };
 pub use send::Send;
 pub use state::{MessageState, State};
+pub use store_checkpointer::StoreCheckpointer;
 pub use tool_node::{tools_condition, ToolNode};
 
 /// Sentinel name for the graph start point.

@@ -18,6 +18,8 @@
 //! ```
 
 pub mod backend;
+#[cfg(feature = "config-builder")]
+pub mod builder;
 pub mod middleware;
 pub mod tools;
 
@@ -30,6 +32,9 @@ use synaptic_middleware::AgentMiddleware;
 
 use backend::Backend;
 pub use middleware::subagent::SubAgentDef;
+
+#[cfg(feature = "config-builder")]
+pub use builder::build_agent_from_config;
 
 /// Configuration for [`create_deep_agent`].
 pub struct DeepAgentOptions {

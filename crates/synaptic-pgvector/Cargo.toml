@@ -13,11 +13,11 @@ homepage.workspace = true
 [dependencies]
 async-trait.workspace = true
 serde_json.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "json", "uuid"] }
 uuid = { version = "1", features = ["v4"] }
 pgvector = { version = "0.4", features = ["sqlx"] }
-synaptic-graph = { version = "0.2", path = "../synaptic-graph", optional = true }
+synaptic-graph = { version = "0.3", path = "../synaptic-graph", optional = true }
 
 [dev-dependencies]
 tokio.workspace = true

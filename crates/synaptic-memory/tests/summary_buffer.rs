@@ -1,13 +1,19 @@
 use std::sync::Arc;
 
 use synaptic_core::{ChatResponse, MemoryStore, Message};
-use synaptic_memory::{ConversationSummaryBufferMemory, InMemoryStore};
+use synaptic_memory::{ChatMessageHistory, ConversationSummaryBufferMemory};
+
+fn new_store() -> Arc<ChatMessageHistory> {
+    Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )))
+}
 use synaptic_models::ScriptedChatModel;
 
 #[tokio::test]
 async fn under_limit_no_summary() {
     let model = Arc::new(ScriptedChatModel::new(vec![]));
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     // max_token_limit high enough that no summarization happens
     let memory = ConversationSummaryBufferMemory::new(store, model, 1000);
 
@@ -38,7 +44,7 @@ async fn over_limit_triggers_summary() {
         },
     ]));
 
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     // Very low token limit to trigger summarization quickly
     let memory = ConversationSummaryBufferMemory::new(store, model, 5);
 
@@ -79,7 +85,7 @@ async fn preserves_recent_messages() {
         },
     ]));
 
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let memory = ConversationSummaryBufferMemory::new(store, model, 5);
 
     memory.append("s1", Message::human("msg1")).await.unwrap();
@@ -111,7 +117,7 @@ async fn clear_removes_summary() {
         },
     ]));
 
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let memory = ConversationSummaryBufferMemory::new(store, model, 5);
 
     memory.append("s1", Message::human("a")).await.unwrap();

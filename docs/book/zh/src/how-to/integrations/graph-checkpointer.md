@@ -1,6 +1,6 @@
 # 图持久化检查点
 
-默认情况下，`synaptic-graph` 使用 [`MemorySaver`]，将图状态存储在进程内存中。这意味着进程重启后状态会丢失——不适合生产环境。
+默认情况下，可以使用 [`StoreCheckpointer`] 搭配 [`InMemoryStore`] 后端，将图状态存储在进程内存中。这意味着进程重启后状态会丢失——不适合生产环境。
 
 Synaptic 提供四种持久化检查点后端：
 
@@ -287,7 +287,7 @@ println!("总检查点数：{}", all.len());
 
 | 检查点 | 持久化 | 外部依赖 | TTL | 分布式 |
 |--------|--------|----------|-----|--------|
-| `MemorySaver` | 否（进程内存） | 无 | 否 | 否 |
+| `StoreCheckpointer` | 否（进程内存） | 无 | 否 | 否 |
 | `SqliteCheckpointer` | 是（文件） | 无 | 否 | 否 |
 | `RedisCheckpointer` | 是 | Redis | 是 | 是 |
 | `PgCheckpointer` | 是 | PostgreSQL | 否 | 是 |

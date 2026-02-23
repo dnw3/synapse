@@ -25,7 +25,7 @@ Each crate implements one core trait or provides a focused capability:
 | `synaptic-gemini` | `GeminiChatModel` |
 | `synaptic-ollama` | `OllamaChatModel` + `OllamaEmbeddings` |
 | `synaptic-tools` | `ToolRegistry`, `SerialToolExecutor`, `ParallelToolExecutor` |
-| `synaptic-memory` | Memory strategies: buffer, window, summary, token buffer, summary buffer, `RunnableWithMessageHistory` |
+| `synaptic-memory` | Memory strategies: buffer, window, summary, token buffer, summary buffer, `ChatMessageHistory`, `RunnableWithMessageHistory` |
 | `synaptic-callbacks` | `RecordingCallback`, `TracingCallback`, `CompositeCallback` |
 | `synaptic-prompts` | `PromptTemplate`, `ChatPromptTemplate`, `FewShotChatMessagePromptTemplate` |
 | `synaptic-parsers` | Output parsers: string, JSON, structured, list, enum, boolean, XML, markdown list, numbered list |
@@ -38,7 +38,7 @@ These crates provide higher-level orchestration:
 | Crate | Purpose |
 |---|---|
 | `synaptic-runnables` | `Runnable` trait with `invoke()`/`batch()`/`stream()`, `BoxRunnable` with pipe operator, `RunnableLambda`, `RunnableParallel`, `RunnableBranch`, `RunnableAssign`, `RunnablePick`, `RunnableWithFallbacks` |
-| `synaptic-graph` | LangGraph-style state machines: `StateGraph`, `CompiledGraph`, `ToolNode`, `create_react_agent`, `create_supervisor`, `create_swarm`, `Command`, `GraphResult`, `Checkpointer`, `MemorySaver`, multi-mode streaming |
+| `synaptic-graph` | LangGraph-style state machines: `StateGraph`, `CompiledGraph`, `ToolNode`, `create_react_agent`, `create_supervisor`, `create_swarm`, `Command`, `GraphResult`, `Checkpointer`, `StoreCheckpointer`, multi-mode streaming |
 
 ### Retrieval Pipeline
 

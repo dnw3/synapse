@@ -100,10 +100,11 @@ while let Some(result) = stream.next().await {
 你可以使用 `stream_with_config()` 将流式处理与检查点结合：
 
 ```rust
-use synaptic::graph::{MemorySaver, CheckpointConfig, StreamMode};
+use synaptic::graph::{StoreCheckpointer, CheckpointConfig, StreamMode};
+use synaptic::store::InMemoryStore;
 use std::sync::Arc;
 
-let checkpointer = Arc::new(MemorySaver::new());
+let checkpointer = Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())));
 let graph = graph.with_checkpointer(checkpointer);
 
 let config = CheckpointConfig::new("thread-1");

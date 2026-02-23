@@ -1,6 +1,6 @@
 # Checkpointing
 
-Checkpointing persists graph state between invocations, enabling resumable execution, multi-turn conversations over a graph, and human-in-the-loop workflows. The `Checkpointer` trait abstracts the storage backend, and `MemorySaver` provides an in-memory implementation for development and testing.
+Checkpointing persists graph state between invocations, enabling resumable execution, multi-turn conversations over a graph, and human-in-the-loop workflows. The `Checkpointer` trait abstracts the storage backend, and `StoreCheckpointer` provides an implementation backed by any `Store` for development and testing.
 
 ## The `Checkpointer` Trait
 
@@ -22,25 +22,27 @@ pub struct Checkpoint {
 }
 ```
 
-## `MemorySaver`
+## `StoreCheckpointer`
 
-`MemorySaver` is the built-in in-memory checkpointer. It stores checkpoints in a `HashMap` keyed by thread ID:
+`StoreCheckpointer` with an `InMemoryStore` backend is the simplest in-memory checkpointer. It stores checkpoints in any `Store` backend, organized by namespace `["checkpoints", thread_id]`:
 
 ```rust
-use synaptic::graph::MemorySaver;
+use synaptic::graph::StoreCheckpointer;
+use synaptic::store::InMemoryStore;
 use std::sync::Arc;
 
-let checkpointer = Arc::new(MemorySaver::new());
+let checkpointer = Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())));
 ```
 
-For production use, you would implement `Checkpointer` with a persistent backend (database, Redis, file system, etc.).
+For production use, you can swap in any `Store` implementation (Redis, database, file system, etc.) or implement the `Checkpointer` trait directly.
 
 ## Attaching a Checkpointer
 
 After compiling a graph, attach a checkpointer with `.with_checkpointer()`:
 
 ```rust
-use synaptic::graph::{StateGraph, FnNode, MessageState, MemorySaver, END};
+use synaptic::graph::{StateGraph, FnNode, MessageState, StoreCheckpointer, END};
+use synaptic::store::InMemoryStore;
 use synaptic::core::Message;
 use std::sync::Arc;
 
@@ -54,7 +56,7 @@ let graph = StateGraph::new()
     .set_entry_point("process")
     .add_edge("process", END)
     .compile()?
-    .with_checkpointer(Arc::new(MemorySaver::new()));
+    .with_checkpointer(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new()))));
 ```
 
 ## `CheckpointConfig`

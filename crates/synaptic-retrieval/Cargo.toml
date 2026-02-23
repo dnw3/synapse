@@ -14,9 +14,9 @@ homepage.workspace = true
 async-trait.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
-synaptic-embeddings = { version = "0.2", path = "../synaptic-embeddings" }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
+synaptic-embeddings = { version = "0.3", path = "../synaptic-embeddings" }
 
 [dev-dependencies]
 tokio.workspace = true
-synaptic-models = { version = "0.2", path = "../synaptic-models" }
+synaptic-models = { version = "0.3", path = "../synaptic-models" }

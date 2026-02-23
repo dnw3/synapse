@@ -1,0 +1,22 @@
+[package]
+name = "synaptic-secrets"
+description = "Secret management and output masking for the Synaptic AI agent framework"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+readme.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+regex.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
+synaptic-middleware = { version = "0.3", path = "../synaptic-middleware" }
+
+[dev-dependencies]
+tokio.workspace = true

@@ -156,8 +156,12 @@ This loop continues until the LLM decides it has enough information to answer di
 The `create_react_agent_with_options()` function accepts a `ReactAgentOptions` struct for advanced configuration:
 
 ```rust
+use synaptic::graph::StoreCheckpointer;
+use synaptic::store::InMemoryStore;
+use std::sync::Arc;
+
 let options = ReactAgentOptions {
-    checkpointer: Some(Arc::new(MemorySaver::new())),
+    checkpointer: Some(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())))),
     system_prompt: Some("You are a helpful weather assistant.".into()),
     interrupt_before: vec!["tools".into()],
     interrupt_after: vec![],

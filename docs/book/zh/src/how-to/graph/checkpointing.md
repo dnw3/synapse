@@ -1,6 +1,6 @@
 # 检查点
 
-检查点在调用之间持久化图的状态，支持可恢复执行、基于图的多轮对话以及人机交互工作流。`Checkpointer` trait 抽象了存储后端，`MemorySaver` 提供了用于开发和测试的内存实现。
+检查点在调用之间持久化图的状态，支持可恢复执行、基于图的多轮对话以及人机交互工作流。`Checkpointer` trait 抽象了存储后端，`StoreCheckpointer` 提供了基于统一 Store 的实现。
 
 ## `Checkpointer` Trait
 
@@ -22,25 +22,27 @@ pub struct Checkpoint {
 }
 ```
 
-## `MemorySaver`
+## `StoreCheckpointer`
 
-`MemorySaver` 是内置的内存检查点器。它将检查点存储在以线程 ID 为键的 `HashMap` 中：
+`StoreCheckpointer` 是基于统一 `Store` 后端的检查点器。传入 `InMemoryStore` 适用于开发和测试，传入 `FileStore` 或其他持久化 Store 实现则可用于生产环境：
 
 ```rust
-use synaptic::graph::MemorySaver;
+use synaptic::graph::StoreCheckpointer;
+use synaptic::store::InMemoryStore;
 use std::sync::Arc;
 
-let checkpointer = Arc::new(MemorySaver::new());
+let checkpointer = Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())));
 ```
 
-在生产环境中，你应该使用持久化后端（数据库、Redis、文件系统等）来实现 `Checkpointer`。
+在生产环境中，你可以传入持久化的 Store 实现（如 `FileStore`、Redis 等）来实现持久化检查点。
 
 ## 附加 Checkpointer
 
 编译图之后，使用 `.with_checkpointer()` 附加检查点器：
 
 ```rust
-use synaptic::graph::{StateGraph, FnNode, MessageState, MemorySaver, END};
+use synaptic::graph::{StateGraph, FnNode, MessageState, StoreCheckpointer, END};
+use synaptic::store::InMemoryStore;
 use synaptic::core::Message;
 use std::sync::Arc;
 
@@ -54,7 +56,7 @@ let graph = StateGraph::new()
     .set_entry_point("process")
     .add_edge("process", END)
     .compile()?
-    .with_checkpointer(Arc::new(MemorySaver::new()));
+    .with_checkpointer(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new()))));
 ```
 
 ## `CheckpointConfig`

@@ -144,6 +144,22 @@ pub use synaptic_macros::*;
 #[cfg(feature = "deep")]
 pub use synaptic_deep as deep;
 
+/// Context condensation strategies: Rolling, LLM summarizing, token budget, pipeline.
+#[cfg(feature = "condenser")]
+pub use synaptic_condenser as condenser;
+
+/// Secret management: SecretRegistry, SecretMaskingMiddleware.
+#[cfg(feature = "secrets")]
+pub use synaptic_secrets as secrets;
+
+/// TOML configuration: SynapticAgentConfig, ModelConfig, McpServerConfig.
+#[cfg(feature = "config")]
+pub use synaptic_config as config;
+
+/// Session lifecycle: SessionManager, SessionInfo.
+#[cfg(feature = "session")]
+pub use synaptic_session as session;
+
 /// Qdrant vector store integration.
 #[cfg(feature = "qdrant")]
 pub use synaptic_qdrant as qdrant;

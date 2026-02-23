@@ -213,6 +213,11 @@ impl Store for InMemoryStore {
     }
 }
 
+#[cfg(feature = "filesystem")]
+mod file_store;
+#[cfg(feature = "filesystem")]
+pub use file_store::FileStore;
+
 #[cfg(test)]
 mod tests {
     use super::*;

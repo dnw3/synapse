@@ -217,13 +217,14 @@ for (state, next_node) in &history {
 
 ```rust
 use std::sync::Arc;
-use synaptic::graph::MemorySaver;
+use synaptic::graph::StoreCheckpointer;
+use synaptic::store::InMemoryStore;
 
-let checkpointer = Arc::new(MemorySaver::new());
+let checkpointer = Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())));
 let compiled = graph.compile()?.with_checkpointer(checkpointer);
 ```
 
-`MemorySaver` 是内存中的 `Checkpointer` 实现，适用于开发和测试。每个检查点（`Checkpoint`）包含：
+`StoreCheckpointer` 是基于 `Store` 的 `Checkpointer` 实现，使用 `InMemoryStore` 适用于开发和测试。每个检查点（`Checkpoint`）包含：
 - 序列化的状态数据
 - 下一个待执行节点的名称
 
@@ -243,7 +244,7 @@ let graph = StateGraph::<MessageState>::new()
     // 在执行工具前暂停，等待人工确认
     .interrupt_before(vec!["tools".to_string()]);
 
-let compiled = graph.compile()?.with_checkpointer(Arc::new(MemorySaver::new()));
+let compiled = graph.compile()?.with_checkpointer(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new()))));
 
 // 第一次执行会在 tools 节点前中断
 let config = CheckpointConfig { thread_id: "t1".to_string() };

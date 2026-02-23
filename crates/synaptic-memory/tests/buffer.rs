@@ -1,11 +1,17 @@
 use std::sync::Arc;
 
 use synaptic_core::{MemoryStore, Message};
-use synaptic_memory::{ConversationBufferMemory, InMemoryStore};
+use synaptic_memory::{ChatMessageHistory, ConversationBufferMemory};
+
+fn new_store() -> Arc<ChatMessageHistory> {
+    Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )))
+}
 
 #[tokio::test]
 async fn buffer_stores_full_conversation() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let buffer = ConversationBufferMemory::new(store);
 
     buffer.append("s1", Message::human("hello")).await.unwrap();
@@ -29,7 +35,7 @@ async fn buffer_stores_full_conversation() {
 
 #[tokio::test]
 async fn buffer_clear() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let buffer = ConversationBufferMemory::new(store);
 
     buffer.append("s1", Message::human("hello")).await.unwrap();

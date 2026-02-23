@@ -59,6 +59,10 @@ members = [
   "crates/synaptic-flashrank",
   "crates/synaptic-langfuse",
   "crates/synaptic-lark",
+  "crates/synaptic-condenser",
+  "crates/synaptic-config",
+  "crates/synaptic-secrets",
+  "crates/synaptic-session",
   "crates/synaptic",
   "examples/react_basic",
   "examples/tool_calling_basic",
@@ -75,12 +79,22 @@ members = [
   "examples/caching",
   "examples/macros_showcase",
   "examples/lark_rag",
+  "examples/lark_streaming_bot",
+  "examples/volcengine_test",
+  "examples/condenser_demo",
+  "examples/security_demo",
+  "examples/secrets_demo",
+  "examples/tool_filter_demo",
+  "examples/config_agent",
+  "examples/session_resume",
+  "examples/file_persistence",
+  "examples/token_budget_demo",
 ]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.2.9"
+version = "0.3.0"
 license = "MIT"
 authors = ["Synaptic Contributors"]
 rust-version = "1.88"
@@ -109,12 +123,15 @@ regex = "1"
 base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 schemars = { version = "1", features = ["derive"] }
-synaptic-core = { version = "0.2", path = "crates/synaptic-core" }
-synaptic-mcp = { version = "0.2", path = "crates/synaptic-mcp" }
-synaptic-macros = { version = "0.2", path = "crates/synaptic-macros" }
-synaptic-middleware = { version = "0.2", path = "crates/synaptic-middleware" }
-synaptic-runnables = { version = "0.2", path = "crates/synaptic-runnables" }
-synaptic-deep = { version = "0.2", path = "crates/synaptic-deep" }
+synaptic-core = { version = "0.3", path = "crates/synaptic-core" }
+synaptic-mcp = { version = "0.3", path = "crates/synaptic-mcp" }
+synaptic-macros = { version = "0.3", path = "crates/synaptic-macros" }
+synaptic-middleware = { version = "0.3", path = "crates/synaptic-middleware" }
+synaptic-runnables = { version = "0.3", path = "crates/synaptic-runnables" }
+synaptic-deep = { version = "0.3", path = "crates/synaptic-deep" }
+toml = "0.8"
+serde_yml = "0.0.12"
+dirs = "6"
 syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"

@@ -180,6 +180,16 @@ impl<S: State> CompiledGraph<S> {
         self
     }
 
+    /// Set a `StoreCheckpointer` backed by the given store.
+    ///
+    /// Convenience method equivalent to:
+    /// ```ignore
+    /// graph.with_checkpointer(Arc::new(StoreCheckpointer::new(store)))
+    /// ```
+    pub fn with_store_checkpointer(self, store: Arc<dyn synaptic_core::Store>) -> Self {
+        self.with_checkpointer(Arc::new(crate::StoreCheckpointer::new(store)))
+    }
+
     /// Execute the graph with initial state.
     pub async fn invoke(&self, state: S) -> Result<GraphResult<S>, SynapticError>
     where

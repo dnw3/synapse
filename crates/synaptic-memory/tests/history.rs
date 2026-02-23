@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use synaptic_core::{MemoryStore, Message, RunnableConfig, SynapticError};
-use synaptic_memory::{InMemoryStore, RunnableWithMessageHistory};
+use synaptic_memory::{ChatMessageHistory, RunnableWithMessageHistory};
 use synaptic_runnables::Runnable;
 
 /// A simple runnable that echoes the last human message content.
@@ -27,7 +27,9 @@ impl Runnable<Vec<Message>, String> for EchoRunnable {
 
 #[tokio::test]
 async fn runnable_with_message_history_loads_and_saves() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
     let inner = EchoRunnable.boxed();
     let history = RunnableWithMessageHistory::new(inner, store.clone());
 
@@ -61,7 +63,9 @@ async fn runnable_with_message_history_loads_and_saves() {
 
 #[tokio::test]
 async fn session_isolation() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
     let inner = EchoRunnable.boxed();
     let history = RunnableWithMessageHistory::new(inner, store.clone());
 
@@ -93,7 +97,9 @@ async fn session_isolation() {
 
 #[tokio::test]
 async fn message_roles_preserved() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
     let inner = EchoRunnable.boxed();
     let history = RunnableWithMessageHistory::new(inner, store.clone());
 
@@ -111,7 +117,9 @@ async fn message_roles_preserved() {
 
 #[tokio::test]
 async fn system_message_in_history() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     // Pre-populate with a system message
     store

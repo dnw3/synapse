@@ -13,12 +13,12 @@ homepage.workspace = true
 [dependencies]
 async-trait.workspace = true
 serde_json.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
-synaptic-graph = { version = "0.2", path = "../synaptic-graph" }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
+synaptic-graph = { version = "0.3", path = "../synaptic-graph" }
 rusqlite = { version = "0.32", features = ["bundled"] }
 tokio.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
 serde_json.workspace = true
-synaptic-graph = { version = "0.2", path = "../synaptic-graph" }
+synaptic-graph = { version = "0.3", path = "../synaptic-graph" }

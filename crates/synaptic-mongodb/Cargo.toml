@@ -15,12 +15,12 @@ async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 futures.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
-synaptic-graph = { version = "0.2", path = "../synaptic-graph" }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
+synaptic-graph = { version = "0.3", path = "../synaptic-graph" }
 mongodb = "3"
 bson = "2"
 
 [dev-dependencies]
 tokio.workspace = true
 serde_json.workspace = true
-synaptic-graph = { version = "0.2", path = "../synaptic-graph" }
+synaptic-graph = { version = "0.3", path = "../synaptic-graph" }

@@ -157,7 +157,7 @@ let result = graph.invoke(state).await?;
 
 ```rust
 let options = ReactAgentOptions {
-    checkpointer: Some(Arc::new(MemorySaver::new())),
+    checkpointer: Some(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())))),
     system_prompt: Some("You are a helpful weather assistant.".into()),
     interrupt_before: vec!["tools".into()],
     interrupt_after: vec![],

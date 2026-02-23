@@ -3,7 +3,8 @@ use std::sync::Arc;
 use serde_json::Value;
 use synaptic_core::{ChatResponse, Message, SynapticError, Tool, ToolCall};
 use synaptic_graph::{
-    create_react_agent_with_options, CheckpointConfig, MemorySaver, MessageState, ReactAgentOptions,
+    create_react_agent_with_options, CheckpointConfig, MessageState, ReactAgentOptions,
+    StoreCheckpointer,
 };
 use synaptic_macros::tool;
 use synaptic_models::ScriptedChatModel;
@@ -65,7 +66,9 @@ async fn agent_without_system_prompt() {
 
 #[tokio::test]
 async fn agent_with_checkpointer() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let model = Arc::new(ScriptedChatModel::new(vec![ChatResponse {
         message: Message::ai("Persisted response"),
@@ -98,7 +101,9 @@ async fn agent_with_checkpointer() {
 
 #[tokio::test]
 async fn agent_with_interrupt_before_tools() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let model = Arc::new(ScriptedChatModel::new(vec![ChatResponse {
         message: Message::ai_with_tool_calls(
@@ -140,7 +145,9 @@ async fn agent_with_interrupt_before_tools() {
 
 #[tokio::test]
 async fn agent_with_interrupt_after_agent() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     let model = Arc::new(ScriptedChatModel::new(vec![ChatResponse {
         message: Message::ai("Response"),

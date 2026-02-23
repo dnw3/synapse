@@ -1,11 +1,17 @@
 use std::sync::Arc;
 
 use synaptic_core::{MemoryStore, Message};
-use synaptic_memory::{ConversationTokenBufferMemory, InMemoryStore};
+use synaptic_memory::{ChatMessageHistory, ConversationTokenBufferMemory};
+
+fn new_store() -> Arc<ChatMessageHistory> {
+    Arc::new(ChatMessageHistory::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )))
+}
 
 #[tokio::test]
 async fn token_buffer_trims_old_messages() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     // Set a small token budget. "hello" = 5 chars => ~2 tokens, "world" = 5 chars => ~2 tokens
     // Each short message is about 2 tokens, so 10 tokens should fit ~5 short messages
     let token_buf = ConversationTokenBufferMemory::new(store, 5);
@@ -34,7 +40,7 @@ async fn token_buffer_trims_old_messages() {
 
 #[tokio::test]
 async fn token_buffer_returns_all_when_under_limit() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let token_buf = ConversationTokenBufferMemory::new(store, 100);
 
     token_buf
@@ -51,7 +57,7 @@ async fn token_buffer_returns_all_when_under_limit() {
 
 #[tokio::test]
 async fn token_buffer_clear() {
-    let store = Arc::new(InMemoryStore::new());
+    let store = new_store();
     let token_buf = ConversationTokenBufferMemory::new(store, 100);
 
     token_buf

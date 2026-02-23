@@ -16,8 +16,8 @@ async-stream.workspace = true
 bytes.workspace = true
 futures.workspace = true
 serde_json.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
-synaptic-models = { version = "0.2", path = "../synaptic-models" }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
+synaptic-models = { version = "0.3", path = "../synaptic-models" }
 
 [dev-dependencies]
 tokio.workspace = true

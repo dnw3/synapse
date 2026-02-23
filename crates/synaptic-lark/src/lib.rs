@@ -59,7 +59,10 @@ pub use tools::translate::LarkTranslateTool;
 pub use vector_store::LarkVectorStore;
 
 #[cfg(feature = "bot")]
-pub use bot::{LarkBotClient, LarkLongConnListener, LarkMessageEvent};
+pub use bot::{
+    LarkBotClient, LarkLongConnListener, LarkMessageEvent, StreamingCardOptions,
+    StreamingCardWriter,
+};
 
 // Re-export core traits for convenience
 pub use synaptic_core::{Loader, Tool};

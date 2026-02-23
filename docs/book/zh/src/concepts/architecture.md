@@ -73,7 +73,7 @@ Synaptic 采用分层的 Cargo 工作区架构，由多个库 crate、1 个门�
 | Crate | 职责 |
 |---|---|
 | `synaptic-runnables` | `Runnable` trait，支持 `invoke()`/`batch()`/`stream()`；`BoxRunnable` 支持管道运算符 `\|` 进行 LCEL 风格的链式组合；`RunnableLambda`、`RunnableParallel`、`RunnableBranch`、`RunnableAssign`、`RunnablePick`、`RunnableWithFallbacks` 等组合类型 |
-| `synaptic-graph` | LangGraph 风格的状态机：`StateGraph` 构建器、`CompiledGraph` 可执行图、`ToolNode` 工具节点、`create_react_agent` 预构建 Agent、`Checkpointer` + `MemorySaver` 检查点持久化，支持图流式执行和可视化 |
+| `synaptic-graph` | LangGraph 风格的状态机：`StateGraph` 构建器、`CompiledGraph` 可执行图、`ToolNode` 工具节点、`create_react_agent` 预构建 Agent、`Checkpointer` + `StoreCheckpointer` 检查点持久化，支持图流式执行和可视化 |
 
 ### 检索管道
 

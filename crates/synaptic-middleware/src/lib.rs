@@ -2,6 +2,7 @@ mod context_editing;
 mod human_in_the_loop;
 mod model_call_limit;
 mod model_fallback;
+mod security;
 mod summarization;
 mod todo_list;
 mod tool_call_limit;
@@ -11,6 +12,10 @@ pub use context_editing::{ContextEditingMiddleware, ContextStrategy};
 pub use human_in_the_loop::{ApprovalCallback, HumanInTheLoopMiddleware};
 pub use model_call_limit::ModelCallLimitMiddleware;
 pub use model_fallback::ModelFallbackMiddleware;
+pub use security::{
+    ConfirmationPolicy, RiskLevel, RuleBasedAnalyzer, SecurityAnalyzer,
+    SecurityConfirmationCallback, SecurityMiddleware, ThresholdConfirmationPolicy,
+};
 pub use summarization::SummarizationMiddleware;
 pub use todo_list::TodoListMiddleware;
 pub use tool_call_limit::ToolCallLimitMiddleware;

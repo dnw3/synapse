@@ -13,7 +13,7 @@ homepage.workspace = true
 [dependencies]
 async-trait.workspace = true
 serde_json.workspace = true
-synaptic-core = { version = "0.2", path = "../synaptic-core" }
+synaptic-core = { version = "0.3", path = "../synaptic-core" }
 qdrant-client = "1.12"
 uuid = { version = "1", features = ["v4", "v5"] }
 

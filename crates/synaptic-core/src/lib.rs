@@ -12,6 +12,12 @@ use thiserror::Error;
 #[cfg(feature = "schemars")]
 pub use schemars;
 
+pub mod context_budget;
+pub mod token_counter;
+
+pub use context_budget::{ContextBudget, ContextSlot, Priority};
+pub use token_counter::{HeuristicTokenCounter, TokenCounter};
+
 // ---------------------------------------------------------------------------
 // ContentBlock — multimodal message content
 // ---------------------------------------------------------------------------
@@ -477,6 +483,12 @@ impl Message {
             } => invalid_tool_calls,
             _ => &[],
         }
+    }
+
+    /// Set the content of this message. No-op for Remove variant.
+    pub fn set_content(&mut self, new_content: impl Into<String>) {
+        let new_content = new_content.into();
+        set_message_field!(self, content, new_content);
     }
 }
 

@@ -10,4 +10,4 @@ path = "src/main.rs"
 
 [dependencies]
 tokio.workspace = true
-synaptic = { version = "0.2", path = "../../crates/synaptic", features = ["lark"] }
+synaptic = { version = "0.3", path = "../../crates/synaptic", features = ["lark"] }

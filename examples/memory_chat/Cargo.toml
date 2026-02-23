@@ -6,4 +6,4 @@ publish = false
 
 [dependencies]
 tokio.workspace = true
-synaptic = { version = "0.2", path = "../../crates/synaptic", features = ["memory"] }
+synaptic = { version = "0.3", path = "../../crates/synaptic", features = ["memory", "store"] }

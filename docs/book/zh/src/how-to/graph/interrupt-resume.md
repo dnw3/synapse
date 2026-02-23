@@ -55,9 +55,10 @@ use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use serde_json::json;
 use synaptic::graph::{
-    interrupt, CheckpointConfig, FnNode, MemorySaver,
+    interrupt, CheckpointConfig, FnNode, StoreCheckpointer,
     NodeOutput, State, StateGraph, END,
 };
+use synaptic::store::InMemoryStore;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct ReviewState {
@@ -88,7 +89,7 @@ let execute = FnNode::new(|mut state: ReviewState| async move {
     Ok(state.into())
 });
 
-let saver = Arc::new(MemorySaver::new());
+let saver = Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())));
 let graph = StateGraph::new()
     .add_node("propose", propose)
     .add_node("gate", gate)
@@ -127,7 +128,7 @@ assert!(result.into_state().done);
 
 ## 注意事项
 
-- **需要 Checkpointer。** 没有它，状态无法在中断和恢复之间保存。`MemorySaver` 适用于开发；生产环境请实现 `Checkpointer`。
+- **需要 Checkpointer。** 没有它，状态无法在中断和恢复之间保存。`StoreCheckpointer` 配合 `InMemoryStore` 适用于开发；生产环境请使用持久化的 Store 实现。
 - **中断时不合并状态。** 当节点返回 `interrupt()` 时，该节点的状态更新不会被应用——只保留之前已执行节点的状态。
 - **`Command::resume(value)`** 在恢复时向图传递一个值，可通过 Command 的 `resume_value` 字段获取。
 - **状态历史。** 调用 `graph.get_state_history(&config)` 可以查看某个线程的所有检查点。

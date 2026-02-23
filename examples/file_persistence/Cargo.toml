@@ -1,0 +1,14 @@
+[package]
+name = "file_persistence"
+edition.workspace = true
+version.workspace = true
+publish = false
+
+[[bin]]
+name = "file_persistence"
+path = "src/main.rs"
+
+[dependencies]
+synaptic = { version = "0.3", path = "../../crates/synaptic", features = ["store-filesystem", "graph"] }
+serde_json.workspace = true
+tokio = { workspace = true }

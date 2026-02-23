@@ -77,13 +77,15 @@ fn facade_reexports_tools() {
     assert!(registry.get("nonexistent").is_none());
 }
 
-#[cfg(feature = "memory")]
+#[cfg(all(feature = "memory", feature = "store"))]
 #[tokio::test]
 async fn facade_reexports_memory() {
+    use std::sync::Arc;
     use synaptic::core::{MemoryStore, Message};
-    use synaptic::memory::InMemoryStore;
+    use synaptic::memory::ChatMessageHistory;
+    use synaptic::store::InMemoryStore;
 
-    let store = InMemoryStore::new();
+    let store = ChatMessageHistory::new(Arc::new(InMemoryStore::new()));
     store.append("s1", Message::human("hi")).await.unwrap();
     let msgs = store.load("s1").await.unwrap();
     assert_eq!(msgs.len(), 1);

@@ -1,5 +1,7 @@
 pub(crate) mod bitable;
 pub(crate) mod calendar;
+#[cfg(feature = "bot")]
+pub(crate) mod cardkit;
 pub(crate) mod chat;
 pub(crate) mod contact;
 pub(crate) mod message;

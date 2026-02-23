@@ -1,6 +1,7 @@
 pub mod brave;
 pub mod calculator;
 pub mod duckduckgo;
+pub mod filter;
 mod handle_error;
 pub mod jina_reader;
 mod parallel_executor;
@@ -10,6 +11,9 @@ pub mod wikipedia;
 pub use brave::BraveSearchTool;
 pub use calculator::CalculatorTool;
 pub use duckduckgo::DuckDuckGoTool;
+pub use filter::{
+    AllowListFilter, CompositeFilter, DenyListFilter, FilterContext, StateMachineFilter, ToolFilter,
+};
 pub use handle_error::HandleErrorTool;
 pub use jina_reader::JinaReaderTool;
 pub use parallel_executor::ParallelToolExecutor;

@@ -174,6 +174,14 @@
 - [宏](how-to/macros.md)
     - [中间件宏](how-to/macros-middleware.md)
     - [宏使用示例](how-to/macros-examples.md)
+- [上下文压缩](how-to/condenser.md)
+- [Token 计数与预算](how-to/token-budget.md)
+- [安全分析](how-to/security.md)
+- [密钥管理](how-to/secrets.md)
+- [工具过滤](how-to/tool-filter.md)
+- [配置](how-to/config.md)
+- [会话管理](how-to/session.md)
+- [文件持久化](how-to/persistence.md)
 
 # 核心概念
 
@@ -187,6 +195,7 @@
 - [流式处理](concepts/streaming.md)
 - [中间件](concepts/middleware.md)
 - [键值存储](concepts/store.md)
+- [Session、Memory 与 Store](concepts/session-memory-store.md)
 - [集成](concepts/integrations.md)
 - [错误处理](concepts/errors.md)
 

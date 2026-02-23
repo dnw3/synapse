@@ -1,0 +1,19 @@
+[model]
+provider = "openai"
+model = "gpt-4o"
+api_key_env = "OPENAI_API_KEY"
+max_tokens = 4096
+temperature = 0.7
+
+[agent]
+system_prompt = "You are a helpful coding assistant."
+max_turns = 10
+
+[agent.tools]
+filesystem = true
+sandbox_root = "/tmp/sandbox"
+
+[paths]
+sessions_dir = ".sessions"
+memory_file = "AGENTS.md"
+skills_dir = ".skills"

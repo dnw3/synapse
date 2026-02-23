@@ -4,7 +4,9 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use synaptic_core::SynapticError;
-use synaptic_graph::{CheckpointConfig, MemorySaver, Node, State, StateGraph, StreamMode, END};
+use synaptic_graph::{
+    CheckpointConfig, Node, State, StateGraph, StoreCheckpointer, StreamMode, END,
+};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct CounterState {
@@ -98,7 +100,9 @@ async fn stream_updates_mode() {
 
 #[tokio::test]
 async fn stream_with_interrupt_after() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
     let graph = StateGraph::new()
         .add_node("a", IncrementNode { name: "a".into() })
         .add_node("b", IncrementNode { name: "b".into() })
@@ -134,7 +138,9 @@ async fn stream_with_interrupt_after() {
 
 #[tokio::test]
 async fn stream_with_checkpoint_resume() {
-    let saver = Arc::new(MemorySaver::new());
+    let saver = Arc::new(StoreCheckpointer::new(Arc::new(
+        synaptic_store::InMemoryStore::new(),
+    )));
 
     // First run with interrupt
     let graph = StateGraph::new()

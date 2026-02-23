@@ -1,10 +1,13 @@
+use std::sync::Arc;
+
 use synaptic::core::{MemoryStore, Message, SynapticError};
-use synaptic::memory::InMemoryStore;
+use synaptic::memory::ChatMessageHistory;
+use synaptic::store::InMemoryStore;
 
 #[tokio::main]
 async fn main() -> Result<(), SynapticError> {
     // --- 1. Basic memory usage ---
-    let memory = InMemoryStore::new();
+    let memory = ChatMessageHistory::new(Arc::new(InMemoryStore::new()));
     let session_id = "demo-session";
 
     // Append a multi-turn conversation

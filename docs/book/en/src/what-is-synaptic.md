@@ -23,7 +23,7 @@ The table below shows how core LangChain Python concepts map to their Synaptic R
 | `ToolNode` | `ToolNode` | `synaptic-graph` |
 | `StateGraph` | `StateGraph` | `synaptic-graph` |
 | `create_react_agent` | `create_react_agent` | `synaptic-graph` |
-| `InMemorySaver` | `MemorySaver` | `synaptic-graph` |
+| `InMemorySaver` | `StoreCheckpointer` | `synaptic-graph` |
 | `StrOutputParser` | `StrOutputParser` | `synaptic-parsers` |
 | `JsonOutputParser` | `JsonOutputParser` | `synaptic-parsers` |
 | `VectorStoreRetriever` | `VectorStoreRetriever` | `synaptic-vectorstores` |

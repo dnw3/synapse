@@ -249,7 +249,14 @@ pub fn create_agent(
 
     let mut graph = builder.compile()?;
 
-    if let Some(checkpointer) = options.checkpointer {
+    // Auto-wire: explicit checkpointer > store-backed checkpointer > none
+    let checkpointer: Option<Arc<dyn Checkpointer>> = match (&options.store, options.checkpointer) {
+        (_, Some(ckpt)) => Some(ckpt),
+        (Some(store), None) => Some(Arc::new(crate::StoreCheckpointer::new(store.clone()))),
+        (None, None) => None,
+    };
+
+    if let Some(checkpointer) = checkpointer {
         graph = graph.with_checkpointer(checkpointer);
     }
 

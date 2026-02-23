@@ -1,0 +1,13 @@
+[package]
+name = "config_agent"
+edition.workspace = true
+version.workspace = true
+publish = false
+
+[[bin]]
+name = "config_agent"
+path = "src/main.rs"
+
+[dependencies]
+synaptic = { version = "0.3", path = "../../crates/synaptic", features = ["config"] }
+tokio = { workspace = true }

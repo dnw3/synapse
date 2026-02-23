@@ -97,13 +97,15 @@ println!("{}", result.messages.last().unwrap().content());
 Pass a checkpointer to persist the supervisor's state across calls:
 
 ```rust,ignore
-use synaptic::graph::MemorySaver;
+use synaptic::graph::StoreCheckpointer;
+use synaptic::store::InMemoryStore;
+use std::sync::Arc;
 
 let supervisor = create_supervisor(
     model,
     agents,
     SupervisorOptions {
-        checkpointer: Some(Arc::new(MemorySaver::new())),
+        checkpointer: Some(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new())))),
         ..Default::default()
     },
 )?;

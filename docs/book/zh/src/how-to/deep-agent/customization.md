@@ -91,10 +91,11 @@ options.middleware = vec![
 可选的检查点器，用于图状态持久化。提供后，代理可以从检查点恢复。
 
 ```rust,ignore
-use synaptic::graph::MemorySaver;
+use synaptic::graph::StoreCheckpointer;
+use synaptic::store::InMemoryStore;
 
 let mut options = DeepAgentOptions::new(backend.clone());
-options.checkpointer = Some(Arc::new(MemorySaver::new()));
+options.checkpointer = Some(Arc::new(StoreCheckpointer::new(Arc::new(InMemoryStore::new()))));
 ```
 
 ### store

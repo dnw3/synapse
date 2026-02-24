@@ -24,7 +24,7 @@ Synaptic is organized as a workspace of focused crates. Each crate has its own A
 | `synaptic-embeddings` | Embeddings trait, `FakeEmbeddings`, `CacheBackedEmbeddings` | [docs.rs](https://docs.rs/synaptic-embeddings) |
 | `synaptic-vectorstores` | Vector store implementations (`InMemoryVectorStore`, `VectorStoreRetriever`, `MultiVectorRetriever`) | [docs.rs](https://docs.rs/synaptic-vectorstores) |
 | `synaptic-qdrant` | Qdrant vector store (`QdrantVectorStore`) | [docs.rs](https://docs.rs/synaptic-qdrant) |
-| `synaptic-pgvector` | PostgreSQL pgvector store (`PgVectorStore`) | [docs.rs](https://docs.rs/synaptic-pgvector) |
+| `synaptic-postgres` | PostgreSQL integration (`PgVectorStore`, `PgStore`, `PgCache`, `PgCheckpointer`) | [docs.rs](https://docs.rs/synaptic-postgres) |
 | `synaptic-redis` | Redis store and cache (`RedisStore`, `RedisCache`) | [docs.rs](https://docs.rs/synaptic-redis) |
 | `synaptic-pdf` | PDF document loader (`PdfLoader`) | [docs.rs](https://docs.rs/synaptic-pdf) |
 | `synaptic-graph` | Graph orchestration (`StateGraph`, `CompiledGraph`, `ToolNode`, `create_react_agent`, checkpointing, streaming) | [docs.rs](https://docs.rs/synaptic-graph) |

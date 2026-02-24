@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_core::{Message, RuntimeAwareTool, Store, SynapticError, ToolContext, ToolRuntime};
+use synaptic_core::{Message, RuntimeAwareTool, Store, SynapticError, ToolRuntime};
 use synaptic_middleware::{MiddlewareChain, ToolCallRequest, ToolCaller};
 use synaptic_tools::SerialToolExecutor;
 
@@ -14,8 +14,6 @@ use crate::state::MessageState;
 /// Wraps a `SerialToolExecutor` into a `ToolCaller` for the middleware chain.
 struct BaseToolCaller {
     executor: SerialToolExecutor,
-    #[expect(dead_code)]
-    tool_context: ToolContext,
 }
 
 #[async_trait]
@@ -111,16 +109,10 @@ impl Node<MessageState> for ToolNode {
                     .await?
             } else {
                 // Regular tool execution
-                let tool_ctx = ToolContext {
-                    state: state_value.clone(),
-                    tool_call_id: call.id.clone(),
-                };
-
                 if let Some(ref chain) = self.middleware {
                     let request = ToolCallRequest { call: call.clone() };
                     let base = BaseToolCaller {
                         executor: self.executor.clone(),
-                        tool_context: tool_ctx,
                     };
                     chain.call_tool(request, &base).await?
                 } else {

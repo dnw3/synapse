@@ -26,7 +26,7 @@ members = [
   "crates/synaptic-macros",
   "crates/synaptic-deep",
   "crates/synaptic-qdrant",
-  "crates/synaptic-pgvector",
+  "crates/synaptic-postgres",
   "crates/synaptic-redis",
   "crates/synaptic-pdf",
   "crates/synaptic-bedrock",
@@ -94,7 +94,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.3.0"
+version = "0.3.1"
 license = "MIT"
 authors = ["Synaptic Contributors"]
 rust-version = "1.88"
@@ -132,6 +132,7 @@ synaptic-deep = { version = "0.3", path = "crates/synaptic-deep" }
 toml = "0.8"
 serde_yml = "0.0.12"
 dirs = "6"
+sha2 = "0.10"
 syn = { version = "2", features = ["full", "extra-traits"] }
 quote = "1"
 proc-macro2 = "1"

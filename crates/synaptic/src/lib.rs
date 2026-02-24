@@ -164,9 +164,9 @@ pub use synaptic_session as session;
 #[cfg(feature = "qdrant")]
 pub use synaptic_qdrant as qdrant;
 
-/// PostgreSQL + pgvector integration.
-#[cfg(feature = "pgvector")]
-pub use synaptic_pgvector as pgvector;
+/// PostgreSQL integration.
+#[cfg(feature = "postgres")]
+pub use synaptic_postgres as postgres;
 
 /// Redis store and cache integration.
 #[cfg(feature = "redis")]
@@ -200,7 +200,7 @@ pub use synaptic_mongodb as mongodb;
 #[cfg(feature = "elasticsearch")]
 pub use synaptic_elasticsearch as elasticsearch;
 
-/// SQLite LLM cache.
+/// SQLite integration.
 #[cfg(feature = "sqlite")]
 pub use synaptic_sqlite as sqlite;
 

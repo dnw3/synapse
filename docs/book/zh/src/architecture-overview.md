@@ -84,7 +84,7 @@ Synaptic 采用 Cargo workspace 组织，包含 22 个库 crate、1 个门面 cr
 | Crate | 职责 |
 |---|---|
 | `synaptic-qdrant` | Qdrant 向量存储（`QdrantVectorStore`） |
-| `synaptic-pgvector` | PostgreSQL pgvector 向量存储（`PgVectorStore`） |
+| `synaptic-postgres` | PostgreSQL 集成（`PgVectorStore`、`PgStore`、`PgCache`、`PgCheckpointer`） |
 | `synaptic-redis` | Redis 存储和缓存（`RedisStore`、`RedisCache`） |
 | `synaptic-pdf` | PDF 文档加载器（`PdfLoader`） |
 

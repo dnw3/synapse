@@ -1,36 +1,38 @@
-# PostgreSQL pgvector
+# PostgreSQL 集成
 
-本指南展示如何使用 Synaptic 的 pgvector 集成，将 PostgreSQL 作为向量存储后端进行文档 Embedding 的存储和相似性搜索。
+本指南展示如何使用 Synaptic 的 PostgreSQL 集成。`synaptic_postgres` crate 提供四个组件：
 
-## 概述
+| 组件 | Trait | 说明 |
+|------|-------|------|
+| `PgVectorStore` | `VectorStore` | 向量相似搜索（需要 pgvector 扩展） |
+| `PgStore` | `Store` | 键值存储（纯 SQL + JSONB） |
+| `PgCache` | `LlmCache` | LLM 响应缓存（纯 SQL + JSONB） |
+| `PgCheckpointer` | `Checkpointer` | Graph 状态持久化（纯 SQL + JSONB） |
 
-`synaptic_pgvector` crate 提供了 `PgVectorStore`，它实现了 `VectorStore` trait，利用 PostgreSQL 的 [pgvector](https://github.com/pgvector/pgvector) 扩展来存储和检索向量数据。适合已有 PostgreSQL 基础设施的团队，无需引入额外的向量数据库服务。
+适合已有 PostgreSQL 基础设施的团队，无需引入额外的外部服务。
 
-## 前置条件
+## 前置要求
 
-1. PostgreSQL 15 或更高版本
-2. 安装 pgvector 扩展：
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-```
+- PostgreSQL >= 12（JSONB + 生成列）
+- pgvector >= 0.5.0（仅 VectorStore 需要；Store/Cache 不需要）
+- 安装命令：`CREATE EXTENSION IF NOT EXISTS vector;`
 
 ## Cargo.toml 配置
 
 ```toml
 [dependencies]
-synaptic = { version = "0.3", features = ["pgvector"] }
+synaptic = { version = "0.3", features = ["postgres"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
-## 基础使用
+## PgVectorStore（向量存储）
 
 ### 创建配置
 
 使用 `PgVectorConfig` 指定表名和向量维度：
 
 ```rust,ignore
-use synaptic::pgvector::{PgVectorConfig, PgVectorStore};
+use synaptic::postgres::{PgVectorConfig, PgVectorStore};
 
 let config = PgVectorConfig::new(
     "documents",   // 表名
@@ -96,6 +98,72 @@ for (doc, score) in &scored {
 store.delete(&["pg-1", "pg-3"]).await?;
 ```
 
+## PgStore（键值存储）
+
+`PgStore` 实现了 `Store` trait，提供带命名空间层次的键值存储。不需要 pgvector 扩展，纯 SQL + JSONB 实现。
+
+```rust,ignore
+use sqlx::postgres::PgPoolOptions;
+use synaptic::postgres::{PgStore, PgStoreConfig, Store};
+use serde_json::json;
+
+let pool = PgPoolOptions::new()
+    .max_connections(5)
+    .connect("postgres://user:pass@localhost/mydb")
+    .await?;
+
+let config = PgStoreConfig::new("synaptic_store");
+let store = PgStore::new(pool, config);
+store.initialize().await?;
+
+// 存取操作
+store.put(&["users"], "alice", json!({"name": "Alice", "age": 30})).await?;
+let item = store.get(&["users"], "alice").await?;
+
+// 全文搜索
+let results = store.search(&["users"], Some("Alice"), 10).await?;
+
+// 列出命名空间
+let namespaces = store.list_namespaces(&[]).await?;
+```
+
+## PgCache（LLM 缓存）
+
+`PgCache` 实现了 `LlmCache` trait，提供持久化的 LLM 响应缓存。不需要 pgvector 扩展，纯 SQL + JSONB 实现。支持可选的 TTL 过期。
+
+```rust,ignore
+use synaptic::postgres::{PgCache, PgCacheConfig, LlmCache};
+
+let config = PgCacheConfig::new("llm_cache").with_ttl(3600);
+let cache = PgCache::new(pool, config);
+cache.initialize().await?;
+```
+
+## PgCheckpointer（Graph 检查点）
+
+`PgCheckpointer` 实现了 `Checkpointer` trait，用于 Graph 状态的持久化。
+
+```rust,ignore
+use sqlx::postgres::PgPoolOptions;
+use synaptic::postgres::PgCheckpointer;
+use synaptic::graph::{create_react_agent, MessageState};
+use std::sync::Arc;
+
+// 创建连接池
+let pool = PgPoolOptions::new()
+    .max_connections(5)
+    .connect("postgres://user:pass@localhost/mydb")
+    .await?;
+
+// 创建并初始化检查点（若表不存在则自动创建）
+let checkpointer = PgCheckpointer::new(pool);
+checkpointer.initialize().await?;
+
+// 构建图
+let graph = create_react_agent(model, tools)?
+    .with_checkpointer(Arc::new(checkpointer));
+```
+
 ## 配置选项
 
 ### 向量维度
@@ -123,6 +191,16 @@ let config = PgVectorConfig::new("qa_history", 1536);
 let config = PgVectorConfig::new("product_embeddings", 3072);
 ```
 
+## 功能矩阵
+
+| 功能 | 最低 PG 版本 | 需要扩展 | 说明 |
+|------|-------------|---------|------|
+| PgStore | 12+ | 无 | 纯 SQL + JSONB |
+| PgCache | 12+ | 无 | 纯 SQL + JSONB |
+| PgVectorStore | 12+ | pgvector >= 0.5 | 向量相似搜索 |
+| PgCheckpointer | 12+ | 无 | 纯 SQL + JSONB |
+| Store FTS | 12+ | 无（内置） | tsvector 全文搜索 |
+
 ## 常见模式
 
 ### 与 VectorStoreRetriever 配合
@@ -133,7 +211,7 @@ let config = PgVectorConfig::new("product_embeddings", 3072);
 use std::sync::Arc;
 use synaptic::vectorstores::{VectorStoreRetriever, VectorStore};
 use synaptic::retrieval::Retriever;
-use synaptic::pgvector::{PgVectorConfig, PgVectorStore};
+use synaptic::postgres::{PgVectorConfig, PgVectorStore};
 use synaptic::embeddings::OpenAiEmbeddings;
 use sqlx::PgPool;
 
@@ -154,7 +232,7 @@ let results = retriever.retrieve("PostgreSQL 性能优化", 5).await?;
 
 ```rust,ignore
 use sqlx::PgPool;
-use synaptic::pgvector::{PgVectorConfig, PgVectorStore};
+use synaptic::postgres::{PgVectorConfig, PgVectorStore};
 
 // 复用应用已有的连接池
 let pool = app_state.db_pool.clone();
@@ -171,7 +249,7 @@ store.initialize().await?;
 use synaptic::loaders::{DirectoryLoader, Loader};
 use synaptic::splitters::{RecursiveCharacterTextSplitter, TextSplitter};
 use synaptic::vectorstores::VectorStore;
-use synaptic::pgvector::{PgVectorConfig, PgVectorStore};
+use synaptic::postgres::{PgVectorConfig, PgVectorStore};
 use synaptic::embeddings::OpenAiEmbeddings;
 use sqlx::PgPool;
 
@@ -192,7 +270,7 @@ let docs = loader.load().await?;
 let splitter = RecursiveCharacterTextSplitter::new(500, 50);
 let chunks = splitter.split_documents(&docs)?;
 
-// 3. 写入 pgvector
+// 3. 写入 PostgreSQL
 let ids = store.add_documents(chunks, &embeddings).await?;
 println!("已写入 {} 个文档块到 PostgreSQL", ids.len());
 
@@ -202,7 +280,7 @@ let results = store.similarity_search("查询内容", 5, &embeddings).await?;
 
 ## 索引策略
 
-pgvector 支持两种索引类型来加速近似最近邻搜索。选择哪种取决于数据集规模和性能需求。
+[pgvector](https://github.com/pgvector/pgvector) 支持两种索引类型来加速近似最近邻搜索。选择哪种取决于数据集规模和性能需求。
 
 **HNSW**（Hierarchical Navigable Small World）-- 推荐用于大多数场景。它提供更高的召回率、更快的查询速度，且不需要单独的训练步骤。代价是更高的内存占用和更慢的索引构建速度。
 
@@ -234,7 +312,7 @@ CREATE INDEX ON documents USING ivfflat (embedding vector_cosine_ops)
 
 ```rust,ignore
 use sqlx::PgPool;
-use synaptic::pgvector::{PgVectorConfig, PgVectorStore};
+use synaptic::postgres::{PgVectorConfig, PgVectorStore};
 
 // 复用应用状态中的连接池
 let pool: PgPool = app_state.db_pool.clone();

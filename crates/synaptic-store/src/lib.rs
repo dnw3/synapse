@@ -6,15 +6,10 @@ use serde_json::Value;
 use tokio::sync::RwLock;
 
 // Re-export Store trait and Item from core
-pub use synaptic_core::{Embeddings, Item, Store, SynapticError};
+pub use synaptic_core::{now_iso, Embeddings, Item, Store, SynapticError};
 
 fn namespace_key(namespace: &[&str]) -> String {
     namespace.join("::")
-}
-
-fn now_iso() -> String {
-    // Simple timestamp without external chrono dependency
-    format!("{:?}", std::time::SystemTime::now())
 }
 
 /// Cosine similarity between two vectors.

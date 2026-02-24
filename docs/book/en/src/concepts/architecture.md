@@ -67,7 +67,7 @@ These crates combine the implementation crates into higher-level abstractions:
 | `synaptic-vectorstores` | `VectorStore` trait, `InMemoryVectorStore`, `MultiVectorRetriever` |
 | `synaptic-retrieval` | `Retriever` trait and seven implementations: InMemory, BM25, MultiQuery, Ensemble, ContextualCompression, SelfQuery, ParentDocument |
 | `synaptic-qdrant` | `QdrantVectorStore` (Qdrant integration) |
-| `synaptic-pgvector` | `PgVectorStore` (PostgreSQL pgvector integration) |
+| `synaptic-postgres` | `PgVectorStore`, `PgStore`, `PgCache`, `PgCheckpointer` (PostgreSQL integration) |
 | `synaptic-redis` | `RedisStore` + `RedisCache` (Redis integration) |
 | `synaptic-pdf` | `PdfLoader` (PDF document loading) |
 
@@ -123,7 +123,7 @@ use synaptic::runnables::{BoxRunnable, Runnable};
 
    Integration crates (each depends on synaptic-core):
 
-   synaptic-qdrant, synaptic-pgvector, synaptic-redis, synaptic-pdf
+   synaptic-qdrant, synaptic-postgres, synaptic-redis, synaptic-pdf
 ```
 
 The arrows point downward toward dependencies. Every crate ultimately depends on `synaptic-core`. The composition crates (`synaptic-graph`, `synaptic-runnables`) additionally depend on the implementation crates they orchestrate.

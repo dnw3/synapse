@@ -17,7 +17,7 @@ synaptic-core (defines traits)
   ├── synaptic-cohere          (DocumentCompressor + Embeddings)
   ├── synaptic-huggingface     (Embeddings)
   ├── synaptic-qdrant          (VectorStore)
-  ├── synaptic-pgvector        (VectorStore + Checkpointer)
+  ├── synaptic-postgres        (VectorStore + Store + LlmCache + Checkpointer)
   ├── synaptic-pinecone        (VectorStore)
   ├── synaptic-chroma          (VectorStore)
   ├── synaptic-mongodb         (VectorStore)
@@ -43,10 +43,10 @@ All integration crates share a common pattern:
 |-------|---------|----------------------|
 | `ChatModel` | LLM chat completion | openai, anthropic, gemini, ollama, bedrock, groq, mistral, deepseek |
 | `Embeddings` | Text embedding vectors | openai, ollama, cohere, huggingface |
-| `VectorStore` | Vector similarity search | qdrant, pgvector, pinecone, chroma, mongodb, elasticsearch, weaviate, (+ in-memory) |
-| `Store` | Key-value storage | redis, (+ in-memory) |
-| `LlmCache` | LLM response caching | redis, sqlite, (+ in-memory) |
-| `Checkpointer` | Graph state persistence | redis, pgvector |
+| `VectorStore` | Vector similarity search | qdrant, postgres, pinecone, chroma, mongodb, elasticsearch, weaviate, (+ in-memory) |
+| `Store` | Key-value storage | redis, postgres, (+ in-memory) |
+| `LlmCache` | LLM response caching | redis, postgres, sqlite, (+ in-memory) |
+| `Checkpointer` | Graph state persistence | redis, postgres |
 | `Loader` | Document loading | pdf, (+ text, json, csv, directory) |
 | `DocumentCompressor` | Document reranking/filtering | cohere, (+ embeddings filter) |
 | `Tool` | Agent tool | tavily, sqltoolkit (3 tools), duckduckgo, wikipedia, (+ custom tools) |
@@ -107,7 +107,7 @@ synaptic = { version = "0.3", features = ["openai", "qdrant"] }
 | `cohere` | Cohere Reranker + Embeddings |
 | `huggingface` | HuggingFace Inference API Embeddings |
 | `qdrant` | Qdrant vector store |
-| `pgvector` | PostgreSQL pgvector store + graph checkpointer |
+| `postgres` | PostgreSQL store, cache, vector store, graph checkpointer |
 | `pinecone` | Pinecone vector store |
 | `chroma` | Chroma vector store |
 | `mongodb` | MongoDB Atlas vector search |

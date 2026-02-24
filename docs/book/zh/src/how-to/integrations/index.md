@@ -24,7 +24,7 @@ Synaptic 通过可选的 feature flag 提供与外部服务和数据源的集成
 | 集成 | Feature | 实现的 Trait | 用途 |
 |------|---------|-------------|------|
 | [Qdrant](qdrant.md) | `qdrant` | `VectorStore` | 高性能向量数据库，支持分布式部署和多种距离度量 |
-| [pgvector](pgvector.md) | `pgvector` | `VectorStore` | 基于 PostgreSQL 的向量存储，利用 pgvector 扩展实现相似性搜索 |
+| [PostgreSQL](postgres.md) | `postgres` | `VectorStore` + `Store` + `LlmCache` | PostgreSQL 集成：向量存储、键值存储、LLM 缓存、Graph 检查点 |
 | [Pinecone](pinecone.md) | `pinecone` | `VectorStore` | 全托管向量数据库，专为大规模相似性搜索设计 |
 | [Chroma](chroma.md) | `chroma` | `VectorStore` | 开源嵌入数据库，支持本地和云端部署 |
 | [MongoDB Atlas](mongodb.md) | `mongodb` | `VectorStore` | MongoDB Atlas 原生向量搜索，在现有 MongoDB 上启用向量检索 |
@@ -70,9 +70,9 @@ synaptic = { version = "0.2", features = ["qdrant", "pinecone", "redis", "tavily
 
 所有集成都实现了 Synaptic 核心 trait，因此可以无缝替换内置实现：
 
-- **Qdrant / pgvector / Pinecone / Chroma / MongoDB / Elasticsearch** 替代 `InMemoryVectorStore` -- 提供持久化和可扩展的向量存储
-- **Redis Store** 替代 `InMemoryStore` -- 提供跨进程共享的键值存储
-- **Redis Cache / SQLite Cache** 替代 `InMemoryCache` -- 提供持久化的 LLM 响应缓存
+- **Qdrant / PostgreSQL / Pinecone / Chroma / MongoDB / Elasticsearch** 替代 `InMemoryVectorStore` -- 提供持久化和可扩展的向量存储
+- **Redis Store / PgStore** 替代 `InMemoryStore` -- 提供跨进程共享的键值存储
+- **Redis Cache / SQLite Cache / PgCache** 替代 `InMemoryCache` -- 提供持久化的 LLM 响应缓存
 - **PDF Loader** 补充现有的 `TextLoader`、`JsonLoader` 等 -- 增加 PDF 格式支持
 - **Cohere Reranker** 与 `ContextualCompressionRetriever` 配合 -- 提升检索精度
 - **Tavily** 作为 Agent 工具 -- 为 Agent 添加网络搜索能力
@@ -91,7 +91,7 @@ synaptic = { version = "0.2", features = ["qdrant", "pinecone", "redis", "tavily
 - [Perplexity AI](perplexity.md) -- 联网搜索增强 LLM
 - [Cohere Reranker](cohere.md) -- 使用 Cohere 重排序模型
 - [Qdrant 向量存储](qdrant.md) -- 使用 Qdrant 存储和搜索嵌入向量
-- [PgVector](pgvector.md) -- 使用 PostgreSQL + pgvector 存储和搜索嵌入向量
+- [PostgreSQL](postgres.md) -- PostgreSQL 集成（向量存储、键值存储、LLM 缓存、Graph 检查点）
 - [Pinecone 向量存储](pinecone.md) -- 使用 Pinecone 全托管向量数据库
 - [Chroma 向量存储](chroma.md) -- 使用 Chroma 开源嵌入数据库
 - [MongoDB Atlas 向量搜索](mongodb.md) -- 使用 MongoDB Atlas 原生向量搜索

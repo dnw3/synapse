@@ -12,8 +12,11 @@ homepage.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 tokio.workspace = true
 synaptic-core = { version = "0.3", path = "../synaptic-core" }
 
 [dev-dependencies]
 tokio.workspace = true
+synaptic-store = { version = "0.3", path = "../synaptic-store" }

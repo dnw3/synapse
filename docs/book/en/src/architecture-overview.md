@@ -77,7 +77,7 @@ These crates provide third-party service integrations:
 | Crate | Purpose |
 |---|---|
 | `synaptic-qdrant` | `QdrantVectorStore` (Qdrant vector database) |
-| `synaptic-pgvector` | `PgVectorStore` (PostgreSQL pgvector extension) |
+| `synaptic-postgres` | `PgVectorStore`, `PgStore`, `PgCache`, `PgCheckpointer` (PostgreSQL integration) |
 | `synaptic-redis` | `RedisStore` + `RedisCache` (Redis key-value store and LLM cache) |
 | `synaptic-pdf` | `PdfLoader` (PDF document loading) |
 
@@ -132,7 +132,7 @@ All crates depend on `synaptic-core` for shared traits and types. Higher-level c
 
   loaders ──► splitters ──► embeddings ──► vectorstores ──► retrieval
 
-  Integration crates: qdrant, pgvector, redis, pdf
+  Integration crates: qdrant, postgres, redis, pdf
 ```
 
 ## Design Principles

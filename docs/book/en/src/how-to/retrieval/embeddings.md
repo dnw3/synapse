@@ -89,14 +89,16 @@ let config = OllamaEmbeddingsConfig::new("nomic-embed-text")
 
 ## CacheBackedEmbeddings
 
-Wraps any `Embeddings` provider with an in-memory cache. Previously computed embeddings are returned from cache; only uncached texts are sent to the underlying provider.
+Wraps any `Embeddings` provider with a `Store`-backed cache. Previously computed embeddings are returned from the store; only uncached texts are sent to the underlying provider. The third argument is a namespace prefix that isolates cache entries by provider or model.
 
 ```rust
 use std::sync::Arc;
 use synaptic::embeddings::{CacheBackedEmbeddings, FakeEmbeddings, Embeddings};
+use synaptic::store::InMemoryStore;
 
 let inner = Arc::new(FakeEmbeddings::new(128));
-let cached = CacheBackedEmbeddings::new(inner);
+let store = Arc::new(InMemoryStore::new());
+let cached = CacheBackedEmbeddings::new(inner, store, "fake");
 
 // First call computes the embedding
 let v1 = cached.embed_query("hello").await?;
@@ -108,6 +110,26 @@ assert_eq!(v1, v2);
 ```
 
 This is especially useful when adding documents to a vector store and then querying, since the same text may be embedded multiple times across operations.
+
+### With OpenAI embeddings
+
+```rust
+use synaptic::embeddings::CacheBackedEmbeddings;
+use synaptic::store::InMemoryStore;
+use std::sync::Arc;
+
+let embeddings = Arc::new(OpenAiEmbeddings::new());
+let store = Arc::new(InMemoryStore::new());
+let cached = CacheBackedEmbeddings::new(embeddings, store, "openai");
+```
+
+### Persistent backends
+
+For production use, swap `InMemoryStore` with a persistent backend so cached embeddings survive process restarts:
+
+- **SqliteStore** -- single-machine persistence (requires `sqlite` feature)
+- **PgStore** -- PostgreSQL-backed persistence (requires `postgres` feature)
+- **RedisStore** -- distributed persistence (requires `redis` feature)
 
 ## Using embeddings with vector stores
 

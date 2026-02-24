@@ -5,11 +5,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use tokio::fs;
 
-use synaptic_core::{Embeddings, Item, Store, SynapticError};
-
-fn now_iso() -> String {
-    format!("{:?}", std::time::SystemTime::now())
-}
+use synaptic_core::{now_iso, Embeddings, Item, Store, SynapticError};
 
 /// File-system backed implementation of `Store`.
 ///

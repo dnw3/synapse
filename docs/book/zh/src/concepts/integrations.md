@@ -17,7 +17,7 @@ synaptic-core（定义 trait）
   ├── synaptic-cohere         (Reranker / DocumentCompressor + Embeddings)
   ├── synaptic-huggingface    (Embeddings)
   ├── synaptic-qdrant         (VectorStore)
-  ├── synaptic-pgvector       (VectorStore + Checkpointer)
+  ├── synaptic-postgres       (VectorStore + Store + LlmCache + Checkpointer)
   ├── synaptic-pinecone       (VectorStore)
   ├── synaptic-chroma         (VectorStore)
   ├── synaptic-mongodb        (VectorStore)
@@ -43,10 +43,10 @@ synaptic-core（定义 trait）
 |-------|------|-----------|
 | `ChatModel` | LLM 聊天补全 | openai, anthropic, gemini, ollama, bedrock, groq, mistral, deepseek |
 | `Embeddings` | 文本嵌入向量 | openai, ollama, cohere, huggingface |
-| `VectorStore` | 向量相似度搜索 | qdrant, pgvector, pinecone, chroma, mongodb, elasticsearch, weaviate, (+ in-memory) |
-| `Store` | 键值存储 | redis, (+ in-memory) |
-| `LlmCache` | LLM 响应缓存 | redis, sqlite, (+ in-memory) |
-| `Checkpointer` | Graph 状态持久化 | redis, pgvector |
+| `VectorStore` | 向量相似度搜索 | qdrant, postgres, pinecone, chroma, mongodb, elasticsearch, weaviate, (+ in-memory) |
+| `Store` | 键值存储 | redis, postgres, (+ in-memory) |
+| `LlmCache` | LLM 响应缓存 | redis, sqlite, postgres, (+ in-memory) |
+| `Checkpointer` | Graph 状态持久化 | redis, postgres |
 | `Loader` | 文档加载 | pdf, (+ text, json, csv, directory) |
 | `Tool` | Agent 工具 | tavily, sqltoolkit（3 个工具）, duckduckgo, wikipedia, (+ 自定义工具) |
 | `DocumentCompressor` | 文档压缩/重排序 | cohere, (+ embeddings-filter) |
@@ -109,7 +109,7 @@ synaptic = { version = "0.2", features = ["openai", "qdrant"] }
 | `cohere` | Cohere Reranker + Embeddings |
 | `huggingface` | HuggingFace Inference API Embeddings |
 | `qdrant` | Qdrant 向量存储 |
-| `pgvector` | PostgreSQL pgvector 存储 + Graph 检查点 |
+| `postgres` | PostgreSQL 集成（VectorStore + Store + Cache + 检查点） |
 | `pinecone` | Pinecone 向量存储 |
 | `chroma` | Chroma 向量存储 |
 | `mongodb` | MongoDB Atlas 向量搜索 |

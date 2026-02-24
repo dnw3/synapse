@@ -1,6 +1,6 @@
 [package]
-name = "synaptic-pgvector"
-description = "PostgreSQL + pgvector integration for Synaptic"
+name = "synaptic-postgres"
+description = "PostgreSQL integration for Synaptic"
 edition.workspace = true
 version.workspace = true
 license.workspace = true

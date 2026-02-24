@@ -7,7 +7,7 @@ Synaptic 提供四种持久化检查点后端：
 | 后端 | Crate | 适用场景 |
 |------|-------|----------|
 | Redis | `synaptic-redis` | 低延迟、支持 TTL 自动过期 |
-| PostgreSQL | `synaptic-pgvector` | 关系型工作负载、ACID 保证 |
+| PostgreSQL | `synaptic-postgres` | 关系型工作负载、ACID 保证 |
 | SQLite | `synaptic-sqlite` | 单机部署、无需外部服务 |
 | MongoDB | `synaptic-mongodb` | 分布式部署、文档型存储 |
 
@@ -22,8 +22,8 @@ synaptic = { version = "0.2", features = ["agent", "redis"] }
 synaptic-redis = { version = "0.2" }
 
 # PostgreSQL 检查点
-synaptic = { version = "0.2", features = ["agent", "pgvector"] }
-synaptic-pgvector = { version = "0.2" }
+synaptic = { version = "0.2", features = ["agent", "postgres"] }
+synaptic-postgres = { version = "0.2" }
 
 # SQLite 检查点（无需外部服务）
 synaptic = { version = "0.2", features = ["agent", "sqlite"] }
@@ -89,7 +89,7 @@ Redis 使用以下键方案存储检查点：
 
 ```rust,ignore
 use sqlx::postgres::PgPoolOptions;
-use synaptic_pgvector::PgCheckpointer;
+use synaptic_postgres::PgCheckpointer;
 use synaptic::graph::{create_react_agent, MessageState};
 use std::sync::Arc;
 

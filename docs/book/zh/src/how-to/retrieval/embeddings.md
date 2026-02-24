@@ -89,14 +89,18 @@ let config = OllamaEmbeddingsConfig::new("nomic-embed-text")
 
 ## CacheBackedEmbeddings
 
-用内存缓存封装任意 `Embeddings` 提供商。之前计算过的 Embeddings 从缓存返回；只有未缓存的文本才会发送到底层提供商。
+用 Store 后端缓存封装任意 `Embeddings` 提供商。之前计算过的 Embeddings 从缓存返回；只有未缓存的文本才会发送到底层提供商。
+
+构造函数接受三个参数：底层 Embeddings 提供商、Store 后端、命名空间前缀。
 
 ```rust
 use std::sync::Arc;
 use synaptic::embeddings::{CacheBackedEmbeddings, FakeEmbeddings, Embeddings};
+use synaptic::store::InMemoryStore;
 
 let inner = Arc::new(FakeEmbeddings::new(128));
-let cached = CacheBackedEmbeddings::new(inner);
+let store = Arc::new(InMemoryStore::new());
+let cached = CacheBackedEmbeddings::new(inner, store, "fake");
 
 // First call computes the embedding
 let v1 = cached.embed_query("hello").await?;
@@ -107,7 +111,21 @@ let v2 = cached.embed_query("hello").await?;
 assert_eq!(v1, v2);
 ```
 
+使用 OpenAI Embeddings 的完整示例：
+
+```rust
+use synaptic::embeddings::CacheBackedEmbeddings;
+use synaptic::store::InMemoryStore;
+use std::sync::Arc;
+
+let embeddings = Arc::new(OpenAiEmbeddings::new());
+let store = Arc::new(InMemoryStore::new());
+let cached = CacheBackedEmbeddings::new(embeddings, store, "openai");
+```
+
 当向 VectorStore 添加文档然后查询时，这特别有用，因为相同的文本可能会在多次操作中被重复嵌入。
+
+> **持久化后端**：`InMemoryStore` 适合开发和测试。在生产环境中，可以使用 `SqliteStore`、`PgStore` 或 `RedisStore` 作为持久化后端，这样缓存在进程重启后仍然有效。
 
 ## 将 Embeddings 与 VectorStore 配合使用
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use synaptic_core::{Store, SynapticError};
+use synaptic_core::{now_iso, Store, SynapticError};
 use synaptic_graph::StoreCheckpointer;
 use synaptic_memory::ChatMessageHistory;
 
@@ -100,8 +100,4 @@ impl SessionManager {
     pub fn store(&self) -> &Arc<dyn Store> {
         &self.store
     }
-}
-
-fn now_iso() -> String {
-    format!("{:?}", std::time::SystemTime::now())
 }

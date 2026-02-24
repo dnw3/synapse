@@ -6,6 +6,10 @@
 //! - [`SqliteCheckpointer`]: A SQLite-backed implementation of the
 //!   [`Checkpointer`](synaptic_graph::Checkpointer) trait for persisting graph
 //!   state between executions.
+//! - [`SqliteStore`]: A SQLite-backed implementation of the [`Store`](synaptic_core::Store)
+//!   trait with FTS5 full-text search.
+//! - [`SqliteVectorStore`]: A SQLite-backed implementation of the
+//!   [`VectorStore`](synaptic_core::VectorStore) trait with FTS5 hybrid search.
 //!
 //! # Quick start
 //!
@@ -25,10 +29,14 @@
 
 mod cache;
 pub mod checkpointer;
+mod store;
+mod vectorstore;
 
 pub use cache::{SqliteCache, SqliteCacheConfig};
 pub use checkpointer::SqliteCheckpointer;
+pub use store::{SqliteStore, SqliteStoreConfig};
+pub use vectorstore::{SqliteVectorStore, SqliteVectorStoreConfig};
 
 // Re-export core traits for convenience.
-pub use synaptic_core::{ChatResponse, LlmCache};
+pub use synaptic_core::{ChatResponse, Document, Embeddings, Item, LlmCache, Store, VectorStore};
 pub use synaptic_graph::Checkpointer;

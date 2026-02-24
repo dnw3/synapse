@@ -7,7 +7,7 @@ Synaptic provides four persistent checkpointer backends:
 | Backend | Crate | Best For |
 |---------|-------|----------|
 | Redis | `synaptic-redis` | Low-latency, optional TTL expiry |
-| PostgreSQL | `synaptic-pgvector` | Relational workloads, ACID guarantees |
+| PostgreSQL | `synaptic-postgres` | Relational workloads, ACID guarantees |
 | SQLite | `synaptic-sqlite` | Single-machine, no external service |
 | MongoDB | `synaptic-mongodb` | Distributed, document-oriented |
 
@@ -22,8 +22,8 @@ synaptic = { version = "0.2", features = ["agent", "redis"] }
 synaptic-redis = { version = "0.2" }
 
 # PostgreSQL checkpointer
-synaptic = { version = "0.2", features = ["agent", "pgvector"] }
-synaptic-pgvector = { version = "0.2" }
+synaptic = { version = "0.2", features = ["agent", "postgres"] }
+synaptic-postgres = { version = "0.2" }
 
 # SQLite checkpointer (no external service required)
 synaptic = { version = "0.2", features = ["agent", "sqlite"] }
@@ -89,7 +89,7 @@ Redis stores checkpoints using the following keys:
 
 ```rust,ignore
 use sqlx::postgres::PgPoolOptions;
-use synaptic_pgvector::PgCheckpointer;
+use synaptic_postgres::PgCheckpointer;
 use synaptic::graph::{create_react_agent, MessageState};
 use std::sync::Arc;
 

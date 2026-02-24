@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use redis::AsyncCommands;
 use serde_json::Value;
-use synaptic_core::{Item, SynapticError};
+use synaptic_core::{encode_namespace, now_iso, Item, SynapticError};
 
 use crate::connection::{collect_matching_keys, RedisBackend, RedisConn};
 
@@ -108,18 +108,9 @@ impl RedisStore {
         }
     }
 
-    /// Encode namespace as a string for storage in the namespace index.
-    fn encode_namespace(namespace: &[&str]) -> String {
-        namespace.join(":")
-    }
-
     async fn get_connection(&self) -> Result<RedisConn, SynapticError> {
         self.backend.get_connection().await
     }
-}
-
-fn now_iso() -> String {
-    format!("{:?}", std::time::SystemTime::now())
 }
 
 /// Helper to GET a key from Redis as an `Option<String>`.
@@ -197,7 +188,7 @@ impl synaptic_core::Store for RedisStore {
         let mut con = self.get_connection().await?;
         let redis_key = self.redis_key(namespace, key);
         let ns_index_key = self.namespace_index_key();
-        let ns_encoded = Self::encode_namespace(namespace);
+        let ns_encoded = encode_namespace(namespace);
 
         // Check for existing item to preserve created_at
         let existing = redis_get_string(&mut con, &redis_key).await?;

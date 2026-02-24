@@ -17,7 +17,7 @@ Synaptic 采用分层的 Cargo 工作区架构，由多个库 crate、1 个门�
 |  实现层: models, memory, callbacks,       |
 |         prompts, parsers, tools, cache    |
 +------------------------------------------+
-|  集成层: qdrant, pgvector, redis, pdf     |
+|  集成层: qdrant, postgres, redis, pdf      |
 +------------------------------------------+
 |  检索管道: loaders, splitters, embeddings,|
 |           vectorstores, retrieval         |
@@ -106,7 +106,7 @@ loaders --> splitters --> embeddings --> vectorstores --> retrieval
 | Crate | 职责 |
 |---|---|
 | `synaptic-qdrant` | Qdrant 向量存储（`QdrantVectorStore`） |
-| `synaptic-pgvector` | PostgreSQL pgvector 向量存储（`PgVectorStore`） |
+| `synaptic-postgres` | PostgreSQL 集成（`PgVectorStore`、`PgStore`、`PgCache`、`PgCheckpointer`） |
 | `synaptic-redis` | Redis 存储和缓存（`RedisStore`、`RedisCache`） |
 | `synaptic-pdf` | PDF 文档加载器（`PdfLoader`） |
 

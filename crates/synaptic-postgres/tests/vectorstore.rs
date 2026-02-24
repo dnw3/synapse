@@ -5,14 +5,14 @@
 //! to the connection string before running:
 //!
 //! ```bash
-//! DATABASE_URL=postgres://user:pass@localhost/test_db cargo test -p synaptic-pgvector -- --ignored
+//! DATABASE_URL=postgres://user:pass@localhost/test_db cargo test -p synaptic-postgres -- --ignored
 //! ```
 
 use std::collections::HashMap;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use synaptic_pgvector::{Document, Embeddings, PgVectorConfig, PgVectorStore, VectorStore};
+use synaptic_postgres::{Document, Embeddings, PgVectorConfig, PgVectorStore, VectorStore};
 
 use synaptic_core::SynapticError;
 

@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use pgvector::Vector;
 use serde_json::Value;
 use sqlx::PgPool;
-use synaptic_core::{Document, Embeddings, SynapticError, VectorStore};
+use synaptic_core::{validate_table_name, Document, Embeddings, SynapticError, VectorStore};
 use uuid::Uuid;
 
 /// Configuration for a [`PgVectorStore`] table.
@@ -267,27 +267,6 @@ impl PgVectorStore {
 
         Ok(results)
     }
-}
-
-/// Validate that a table name is safe to interpolate into SQL.
-///
-/// Allows alphanumeric ASCII characters, underscores, and dots (for
-/// schema-qualified names like `public.documents`).
-fn validate_table_name(name: &str) -> Result<(), SynapticError> {
-    if name.is_empty() {
-        return Err(SynapticError::VectorStore(
-            "table name must not be empty".to_string(),
-        ));
-    }
-    if !name
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
-    {
-        return Err(SynapticError::VectorStore(format!(
-            "invalid table name '{name}': only alphanumeric, underscore, and dot characters are allowed",
-        )));
-    }
-    Ok(())
 }
 
 #[cfg(test)]

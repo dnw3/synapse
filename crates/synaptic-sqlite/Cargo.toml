@@ -1,6 +1,6 @@
 [package]
 name = "synaptic-sqlite"
-description = "SQLite LLM cache and graph checkpointer integration for Synaptic"
+description = "SQLite integration for Synaptic — cache, checkpointer, store, and vector store"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
@@ -17,8 +17,10 @@ synaptic-core = { version = "0.3", path = "../synaptic-core" }
 synaptic-graph = { version = "0.3", path = "../synaptic-graph" }
 rusqlite = { version = "0.32", features = ["bundled"] }
 tokio.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
 serde_json.workspace = true
 synaptic-graph = { version = "0.3", path = "../synaptic-graph" }
+synaptic-embeddings = { version = "0.3", path = "../synaptic-embeddings" }

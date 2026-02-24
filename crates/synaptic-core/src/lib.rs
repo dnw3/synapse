@@ -1038,69 +1038,6 @@ pub trait Tool: Send + Sync {
 }
 
 // ---------------------------------------------------------------------------
-// ToolContext — context-aware tool execution
-// ---------------------------------------------------------------------------
-
-/// Context passed to tools during graph execution.
-///
-/// Provides access to the current graph state (serialized as JSON),
-/// the tool call ID, and an optional key-value store reference.
-#[derive(Debug, Clone, Default)]
-pub struct ToolContext {
-    /// The current graph state, serialized as JSON.
-    pub state: Option<Value>,
-    /// The ID of the tool call being executed.
-    pub tool_call_id: String,
-}
-
-/// A tool that receives execution context from the graph.
-///
-/// This extends the basic `Tool` trait with graph-level context
-/// (current state, store, tool call ID). Implement this for tools
-/// that need to read or modify graph state.
-#[async_trait]
-pub trait ContextAwareTool: Send + Sync {
-    fn name(&self) -> &'static str;
-    fn description(&self) -> &'static str;
-    async fn call_with_context(
-        &self,
-        args: Value,
-        ctx: ToolContext,
-    ) -> Result<Value, SynapticError>;
-}
-
-/// Wrapper that adapts a `ContextAwareTool` into a standard `Tool`.
-///
-/// When used outside a graph context, the tool receives a default
-/// (empty) `ToolContext`.
-pub struct ContextAwareToolAdapter {
-    inner: Arc<dyn ContextAwareTool>,
-}
-
-impl ContextAwareToolAdapter {
-    pub fn new(inner: Arc<dyn ContextAwareTool>) -> Self {
-        Self { inner }
-    }
-}
-
-#[async_trait]
-impl Tool for ContextAwareToolAdapter {
-    fn name(&self) -> &'static str {
-        self.inner.name()
-    }
-
-    fn description(&self) -> &'static str {
-        self.inner.description()
-    }
-
-    async fn call(&self, args: Value) -> Result<Value, SynapticError> {
-        self.inner
-            .call_with_context(args, ToolContext::default())
-            .await
-    }
-}
-
-// ---------------------------------------------------------------------------
 // MemoryStore
 // ---------------------------------------------------------------------------
 
@@ -1497,4 +1434,36 @@ impl Entrypoint {
     pub async fn invoke(&self, input: Value) -> Result<Value, SynapticError> {
         (self.invoke_fn)(input).await
     }
+}
+
+// ---------------------------------------------------------------------------
+// Shared store utilities
+// ---------------------------------------------------------------------------
+
+/// ISO 8601-ish timestamp for store metadata (no chrono dependency).
+pub fn now_iso() -> String {
+    format!("{:?}", std::time::SystemTime::now())
+}
+
+/// Encode a namespace slice as a colon-separated string.
+pub fn encode_namespace(namespace: &[&str]) -> String {
+    namespace.join(":")
+}
+
+/// Validate a SQL table name (alphanumeric, underscore, and dot only).
+pub fn validate_table_name(name: &str) -> Result<(), SynapticError> {
+    if name.is_empty() {
+        return Err(SynapticError::Store(
+            "table name must not be empty".to_string(),
+        ));
+    }
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+    {
+        return Err(SynapticError::Store(format!(
+            "invalid table name '{name}': only alphanumeric, underscore, and dot characters are allowed",
+        )));
+    }
+    Ok(())
 }

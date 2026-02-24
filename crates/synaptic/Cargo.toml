@@ -41,7 +41,7 @@ synaptic-secrets = { version = "0.3", path = "../synaptic-secrets", optional = t
 synaptic-config = { version = "0.3", path = "../synaptic-config", optional = true }
 synaptic-session = { version = "0.3", path = "../synaptic-session", optional = true }
 synaptic-qdrant = { version = "0.3", path = "../synaptic-qdrant", optional = true }
-synaptic-pgvector = { version = "0.3", path = "../synaptic-pgvector", optional = true }
+synaptic-postgres = { version = "0.3", path = "../synaptic-postgres", optional = true }
 synaptic-redis = { version = "0.3", path = "../synaptic-redis", optional = true }
 synaptic-pdf = { version = "0.3", path = "../synaptic-pdf", optional = true }
 synaptic-bedrock = { version = "0.3", path = "../synaptic-bedrock", optional = true }
@@ -82,7 +82,7 @@ default = ["runnables", "prompts", "parsers", "tools", "callbacks"]
 # Infrastructure (provider-agnostic)
 model-utils = ["dep:synaptic-models"]
 runnables = ["dep:synaptic-runnables"]
-prompts = ["runnables", "embeddings", "dep:synaptic-prompts"]
+prompts = ["runnables", "dep:synaptic-prompts"]
 parsers = ["runnables", "dep:synaptic-parsers"]
 tools = ["dep:synaptic-tools"]
 memory = ["runnables", "dep:synaptic-memory"]
@@ -118,7 +118,7 @@ ollama = ["model-utils", "dep:synaptic-ollama"]
 bedrock = ["dep:synaptic-bedrock"]
 cohere = ["dep:synaptic-cohere"]
 qdrant = ["dep:synaptic-qdrant"]
-pgvector = ["dep:synaptic-pgvector"]
+postgres = ["dep:synaptic-postgres"]
 redis = ["dep:synaptic-redis"]
 redis-cluster = ["redis", "synaptic-redis/cluster"]
 pdf = ["dep:synaptic-pdf"]
@@ -153,13 +153,14 @@ lark-bot = ["dep:synaptic-lark", "synaptic-lark/bot"]
 
 # Convenience combinations
 models = ["openai", "anthropic", "gemini", "ollama", "bedrock", "cohere", "groq", "mistral", "deepseek", "together", "fireworks", "xai", "perplexity"]
-agent = ["default", "openai", "model-utils", "graph", "memory", "middleware", "store", "condenser", "secrets", "config", "session"]
+agent = ["default", "openai", "graph", "memory", "middleware", "store", "condenser", "secrets", "config", "session"]
 rag = ["default", "openai", "embeddings", "retrieval", "loaders", "splitters", "vectorstores"]
 full = ["default", "agent", "rag", "cache", "eval", "mcp", "macros", "deep", "schemars",
-        "models", "qdrant", "pgvector", "redis", "redis-cluster", "pdf",
+        "otel", "langfuse",
+        "models", "qdrant", "postgres", "redis", "redis-cluster", "pdf",
         "pinecone", "chroma", "mongodb", "elasticsearch", "sqlite", "tavily",
         "huggingface", "voyage", "nomic", "jina", "weaviate", "sqltoolkit",
-        "together", "fireworks", "xai", "perplexity", "e2b", "confluence", "slack",
+        "e2b", "confluence", "slack",
         "milvus", "opensearch", "lancedb", "flashrank", "lark",
         "store-filesystem", "deep-config"]
 

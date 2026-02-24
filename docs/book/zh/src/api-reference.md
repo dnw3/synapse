@@ -35,7 +35,7 @@ cargo doc --workspace --open
 | [`synaptic-gemini`](https://docs.rs/synaptic-gemini) | Google Gemini 提供商：`GeminiChatModel` |
 | [`synaptic-ollama`](https://docs.rs/synaptic-ollama) | Ollama 提供商：`OllamaChatModel`、`OllamaEmbeddings` |
 | [`synaptic-qdrant`](https://docs.rs/synaptic-qdrant) | Qdrant 向量存储：`QdrantVectorStore` |
-| [`synaptic-pgvector`](https://docs.rs/synaptic-pgvector) | PostgreSQL pgvector 向量存储：`PgVectorStore` |
+| [`synaptic-postgres`](https://docs.rs/synaptic-postgres) | PostgreSQL 集成：`PgVectorStore`、`PgStore`、`PgCache`、`PgCheckpointer` |
 | [`synaptic-redis`](https://docs.rs/synaptic-redis) | Redis 存储和缓存：`RedisStore`、`RedisCache` |
 | [`synaptic-pdf`](https://docs.rs/synaptic-pdf) | PDF 文档加载器：`PdfLoader` |
 | [`synaptic-eval`](https://docs.rs/synaptic-eval) | 评估器：`ExactMatchEvaluator`、`RegexMatchEvaluator`、`LLMJudgeEvaluator` 等 |

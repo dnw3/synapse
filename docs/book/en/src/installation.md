@@ -75,7 +75,7 @@ Individual features: `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, 
 | Feature | Description |
 |---------|-------------|
 | `qdrant` | Qdrant vector store (`synaptic-qdrant`) |
-| `pgvector` | PostgreSQL pgvector store (`synaptic-pgvector`) |
+| `postgres` | PostgreSQL store, cache, vector store, graph checkpointer (`synaptic-postgres`) |
 | `redis` | Redis store + cache (`synaptic-redis`) |
 | `pdf` | PDF document loader (`synaptic-pdf`) |
 | `bedrock` | AWS Bedrock ChatModel (`synaptic-bedrock`) |

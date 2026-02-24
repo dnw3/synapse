@@ -4,6 +4,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use synaptic_core::SynapticError;
 use synaptic_embeddings::{CacheBackedEmbeddings, Embeddings, FakeEmbeddings};
+use synaptic_store::InMemoryStore;
 
 /// A counting wrapper around FakeEmbeddings to verify cache behavior.
 struct CountingEmbeddings {
@@ -43,10 +44,15 @@ impl Embeddings for CountingEmbeddings {
     }
 }
 
+fn make_cached(counting: Arc<CountingEmbeddings>) -> CacheBackedEmbeddings {
+    let store = Arc::new(InMemoryStore::new());
+    CacheBackedEmbeddings::new(counting, store, "test")
+}
+
 #[tokio::test]
 async fn embed_query_caches_results() {
     let counting = Arc::new(CountingEmbeddings::new());
-    let cached = CacheBackedEmbeddings::new(counting.clone());
+    let cached = make_cached(counting.clone());
 
     let result1 = cached.embed_query("hello world").await.unwrap();
     assert_eq!(counting.query_call_count(), 1);
@@ -60,7 +66,7 @@ async fn embed_query_caches_results() {
 #[tokio::test]
 async fn embed_query_different_texts_calls_inner() {
     let counting = Arc::new(CountingEmbeddings::new());
-    let cached = CacheBackedEmbeddings::new(counting.clone());
+    let cached = make_cached(counting.clone());
 
     cached.embed_query("hello").await.unwrap();
     assert_eq!(counting.query_call_count(), 1);
@@ -72,7 +78,7 @@ async fn embed_query_different_texts_calls_inner() {
 #[tokio::test]
 async fn embed_documents_caches_results() {
     let counting = Arc::new(CountingEmbeddings::new());
-    let cached = CacheBackedEmbeddings::new(counting.clone());
+    let cached = make_cached(counting.clone());
 
     let result1 = cached.embed_documents(&["hello", "world"]).await.unwrap();
     assert_eq!(counting.document_call_count(), 1);
@@ -88,7 +94,7 @@ async fn embed_documents_caches_results() {
 #[tokio::test]
 async fn embed_documents_partial_cache_hit() {
     let counting = Arc::new(CountingEmbeddings::new());
-    let cached = CacheBackedEmbeddings::new(counting.clone());
+    let cached = make_cached(counting.clone());
 
     // First call caches "hello" and "world"
     cached.embed_documents(&["hello", "world"]).await.unwrap();
@@ -103,7 +109,7 @@ async fn embed_documents_partial_cache_hit() {
 #[tokio::test]
 async fn embed_query_and_documents_share_cache() {
     let counting = Arc::new(CountingEmbeddings::new());
-    let cached = CacheBackedEmbeddings::new(counting.clone());
+    let cached = make_cached(counting.clone());
 
     // Cache via embed_query
     let query_result = cached.embed_query("hello").await.unwrap();

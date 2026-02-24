@@ -50,7 +50,7 @@ synaptic = { version = "0.2", features = ["agent"] }
 | `deepseek` | DeepSeek ChatModel (R1 reasoning + V3) |
 | `models` | All chat model providers |
 | `qdrant` | Qdrant vector store |
-| `pgvector` | PostgreSQL + pgvector store + graph checkpointer |
+| `postgres` | PostgreSQL store, cache, vector store, graph checkpointer |
 | `redis` | Redis store + LLM cache + graph checkpointer |
 | `weaviate` | Weaviate vector store |
 | `pinecone` | Pinecone vector store |
@@ -151,7 +151,7 @@ let result = graph.invoke(state).await?;
 |-------|---------|
 | `synaptic-vectorstores` | In-memory (cosine similarity) |
 | `synaptic-qdrant` | Qdrant |
-| `synaptic-pgvector` | PostgreSQL + pgvector |
+| `synaptic-postgres` | PostgreSQL |
 | `synaptic-pinecone` | Pinecone |
 | `synaptic-chroma` | Chroma |
 | `synaptic-mongodb` | MongoDB Atlas Vector Search |
@@ -163,7 +163,7 @@ let result = graph.invoke(state).await?;
 | Crate | Backend |
 |-------|---------|
 | `synaptic-redis` | Redis Store + LLM Cache + Graph Checkpointer |
-| `synaptic-pgvector` | PostgreSQL + pgvector (also Graph Checkpointer) |
+| `synaptic-postgres` | PostgreSQL (Store + Cache + VectorStore + Graph Checkpointer) |
 | `synaptic-sqlite` | SQLite LLM Cache |
 
 ### Tools

@@ -65,7 +65,7 @@ synaptic = { version = "0.2", features = ["openai", "graph", "cache"] }
 | Feature | 说明 |
 |---------|------|
 | `qdrant` | Qdrant 向量存储（`QdrantVectorStore`） |
-| `pgvector` | PostgreSQL pgvector 向量存储（`PgVectorStore`） |
+| `postgres` | PostgreSQL 集成（`PgVectorStore`、`PgStore`、`PgCache`） |
 | `redis` | Redis 存储和缓存（`RedisStore`、`RedisCache`） |
 | `pdf` | PDF 文档加载器（`PdfLoader`） |
 | `bedrock` | AWS Bedrock ChatModel（`synaptic-bedrock`） |
@@ -77,7 +77,7 @@ synaptic = { version = "0.2", features = ["openai", "graph", "cache"] }
 | `sqlite` | SQLite LLM 缓存（`synaptic-sqlite`） |
 | `tavily` | Tavily 搜索工具（`synaptic-tavily`） |
 
-单独可用的 features：`openai`, `anthropic`, `gemini`, `ollama`, `bedrock`, `cohere`, `models`, `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`, `qdrant`, `pgvector`, `redis`, `pdf`, `pinecone`, `chroma`, `mongodb`, `elasticsearch`, `sqlite`, `tavily`。
+单独可用的 features：`openai`, `anthropic`, `gemini`, `ollama`, `bedrock`, `cohere`, `models`, `model-utils`, `runnables`, `prompts`, `parsers`, `tools`, `memory`, `callbacks`, `retrieval`, `loaders`, `splitters`, `embeddings`, `vectorstores`, `graph`, `cache`, `eval`, `store`, `middleware`, `mcp`, `macros`, `deep`, `qdrant`, `postgres`, `redis`, `pdf`, `pinecone`, `chroma`, `mongodb`, `elasticsearch`, `sqlite`, `tavily`。
 
 **高级 features：**
 

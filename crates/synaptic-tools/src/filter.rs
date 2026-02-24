@@ -129,10 +129,7 @@ impl ToolFilter for StateMachineFilter {
         // Apply after-tool rules: restrict to only allowed_next
         if let Some(last) = &context.last_tool {
             if let Some(allowed) = self.after_tool_rules.get(last) {
-                result = result
-                    .into_iter()
-                    .filter(|t| allowed.contains(&t.name))
-                    .collect();
+                result.retain(|t| allowed.contains(&t.name));
             }
         }
 
@@ -151,15 +148,12 @@ impl ToolFilter for StateMachineFilter {
         }
 
         if !gated_tools.is_empty() {
-            result = result
-                .into_iter()
-                .filter(|t| {
-                    match gated_tools.get(t.name.as_str()) {
-                        Some(&met) => met, // Gated tool: only include if threshold met
-                        None => true,      // Not gated: always include
-                    }
-                })
-                .collect();
+            result.retain(|t| {
+                match gated_tools.get(t.name.as_str()) {
+                    Some(&met) => met, // Gated tool: only include if threshold met
+                    None => true,      // Not gated: always include
+                }
+            });
         }
 
         result

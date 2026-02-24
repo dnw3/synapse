@@ -2,6 +2,8 @@ use async_trait::async_trait;
 use redis::AsyncCommands;
 use synaptic_core::{ChatResponse, SynapticError};
 
+use crate::connection::{collect_matching_keys, RedisBackend, RedisConn};
+
 /// Configuration for [`RedisCache`].
 #[derive(Debug, Clone)]
 pub struct RedisCacheConfig {
@@ -24,23 +26,18 @@ impl Default for RedisCacheConfig {
 ///
 /// Stores serialized [`ChatResponse`] values under `{prefix}{key}` with
 /// optional TTL expiration managed by Redis itself.
+///
+/// Supports both standalone Redis and Redis Cluster (with the `cluster` feature).
 pub struct RedisCache {
-    client: redis::Client,
+    backend: RedisBackend,
     config: RedisCacheConfig,
 }
 
 impl RedisCache {
-    /// Create a new `RedisCache` with an existing Redis client and configuration.
-    pub fn new(client: redis::Client, config: RedisCacheConfig) -> Self {
-        Self { client, config }
-    }
-
     /// Create a new `RedisCache` from a Redis URL with default configuration.
     pub fn from_url(url: &str) -> Result<Self, SynapticError> {
-        let client = redis::Client::open(url)
-            .map_err(|e| SynapticError::Cache(format!("failed to connect to Redis: {e}")))?;
         Ok(Self {
-            client,
+            backend: RedisBackend::standalone(url)?,
             config: RedisCacheConfig::default(),
         })
     }
@@ -50,9 +47,37 @@ impl RedisCache {
         url: &str,
         config: RedisCacheConfig,
     ) -> Result<Self, SynapticError> {
-        let client = redis::Client::open(url)
-            .map_err(|e| SynapticError::Cache(format!("failed to connect to Redis: {e}")))?;
-        Ok(Self { client, config })
+        Ok(Self {
+            backend: RedisBackend::standalone(url)?,
+            config,
+        })
+    }
+
+    /// Create a new `RedisCache` from an existing [`RedisBackend`].
+    #[allow(dead_code)]
+    pub(crate) fn from_backend(backend: RedisBackend, config: RedisCacheConfig) -> Self {
+        Self { backend, config }
+    }
+
+    /// Create a new `RedisCache` connecting to a Redis Cluster.
+    #[cfg(feature = "cluster")]
+    pub fn from_cluster_nodes(nodes: &[&str]) -> Result<Self, SynapticError> {
+        Ok(Self {
+            backend: RedisBackend::cluster(nodes)?,
+            config: RedisCacheConfig::default(),
+        })
+    }
+
+    /// Create a new `RedisCache` connecting to a Redis Cluster with custom configuration.
+    #[cfg(feature = "cluster")]
+    pub fn from_cluster_nodes_with_config(
+        nodes: &[&str],
+        config: RedisCacheConfig,
+    ) -> Result<Self, SynapticError> {
+        Ok(Self {
+            backend: RedisBackend::cluster(nodes)?,
+            config,
+        })
     }
 
     /// Build the full Redis key for a cache entry.
@@ -60,19 +85,13 @@ impl RedisCache {
         format!("{}{key}", self.config.prefix)
     }
 
-    async fn get_connection(&self) -> Result<redis::aio::MultiplexedConnection, SynapticError> {
-        self.client
-            .get_multiplexed_async_connection()
-            .await
-            .map_err(|e| SynapticError::Cache(format!("Redis connection error: {e}")))
+    async fn get_connection(&self) -> Result<RedisConn, SynapticError> {
+        self.backend.get_connection().await
     }
 }
 
 /// Helper to GET a key from Redis as an `Option<String>`.
-async fn redis_get_string(
-    con: &mut redis::aio::MultiplexedConnection,
-    key: &str,
-) -> Result<Option<String>, SynapticError> {
+async fn redis_get_string(con: &mut RedisConn, key: &str) -> Result<Option<String>, SynapticError> {
     let raw: Option<String> = con
         .get(key)
         .await
@@ -123,28 +142,15 @@ impl synaptic_core::LlmCache for RedisCache {
         let mut con = self.get_connection().await?;
         let pattern = format!("{}*", self.config.prefix);
 
-        // Collect all matching keys via SCAN, then delete them
-        let mut cursor: u64 = 0;
-        loop {
-            let (next_cursor, keys): (u64, Vec<String>) = redis::cmd("SCAN")
-                .arg(cursor)
-                .arg("MATCH")
-                .arg(&pattern)
-                .arg("COUNT")
-                .arg(100)
-                .query_async(&mut con)
-                .await
-                .map_err(|e| SynapticError::Cache(format!("Redis SCAN error: {e}")))?;
+        // Collect all matching keys (SCAN for standalone, KEYS for cluster)
+        let keys = collect_matching_keys(&mut con, &pattern).await?;
 
-            if !keys.is_empty() {
-                con.del::<_, ()>(&keys)
+        if !keys.is_empty() {
+            // Delete in batches to avoid issues with large key sets
+            for chunk in keys.chunks(100) {
+                con.del::<_, ()>(chunk)
                     .await
                     .map_err(|e| SynapticError::Cache(format!("Redis DEL error: {e}")))?;
-            }
-
-            cursor = next_cursor;
-            if cursor == 0 {
-                break;
             }
         }
 

@@ -120,6 +120,7 @@ cohere = ["dep:synaptic-cohere"]
 qdrant = ["dep:synaptic-qdrant"]
 pgvector = ["dep:synaptic-pgvector"]
 redis = ["dep:synaptic-redis"]
+redis-cluster = ["redis", "synaptic-redis/cluster"]
 pdf = ["dep:synaptic-pdf"]
 pinecone = ["dep:synaptic-pinecone"]
 chroma = ["dep:synaptic-chroma"]
@@ -155,7 +156,7 @@ models = ["openai", "anthropic", "gemini", "ollama", "bedrock", "cohere", "groq"
 agent = ["default", "openai", "model-utils", "graph", "memory", "middleware", "store", "condenser", "secrets", "config", "session"]
 rag = ["default", "openai", "embeddings", "retrieval", "loaders", "splitters", "vectorstores"]
 full = ["default", "agent", "rag", "cache", "eval", "mcp", "macros", "deep", "schemars",
-        "models", "qdrant", "pgvector", "redis", "pdf",
+        "models", "qdrant", "pgvector", "redis", "redis-cluster", "pdf",
         "pinecone", "chroma", "mongodb", "elasticsearch", "sqlite", "tavily",
         "huggingface", "voyage", "nomic", "jina", "weaviate", "sqltoolkit",
         "together", "fireworks", "xai", "perplexity", "e2b", "confluence", "slack",

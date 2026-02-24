@@ -230,6 +230,66 @@ let cache = Arc::new(
 // 不同的 prefix 确保 Store 和 Cache 的 key 互不冲突
 ```
 
+## Redis Cluster
+
+Synaptic 支持 Redis Cluster，适用于需要水平扩展和高可用的生产环境。
+
+### Cargo.toml 配置
+
+启用 `redis-cluster` feature：
+
+```toml
+[dependencies]
+synaptic = { version = "0.3", features = ["redis-cluster"] }
+```
+
+### 创建集群 Store
+
+```rust,ignore
+use synaptic::redis::RedisStore;
+
+let store = RedisStore::from_cluster_nodes(&[
+    "redis://127.0.0.1:7000/",
+    "redis://127.0.0.1:7001/",
+    "redis://127.0.0.1:7002/",
+])?;
+```
+
+带自定义配置：
+
+```rust,ignore
+use synaptic::redis::{RedisStore, RedisStoreConfig};
+
+let config = RedisStoreConfig {
+    prefix: "myapp:store:".to_string(),
+};
+let store = RedisStore::from_cluster_nodes_with_config(
+    &["redis://127.0.0.1:7000/", "redis://127.0.0.1:7001/"],
+    config,
+)?;
+```
+
+### 创建集群 Cache
+
+```rust,ignore
+use synaptic::redis::{RedisCache, RedisCacheConfig};
+
+let config = RedisCacheConfig {
+    ttl: Some(3600),
+    ..Default::default()
+};
+let cache = RedisCache::from_cluster_nodes_with_config(
+    &["redis://127.0.0.1:7000/", "redis://127.0.0.1:7001/"],
+    config,
+)?;
+```
+
+### 注意事项
+
+- 所有 `Store`、`LlmCache` 和 `Checkpointer` 操作在单节点和集群后端上行为一致。API 完全相同——只有构造器不同。
+- 键枚举操作（`search`、`clear`）在集群上使用 `KEYS`（redis-rs 自动分发到所有节点），而非单节点上的 `SCAN`。这些操作不在热路径上。
+- `redis-cluster` feature 会引入 `redis` crate 的 `cluster-async` feature。
+
 ### 与 InMemoryStore / InMemoryCache 的区别
 
 | 特性 | `InMemory*` | `Redis*` |

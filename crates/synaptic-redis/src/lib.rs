@@ -26,6 +26,7 @@
 mod cache;
 #[cfg(feature = "checkpointer")]
 pub mod checkpointer;
+mod connection;
 mod store;
 
 pub use cache::{RedisCache, RedisCacheConfig};

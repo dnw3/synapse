@@ -45,17 +45,6 @@ let config = RedisStoreConfig {
 let store = RedisStore::from_url_with_config("redis://127.0.0.1/", config)?;
 ```
 
-### Using an existing client
-
-If you already have a configured `redis::Client`, pass it directly:
-
-```rust,ignore
-use synaptic::redis::{RedisStore, RedisStoreConfig};
-
-let client = redis::Client::open("redis://127.0.0.1/")?;
-let store = RedisStore::new(client, RedisStoreConfig::default());
-```
-
 ### Storing and retrieving data
 
 `RedisStore` implements the `Store` trait with full namespace support:
@@ -202,12 +191,65 @@ cache.clear().await?;
 
 This deletes all Redis keys matching the cache prefix.
 
-### Using an existing client
+## Redis Cluster
+
+Synaptic supports Redis Cluster for production deployments that require horizontal scaling and high availability.
+
+### Setup
+
+Enable the `redis-cluster` feature in your `Cargo.toml`:
+
+```toml
+[dependencies]
+synaptic = { version = "0.3", features = ["redis-cluster"] }
+```
+
+### Creating a cluster store
 
 ```rust,ignore
-let client = redis::Client::open("redis://127.0.0.1/")?;
-let cache = RedisCache::new(client, RedisCacheConfig::default());
+use synaptic::redis::RedisStore;
+
+let store = RedisStore::from_cluster_nodes(&[
+    "redis://127.0.0.1:7000/",
+    "redis://127.0.0.1:7001/",
+    "redis://127.0.0.1:7002/",
+])?;
 ```
+
+With custom config:
+
+```rust,ignore
+use synaptic::redis::{RedisStore, RedisStoreConfig};
+
+let config = RedisStoreConfig {
+    prefix: "myapp:store:".to_string(),
+};
+let store = RedisStore::from_cluster_nodes_with_config(
+    &["redis://127.0.0.1:7000/", "redis://127.0.0.1:7001/"],
+    config,
+)?;
+```
+
+### Creating a cluster cache
+
+```rust,ignore
+use synaptic::redis::{RedisCache, RedisCacheConfig};
+
+let config = RedisCacheConfig {
+    ttl: Some(3600),
+    ..Default::default()
+};
+let cache = RedisCache::from_cluster_nodes_with_config(
+    &["redis://127.0.0.1:7000/", "redis://127.0.0.1:7001/"],
+    config,
+)?;
+```
+
+### Notes
+
+- All `Store`, `LlmCache`, and `Checkpointer` operations work identically on standalone and cluster backends. The API surface is the same -- only the constructor changes.
+- Key enumeration (`search`, `clear`) uses `KEYS` on clusters (redis-rs scatters across nodes automatically) instead of `SCAN` on standalone. These operations are not on the hot path.
+- The `redis-cluster` feature pulls in the `cluster-async` feature from the `redis` crate.
 
 ## Configuration reference
 

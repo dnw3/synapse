@@ -3,6 +3,8 @@ use redis::AsyncCommands;
 use serde_json::Value;
 use synaptic_core::{Item, SynapticError};
 
+use crate::connection::{collect_matching_keys, RedisBackend, RedisConn};
+
 /// Configuration for [`RedisStore`].
 #[derive(Debug, Clone)]
 pub struct RedisStoreConfig {
@@ -23,27 +25,22 @@ impl Default for RedisStoreConfig {
 /// Keys are stored in the format `{prefix}{namespace_joined_by_colon}:{key}`.
 /// A Redis SET at `{prefix}__namespaces__` tracks all known namespace paths
 /// for efficient [`list_namespaces`](synaptic_core::Store::list_namespaces) queries.
+///
+/// Supports both standalone Redis and Redis Cluster (with the `cluster` feature).
 pub struct RedisStore {
-    client: redis::Client,
+    backend: RedisBackend,
     config: RedisStoreConfig,
 }
 
 impl RedisStore {
-    /// Create a new `RedisStore` with an existing Redis client and configuration.
-    pub fn new(client: redis::Client, config: RedisStoreConfig) -> Self {
-        Self { client, config }
-    }
-
     /// Create a new `RedisStore` from a Redis URL with default configuration.
     ///
     /// # Errors
     ///
     /// Returns an error if the URL is invalid.
     pub fn from_url(url: &str) -> Result<Self, SynapticError> {
-        let client = redis::Client::open(url)
-            .map_err(|e| SynapticError::Store(format!("failed to connect to Redis: {e}")))?;
         Ok(Self {
-            client,
+            backend: RedisBackend::standalone(url)?,
             config: RedisStoreConfig::default(),
         })
     }
@@ -53,9 +50,37 @@ impl RedisStore {
         url: &str,
         config: RedisStoreConfig,
     ) -> Result<Self, SynapticError> {
-        let client = redis::Client::open(url)
-            .map_err(|e| SynapticError::Store(format!("failed to connect to Redis: {e}")))?;
-        Ok(Self { client, config })
+        Ok(Self {
+            backend: RedisBackend::standalone(url)?,
+            config,
+        })
+    }
+
+    /// Create a new `RedisStore` from an existing [`RedisBackend`].
+    #[allow(dead_code)]
+    pub(crate) fn from_backend(backend: RedisBackend, config: RedisStoreConfig) -> Self {
+        Self { backend, config }
+    }
+
+    /// Create a new `RedisStore` connecting to a Redis Cluster.
+    #[cfg(feature = "cluster")]
+    pub fn from_cluster_nodes(nodes: &[&str]) -> Result<Self, SynapticError> {
+        Ok(Self {
+            backend: RedisBackend::cluster(nodes)?,
+            config: RedisStoreConfig::default(),
+        })
+    }
+
+    /// Create a new `RedisStore` connecting to a Redis Cluster with custom configuration.
+    #[cfg(feature = "cluster")]
+    pub fn from_cluster_nodes_with_config(
+        nodes: &[&str],
+        config: RedisStoreConfig,
+    ) -> Result<Self, SynapticError> {
+        Ok(Self {
+            backend: RedisBackend::cluster(nodes)?,
+            config,
+        })
     }
 
     /// Build the Redis key for a given namespace and item key.
@@ -73,7 +98,7 @@ impl RedisStore {
         format!("{}__namespaces__", self.config.prefix)
     }
 
-    /// Build the SCAN pattern for a given namespace.
+    /// Build the SCAN/KEYS pattern for a given namespace.
     fn scan_pattern(&self, namespace: &[&str]) -> String {
         let ns = namespace.join(":");
         if ns.is_empty() {
@@ -88,11 +113,8 @@ impl RedisStore {
         namespace.join(":")
     }
 
-    async fn get_connection(&self) -> Result<redis::aio::MultiplexedConnection, SynapticError> {
-        self.client
-            .get_multiplexed_async_connection()
-            .await
-            .map_err(|e| SynapticError::Store(format!("Redis connection error: {e}")))
+    async fn get_connection(&self) -> Result<RedisConn, SynapticError> {
+        self.backend.get_connection().await
     }
 }
 
@@ -101,10 +123,7 @@ fn now_iso() -> String {
 }
 
 /// Helper to GET a key from Redis as an `Option<String>`.
-async fn redis_get_string(
-    con: &mut redis::aio::MultiplexedConnection,
-    key: &str,
-) -> Result<Option<String>, SynapticError> {
+async fn redis_get_string(con: &mut RedisConn, key: &str) -> Result<Option<String>, SynapticError> {
     let raw: Option<String> = con
         .get(key)
         .await
@@ -140,31 +159,14 @@ impl synaptic_core::Store for RedisStore {
         let pattern = self.scan_pattern(namespace);
         let ns_index_key = self.namespace_index_key();
 
-        // Collect all matching keys via SCAN
-        let mut keys: Vec<String> = Vec::new();
-        let mut cursor: u64 = 0;
-        loop {
-            let (next_cursor, batch): (u64, Vec<String>) = redis::cmd("SCAN")
-                .arg(cursor)
-                .arg("MATCH")
-                .arg(&pattern)
-                .arg("COUNT")
-                .arg(100)
-                .query_async(&mut con)
-                .await
-                .map_err(|e| SynapticError::Store(format!("Redis SCAN error: {e}")))?;
+        // Collect all matching keys (SCAN for standalone, KEYS for cluster)
+        let all_keys = collect_matching_keys(&mut con, &pattern).await?;
 
-            // Filter out the namespace index key
-            for k in batch {
-                if k != ns_index_key {
-                    keys.push(k);
-                }
-            }
-            cursor = next_cursor;
-            if cursor == 0 {
-                break;
-            }
-        }
+        // Filter out the namespace index key
+        let keys: Vec<String> = all_keys
+            .into_iter()
+            .filter(|k| k != &ns_index_key)
+            .collect();
 
         // Load items
         let mut items: Vec<Item> = Vec::new();

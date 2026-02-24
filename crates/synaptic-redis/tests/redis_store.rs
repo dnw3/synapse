@@ -36,6 +36,12 @@ fn store_config_custom_prefix() {
 }
 
 #[test]
+fn store_from_url_valid() {
+    let result = synaptic_redis::RedisStore::from_url("redis://127.0.0.1/");
+    assert!(result.is_ok());
+}
+
+#[test]
 fn store_from_url_invalid_url() {
     // An obviously invalid URL should produce an error
     let result = synaptic_redis::RedisStore::from_url("not-a-valid-url");
@@ -43,9 +49,66 @@ fn store_from_url_invalid_url() {
 }
 
 #[test]
+fn cache_from_url_valid() {
+    let result = synaptic_redis::RedisCache::from_url("redis://127.0.0.1/");
+    assert!(result.is_ok());
+}
+
+#[test]
 fn cache_from_url_invalid_url() {
     let result = synaptic_redis::RedisCache::from_url("not-a-valid-url");
     assert!(result.is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Cluster constructor tests (no running cluster required)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "cluster")]
+mod cluster_constructors {
+    use synaptic_redis::{RedisCache, RedisCacheConfig, RedisStore, RedisStoreConfig};
+
+    #[test]
+    fn store_from_cluster_nodes() {
+        let result = RedisStore::from_cluster_nodes(&[
+            "redis://127.0.0.1:7000/",
+            "redis://127.0.0.1:7001/",
+            "redis://127.0.0.1:7002/",
+        ]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn store_from_cluster_nodes_with_config() {
+        let config = RedisStoreConfig {
+            prefix: "cluster:store:".to_string(),
+        };
+        let result = RedisStore::from_cluster_nodes_with_config(
+            &["redis://127.0.0.1:7000/", "redis://127.0.0.1:7001/"],
+            config,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn cache_from_cluster_nodes() {
+        let result =
+            RedisCache::from_cluster_nodes(&["redis://127.0.0.1:7000/", "redis://127.0.0.1:7001/"]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn cache_from_cluster_nodes_with_config() {
+        let config = RedisCacheConfig {
+            prefix: "cluster:cache:".to_string(),
+            ttl: Some(600),
+        };
+        let result = RedisCache::from_cluster_nodes_with_config(
+            &["redis://127.0.0.1:7000/", "redis://127.0.0.1:7001/"],
+            config,
+        );
+        assert!(result.is_ok());
+    }
 }
 
 // ---------------------------------------------------------------------------

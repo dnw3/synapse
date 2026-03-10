@@ -1,0 +1,26 @@
+# Build
+/target
+/web/dist
+/web/node_modules
+
+# Runtime
+.sessions/
+log/
+data/
+
+# Config (contains secrets)
+synaptic.toml
+.env
+
+# IDE / tooling
+.claude
+CLAUDE.md
+AGENTS.md
+
+# OS
+.DS_Store
+*.swp
+*~
+
+CLAUDE.md
+docs/

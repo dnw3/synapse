@@ -1,0 +1,364 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Roboto:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* ── Synapse Design System ─────────────────────────────────── */
+
+/* ── Dark Theme · Bitcoin DeFi Aesthetic ──────────────────── */
+:root,
+[data-theme="dark"] {
+  /* True Void foundation */
+  --bg-primary: #030304;
+  --bg-elevated: #0F1115;
+  --bg-surface: #161A22;
+  --bg-hover: #1E2530;
+
+  /* Dim boundaries — ultra-thin, barely visible */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(30, 41, 59, 0.8);
+  --border-strong: rgba(255, 255, 255, 0.20);
+
+  /* Pure light on true void — maximum contrast */
+  --text-primary: #FFFFFF;
+  --text-secondary: #94A3B8;
+  --text-tertiary: #64748B;
+
+  /* Bitcoin Fire — accent set by JS, fallback orange */
+  --accent: #F7931A;
+  --accent-light: #FFD600;
+  --accent-glow: rgba(247, 147, 26, 0.15);
+  --accent-glow-strong: rgba(247, 147, 26, 0.25);
+  --accent-gradient-end: #EA580C;
+
+  /* Status — keep semantic, gold success */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+
+  /* Typography — Inter body, Space Grotesk headings */
+  --font-sans: 'Inter', 'PingFang SC', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-heading: 'Space Grotesk', 'Inter', -apple-system, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Geometric precision with soft curves */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Colored shadows — orange/gold tints, never pure black */
+  --shadow-sm: 0 1px 3px rgba(247, 147, 26, 0.06), 0 0 1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(247, 147, 26, 0.08), 0 0 1px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 20px rgba(247, 147, 26, 0.15);
+
+  --noise-opacity: 0.03;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(247, 147, 26, 0.25);
+
+  --prose-code-bg: var(--bg-surface);
+  --input-bg: rgba(0, 0, 0, 0.5);
+
+  /* Tool colors — Bitcoin palette */
+  --tool-read: #22d3ee;
+  --tool-write: #34d399;
+  --tool-edit: #FFD600;
+  --tool-exec: #F7931A;
+  --tool-task: #60a5fa;
+
+  /* Chart — warm palette anchored on Bitcoin orange */
+  --chart-grid: rgba(30, 41, 59, 0.5);
+  --chart-tick: #94A3B8;
+  --stat-positive: #34d399;
+  --stat-negative: #f87171;
+  --stat-neutral: #94A3B8;
+  --chart-area-fill: rgba(247, 147, 26, 0.12);
+  --chart-line: #FFD600;
+  --card-glow: rgba(247, 147, 26, 0.04);
+  --chart-1: #F7931A;
+  --chart-2: #FFD600;
+  --chart-3: #34d399;
+  --chart-4: #22d3ee;
+  --chart-5: #f87171;
+  --chart-6: #EA580C;
+  --chart-7: #a78bfa;
+  --chart-8: #fb923c;
+
+  /* Code — warm syntax highlighting */
+  --code-key: #FFD600;
+  --code-string: #34d399;
+  --code-bool: #F7931A;
+  --code-null: #f87171;
+  --code-number: #22d3ee;
+
+  /* HTTP methods */
+  --method-get: #22d3ee;
+  --method-post: #34d399;
+  --method-put: #F7931A;
+  --method-delete: #f87171;
+
+  color-scheme: dark;
+}
+
+/* ── Light Theme · Material You (MD3) ────────────────────── */
+[data-theme="light"] {
+  /* Tonal surfaces — warm off-white, never pure #FFF */
+  --bg-primary: #FFFBFE;
+  --bg-elevated: #F3EDF7;
+  --bg-surface: #E7E0EC;
+  --bg-hover: #DDD6E3;
+
+  /* Borders — use sparingly, tonal surfaces preferred */
+  --border-subtle: rgba(121, 116, 126, 0.12);
+  --border-default: rgba(121, 116, 126, 0.20);
+  --border-strong: rgba(121, 116, 126, 0.35);
+
+  /* On Surface — warm near-black + muted variants */
+  --text-primary: #1C1B1F;
+  --text-secondary: #49454F;
+  --text-tertiary: #79747E;
+
+  /* Status — expressive but harmonious */
+  --success: #386A20;
+  --warning: #7D5700;
+  --error: #BA1A1A;
+
+  /* Elevation — subtle diffuse shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+
+  /* No noise texture — MD3 uses tonal surfaces for depth */
+  --noise-opacity: 0;
+
+  --scrollbar-thumb: rgba(73, 69, 79, 0.18);
+  --scrollbar-thumb-hover: rgba(73, 69, 79, 0.30);
+
+  --prose-code-bg: var(--bg-surface);
+  --input-bg: var(--bg-surface);
+
+  /* Organic, generous rounding — friendly & approachable */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 28px;
+
+  /* Roboto — canonical Material Design typeface */
+  --font-sans: 'Roboto', 'PingFang SC', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  /* Tool colors — tonal, expressive */
+  --tool-read: #0061A4;
+  --tool-write: #386A20;
+  --tool-edit: #7D5700;
+  --tool-exec: var(--accent);
+  --tool-task: #6750A4;
+
+  /* Chart — MD3 extended palette */
+  --chart-grid: rgba(73, 69, 79, 0.08);
+  --chart-tick: #79747E;
+  --stat-positive: #386A20;
+  --stat-negative: #BA1A1A;
+  --stat-neutral: #79747E;
+  --chart-area-fill: rgba(103, 80, 164, 0.10);
+  --chart-line: var(--accent);
+  --card-glow: rgba(103, 80, 164, 0.06);
+  --chart-1: #6750A4;
+  --chart-2: #7D5260;
+  --chart-3: #386A20;
+  --chart-4: #7D5700;
+  --chart-5: #BA1A1A;
+  --chart-6: #0061A4;
+  --chart-7: #6750A4;
+  --chart-8: #625B71;
+
+  /* Code — tonal, readable */
+  --code-key: #0061A4;
+  --code-string: #386A20;
+  --code-bool: #7D5700;
+  --code-null: #BA1A1A;
+  --code-number: #6750A4;
+
+  /* HTTP methods */
+  --method-get: #0061A4;
+  --method-post: #386A20;
+  --method-put: #7D5700;
+  --method-delete: #BA1A1A;
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'ss01', 'ss02', 'cv01';
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* ── Selection ─────────────────────────────────────────────── */
+::selection {
+  background: var(--accent-glow-strong);
+  color: var(--text-primary);
+}
+
+/* ── Focus ─────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Monospace ─────────────────────────────────────────────── */
+code, pre, .font-mono { font-family: var(--font-mono) !important; }
+
+/* ── Subtle noise texture on root ──────────────────────────── */
+#root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+  opacity: var(--noise-opacity);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Terminal ──────────────────────────────────────────────── */
+.xterm { padding: 8px; }
+
+/* ── Animate ──────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50% { box-shadow: 0 0 12px 2px var(--accent-glow); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+.animate-fade-in { animation: fade-in 0.3s ease-out both; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-float { animation: float 8s ease-in-out infinite; }
+
+/* ── Bitcoin grid pattern ─────────────────────────────────── */
+.bg-grid-pattern {
+  background-size: 50px 50px;
+  background-image:
+    linear-gradient(to right, rgba(30, 41, 59, 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(30, 41, 59, 0.5) 1px, transparent 1px);
+  mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+}
+
+/* ── Glass morphism utility ───────────────────────────────── */
+.glass-surface {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* ── Heading font utility ─────────────────────────────────── */
+.font-heading { font-family: var(--font-heading, var(--font-sans)); }
+
+/* ── Prose theme control ──────────────────────────────────── */
+.synapse-prose {
+  --tw-prose-body: var(--text-primary);
+  --tw-prose-headings: var(--text-primary);
+  --tw-prose-links: var(--accent);
+  --tw-prose-bold: var(--text-primary);
+  --tw-prose-code: var(--accent-light);
+  --tw-prose-pre-bg: var(--bg-surface);
+  --tw-prose-pre-code: var(--text-primary);
+  --tw-prose-quotes: var(--text-secondary);
+  --tw-prose-counters: var(--text-secondary);
+  --tw-prose-bullets: var(--text-tertiary);
+  --tw-prose-hr: var(--border-default);
+  --tw-prose-th-borders: var(--border-default);
+  --tw-prose-td-borders: var(--border-subtle);
+}
+[data-theme="dark"] .synapse-prose {
+  --tw-prose-invert-body: var(--text-primary);
+  --tw-prose-invert-headings: var(--text-primary);
+  --tw-prose-invert-links: var(--accent-light);
+  --tw-prose-invert-bold: var(--text-primary);
+  --tw-prose-invert-code: var(--accent-light);
+}
+
+/* ── Dark Theme · Bitcoin DeFi Overrides ─────────────────── */
+
+/* Space Grotesk for headings in dark mode */
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.01em;
+}
+
+/* Focus — orange glow ring */
+[data-theme="dark"] :focus-visible {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 12px rgba(247, 147, 26, 0.2);
+}
+
+/* Selection — Bitcoin orange tint */
+[data-theme="dark"] ::selection {
+  background: rgba(247, 147, 26, 0.25);
+  color: #FFFFFF;
+}
+
+/* Scrollbar — subtle orange hover */
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(247, 147, 26, 0.25);
+}
+
+/* ── Light Theme · Material You (MD3) Overrides ──────────── */
+
+/* MD3 standard easing + 300ms transitions */
+[data-theme="light"] body {
+  transition: background-color 0.3s cubic-bezier(0.2, 0, 0, 1),
+              color 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* MD3 focus — primary color ring, organic radius */
+[data-theme="light"] :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Selection — primary tint */
+[data-theme="light"] ::selection {
+  background: rgba(103, 80, 164, 0.18);
+  color: #1C1B1F;
+}
+
+/* Light theme Monaco override */
+[data-theme="light"] .monaco-editor,
+[data-theme="light"] .monaco-editor .margin,
+[data-theme="light"] .monaco-editor-background {
+  background-color: var(--bg-primary) !important;
+}

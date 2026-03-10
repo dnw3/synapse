@@ -1,0 +1,680 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import { MessageSquare, ChevronDown, ChevronRight, Trash2, Pencil, PackageMinus, Search, Filter, Clock } from "lucide-react";
+import { cn } from "../../lib/cn";
+import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import type { SessionEntry } from "../../types/dashboard";
+import {
+  SectionCard,
+  SectionHeader,
+  EmptyState,
+  LoadingSkeleton,
+  Pagination,
+  StatsCard,
+  formatTokens,
+  formatCost,
+  formatDate,
+  useInlineConfirm,
+  useToast,
+  ToastContainer,
+} from "./shared";
+
+type SortField = "id" | "created_at" | "message_count" | "token_count";
+type SortOrder = "asc" | "desc";
+
+const PAGE_LIMIT = 50;
+
+const THINKING_OPTIONS = ["off", "minimal", "low", "medium", "high"] as const;
+const VERBOSE_OPTIONS = ["inherit", "off", "on", "full"] as const;
+
+export default function SessionsPage() {
+  const { t, i18n } = useTranslation();
+  const api = useDashboardAPI();
+
+  const [sessions, setSessions] = useState<SessionEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const [sortField, setSortField] = useState<SortField>("created_at");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [search, setSearch] = useState("");
+
+  // Filter bar state
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeWithinMin, setActiveWithinMin] = useState<string>("");
+  const [includeGlobal, setIncludeGlobal] = useState(false);
+  const [limitInput, setLimitInput] = useState<string>("");
+
+  // Inline label editing
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [editLabelValue, setEditLabelValue] = useState("");
+  const labelEditRef = useRef<HTMLInputElement>(null);
+
+  // Inline ID editing (rename)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editRef = useRef<HTMLInputElement>(null);
+
+  // Expanded row
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm(3000);
+  const { toasts, addToast } = useToast();
+
+  const loadSessions = useCallback(async () => {
+    setLoading(true);
+    const data = await api.fetchSessions({
+      limit: limitInput ? parseInt(limitInput, 10) || PAGE_LIMIT : PAGE_LIMIT,
+      offset,
+      sort: sortField,
+      order: sortOrder,
+    });
+    if (data) {
+      if (Array.isArray(data)) {
+        const sessions = data as SessionEntry[];
+        setSessions(sessions);
+        setTotal(sessions.length);
+      } else {
+        setSessions(data.sessions ?? []);
+        setTotal(data.total ?? data.sessions?.length ?? 0);
+      }
+    }
+    setLoading(false);
+  }, [api, offset, sortField, sortOrder, limitInput]);
+
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  // Focus edit inputs
+  useEffect(() => {
+    if (editingId && editRef.current) {
+      editRef.current.focus();
+      editRef.current.select();
+    }
+  }, [editingId]);
+
+  useEffect(() => {
+    if (editingLabelId && labelEditRef.current) {
+      labelEditRef.current.focus();
+      labelEditRef.current.select();
+    }
+  }, [editingLabelId]);
+
+  // Sort handler
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortOrder("desc");
+    }
+    setOffset(0);
+  };
+
+  // Actions
+  const handleDelete = async (id: string) => {
+    if (confirming !== id) {
+      requestConfirm(id);
+      return;
+    }
+    resetConfirm();
+    const ok = await api.deleteSession(id);
+    if (ok) {
+      addToast(t("sessions.deleted"), "success");
+      loadSessions();
+    } else {
+      addToast(t("sessions.deleteFailed"), "error");
+    }
+  };
+
+  const handleRename = async (id: string) => {
+    if (!editValue.trim()) {
+      setEditingId(null);
+      return;
+    }
+    const result = await api.renameSession(id, editValue.trim());
+    if (result) {
+      addToast(t("sessions.renamed"), "success");
+      loadSessions();
+    } else {
+      addToast(t("sessions.renameFailed"), "error");
+    }
+    setEditingId(null);
+  };
+
+  const handleLabelSave = async (id: string) => {
+    const result = await api.patchSessionOverrides(id, { label: editLabelValue.trim() || undefined });
+    if (result) {
+      addToast(t("sessions.labelUpdated"), "success");
+      // Update local state immediately
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, label: editLabelValue.trim() || undefined } : s))
+      );
+    } else {
+      addToast(t("sessions.updateFailed"), "error");
+    }
+    setEditingLabelId(null);
+  };
+
+  const handleThinkingChange = async (id: string, value: string) => {
+    const result = await api.patchSessionOverrides(id, { thinking: value });
+    if (result) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, thinking_level: value } : s))
+      );
+      addToast(t("sessions.thinkingUpdated"), "success");
+    } else {
+      addToast(t("sessions.updateFailed"), "error");
+    }
+  };
+
+  const handleVerboseChange = async (id: string, value: string) => {
+    const result = await api.patchSessionOverrides(id, { verbose: value });
+    if (result) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, verbose_level: value } : s))
+      );
+      addToast(t("sessions.verboseUpdated"), "success");
+    } else {
+      addToast(t("sessions.updateFailed"), "error");
+    }
+  };
+
+  const handleCompact = async (id: string) => {
+    const result = await api.compactSession(id);
+    if (result) {
+      addToast(t("sessions.compacted"), "success");
+      loadSessions();
+    } else {
+      addToast(t("sessions.compactFailed"), "error");
+    }
+  };
+
+  const startEditing = (id: string) => {
+    setEditingId(id);
+    setEditValue(id);
+  };
+
+  const startLabelEdit = (session: SessionEntry) => {
+    setEditingLabelId(session.id);
+    setEditLabelValue(session.label ?? "");
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  // Filter by search and active-within
+  let filtered = search
+    ? sessions.filter(
+        (s) =>
+          s.id.toLowerCase().includes(search.toLowerCase()) ||
+          (s.label && s.label.toLowerCase().includes(search.toLowerCase()))
+      )
+    : sessions;
+
+  // Active within filter
+  if (activeWithinMin) {
+    const mins = parseInt(activeWithinMin, 10);
+    if (mins > 0) {
+      const cutoff = Date.now() - mins * 60 * 1000;
+      filtered = filtered.filter((s) => {
+        const ts = s.updated_at || s.created_at;
+        if (!ts) return true;
+        const d = /^\d+$/.test(ts) ? new Date(Number(ts)) : new Date(ts);
+        return d.getTime() >= cutoff;
+      });
+    }
+  }
+
+  // Include global filter (currently a placeholder - filters sessions with "global" in id)
+  if (!includeGlobal) {
+    filtered = filtered.filter((s) => !s.id.startsWith("global:"));
+  }
+
+  // Stats
+  const totalMessages = sessions.reduce((sum, s) => sum + (s.message_count ?? 0), 0);
+  const totalTokens = sessions.reduce((sum, s) => sum + (s.token_count ?? 0), 0);
+
+  // Sort header component
+  const SortHeader = ({ field, label, align }: { field: SortField; label: string; align?: "right" }) => (
+    <th
+      className={cn(
+        "px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)] cursor-pointer select-none hover:text-[var(--text-secondary)] transition-colors",
+        align === "right" && "text-right"
+      )}
+      onClick={() => handleSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <ChevronDown
+          className={cn(
+            "h-3 w-3 transition-transform",
+            sortField === field ? "opacity-100" : "opacity-0",
+            sortField === field && sortOrder === "asc" && "rotate-180"
+          )}
+        />
+      </span>
+    </th>
+  );
+
+  // Inline dropdown component
+  const InlineSelect = ({
+    value,
+    options,
+    onChange,
+  }: {
+    value: string;
+    options: readonly string[];
+    onChange: (v: string) => void;
+  }) => (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none pr-5"
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "right 4px center",
+      }}
+    >
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+  );
+
+  return (
+    <div className="flex flex-col h-full min-h-0 gap-5">
+      {/* Stats cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatsCard
+          icon={<MessageSquare className="h-5 w-5" />}
+          label={t("sessions.totalSessions")}
+          value={total.toLocaleString()}
+          accent="var(--accent)"
+        />
+        <StatsCard
+          icon={<MessageSquare className="h-5 w-5" />}
+          label={t("sessions.totalMessages")}
+          value={totalMessages.toLocaleString()}
+          accent="var(--chart-2)"
+        />
+        <StatsCard
+          icon={<MessageSquare className="h-5 w-5" />}
+          label={t("sessions.totalTokens")}
+          value={formatTokens(totalTokens)}
+          accent="var(--chart-3)"
+        />
+      </div>
+
+      {/* Sessions table */}
+      <SectionCard className="flex-1 min-h-0 flex flex-col">
+        <SectionHeader
+          icon={<MessageSquare className="h-4 w-4" />}
+          title={t("sessions.sessionList")}
+          right={
+            <div className="flex items-center gap-2">
+              {/* Filter toggle */}
+              <button
+                onClick={() => setShowFilters((v) => !v)}
+                className={cn(
+                  "p-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer",
+                  showFilters
+                    ? "text-[var(--accent)] bg-[var(--accent)]/10"
+                    : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                )}
+                title={t("sessions.filters")}
+              >
+                <Filter className="h-3.5 w-3.5" />
+              </button>
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+                <input
+                  type="text"
+                  placeholder={t("sessions.searchPlaceholder")}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8 pr-3 py-1.5 text-[12px] rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-colors w-48"
+                />
+              </div>
+            </div>
+          }
+        />
+
+        {/* Filter bar */}
+        {showFilters && (
+          <div className="flex flex-wrap items-center gap-4 px-3 py-2.5 mb-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+            {/* Active within */}
+            <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+              <Clock className="h-3 w-3 text-[var(--text-tertiary)]" />
+              {t("sessions.activeWithin")}
+              <input
+                type="number"
+                min="0"
+                value={activeWithinMin}
+                onChange={(e) => setActiveWithinMin(e.target.value)}
+                placeholder="--"
+                className="w-14 px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] text-center"
+              />
+              <span className="text-[var(--text-tertiary)]">{t("sessions.minutes")}</span>
+            </label>
+
+            {/* Include global */}
+            <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeGlobal}
+                onChange={(e) => setIncludeGlobal(e.target.checked)}
+                className="rounded border-[var(--border-subtle)] text-[var(--accent)] focus:ring-[var(--accent)] h-3 w-3"
+              />
+              {t("sessions.includeGlobal")}
+            </label>
+
+            {/* Limit */}
+            <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+              {t("sessions.limit")}
+              <input
+                type="number"
+                min="1"
+                max="500"
+                value={limitInput}
+                onChange={(e) => setLimitInput(e.target.value)}
+                placeholder={String(PAGE_LIMIT)}
+                className="w-16 px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] text-center"
+              />
+            </label>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <LoadingSkeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={<MessageSquare className="h-8 w-8" />}
+            message={t("sessions.noSessions")}
+          />
+        ) : (
+          <>
+            <div className="overflow-x-auto flex-1 min-h-0 overflow-y-auto">
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr>
+                    <th className="w-6 px-1 py-2.5 border-b border-[var(--border-subtle)]" />
+                    <SortHeader field="id" label="ID" />
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
+                      {t("sessions.label")}
+                    </th>
+                    <SortHeader field="created_at" label={t("sessions.created")} />
+                    <SortHeader field="message_count" label={t("sessions.messages")} align="right" />
+                    <SortHeader field="token_count" label="Tokens" align="right" />
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
+                      Thinking
+                    </th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
+                      Verbose
+                    </th>
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)] text-right">
+                      {t("sessions.actions")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((session) => (
+                    <>
+                      <tr
+                        key={session.id}
+                        className={cn(
+                          "hover:bg-[var(--bg-hover)] transition-colors",
+                          expandedId === session.id && "bg-[var(--bg-hover)]"
+                        )}
+                      >
+                        {/* Expand toggle */}
+                        <td className="px-1 py-2.5 border-b border-[var(--border-subtle)]">
+                          <button
+                            onClick={() => toggleExpand(session.id)}
+                            className="p-0.5 rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                          >
+                            {expandedId === session.id ? (
+                              <ChevronDown className="h-3 w-3" />
+                            ) : (
+                              <ChevronRight className="h-3 w-3" />
+                            )}
+                          </button>
+                        </td>
+
+                        {/* ID */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
+                          {editingId === session.id ? (
+                            <input
+                              ref={editRef}
+                              type="text"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onBlur={() => handleRename(session.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleRename(session.id);
+                                if (e.key === "Escape") setEditingId(null);
+                              }}
+                              className="px-1.5 py-0.5 text-[12px] font-mono bg-[var(--bg-surface)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-36"
+                            />
+                          ) : (
+                            <span
+                              className="font-mono text-[var(--accent-light)] cursor-default"
+                              title={session.id}
+                            >
+                              {session.id.length > 12 ? `${session.id.slice(0, 12)}...` : session.id}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Label (inline editable) */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
+                          {editingLabelId === session.id ? (
+                            <input
+                              ref={labelEditRef}
+                              type="text"
+                              value={editLabelValue}
+                              onChange={(e) => setEditLabelValue(e.target.value)}
+                              onBlur={() => handleLabelSave(session.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleLabelSave(session.id);
+                                if (e.key === "Escape") setEditingLabelId(null);
+                              }}
+                              placeholder={t("sessions.enterLabel")}
+                              className="px-1.5 py-0.5 text-[12px] bg-[var(--bg-surface)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-28"
+                            />
+                          ) : (
+                            <span
+                              onClick={() => startLabelEdit(session)}
+                              className="text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-1 group"
+                              title={t("sessions.clickToEditLabel")}
+                            >
+                              {session.label || (
+                                <span className="text-[var(--text-tertiary)] italic text-[11px]">
+                                  {t("sessions.noLabel")}
+                                </span>
+                              )}
+                              <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 transition-opacity" />
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Created */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
+                          {formatDate(session.created_at, i18n.language)}
+                        </td>
+
+                        {/* Messages */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] text-right tabular-nums text-[var(--text-secondary)]">
+                          {(session.message_count ?? 0).toLocaleString()}
+                        </td>
+
+                        {/* Tokens */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] text-right tabular-nums text-[var(--text-secondary)]">
+                          {formatTokens(session.token_count ?? 0)}
+                        </td>
+
+                        {/* Thinking level */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
+                          <InlineSelect
+                            value={session.thinking_level ?? "off"}
+                            options={THINKING_OPTIONS}
+                            onChange={(v) => handleThinkingChange(session.id, v)}
+                          />
+                        </td>
+
+                        {/* Verbose */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
+                          <InlineSelect
+                            value={session.verbose_level ?? "inherit"}
+                            options={VERBOSE_OPTIONS}
+                            onChange={(v) => handleVerboseChange(session.id, v)}
+                          />
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Rename */}
+                            <button
+                              onClick={() => startEditing(session.id)}
+                              className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer"
+                              title={t("sessions.rename")}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+
+                            {/* Compact */}
+                            <button
+                              onClick={() => handleCompact(session.id)}
+                              className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer"
+                              title={t("sessions.compact")}
+                            >
+                              <PackageMinus className="h-3.5 w-3.5" />
+                            </button>
+
+                            {/* Delete */}
+                            <button
+                              onClick={() => handleDelete(session.id)}
+                              className={cn(
+                                "p-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer",
+                                confirming === session.id
+                                  ? "text-[var(--error)] bg-[var(--error)]/10"
+                                  : "text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--bg-surface)]"
+                              )}
+                              title={confirming === session.id ? t("sessions.clickToConfirm") : t("sessions.delete")}
+                            >
+                              {confirming === session.id ? (
+                                <span className="text-[11px] font-medium px-0.5">
+                                  {t("sessions.confirm")}
+                                </span>
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expanded detail row */}
+                      {expandedId === session.id && (
+                        <tr key={`${session.id}-detail`}>
+                          <td
+                            colSpan={9}
+                            className="px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+                          >
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px]">
+                              {/* Token breakdown */}
+                              <div>
+                                <div className="text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
+                                  {t("sessions.tokenBreakdown")}
+                                </div>
+                                <div className="space-y-0.5 text-[var(--text-secondary)]">
+                                  <div className="flex justify-between">
+                                    <span>Input</span>
+                                    <span className="tabular-nums">{formatTokens(session.input_tokens ?? 0)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Output</span>
+                                    <span className="tabular-nums">{formatTokens(session.output_tokens ?? 0)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Cache</span>
+                                    <span className="tabular-nums">{formatTokens(session.cache_tokens ?? 0)}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Cost */}
+                              <div>
+                                <div className="text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
+                                  {t("sessions.cost")}
+                                </div>
+                                <div className="text-[var(--text-primary)] font-medium text-sm">
+                                  {formatCost(session.cost ?? 0)}
+                                </div>
+                              </div>
+
+                              {/* Timestamps */}
+                              <div>
+                                <div className="text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
+                                  {t("sessions.timestamps")}
+                                </div>
+                                <div className="space-y-0.5 text-[var(--text-secondary)]">
+                                  <div>
+                                    <span className="text-[var(--text-tertiary)]">{t("sessions.createdLabel")}</span>
+                                    {formatDate(session.created_at, i18n.language)}
+                                  </div>
+                                  {session.updated_at && (
+                                    <div>
+                                      <span className="text-[var(--text-tertiary)]">{t("sessions.updatedLabel")}</span>
+                                      {formatDate(session.updated_at, i18n.language)}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Model */}
+                              <div>
+                                <div className="text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
+                                  {t("sessions.model")}
+                                </div>
+                                <div className="text-[var(--text-secondary)] font-mono text-[11px]">
+                                  {session.model || (
+                                    <span className="text-[var(--text-tertiary)] italic">{t("sessions.notSet")}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              total={search || activeWithinMin ? filtered.length : total}
+              limit={limitInput ? parseInt(limitInput, 10) || PAGE_LIMIT : PAGE_LIMIT}
+              offset={offset}
+              onChange={setOffset}
+            />
+          </>
+        )}
+      </SectionCard>
+
+      <ToastContainer toasts={toasts} />
+    </div>
+  );
+}

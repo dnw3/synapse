@@ -1,0 +1,125 @@
+[package]
+name = "synapse"
+version = "0.2.0"
+edition = "2021"
+description = "AI Agent product powered by Synaptic framework"
+
+[dependencies]
+# Framework
+synaptic = { path = "../synaptic/crates/synaptic", features = ["agent", "mcp", "deep-config", "store-filesystem", "embeddings", "vectorstores", "scheduler", "sqlite", "ollama", "splitters", "voyage", "jina", "cohere", "nomic"] }
+synaptic-deep = { path = "../synaptic/crates/synaptic-deep", features = ["filesystem"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+rustyline = "15"
+colored = "3"
+dotenvy = "0.15"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "json", "registry"] }
+tracing-appender = "0.2"
+
+# PDF extraction
+pdf-extract = "0.10"
+
+# Date/time
+chrono = "0.4"
+
+# Base64 encoding (for image data URLs)
+base64 = "0.22"
+
+# Misc
+regex = "1"
+dirs = "6"
+uuid = { version = "1", features = ["v4"] }
+which = "7"
+urlencoding = "2"
+
+# Web (Phase 3)
+axum = { version = "0.8", features = ["ws", "multipart"], optional = true }
+tower-http = { version = "0.6", features = ["fs", "cors", "trace"], optional = true }
+tokio-tungstenite = { version = "0.26", optional = true }
+tokio-stream = { version = "0.1", optional = true }
+argon2 = { version = "0.5", optional = true }
+password-hash = { version = "0.5", features = ["getrandom"], optional = true }
+
+# OpenTelemetry (Phase 9)
+opentelemetry = { version = "0.28", optional = true }
+opentelemetry_sdk = { version = "0.28", optional = true }
+opentelemetry-otlp = { version = "0.28", features = ["http-proto", "reqwest-client"], optional = true }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json"] }
+
+# Crypto (for DingTalk signature verification; already transitive deps)
+hmac = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+
+# TUI
+ratatui = { version = "0.29", optional = true }
+crossterm = { version = "0.28", optional = true }
+
+# Plugin dynamic loading
+libloading = { version = "0.8", optional = true }
+
+# File system watcher (for LTM directory watching)
+notify = "7"
+
+# Desktop notifications
+notify-rust = { version = "4", optional = true }
+
+# Audio I/O for voice mode
+cpal = { version = "0.15", optional = true }
+
+# Voice provider (openai feature for TTS/STT)
+synaptic-voice = { path = "../synaptic/crates/synaptic-voice", features = ["openai"], optional = true }
+lru = "0.16.3"
+
+[features]
+default = ["task"]
+task = []
+web = ["dep:axum", "dep:tower-http", "dep:tokio-tungstenite", "dep:tokio-stream", "dep:argon2", "dep:password-hash"]
+docker = []
+bot-lark = ["synaptic/lark-bot", "synaptic/lark"]
+bot-slack = ["dep:tokio-tungstenite"]
+bot-telegram = []
+bot-discord = ["dep:tokio-tungstenite"]
+bot-dingtalk = ["dep:axum", "dep:hmac", "dep:sha2"]
+bot-line = ["dep:axum", "dep:hmac", "dep:sha2"]
+bot-mattermost = ["dep:tokio-tungstenite"]
+bot-signal = []
+bot-imessage = []
+bot-matrix = []
+bot-teams = ["dep:axum"]
+bot-googlechat = ["dep:axum"]
+bot-wechat = ["dep:axum"]
+bot-whatsapp = ["dep:tokio-tungstenite"]
+bot-irc = []
+bot-webchat = ["dep:axum", "dep:tower-http"]
+bot-twitch = []
+bot-nostr = []
+bot-nextcloud = []
+bot-synology = ["dep:axum"]
+bot-tlon = []
+bot-zalo = ["dep:axum"]
+ltm-postgres = ["synaptic/postgres"]
+ltm-redis = ["synaptic/redis"]
+plugins = ["dep:libloading"]
+broadcast = []
+voice = ["synaptic/voice", "dep:synaptic-voice", "dep:cpal"]
+browser = ["synaptic/browser"]
+otel = ["synaptic/otel", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
+notify = ["dep:notify-rust"]
+tui = ["dep:ratatui", "dep:crossterm"]
+full = ["task", "web", "docker", "voice", "browser", "notify", "broadcast", "bot-lark", "bot-slack", "bot-telegram", "bot-discord", "bot-dingtalk", "bot-line", "bot-mattermost", "bot-matrix", "bot-teams", "bot-googlechat", "bot-wechat", "bot-whatsapp", "bot-signal", "bot-imessage", "bot-irc", "bot-webchat", "bot-twitch", "bot-nostr", "bot-nextcloud", "bot-synology", "bot-tlon", "bot-zalo", "tui"]

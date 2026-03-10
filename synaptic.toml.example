@@ -1,0 +1,105 @@
+# Synapse Configuration
+# Copy to synaptic.toml and edit as needed.
+
+[model]
+provider = "openai"
+model = "gpt-4o"
+api_key_env = "OPENAI_API_KEY"
+# base_url = "https://api.openai.com/v1"   # Override for compatible providers
+# temperature = 0.7
+# max_tokens = 4096
+
+# Fallback models for automatic failover (tried in order on primary failure)
+# fallback_models = ["gpt-4o-mini", "gpt-3.5-turbo"]
+
+# --- Custom Providers ---
+# Register providers with custom base_url and API key configuration.
+# Supports single key (api_key_env) and multi-key rotation (api_keys_env).
+
+# [[providers]]
+# name = "ark"
+# base_url = "https://ark.cn-beijing.volces.com/api/v3"
+# api_key_env = "ARK_API_KEY"
+# api_keys_env = "ARK_API_KEYS"  # comma-separated keys for round-robin rotation
+
+# [[providers]]
+# name = "my-openai"
+# base_url = "https://api.openai.com/v1"
+# api_key_env = "OPENAI_API_KEY"
+
+# --- Model Catalog ---
+# Named models with aliases and per-model parameter overrides.
+# Use `synapse models list` or `/model list` to view.
+
+# [[models]]
+# name = "doubao-seed-2-0-pro-260215"
+# aliases = ["pro", "default"]
+# provider = "ark"
+# temperature = 0.7
+
+# [[models]]
+# name = "glm-4-7-251222"
+# aliases = ["glm"]
+# provider = "ark"
+
+# [[models]]
+# name = "gpt-4o"
+# aliases = ["4o"]
+
+# --- Channel Model Bindings ---
+# Bind specific models to channels. Supports exact match and platform wildcards.
+
+# [[channel_models]]
+# channel = "telegram:-1001234"
+# model = "glm"             # uses alias
+
+# [[channel_models]]
+# channel = "slack:*"       # all Slack channels
+# model = "gpt-4o"
+
+[agent]
+system_prompt = "You are Synapse, a helpful AI assistant powered by the Synaptic framework. You can read and write files, execute commands, and help with complex coding tasks."
+max_turns = 50
+
+[agent.tools]
+filesystem = true
+# sandbox_root = "/workspace"
+
+[paths]
+sessions_dir = ".sessions"
+memory_file = "AGENTS.md"
+# skills_dir = ".skills"
+
+# Web server (synapse serve)
+# [serve]
+# host = "0.0.0.0"
+# port = 3000
+
+# Docker sandbox (synapse task --docker)
+# [docker]
+# enabled = false
+# image = "synapse-sandbox:latest"
+# memory_limit = "4g"
+# cpu_limit = 2
+# network = true
+
+# MCP servers (tools automatically available to agent)
+# [[mcp]]
+# name = "browser"
+# transport = "stdio"
+# command = "npx"
+# args = ["-y", "@anthropic/mcp-server-chrome-devtools"]
+
+# Lark bot (synapse bot lark)
+# [lark]
+# app_id = "cli_xxx"
+# app_secret_env = "LARK_APP_SECRET"
+
+# Slack bot (synapse bot slack)
+# [slack]
+# app_token_env = "SLACK_APP_TOKEN"
+# bot_token_env = "SLACK_BOT_TOKEN"
+
+# Telegram bot (synapse bot telegram)
+# [telegram]
+# bot_token_env = "TELEGRAM_BOT_TOKEN"

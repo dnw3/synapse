@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Synapse</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#030304">
+    <script>
+      // Prevent flash of wrong theme
+      (function() {
+        var mode = localStorage.getItem('synapse-theme-mode') || 'system';
+        var resolved = mode;
+        if (mode === 'system') {
+          resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', resolved);
+        // Apply persisted accent color
+        var presets = {
+          bitcoin:{ v:'#F7931A', l:'#FFD600', g:'rgba(247,147,26,0.15)', gs:'rgba(247,147,26,0.25)', ge:'#EA580C' },
+          blue:   { v:'#2563eb', l:'#60a5fa', g:'rgba(37,99,235,0.15)',  gs:'rgba(37,99,235,0.25)',  ge:'#1d4ed8' },
+          teal:   { v:'#0d9488', l:'#2dd4bf', g:'rgba(13,148,136,0.15)', gs:'rgba(13,148,136,0.25)', ge:'#0f766e' },
+          green:  { v:'#16a34a', l:'#4ade80', g:'rgba(22,163,74,0.15)',  gs:'rgba(22,163,74,0.25)',  ge:'#15803d' },
+          orange: { v:'#ea580c', l:'#fb923c', g:'rgba(234,88,12,0.15)',  gs:'rgba(234,88,12,0.25)',  ge:'#c2410c' },
+          rose:   { v:'#e11d48', l:'#fb7185', g:'rgba(225,29,72,0.15)',  gs:'rgba(225,29,72,0.25)',  ge:'#be123c' },
+          violet: { v:'#7c3aed', l:'#a78bfa', g:'rgba(124,58,237,0.15)', gs:'rgba(124,58,237,0.25)', ge:'#6d28d9' },
+          purple: { v:'#6750A4', l:'#7F67BE', g:'rgba(103,80,164,0.15)', gs:'rgba(103,80,164,0.25)', ge:'#4F378B' },
+        };
+        // Light → MD3 purple, Dark → Bitcoin orange (default)
+        var accentName = resolved === 'light' ? 'purple' : (localStorage.getItem('synapse-accent') || 'bitcoin');
+        var p = presets[accentName] || presets.blue;
+        var s = document.documentElement.style;
+        s.setProperty('--accent', p.v);
+        s.setProperty('--accent-light', p.l);
+        s.setProperty('--accent-glow', p.g);
+        s.setProperty('--accent-glow-strong', p.gs);
+        s.setProperty('--accent-gradient-end', p.ge);
+        // Update theme-color meta
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.content = resolved === 'light' ? '#FFFBFE' : '#030304';
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
+    </script>
+  </body>
+</html>

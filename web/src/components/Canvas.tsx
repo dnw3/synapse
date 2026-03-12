@@ -192,6 +192,7 @@ function ChartBlock({ block }: { block: CanvasBlock }) {
 }
 
 function FormBlock({ block, onSubmit }: { block: CanvasBlock; onSubmit?: (blockId: string, values: Record<string, string | boolean>) => void }) {
+  const { t } = useTranslation();
   let schema: FormBlockMeta | null = null;
   try {
     schema = JSON.parse(block.content) as FormBlockMeta;
@@ -203,7 +204,7 @@ function FormBlock({ block, onSubmit }: { block: CanvasBlock; onSubmit?: (blockI
 
   if (!schema || !Array.isArray(schema.fields)) {
     return (
-      <div className="text-xs text-[var(--error)] px-1">Invalid form schema in canvas block.</div>
+      <div className="text-xs text-[var(--error)] px-1">{t("canvas.formInvalidSchema")}</div>
     );
   }
 
@@ -247,7 +248,7 @@ function FormBlock({ block, onSubmit }: { block: CanvasBlock; onSubmit?: (blockI
             onChange={(e) => handleChange(field.name, e.target.value)}
             className={inputClasses}
           >
-            <option value="">-- select --</option>
+            <option value="">{t("canvas.formSelectPlaceholder")}</option>
             {field.options.map((opt) => (
               <option key={opt} value={opt}>
                 {opt}
@@ -282,7 +283,7 @@ function FormBlock({ block, onSubmit }: { block: CanvasBlock; onSubmit?: (blockI
           onSubmit?.(block.id, values);
         }}
       >
-        {schema.submitLabel ?? "Submit"}
+        {schema.submitLabel ?? t("canvas.formSubmit")}
       </Button>
     </div>
   );

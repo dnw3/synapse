@@ -374,7 +374,7 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
               onClick={() => fileInputRef.current?.click()}
               disabled={loading || uploading}
               className="h-[44px] w-[44px] rounded-[var(--radius-md)] shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
-              title="Attach file"
+              title={t("chat.attachFile")}
             >
               {uploading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

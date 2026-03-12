@@ -149,7 +149,7 @@ export default function Dashboard({ connected: wsConnected, conversationCount, m
         {!SELF_SCROLL_TABS.has(activeTab) && (
           <div className="flex items-center justify-between pt-3 pb-4 mt-auto border-t border-[var(--border-subtle)] flex-shrink-0">
             <span className="text-[11px] text-[var(--text-tertiary)] font-mono">
-              Synapse · Powered by Synaptic Framework
+              {t("dashboard.poweredBy")}
             </span>
             <span className="text-[11px] text-[var(--text-tertiary)] font-mono">
               {t("dashboard.lastRefresh")}: {new Date().toLocaleTimeString()}

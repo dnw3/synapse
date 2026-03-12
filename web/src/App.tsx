@@ -424,7 +424,7 @@ export default function App() {
   const toolbarTitle = isChatView
     ? (conv.titles[conv.activeId ?? ""] || t("chat.newChat"))
     : t(TABS.find((tb) => tb.key === activeView)?.i18nKey ?? "app.title");
-  const toolbarSubtitle = isChatView ? `${allMessages.length} msgs` : undefined;
+  const toolbarSubtitle = isChatView ? t("sidebar.messages", { count: allMessages.length }) : undefined;
   const toolbarModel = isChatView ? "claude-3.5-sonnet" : undefined;
   const toolbarStatus = (!["idle", "pong"].includes(ws.status)) ? t(`status.${ws.status}`) : undefined;
 

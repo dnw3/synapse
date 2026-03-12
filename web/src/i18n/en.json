@@ -28,7 +28,9 @@
     "emptyHint": "Send a message to start a conversation",
     "queue": "Queue",
     "queued": "Queued ({{count}})",
-    "errorPrefix": "Error"
+    "errorPrefix": "Error",
+    "newChat": "New Chat",
+    "attachFile": "Attach file"
   },
   "files": {
     "title": "Files",
@@ -113,7 +115,8 @@
   },
   "pagination": {
     "prev": "Prev",
-    "next": "Next"
+    "next": "Next",
+    "ofTotal": "{{from}}–{{to}} of {{total}}"
   },
   "canvas": {
     "title": "Canvas",
@@ -123,7 +126,10 @@
     "emptyHint2": "Use [canvas:type] markers.",
     "blocks": "{{count}} blocks",
     "export": "Export",
-    "clear": "Clear"
+    "clear": "Clear",
+    "formInvalidSchema": "Invalid form schema in canvas block.",
+    "formSelectPlaceholder": "-- select --",
+    "formSubmit": "Submit"
   },
   "logs": {
     "entries": "{{count}} entries",
@@ -252,6 +258,14 @@
     "compacted": "Compacted",
     "compactFailed": "Failed to compact"
   },
+  "browser": {
+    "noSession": "No browser session active.",
+    "screenshotHint": "The agent will show browser screenshots here when using Chrome DevTools."
+  },
+  "editor": {
+    "save": "Save",
+    "untitled": "untitled"
+  },
   "dashboard": {
     "chat": "Chat",
     "monitor": "Monitor",
@@ -318,7 +332,8 @@
     "debug": "Debug",
     "allOperational": "All Systems Operational",
     "gatewayDisconnected": "Gateway Disconnected",
-    "lastRefresh": "Last refresh"
+    "lastRefresh": "Last refresh",
+    "poweredBy": "Synapse · Powered by Synaptic Framework"
   },
   "debug": {
     "status": "Status",

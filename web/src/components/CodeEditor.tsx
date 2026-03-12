@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Editor from '@monaco-editor/react';
 
 interface CodeEditorProps {
@@ -13,6 +14,7 @@ interface CodeEditorProps {
 }
 
 export function CodeEditor({ filePath, language, initialContent = '', onSave }: CodeEditorProps) {
+  const { t } = useTranslation();
   const [content, setContent] = useState(initialContent);
   const [isDirty, setIsDirty] = useState(false);
   const isDark = document.documentElement.getAttribute("data-theme") !== "light";
@@ -62,7 +64,7 @@ export function CodeEditor({ filePath, language, initialContent = '', onSave }: 
     <div className="flex flex-col h-full bg-[var(--bg-content)] border border-[var(--separator)] rounded-[var(--radius-md)] overflow-hidden">
       <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-grouped)] border-b border-[var(--border-subtle)] text-sm flex-shrink-0">
         <span className="text-[var(--text-secondary)] font-mono text-xs font-medium">
-          {filePath || 'untitled'}
+          {filePath || t("editor.untitled")}
           {isDirty && <span className="text-[var(--warning)] ml-1">{'\u25cf'}</span>}
         </span>
         <button
@@ -70,7 +72,7 @@ export function CodeEditor({ filePath, language, initialContent = '', onSave }: 
           disabled={!isDirty}
           className="px-2 py-0.5 text-xs rounded-[var(--radius-sm)] bg-[var(--accent)] text-white disabled:opacity-40 hover:opacity-90 transition-colors"
         >
-          Save
+          {t("editor.save")}
         </button>
       </div>
       <div className="flex-1 min-h-0">

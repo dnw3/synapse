@@ -28,7 +28,9 @@
     "emptyHint": "发送消息开始对话",
     "queue": "排队发送",
     "queued": "排队中 ({{count}})",
-    "errorPrefix": "错误"
+    "errorPrefix": "错误",
+    "newChat": "新建会话",
+    "attachFile": "附件"
   },
   "files": {
     "title": "文件",
@@ -113,7 +115,8 @@
   },
   "pagination": {
     "prev": "上一页",
-    "next": "下一页"
+    "next": "下一页",
+    "ofTotal": "{{from}}–{{to}} / {{total}}"
   },
   "canvas": {
     "title": "画布",
@@ -123,7 +126,10 @@
     "emptyHint2": "使用 [canvas:type] 标记。",
     "blocks": "{{count}} 个区块",
     "export": "导出",
-    "clear": "清空"
+    "clear": "清空",
+    "formInvalidSchema": "Canvas 区块中的表单 schema 无效。",
+    "formSelectPlaceholder": "-- 请选择 --",
+    "formSubmit": "提交"
   },
   "logs": {
     "entries": "{{count}} 条记录",
@@ -252,6 +258,14 @@
     "compacted": "已压缩",
     "compactFailed": "压缩失败"
   },
+  "browser": {
+    "noSession": "暂无浏览器会话。",
+    "screenshotHint": "Agent 使用 Chrome DevTools 时，浏览器截图将在此展示。"
+  },
+  "editor": {
+    "save": "保存",
+    "untitled": "未命名"
+  },
   "dashboard": {
     "chat": "聊天",
     "monitor": "监控",
@@ -318,7 +332,8 @@
     "debug": "调试",
     "allOperational": "系统运行正常",
     "gatewayDisconnected": "网关未连接",
-    "lastRefresh": "上次刷新"
+    "lastRefresh": "上次刷新",
+    "poweredBy": "Synapse · 由 Synaptic 框架驱动"
   },
   "debug": {
     "status": "状态",

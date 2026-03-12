@@ -229,7 +229,7 @@ export function Pagination({
   return (
     <div className="flex items-center justify-between pt-3 text-[11px]">
       <span className="text-[var(--text-tertiary)] font-mono tabular-nums">
-        {from}–{to} of {total}
+        {t("pagination.ofTotal", { from, to, total })}
       </span>
       <div className="flex items-center gap-1">
         <button

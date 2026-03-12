@@ -23,7 +23,7 @@ function SegmentedControl({ items, value, onChange, className }: SegmentedContro
           className={cn(
             "relative px-3 py-1.5 text-[13px] font-medium rounded-[var(--radius-sm)] transition-all duration-150 cursor-pointer",
             value === item.value
-              ? "bg-white text-[var(--text-primary)] shadow-[var(--shadow-sm)] dark:bg-[#636366] dark:text-[var(--text-primary)]"
+              ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]"
               : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           )}
         >

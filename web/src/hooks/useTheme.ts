@@ -161,12 +161,13 @@ export function useTheme() {
 
   return {
     mode,
+    setMode,
     effectiveTheme,
     /** @deprecated Use effectiveTheme instead */
     resolved: effectiveTheme,
     accent,
-    cycleMode,
     setAccent,
+    cycleMode,
     accentPresets: ACCENT_PRESETS,
   };
 }

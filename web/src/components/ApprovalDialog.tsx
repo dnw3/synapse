@@ -39,10 +39,10 @@ export default function ApprovalDialog({ request, onRespond }: ApprovalDialogPro
       className="mx-4 my-2 rounded-[var(--radius-lg)] p-4 animate-fade-slide-in"
       style={{
         background: "var(--bg-content)",
+        borderTop: `1px solid color-mix(in srgb, ${accentColor} 25%, transparent)`,
+        borderRight: `1px solid color-mix(in srgb, ${accentColor} 25%, transparent)`,
+        borderBottom: `1px solid color-mix(in srgb, ${accentColor} 25%, transparent)`,
         borderLeft: `3px solid ${accentColor}`,
-        border: `1px solid color-mix(in srgb, ${accentColor} 25%, transparent)`,
-        borderLeftWidth: 3,
-        borderLeftColor: accentColor,
       }}
     >
       {/* Header */}

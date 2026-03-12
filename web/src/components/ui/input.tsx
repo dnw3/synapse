@@ -32,7 +32,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         className={cn(
           "w-full h-8 px-3 text-[13px] rounded-[var(--radius-md)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
-          "bg-[var(--bg-window)] dark:bg-[#2C2C2E]",
+          "bg-[var(--bg-content)]",
           "border border-[var(--border-subtle)]",
           "outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-0 focus:shadow-[0_0_0_3px_var(--accent-glow)]",
           "transition-all duration-150",

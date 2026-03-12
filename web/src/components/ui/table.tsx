@@ -72,7 +72,7 @@ function Table<T extends Record<string, unknown>>({
               onClick={() => onRowClick?.(item)}
               className={cn(
                 "h-10 border-b border-[var(--border-subtle)] last:border-b-0 transition-colors",
-                i % 2 === 1 && "bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)]",
+                i % 2 === 1 && "bg-[var(--bg-hover)]",
                 "hover:bg-[var(--bg-hover)]",
                 onRowClick && "cursor-pointer"
               )}

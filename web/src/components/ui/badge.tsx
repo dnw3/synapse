@@ -8,18 +8,12 @@ interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 const VARIANT_CLASSES: Record<BadgeVariant, string> = {
-  success:
-    "bg-[var(--success)]/10 text-[var(--success)] dark:bg-[var(--success)]/15",
-  warning:
-    "bg-[var(--warning)]/10 text-[var(--warning)] dark:bg-[var(--warning)]/15",
-  error:
-    "bg-[var(--error)]/10 text-[var(--error)] dark:bg-[var(--error)]/15",
-  info:
-    "bg-[var(--info)]/10 text-[var(--info)] dark:bg-[var(--info)]/15",
-  accent:
-    "bg-[var(--accent)]/10 text-[var(--accent)] dark:bg-[var(--accent)]/15",
-  neutral:
-    "bg-[var(--bg-grouped)] text-[var(--text-secondary)]",
+  success: "bg-[var(--success)]/12 text-[var(--success)]",
+  warning: "bg-[var(--warning)]/12 text-[var(--warning)]",
+  error: "bg-[var(--error)]/12 text-[var(--error)]",
+  info: "bg-[var(--info)]/12 text-[var(--info)]",
+  accent: "bg-[var(--accent)]/12 text-[var(--accent)]",
+  neutral: "bg-[var(--bg-grouped)] text-[var(--text-secondary)]",
 };
 
 function Badge({ variant = "neutral", className, children, ...props }: BadgeProps) {

@@ -151,7 +151,7 @@ export default function MessageBubble({ message, turn }: Props) {
           <Bot className="h-3.5 w-3.5 text-[var(--accent-light)]" />
         )}
       </div>
-      <div className="flex-1 min-w-0 space-y-2 max-w-[70%]">
+      <div className="flex-1 min-w-0 space-y-2">
         {msgs.map((msg, i) => {
           if (msg.role === "tool") {
             return <ToolResultSnippet key={i} content={msg.content} />;
@@ -164,7 +164,7 @@ export default function MessageBubble({ message, turn }: Props) {
               {msg.reasoning && <ThinkingBlock content={msg.reasoning} />}
               {hasContent && (
                 <div
-                  className="px-4 py-2.5 text-[var(--text-primary)]"
+                  className="max-w-[70%] px-4 py-2.5 text-[var(--text-primary)]"
                   style={{
                     background: "var(--bg-elevated)",
                     borderRadius: "16px 16px 16px 4px",

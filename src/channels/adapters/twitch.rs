@@ -79,8 +79,12 @@ async fn run_twitch_irc(
     };
 
     // Authenticate with OAuth token
-    let oauth_token = resolve_secret(config.oauth_token.as_deref(), config.oauth_token_env.as_deref(), "Twitch OAuth token")
-        .map_err(|e| format!("{}", e))?;
+    let oauth_token = resolve_secret(
+        config.oauth_token.as_deref(),
+        config.oauth_token_env.as_deref(),
+        "Twitch OAuth token",
+    )
+    .map_err(|e| format!("{}", e))?;
     send(format!("PASS oauth:{}", oauth_token));
     send(format!("NICK {}", config.nick));
 
@@ -138,8 +142,8 @@ async fn run_twitch_irc(
                     let chunks = formatter::chunk_irc(&reply);
                     for chunk in chunks {
                         for irc_line in chunk.lines() {
-                            let _ = tx_clone
-                                .send(format!("PRIVMSG {} :{}", reply_target, irc_line));
+                            let _ =
+                                tx_clone.send(format!("PRIVMSG {} :{}", reply_target, irc_line));
                         }
                     }
                 }

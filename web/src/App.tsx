@@ -373,15 +373,19 @@ export default function App() {
   // Build streaming messages from WS events and track approval requests
   const streamingMessages: Message[] = [];
   let currentAssistantContent = "";
+  let currentReasoning = "";
   const streamingRequestId = currentRequestIdRef.current ?? undefined;
   let pendingApproval: { tool_name: string; args_preview: string; risk_level: string } | null = null;
   for (const evt of ws.events) {
     if (evt.type === "token") {
       currentAssistantContent += evt.content;
+    } else if (evt.type === "reasoning") {
+      currentReasoning += evt.content;
     } else if (evt.type === "tool_call") {
-      if (currentAssistantContent) {
-        streamingMessages.push({ role: "assistant", content: currentAssistantContent, tool_calls: [] });
+      if (currentAssistantContent || currentReasoning) {
+        streamingMessages.push({ role: "assistant", content: currentAssistantContent, tool_calls: [], reasoning: currentReasoning || undefined });
         currentAssistantContent = "";
+        currentReasoning = "";
       }
       streamingMessages.push({ role: "assistant", content: "", tool_calls: [{ name: evt.name, arguments: evt.args }] });
     } else if (evt.type === "tool_result") {
@@ -390,8 +394,14 @@ export default function App() {
       pendingApproval = { tool_name: evt.tool_name, args_preview: evt.args_preview, risk_level: evt.risk_level };
     }
   }
-  if (currentAssistantContent) {
-    streamingMessages.push({ role: "assistant", content: currentAssistantContent, tool_calls: [], request_id: streamingRequestId });
+  if (currentAssistantContent || currentReasoning) {
+    streamingMessages.push({
+      role: "assistant",
+      content: currentAssistantContent,
+      tool_calls: [],
+      request_id: streamingRequestId,
+      reasoning: currentReasoning || undefined,
+    });
   }
 
   const handleApprovalRespond = useCallback((approved: boolean, allowAll?: boolean) => {
@@ -467,7 +477,7 @@ export default function App() {
               {ws.connected ? t("app.connected") : t("app.disconnected")}
             </div>
           )}
-          {isChatView && ws.status !== "idle" && (
+          {isChatView && !["idle", "pong"].includes(ws.status) && (
             <span className="px-2 py-0.5 text-[10px] font-medium bg-[var(--accent-glow)] text-[var(--accent-light)] border border-[var(--accent)]/20 rounded-full animate-pulse-glow">
               {t(`status.${ws.status}`)}
             </span>
@@ -678,6 +688,11 @@ export default function App() {
             conversationCount={conv.conversations.length}
             messageCount={allMessages.length}
             activeTab={activeView as TabKey}
+            onNavigateToChat={(id) => {
+              conv.ensureConversation(id);
+              conv.setActiveId(id);
+              setActiveView("chat");
+            }}
           />
         )}
       </div>

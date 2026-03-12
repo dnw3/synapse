@@ -52,9 +52,7 @@ async fn metrics_handler(
     // -------------------------------------------------------
     // 2. synapse_request_duration_seconds{method, path} histogram (sum + count)
     // -------------------------------------------------------
-    out.push_str(
-        "# HELP synapse_request_duration_seconds HTTP request duration in seconds\n",
-    );
+    out.push_str("# HELP synapse_request_duration_seconds HTTP request duration in seconds\n");
     out.push_str("# TYPE synapse_request_duration_seconds histogram\n");
     {
         let durs = state.request_metrics.durations.read().await;
@@ -77,9 +75,7 @@ async fn metrics_handler(
     // -------------------------------------------------------
     // 3. synapse_active_sessions gauge
     // -------------------------------------------------------
-    out.push_str(
-        "# HELP synapse_active_sessions Number of active WebSocket sessions\n",
-    );
+    out.push_str("# HELP synapse_active_sessions Number of active WebSocket sessions\n");
     out.push_str("# TYPE synapse_active_sessions gauge\n");
     let active = state.cancel_tokens.read().await.len();
     out.push_str(&format!("synapse_active_sessions {}\n\n", active));
@@ -122,9 +118,7 @@ async fn metrics_handler(
     // -------------------------------------------------------
     // 5. synapse_llm_request_duration_seconds{model} histogram (sum + count)
     // -------------------------------------------------------
-    out.push_str(
-        "# HELP synapse_llm_request_duration_seconds LLM request duration in seconds\n",
-    );
+    out.push_str("# HELP synapse_llm_request_duration_seconds LLM request duration in seconds\n");
     out.push_str("# TYPE synapse_llm_request_duration_seconds histogram\n");
     {
         let llm_durs = state.request_metrics.llm_durations.read().await;
@@ -147,9 +141,7 @@ async fn metrics_handler(
     // -------------------------------------------------------
     // 6. synapse_memory_entries gauge
     // -------------------------------------------------------
-    out.push_str(
-        "# HELP synapse_memory_entries Total message entries across all sessions\n",
-    );
+    out.push_str("# HELP synapse_memory_entries Total message entries across all sessions\n");
     out.push_str("# TYPE synapse_memory_entries gauge\n");
     let memory_entries = {
         let memory = state.sessions.memory();

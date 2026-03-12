@@ -27,13 +27,18 @@ pub async fn run(
         .as_ref()
         .ok_or("Discord bot configuration not found in config")?;
 
-    let token = resolve_secret(discord_config.bot_token.as_deref(), discord_config.bot_token_env.as_deref(), "Discord bot token")
-        .map_err(|e| format!("{}", e))?;
+    let token = resolve_secret(
+        discord_config.bot_token.as_deref(),
+        discord_config.bot_token_env.as_deref(),
+        "Discord bot token",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
     let allowlist = discord_config.allowlist.clone();
-    let agent_session = Arc::new(AgentSession::new(model, config_arc, true));
+    let agent_session =
+        Arc::new(AgentSession::new(model, config_arc, true).with_channel("discord"));
 
     if !allowlist.is_empty() {
         eprintln!(
@@ -156,9 +161,7 @@ pub async fn run(
                     for att in atts {
                         let filename = att["filename"].as_str().unwrap_or("file").to_string();
                         let url = att["url"].as_str().unwrap_or("").to_string();
-                        let content_type = att["content_type"]
-                            .as_str()
-                            .map(|s| s.to_string());
+                        let content_type = att["content_type"].as_str().map(|s| s.to_string());
                         if !url.is_empty() {
                             attachments.push(crate::channels::handler::Attachment {
                                 filename,
@@ -207,7 +210,10 @@ pub async fn run(
                         .send()
                         .await;
 
-                    match session.handle_message_with_attachments(&channel_id, &content, &attachments).await {
+                    match session
+                        .handle_message_with_attachments(&channel_id, &content, &attachments)
+                        .await
+                    {
                         Ok(reply) => {
                             // Split long replies into chunks (Discord 2000 char limit)
                             let chunks = formatter::chunk_discord(&reply);
@@ -223,7 +229,8 @@ pub async fn run(
                                     .await;
                             }
                             // React with checkmark on success
-                            reactions::discord_react(&tok, &channel_id, &message_id, "\u{2705}").await;
+                            reactions::discord_react(&tok, &channel_id, &message_id, "\u{2705}")
+                                .await;
                         }
                         Err(e) => {
                             eprintln!("Discord: handler error: {}", e);

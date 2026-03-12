@@ -19,10 +19,7 @@ fn is_valid_request_id(id: &str) -> bool {
 /// 3. Creates a tracing span with request_id, method, path
 /// 4. Adds `X-Request-Id` to response headers
 /// 5. Logs request completion with status and duration
-pub async fn request_tracing_middleware(
-    request: Request<Body>,
-    next: Next,
-) -> Response<Body> {
+pub async fn request_tracing_middleware(request: Request<Body>, next: Next) -> Response<Body> {
     let request_id = request
         .headers()
         .get("x-request-id")

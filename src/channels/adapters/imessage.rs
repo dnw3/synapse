@@ -22,8 +22,12 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [imessage] section in config")?;
 
-    let password = resolve_secret(imessage_config.password.as_deref(), imessage_config.password_env.as_deref(), "iMessage password")
-        .map_err(|e| format!("{}", e))?;
+    let password = resolve_secret(
+        imessage_config.password.as_deref(),
+        imessage_config.password_env.as_deref(),
+        "iMessage password",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -156,12 +160,7 @@ pub async fn run(
                                 "message": chunk,
                                 "password": pw,
                             });
-                            if let Err(e) = http
-                                .post(&send_url)
-                                .json(&body)
-                                .send()
-                                .await
-                            {
+                            if let Err(e) = http.post(&send_url).json(&body).send().await {
                                 tracing::error!(channel = "imessage", error = %e, "send error");
                             }
                         }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::post};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 
 use crate::agent;
@@ -49,8 +49,12 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [zalo] section in config")?;
 
-    let access_token = resolve_secret(zalo_config.access_token.as_deref(), zalo_config.access_token_env.as_deref(), "Zalo access token")
-        .map_err(|e| format!("{}", e))?;
+    let access_token = resolve_secret(
+        zalo_config.access_token.as_deref(),
+        zalo_config.access_token_env.as_deref(),
+        "Zalo access token",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

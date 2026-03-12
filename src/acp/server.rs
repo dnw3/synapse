@@ -35,9 +35,9 @@ async fn handle_acp(
                 .and_then(|p| serde_json::from_value(p).ok())
                 .ok_or((StatusCode::BAD_REQUEST, "invalid params".to_string()))?;
 
-            let session_id = run_params.session_id.unwrap_or_else(|| {
-                uuid::Uuid::new_v4().to_string()
-            });
+            let session_id = run_params
+                .session_id
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
             // Simple non-streaming execution
             let memory = state.sessions.memory();

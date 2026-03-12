@@ -15,7 +15,7 @@ use crate::config::SynapseConfig;
 use crate::memory::LongTermMemory;
 use crate::usage;
 
-use super::session::{list_sessions, prune_sessions, view_session_history, send_to_session};
+use super::session::{list_sessions, prune_sessions, send_to_session, view_session_history};
 use super::skills::{resolve_skill_slash_command, SkillSlashResult};
 
 pub enum CommandResult {
@@ -88,18 +88,9 @@ pub async fn handle_command(
                 "  {} -- View messages from another session",
                 "/history".cyan()
             );
-            println!(
-                "  {} -- Send a message to another session",
-                "/send".cyan()
-            );
-            println!(
-                "  {} -- Prune sessions older than N days",
-                "/prune".cyan()
-            );
-            println!(
-                "  {} -- Delete memories matching keyword",
-                "/forget".cyan()
-            );
+            println!("  {} -- Send a message to another session", "/send".cyan());
+            println!("  {} -- Prune sessions older than N days", "/prune".cyan());
+            println!("  {} -- Delete memories matching keyword", "/forget".cyan());
             println!(
                 "  {} -- List all memories (/memories clear to wipe)",
                 "/memories".cyan()
@@ -108,16 +99,17 @@ pub async fn handle_command(
                 "  {} -- List / inspect skills (/skill list, /skill info <name>)",
                 "/skill".cyan()
             );
-            println!(
-                "  {} -- List configured sub-agents",
-                "/subagents".cyan()
-            );
+            println!("  {} -- List configured sub-agents", "/subagents".cyan());
             if let Some(ref commands) = config.commands {
                 if !commands.is_empty() {
                     println!();
                     println!("{}", "--- Custom Commands ---".bold());
                     for cmd in commands {
-                        println!("  {} -- {}", format!("/{}", cmd.name).cyan(), cmd.description);
+                        println!(
+                            "  {} -- {}",
+                            format!("/{}", cmd.name).cyan(),
+                            cmd.description
+                        );
                     }
                 }
             }
@@ -152,11 +144,7 @@ pub async fn handle_command(
         }
 
         "/session" => {
-            let count = memory
-                .load(session_id)
-                .await
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let count = memory.load(session_id).await.map(|m| m.len()).unwrap_or(0);
             println!("{} {}", "Session ID:".bold(), session_id.cyan());
             if let Ok(Some(info)) = session_mgr.get_session(session_id).await {
                 println!("{} {}", "Created:".bold(), info.created_at.dimmed());
@@ -213,11 +201,7 @@ pub async fn handle_command(
         }
 
         "/status" => {
-            let count = memory
-                .load(session_id)
-                .await
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let count = memory.load(session_id).await.map(|m| m.len()).unwrap_or(0);
             println!("{}", "--- Status ---".bold());
             println!("  {} {}", "Session:".bold(), session_id.cyan());
             println!("  {} {}", "Model:".bold(), current_model_name.cyan());
@@ -273,8 +257,7 @@ pub async fn handle_command(
                 let path = cwd.join(name);
                 if path.exists() {
                     if let Ok(meta) = std::fs::metadata(&path) {
-                        loaded_files
-                            .push(format!("{} ({})", name, super::format_size(meta.len())));
+                        loaded_files.push(format!("{} ({})", name, super::format_size(meta.len())));
                     }
                 }
             }
@@ -324,17 +307,17 @@ pub async fn handle_command(
                         println!("{}", "--- Model Catalog ---".bold());
                         for entry in &entries {
                             let is_current = entry.name == *current_model_name
-                                || entry.aliases.iter().any(|a| a == current_model_name.as_str());
+                                || entry
+                                    .aliases
+                                    .iter()
+                                    .any(|a| a == current_model_name.as_str());
                             let marker = if is_current { " *" } else { "" };
                             let aliases = if entry.aliases.is_empty() {
                                 String::new()
                             } else {
                                 format!(" ({})", entry.aliases.join(", "))
                             };
-                            let provider = entry
-                                .provider
-                                .as_deref()
-                                .unwrap_or("-");
+                            let provider = entry.provider.as_deref().unwrap_or("-");
                             println!(
                                 "  {} [{}]{}{}",
                                 entry.name.cyan(),
@@ -391,11 +374,7 @@ pub async fn handle_command(
                         };
                         println!("  {} {}", "Key mode:".bold(), key_status);
                     }
-                    println!(
-                        "  {} {}",
-                        "Catalog size:".bold(),
-                        registry.list().len()
-                    );
+                    println!("  {} {}", "Catalog size:".bold(), registry.list().len());
                 }
                 _ => {
                     // Switch model (name or alias)
@@ -403,9 +382,7 @@ pub async fn handle_command(
                         Ok(new_model) => {
                             // Resolve to canonical name if it's an alias
                             let registry = agent::registry::ModelRegistry::from_config(config);
-                            let display_name = registry
-                                .canonical_name(arg)
-                                .unwrap_or(arg);
+                            let display_name = registry.canonical_name(arg).unwrap_or(arg);
                             *model = new_model;
                             *current_model_name = display_name.to_string();
                             tracker.set_model(display_name).await;
@@ -417,19 +394,11 @@ pub async fn handle_command(
                                     arg.dimmed()
                                 );
                             } else {
-                                eprintln!(
-                                    "{} Switched to {}",
-                                    "model:".green().bold(),
-                                    arg.cyan()
-                                );
+                                eprintln!("{} Switched to {}", "model:".green().bold(), arg.cyan());
                             }
                         }
                         Err(e) => {
-                            eprintln!(
-                                "{} Failed to switch model: {}",
-                                "error:".red().bold(),
-                                e
-                            );
+                            eprintln!("{} Failed to switch model: {}", "error:".red().bold(), e);
                         }
                     }
                 }
@@ -452,9 +421,8 @@ pub async fn handle_command(
             match level {
                 "off" | "none" => {
                     *thinking = None;
-                    messages.retain(|m| {
-                        !(m.is_system() && m.content().starts_with("[Thinking mode:"))
-                    });
+                    messages
+                        .retain(|m| !(m.is_system() && m.content().starts_with("[Thinking mode:")));
                     eprintln!("{} Thinking mode disabled", "think:".green().bold());
                 }
                 "low" | "minimal" => {
@@ -555,10 +523,7 @@ pub async fn handle_command(
 
         "/history" => {
             if arg.is_empty() {
-                eprintln!(
-                    "{} Usage: /history <session_id>",
-                    "usage:".yellow().bold()
-                );
+                eprintln!("{} Usage: /history <session_id>", "usage:".yellow().bold());
             } else {
                 let target_sid = arg.split_whitespace().next().unwrap_or(arg);
                 match view_session_history(session_mgr, target_sid).await {
@@ -571,10 +536,7 @@ pub async fn handle_command(
 
         "/forget" => {
             if arg.is_empty() {
-                eprintln!(
-                    "{} Usage: /forget <keyword>",
-                    "usage:".yellow().bold()
-                );
+                eprintln!("{} Usage: /forget <keyword>", "usage:".yellow().bold());
             } else {
                 match ltm.forget(arg).await {
                     Ok(removed) => {
@@ -603,11 +565,7 @@ pub async fn handle_command(
             if arg == "clear" {
                 match ltm.clear_all().await {
                     Ok(count) => {
-                        eprintln!(
-                            "{} Cleared {} memories",
-                            "memories:".green().bold(),
-                            count
-                        );
+                        eprintln!("{} Cleared {} memories", "memories:".green().bold(), count);
                     }
                     Err(e) => eprintln!("{} {}", "error:".red().bold(), e),
                 }
@@ -616,7 +574,11 @@ pub async fn handle_command(
                 if memories.is_empty() {
                     println!("{}", "No long-term memories stored.".dimmed());
                 } else {
-                    println!("{} ({} total)", "Long-term Memories:".bold(), memories.len());
+                    println!(
+                        "{} ({} total)",
+                        "Long-term Memories:".bold(),
+                        memories.len()
+                    );
                     for (i, (key, content)) in memories.iter().enumerate() {
                         let preview = if content.len() > 100 {
                             format!("{}...", &content[..97])
@@ -624,12 +586,7 @@ pub async fn handle_command(
                             content.clone()
                         };
                         let preview = preview.replace('\n', " ");
-                        println!(
-                            "  {}. [{}] {}",
-                            i + 1,
-                            key.dimmed(),
-                            preview
-                        );
+                        println!("  {}. [{}] {}", i + 1, key.dimmed(), preview);
                     }
                 }
             }
@@ -677,10 +634,7 @@ pub async fn handle_command(
                             eprintln!("{} {}", "error:".red().bold(), e);
                         }
                     } else {
-                        eprintln!(
-                            "{} Usage: /skill info <name>",
-                            "usage:".yellow().bold()
-                        );
+                        eprintln!("{} Usage: /skill info <name>", "usage:".yellow().bold());
                     }
                 }
                 _ => {
@@ -718,11 +672,7 @@ pub async fn handle_command(
                     if !config.subagent.agents.is_empty() {
                         println!("{}", "--- Config Agents ---".bold());
                         for def in &config.subagent.agents {
-                            println!(
-                                "  {} — {}",
-                                def.name.cyan(),
-                                def.description
-                            );
+                            println!("  {} — {}", def.name.cyan(), def.description);
                             if let Some(ref tp) = def.tool_profile {
                                 println!("    profile: {}", tp);
                             }
@@ -735,11 +685,7 @@ pub async fn handle_command(
                     if !discovered.is_empty() {
                         println!("{}", "--- Discovered Agents (.claude/agents/) ---".bold());
                         for def in &discovered {
-                            println!(
-                                "  {} — {}",
-                                def.name.cyan(),
-                                def.description
-                            );
+                            println!("  {} — {}", def.name.cyan(), def.description);
                         }
                         println!();
                     }
@@ -773,11 +719,7 @@ pub async fn handle_command(
             // Check skill slash commands first
             let cwd = std::env::current_dir().unwrap_or_default();
             if let Some(skill_result) = resolve_skill_slash_command(cmd_name, arg, &cwd).await {
-                eprintln!(
-                    "{} Using skill /{}",
-                    "skill:".magenta().bold(),
-                    cmd_name
-                );
+                eprintln!("{} Using skill /{}", "skill:".magenta().bold(), cmd_name);
                 match skill_result {
                     SkillSlashResult::ToolDispatch {
                         tool_name,
@@ -791,10 +733,8 @@ pub async fn handle_command(
                             arguments,
                             arg_mode
                         );
-                        let dispatch_msg = format!(
-                            "Execute tool `{}` with arguments: {}",
-                            tool_name, arguments
-                        );
+                        let dispatch_msg =
+                            format!("Execute tool `{}` with arguments: {}", tool_name, arguments);
                         messages.push(Message::human(&dispatch_msg));
                     }
                     SkillSlashResult::Body(skill_body) => {

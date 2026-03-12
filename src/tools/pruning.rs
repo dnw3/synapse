@@ -91,10 +91,7 @@ pub fn prune_tool_results_with_options(messages: &mut Vec<Message>, opts: &Pruni
             continue;
         }
 
-        let tool_call_id = messages[i]
-            .tool_call_id()
-            .unwrap_or("")
-            .to_string();
+        let tool_call_id = messages[i].tool_call_id().unwrap_or("").to_string();
 
         // Skip if this tool result is protected by keepLastAssistants
         if !protected_ids.is_empty() && protected_ids.contains(&tool_call_id) {
@@ -187,12 +184,17 @@ fn should_skip_pruning(tool_name: &str, allow: &[String], deny: &[String]) -> bo
         return false;
     }
     // Deny takes precedence — if in deny list, always prune (don't skip)
-    if deny.iter().any(|d| tool_name == d || matches_wildcard(d, tool_name)) {
+    if deny
+        .iter()
+        .any(|d| tool_name == d || matches_wildcard(d, tool_name))
+    {
         return false;
     }
     // If allow list is non-empty, only prune tools NOT in the list
     if !allow.is_empty() {
-        return allow.iter().any(|a| tool_name == a || matches_wildcard(a, tool_name));
+        return allow
+            .iter()
+            .any(|a| tool_name == a || matches_wildcard(a, tool_name));
     }
     false
 }

@@ -92,7 +92,11 @@ async fn run_tcp(
 
     // Optional server password (must precede NICK/USER per RFC 1459).
     if irc_config.password.is_some() || irc_config.password_env.is_some() {
-        let password = resolve_secret(irc_config.password.as_deref(), irc_config.password_env.as_deref(), "IRC password")?;
+        let password = resolve_secret(
+            irc_config.password.as_deref(),
+            irc_config.password_env.as_deref(),
+            "IRC password",
+        )?;
         send(format!("PASS {}", password));
     }
 
@@ -176,8 +180,8 @@ async fn run_tcp(
                         // Each chunk is already ≤400 chars; send line-by-line
                         // in case the agent included embedded newlines.
                         for irc_line in chunk.lines() {
-                            let _ = tx_clone
-                                .send(format!("PRIVMSG {} :{}", reply_target, irc_line));
+                            let _ =
+                                tx_clone.send(format!("PRIVMSG {} :{}", reply_target, irc_line));
                         }
                     }
                 }
@@ -209,7 +213,7 @@ fn parse_privmsg(line: &str) -> Option<PrivMsg> {
     let mut parts = line[1..].splitn(3, ' ');
     let prefix = parts.next()?; // nick!user@host
     let command = parts.next()?; // PRIVMSG
-    let rest = parts.next()?;   // <target> :<text>
+    let rest = parts.next()?; // <target> :<text>
 
     if !command.eq_ignore_ascii_case("PRIVMSG") {
         return None;

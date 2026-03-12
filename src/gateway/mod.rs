@@ -40,9 +40,9 @@ pub async fn run_server_with_log_buffer(
     log_buffer: Option<crate::logging::LogBuffer>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app_state = if let Some(buf) = log_buffer {
-        state::AppState::with_log_buffer(config, buf)?
+        state::AppState::with_log_buffer(config, buf).await?
     } else {
-        state::AppState::new(config)?
+        state::AppState::new(config).await?
     };
 
     // Build the main API router with auth middleware on protected routes
@@ -99,10 +99,7 @@ pub async fn run_server_with_log_buffer(
     // Serve uploaded files from data/uploads/
     let uploads_dir = std::path::Path::new("data/uploads");
     let _ = std::fs::create_dir_all(uploads_dir);
-    let app = app.nest_service(
-        "/uploads",
-        tower_http::services::ServeDir::new(uploads_dir),
-    );
+    let app = app.nest_service("/uploads", tower_http::services::ServeDir::new(uploads_dir));
 
     // Serve static files from web/dist if available
     let app = {

@@ -73,9 +73,10 @@ interface DashboardProps {
   conversationCount: number;
   messageCount: number;
   activeTab: TabKey;
+  onNavigateToChat?: (conversationId: string) => void;
 }
 
-export default function Dashboard({ connected: wsConnected, conversationCount, messageCount, activeTab }: DashboardProps) {
+export default function Dashboard({ connected: wsConnected, conversationCount, messageCount, activeTab, onNavigateToChat }: DashboardProps) {
   const { t } = useTranslation();
 
   // Use HTTP health check for gateway status (WS is only connected during chat)
@@ -133,7 +134,7 @@ export default function Dashboard({ connected: wsConnected, conversationCount, m
           <OverviewPage connected={gatewayOnline} conversationCount={conversationCount} messageCount={messageCount} />
         )}
         {activeTab === "usage" && <UsagePage />}
-        {activeTab === "sessions" && <SessionsPage />}
+        {activeTab === "sessions" && <SessionsPage onNavigateToChat={onNavigateToChat} />}
         {activeTab === "logs" && <LogsPage />}
         {activeTab === "schedules" && <SchedulesPage />}
         {activeTab === "config" && <ConfigPage />}

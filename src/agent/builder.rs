@@ -2,8 +2,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use synaptic::callbacks::CostTrackingCallback;
 use synaptic::condenser::{
-    ChunkedSummarizingCondenser, CondenserMiddleware, Condenser, LlmSummarizingCondenser,
+    ChunkedSummarizingCondenser, Condenser, CondenserMiddleware, LlmSummarizingCondenser,
     TokenBudgetCondenser,
 };
 use synaptic::core::{ChatModel, SynapticError, TokenCounter, Tool};
@@ -14,7 +15,6 @@ use synaptic::middleware::{
     SecurityConfirmationCallback, SecurityMiddleware, SsrfGuardConfig, SsrfGuardMiddleware,
     ThresholdConfirmationPolicy,
 };
-use synaptic::callbacks::CostTrackingCallback;
 use synaptic::secrets::{SecretMaskingMiddleware, SecretRegistry};
 use synaptic_deep::backend::FilesystemBackend;
 use synaptic_deep::CommandExecutor;
@@ -24,7 +24,7 @@ use crate::config::SynapseConfig;
 use super::callbacks::AutoApproveCallback;
 use super::context::load_project_context;
 use super::discovery::discover_agents;
-use super::middleware::{LoopDetectionMiddleware, build_fallback_middleware};
+use super::middleware::{build_fallback_middleware, LoopDetectionMiddleware};
 use super::thinking::{ThinkingMiddleware, VerboseMiddleware};
 use super::tracing_mw::AgentTracingMiddleware;
 
@@ -114,6 +114,8 @@ pub async fn build_deep_agent(
         None,
         None,
         None,
+        "unknown",
+        None,
     )
     .await
 }
@@ -131,22 +133,19 @@ pub async fn build_deep_agent_with_callback(
     session_mgr: Option<Arc<synaptic::session::SessionManager>>,
     session_overrides: Option<SessionOverrides>,
     cost_tracker: Option<Arc<CostTrackingCallback>>,
+    channel: &str,
+    agent_name: Option<&str>,
 ) -> Result<CompiledGraph<MessageState>, SynapticError> {
     // Use docker backend if configured, otherwise filesystem
     #[cfg(feature = "docker")]
     let backend: Arc<dyn synaptic_deep::backend::Backend> = {
         if let Some(ref docker_cfg) = config.docker {
             if docker_cfg.enabled {
-                let image = docker_cfg
-                    .image
-                    .as_deref()
-                    .unwrap_or("ubuntu:22.04");
+                let image = docker_cfg.image.as_deref().unwrap_or("ubuntu:22.04");
                 let work_dir = cwd.to_string_lossy();
                 tracing::info!(backend = "docker", image = %image, "Creating Docker container");
                 match crate::docker::manager::DockerManager::create_workspace_with_mount(
-                    image,
-                    &work_dir,
-                    &work_dir,
+                    image, &work_dir, &work_dir,
                 )
                 .await
                 {
@@ -167,8 +166,7 @@ pub async fn build_deep_agent_with_callback(
         }
     };
     #[cfg(not(feature = "docker"))]
-    let backend: Arc<dyn synaptic_deep::backend::Backend> =
-        Arc::new(FilesystemBackend::new(cwd));
+    let backend: Arc<dyn synaptic_deep::backend::Backend> = Arc::new(FilesystemBackend::new(cwd));
 
     let mut options = DeepAgentOptions::new(backend.clone());
 
@@ -180,22 +178,53 @@ pub async fn build_deep_agent_with_callback(
             "You are Synapse, a helpful AI assistant powered by the Synaptic framework.".to_string()
         });
 
-    let project_context = load_project_context(cwd, &config.context);
+    let workspace_dir = config.workspace_dir_for_agent(agent_name);
+    let project_context = load_project_context(&workspace_dir, cwd, &config.context);
     if !project_context.is_empty() {
         system_prompt.push_str("\n\n# Project Context\n\n");
         system_prompt.push_str(&project_context);
     }
 
     options.system_prompt = Some(system_prompt);
+
+    // Self-awareness: environment detection + agent identity / self-modification guide
+    {
+        use synaptic_deep::{ChannelInfo, EnvironmentInfo};
+        let mut env = EnvironmentInfo::detect();
+        // Enrich with git info
+        env.git_root = std::process::Command::new("git")
+            .args(["rev-parse", "--show-toplevel"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+        env.git_branch = std::process::Command::new("git")
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+        // Channel info
+        let (caps, limit) = super::self_awareness::channel_info_for(channel);
+        env.channel = Some(ChannelInfo {
+            name: channel.to_string(),
+            capabilities: caps.iter().map(|s| s.to_string()).collect(),
+            message_limit: limit,
+        });
+        options.environment = Some(env);
+        options.self_section = Some(super::self_awareness::build_self_section(config, channel));
+    }
     options.enable_filesystem = config.base.agent.tools.filesystem;
     options.memory_file = Some(config.base.paths.memory_file.clone());
 
-    // Build skills_dirs: personal > project > legacy > custom config
+    // Build skills_dirs: synapse personal > claude personal > project > legacy > custom config
     {
         let mut skills_dirs = Vec::new();
         if let Some(home) = dirs::home_dir() {
-            let personal = home.join(".claude/skills");
-            skills_dirs.push(personal.to_string_lossy().to_string());
+            // Synapse's own personal skills (highest priority)
+            skills_dirs.push(home.join(".synapse/skills").to_string_lossy().to_string());
+            // OpenClaw-compatible personal skills (fallback)
+            skills_dirs.push(home.join(".claude/skills").to_string_lossy().to_string());
         }
         skills_dirs.push(cwd.join(".claude/skills").to_string_lossy().to_string());
         skills_dirs.push(cwd.join(".claude/commands").to_string_lossy().to_string());
@@ -206,8 +235,24 @@ pub async fn build_deep_agent_with_callback(
                     .to_string(),
             );
         }
+        // Add extra skill directories from config
+        for extra in &config.skills.extra_dirs {
+            let expanded = if extra.starts_with("~/") {
+                dirs::home_dir()
+                    .unwrap_or_default()
+                    .join(extra.trim_start_matches("~/"))
+                    .to_string_lossy()
+                    .to_string()
+            } else {
+                extra.clone()
+            };
+            skills_dirs.push(expanded);
+        }
         options.skills_dirs = skills_dirs;
     }
+
+    // Use configured prompt budget for skill descriptions
+    options.skill_description_budget = config.skills.max_skills_prompt_chars;
 
     // ShellCommandExecutor for skill !`command` placeholders
     options.command_executor = Some(Arc::new(ShellCommandExecutor::new(cwd)));
@@ -273,22 +318,16 @@ pub async fn build_deep_agent_with_callback(
     options.tools.extend(mcp_tools);
 
     // Add apply_patch tool
-    options
-        .tools
-        .push(crate::tools::ApplyPatchTool::new(cwd));
+    options.tools.push(crate::tools::ApplyPatchTool::new(cwd));
 
     // Add PDF reading tool
     options.tools.push(crate::tools::ReadPdfTool::new(cwd));
 
     // Add Firecrawl web scraping tool
-    options
-        .tools
-        .push(crate::tools::FirecrawlTool::new());
+    options.tools.push(crate::tools::FirecrawlTool::new());
 
     // Add image analysis tool (always available — works with any vision model)
-    options
-        .tools
-        .push(crate::tools::AnalyzeImageTool::new(cwd));
+    options.tools.push(crate::tools::AnalyzeImageTool::new(cwd));
 
     // Add audio transcription tool
     #[cfg(feature = "voice")]
@@ -375,9 +414,9 @@ pub async fn build_deep_agent_with_callback(
 
     // SSRF guard middleware
     if config.security.as_ref().is_none_or(|s| s.ssrf_guard) {
-        options
-            .middleware
-            .push(Arc::new(SsrfGuardMiddleware::new(SsrfGuardConfig::default())));
+        options.middleware.push(Arc::new(SsrfGuardMiddleware::new(
+            SsrfGuardConfig::default(),
+        )));
         tracing::info!("SSRF guard enabled");
     }
 
@@ -456,20 +495,18 @@ pub async fn build_deep_agent_with_callback(
     // Thinking middleware (session override or config default)
     {
         let overrides = session_overrides.as_ref();
-        let thinking_level = overrides
-            .and_then(|o| o.thinking.as_deref())
-            .or_else(|| {
-                // Check model entry for default thinking level
-                if let Some(ref models) = config.model_catalog {
-                    let primary = &config.base.model.model;
-                    models
-                        .iter()
-                        .find(|m| m.name == *primary || m.aliases.contains(&primary.to_string()))
-                        .and_then(|m| m.thinking.as_deref())
-                } else {
-                    None
-                }
-            });
+        let thinking_level = overrides.and_then(|o| o.thinking.as_deref()).or_else(|| {
+            // Check model entry for default thinking level
+            if let Some(ref models) = config.model_catalog {
+                let primary = &config.base.model.model;
+                models
+                    .iter()
+                    .find(|m| m.name == *primary || m.aliases.contains(&primary.to_string()))
+                    .and_then(|m| m.thinking.as_deref())
+            } else {
+                None
+            }
+        });
 
         if let Some(level) = thinking_level {
             if level == "adaptive" {
@@ -536,12 +573,13 @@ pub async fn build_deep_agent_with_callback(
 
     // DeepSummarizationMiddleware
     if config.memory.auto_compact {
-        let summarization = synaptic_deep::middleware::summarization::DeepSummarizationMiddleware::new(
-            backend.clone(),
-            model.clone(),
-            config.memory.auto_compact_threshold,
-            0.8,
-        );
+        let summarization =
+            synaptic_deep::middleware::summarization::DeepSummarizationMiddleware::new(
+                backend.clone(),
+                model.clone(),
+                config.memory.auto_compact_threshold,
+                0.8,
+            );
         options.middleware.push(Arc::new(summarization));
         tracing::info!("Deep summarization middleware enabled");
     }
@@ -550,9 +588,7 @@ pub async fn build_deep_agent_with_callback(
     if let Some(tracker) = cost_tracker {
         let model_name = config.base.model.model.clone();
         tracker.set_model(&model_name).await;
-        options
-            .middleware
-            .push(Arc::new(CostTrackingMw(tracker)));
+        options.middleware.push(Arc::new(CostTrackingMw(tracker)));
         tracing::info!("Cost tracking middleware enabled");
     }
 
@@ -576,9 +612,36 @@ pub async fn build_deep_agent_with_callback(
     }
 
     // Skill hooks executor
-    options.hooks_executor = Some(Arc::new(
-        crate::hooks::SynapseHooksExecutor::new(Arc::new(config.clone())),
-    ));
+    options.hooks_executor = Some(Arc::new(crate::hooks::SynapseHooksExecutor::new(Arc::new(
+        config.clone(),
+    ))));
+
+    // Post-session reflection for self-evolution
+    if config.reflection.enabled {
+        let reflection_model_name = config.reflection.model.as_deref();
+        match reflection_model_name {
+            Some(name) => match super::model::build_model_by_name(config, name) {
+                Ok(m) => {
+                    let mut rcfg = synaptic_deep::ReflectionConfig::default();
+                    rcfg.min_messages = config.reflection.min_messages;
+                    rcfg.memory_file = config.base.paths.memory_file.clone();
+                    options.reflection_model = Some(m);
+                    options.reflection_config = Some(rcfg);
+                    tracing::info!(model = name, "Reflection middleware enabled");
+                }
+                Err(e) => tracing::warn!(error = %e, "Failed to build reflection model, skipping"),
+            },
+            None => {
+                // Use main model (fallback)
+                let mut rcfg = synaptic_deep::ReflectionConfig::default();
+                rcfg.min_messages = config.reflection.min_messages;
+                rcfg.memory_file = config.base.paths.memory_file.clone();
+                options.reflection_model = Some(model.clone());
+                options.reflection_config = Some(rcfg);
+                tracing::info!("Reflection middleware enabled (using main model)");
+            }
+        }
+    }
 
     create_deep_agent(model, options)
 }

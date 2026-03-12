@@ -197,12 +197,12 @@ pub async fn repl(
                     let estimated = counter.count_messages(messages);
                     if estimated > config.memory.auto_compact_threshold {
                         let keep = config.memory.keep_recent;
-                        let (system_msg, rest) =
-                            if !messages.is_empty() && messages[0].is_system() {
-                                (Some(messages[0].clone()), &messages[1..])
-                            } else {
-                                (None, messages.as_slice())
-                            };
+                        let (system_msg, rest) = if !messages.is_empty() && messages[0].is_system()
+                        {
+                            (Some(messages[0].clone()), &messages[1..])
+                        } else {
+                            (None, messages.as_slice())
+                        };
 
                         if rest.len() > keep {
                             let discard_count = rest.len() - keep;
@@ -299,9 +299,7 @@ pub async fn repl(
 
                 let turn_tokens = (prompt_chars + full_response.len()) / 4;
                 if turn_tokens > 0 {
-                    if let Ok(Some(mut info)) =
-                        session_mgr.get_session(&current_session_id).await
-                    {
+                    if let Ok(Some(mut info)) = session_mgr.get_session(&current_session_id).await {
                         info.token_count += turn_tokens as u64;
                         session_mgr.update_session(&info).await.ok();
                     }

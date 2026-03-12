@@ -33,9 +33,7 @@ pub async fn broadcast(
             "telegram" => {
                 send_telegram(channel_id, message, tokens.telegram_token.as_deref()).await
             }
-            "discord" => {
-                send_discord(channel_id, message, tokens.discord_token.as_deref()).await
-            }
+            "discord" => send_discord(channel_id, message, tokens.discord_token.as_deref()).await,
             _ => Err(format!("unsupported platform '{}'", platform)),
         };
 
@@ -62,15 +60,18 @@ impl BroadcastTokens {
         let slack_token = config
             .slack
             .as_ref()
-            .and_then(|c| std::env::var(&c.bot_token_env).ok());
+            .and_then(|c| c.bot_token_env.as_ref())
+            .and_then(|env| std::env::var(env).ok());
         let telegram_token = config
             .telegram
             .as_ref()
-            .and_then(|c| std::env::var(&c.bot_token_env).ok());
+            .and_then(|c| c.bot_token_env.as_ref())
+            .and_then(|env| std::env::var(env).ok());
         let discord_token = config
             .discord
             .as_ref()
-            .and_then(|c| std::env::var(&c.bot_token_env).ok());
+            .and_then(|c| c.bot_token_env.as_ref())
+            .and_then(|env| std::env::var(env).ok());
 
         Self {
             slack_token,
@@ -126,11 +127,7 @@ async fn send_telegram(chat_id: &str, message: &str, token: Option<&str>) -> Res
     Ok(())
 }
 
-async fn send_discord(
-    channel_id: &str,
-    message: &str,
-    token: Option<&str>,
-) -> Result<(), String> {
+async fn send_discord(channel_id: &str, message: &str, token: Option<&str>) -> Result<(), String> {
     let token = token.ok_or("Discord bot token not configured")?;
     let client = reqwest::Client::new();
     let resp = client

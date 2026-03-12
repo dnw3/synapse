@@ -243,3 +243,30 @@ impl Default for SessionConfig {
         }
     }
 }
+
+/// Post-session reflection configuration for agent self-evolution.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReflectionSynapseConfig {
+    /// Enable reflection after each session. Default: false.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Model name for reflection (should be cheap/fast, e.g. "haiku"). Default: uses main model.
+    pub model: Option<String>,
+    /// Minimum messages in conversation to trigger reflection. Default: 6.
+    #[serde(default = "default_min_messages")]
+    pub min_messages: usize,
+}
+
+fn default_min_messages() -> usize {
+    6
+}
+
+impl Default for ReflectionSynapseConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            model: None,
+            min_messages: 6,
+        }
+    }
+}

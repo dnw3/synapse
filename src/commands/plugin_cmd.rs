@@ -225,12 +225,7 @@ fn plugin_install(source: &str) -> Result<(), Box<dyn std::error::Error>> {
 fn plugin_enable(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let plugin_dir = plugins_dir().join(name);
     if !plugin_dir.exists() {
-        return Err(format!(
-            "plugin '{}' not found in {}",
-            name,
-            plugins_dir().display()
-        )
-        .into());
+        return Err(format!("plugin '{}' not found in {}", name, plugins_dir().display()).into());
     }
 
     let mut disabled = load_disabled_plugins();
@@ -251,12 +246,7 @@ fn plugin_enable(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 fn plugin_disable(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let plugin_dir = plugins_dir().join(name);
     if !plugin_dir.exists() {
-        return Err(format!(
-            "plugin '{}' not found in {}",
-            name,
-            plugins_dir().display()
-        )
-        .into());
+        return Err(format!("plugin '{}' not found in {}", name, plugins_dir().display()).into());
     }
 
     let mut disabled = load_disabled_plugins();
@@ -277,12 +267,7 @@ fn plugin_disable(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 fn plugin_remove(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let plugin_dir = plugins_dir().join(name);
     if !plugin_dir.exists() {
-        return Err(format!(
-            "plugin '{}' not found in {}",
-            name,
-            plugins_dir().display()
-        )
-        .into());
+        return Err(format!("plugin '{}' not found in {}", name, plugins_dir().display()).into());
     }
 
     std::fs::remove_dir_all(&plugin_dir)?;

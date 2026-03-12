@@ -49,7 +49,7 @@ pub enum Command {
     /// List all sessions.
     Sessions,
 
-    /// Interactive setup wizard — creates synaptic.toml config file.
+    /// Interactive setup wizard — creates synapse.toml config file.
     Init,
 
     /// Health check — verifies config, API keys, model connectivity, and integrations.

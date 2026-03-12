@@ -16,12 +16,17 @@ import type {
   UsageTimeseriesEntry,
   UsageSessionEntry,
   AgentEntry,
+  ToolCatalogGroup,
   DebugInvokeRequest,
   DebugInvokeResponse,
   DebugHealthResponse,
   WorkspaceFileEntry,
   WorkspaceFileContent,
   IdentityInfo,
+  StoreSearchResult,
+  StoreSkillItem,
+  StoreSkillDetail,
+  StoreStatus,
 } from "../types/dashboard";
 
 export function useDashboardAPI() {
@@ -181,8 +186,9 @@ export function useDashboardAPI() {
   const reloadConfig = useCallback(() =>
     postJSON<{ ok: boolean }>("/config/reload"), [postJSON]);
 
-  // Agents (Phase 4)
+  // Agents (Phase 4) + Tools catalog
   const fetchAgents = useCallback(() => fetchJSON<AgentEntry[]>("/agents"), [fetchJSON]);
+  const fetchToolsCatalog = useCallback(() => fetchJSON<ToolCatalogGroup[]>("/tools"), [fetchJSON]);
   const createAgent = useCallback((agent: Partial<AgentEntry>) =>
     postJSON<AgentEntry>("/agents", agent), [postJSON]);
   const updateAgent = useCallback((name: string, agent: Partial<AgentEntry>) =>
@@ -209,6 +215,10 @@ export function useDashboardAPI() {
   // Skills (Phase 7)
   const toggleSkill = useCallback((name: string) =>
     postJSON<{ enabled: boolean }>(`/skills/${encodeURIComponent(name)}/toggle`), [postJSON]);
+  const fetchSkillFiles = useCallback((path: string) =>
+    fetchJSON<{ files: { name: string; size: number }[] }>(`/skills/files?path=${encodeURIComponent(path)}`), [fetchJSON]);
+  const fetchSkillFileContent = useCallback((path: string) =>
+    fetchJSON<{ content: string }>(`/skills/content?path=${encodeURIComponent(path)}`), [fetchJSON]);
 
   // Debug (Phase 8)
   const debugInvoke = useCallback((req: DebugInvokeRequest) =>
@@ -216,21 +226,42 @@ export function useDashboardAPI() {
   const fetchDebugHealth = useCallback(() =>
     fetchJSON<DebugHealthResponse>("/debug/health" as never), [fetchJSON]);
 
-  // Workspace
-  const fetchWorkspaceFiles = useCallback(() =>
-    fetchJSON<WorkspaceFileEntry[]>("/workspace"), [fetchJSON]);
-  const fetchWorkspaceFile = useCallback((filename: string) =>
-    fetchJSON<WorkspaceFileContent>(`/workspace/${encodeURIComponent(filename)}`), [fetchJSON]);
-  const saveWorkspaceFile = useCallback((filename: string, content: string) =>
-    putJSON<{ ok: boolean }>(`/workspace/${encodeURIComponent(filename)}`, { content }), [putJSON]);
-  const createWorkspaceFile = useCallback((filename: string, content: string) =>
-    postJSON<{ ok: boolean }>(`/workspace/${encodeURIComponent(filename)}`, { content }), [postJSON]);
-  const deleteWorkspaceFile = useCallback((filename: string) =>
-    deleteJSON(`/workspace/${encodeURIComponent(filename)}`), [deleteJSON]);
-  const resetWorkspaceFile = useCallback((filename: string) =>
-    postJSON<{ ok: boolean }>(`/workspace/${encodeURIComponent(filename)}/reset`), [postJSON]);
-  const fetchIdentity = useCallback(() =>
-    fetchJSON<IdentityInfo>("/identity"), [fetchJSON]);
+  // Workspace (supports optional ?agent= param for per-agent workspaces)
+  const agentQs = (agent?: string) => agent ? `?agent=${encodeURIComponent(agent)}` : "";
+  const fetchWorkspaceFiles = useCallback((agent?: string) =>
+    fetchJSON<WorkspaceFileEntry[]>(`/workspace${agentQs(agent)}`), [fetchJSON]);
+  const fetchWorkspaceFile = useCallback((filename: string, agent?: string) =>
+    fetchJSON<WorkspaceFileContent>(`/workspace/${encodeURIComponent(filename)}${agentQs(agent)}`), [fetchJSON]);
+  const saveWorkspaceFile = useCallback((filename: string, content: string, agent?: string) =>
+    putJSON<{ ok: boolean }>(`/workspace/${encodeURIComponent(filename)}${agentQs(agent)}`, { content }), [putJSON]);
+  const createWorkspaceFile = useCallback((filename: string, content: string, agent?: string) =>
+    postJSON<{ ok: boolean }>(`/workspace/${encodeURIComponent(filename)}${agentQs(agent)}`, { content }), [postJSON]);
+  const deleteWorkspaceFile = useCallback((filename: string, agent?: string) =>
+    deleteJSON(`/workspace/${encodeURIComponent(filename)}${agentQs(agent)}`), [deleteJSON]);
+  const resetWorkspaceFile = useCallback((filename: string, agent?: string) =>
+    postJSON<{ ok: boolean }>(`/workspace/${encodeURIComponent(filename)}/reset${agentQs(agent)}`), [postJSON]);
+  const fetchIdentity = useCallback((agent?: string) =>
+    fetchJSON<IdentityInfo>(`/identity${agentQs(agent)}`), [fetchJSON]);
+
+  // Skill Store
+  const storeSearch = useCallback((q: string, limit = 20) =>
+    fetchJSON<{ results: StoreSearchResult[]; source: string }>(`/store/search?q=${encodeURIComponent(q)}&limit=${limit}`), [fetchJSON]);
+  const storeList = useCallback((limit = 20, sort?: string, offset?: number) => {
+    let path = `/store/skills?limit=${limit}`;
+    if (sort) path += `&sort=${sort}`;
+    if (offset) path += `&cursor=${offset}`;
+    return fetchJSON<{ items: StoreSkillItem[]; source: string }>(path);
+  }, [fetchJSON]);
+  const storeInstall = useCallback((slug: string, version?: string) =>
+    postJSON<{ ok: boolean }>("/store/install", { slug, version }), [postJSON]);
+  const storeDetail = useCallback((slug: string) =>
+    fetchJSON<StoreSkillDetail>(`/store/skills/${encodeURIComponent(slug)}`), [fetchJSON]);
+  const storeFiles = useCallback((slug: string) =>
+    fetchJSON<{ files: { name: string; size: number }[]; skillMd: string | null }>(`/store/skills/${encodeURIComponent(slug)}/files`), [fetchJSON]);
+  const storeFileContent = useCallback((slug: string, filePath: string) =>
+    fetchJSON<{ content: string | null }>(`/store/skills/${encodeURIComponent(slug)}/files/${filePath.split('/').map(encodeURIComponent).join('/')}`), [fetchJSON]);
+  const storeStatus = useCallback(() =>
+    fetchJSON<StoreStatus>("/store/status"), [fetchJSON]);
 
   // Logs export (Phase 9)
   const exportLogs = useCallback(async (): Promise<Blob | null> => {
@@ -254,14 +285,16 @@ export function useDashboardAPI() {
     createSchedule, updateSchedule, deleteSchedule, triggerSchedule, toggleSchedule, fetchScheduleRuns,
     // Config advanced
     fetchConfigSchema, patchConfig, validateConfig, reloadConfig,
-    // Agents
-    fetchAgents, createAgent, updateAgent, deleteAgent,
+    // Agents + Tools
+    fetchAgents, createAgent, updateAgent, deleteAgent, fetchToolsCatalog,
     // Sessions advanced
     deleteSession, renameSession, patchSessionOverrides, compactSession,
     // Channels
     toggleChannel, updateChannelConfig,
     // Skills
-    toggleSkill,
+    toggleSkill, fetchSkillFiles, fetchSkillFileContent,
+    // Store
+    storeSearch, storeList, storeDetail, storeFiles, storeFileContent, storeInstall, storeStatus,
     // Debug
     debugInvoke, fetchDebugHealth,
     // Logs
@@ -277,10 +310,11 @@ export function useDashboardAPI() {
     fetchUsageTimeseries, fetchUsageSessions,
     createSchedule, updateSchedule, deleteSchedule, triggerSchedule, toggleSchedule, fetchScheduleRuns,
     fetchConfigSchema, patchConfig, validateConfig, reloadConfig,
-    fetchAgents, createAgent, updateAgent, deleteAgent,
+    fetchAgents, createAgent, updateAgent, deleteAgent, fetchToolsCatalog,
     deleteSession, renameSession, patchSessionOverrides, compactSession,
     toggleChannel, updateChannelConfig,
-    toggleSkill,
+    toggleSkill, fetchSkillFiles, fetchSkillFileContent,
+    storeSearch, storeList, storeDetail, storeFiles, storeFileContent, storeInstall, storeStatus,
     debugInvoke, fetchDebugHealth,
     exportLogs,
     fetchWorkspaceFiles, fetchWorkspaceFile, saveWorkspaceFile,

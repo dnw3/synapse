@@ -16,7 +16,7 @@ fn config_to_mcp_connection(mc: &synaptic::config::McpServerConfig) -> Option<Mc
             Some(McpConnection::Stdio(StdioConnection {
                 command,
                 args: mc.args.clone().unwrap_or_default(),
-                env: HashMap::new(),
+                env: mc.env.clone().unwrap_or_default(),
             }))
         }
         "sse" => {

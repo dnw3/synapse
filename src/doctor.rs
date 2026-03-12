@@ -108,7 +108,7 @@ pub async fn run_doctor(config: &SynapseConfig) -> Result<(), Box<dyn std::error
 
 fn check_config() -> CheckResult {
     let paths = [
-        "synaptic.toml",
+        "synapse.toml",
         "synaptic.json",
         "synaptic.yaml",
         "synaptic.yml",

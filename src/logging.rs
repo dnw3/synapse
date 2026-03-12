@@ -425,16 +425,16 @@ where
         attrs.record(&mut visitor);
         if let Some(span) = ctx.span(id) {
             if let Some(request_id) = visitor.request_id {
-                span.extensions_mut()
-                    .insert(RequestIdExtension(request_id));
+                span.extensions_mut().insert(RequestIdExtension(request_id));
             }
             // Store other span fields (method, path, etc.) for enriching log entries
             let mut field_visitor = FieldVisitor::new();
             attrs.record(&mut field_visitor);
             field_visitor.fields.remove("request_id"); // already stored separately
             if !field_visitor.fields.is_empty() {
-                span.extensions_mut()
-                    .insert(SpanContextExtension { fields: field_visitor.fields });
+                span.extensions_mut().insert(SpanContextExtension {
+                    fields: field_visitor.fields,
+                });
             }
         }
     }
@@ -542,10 +542,7 @@ pub fn init_tracing(config: &LogConfig) -> LogBuffer {
 
         // Ensure log directory exists
         if let Err(e) = std::fs::create_dir_all(log_path) {
-            eprintln!(
-                "warning: failed to create log directory {}: {}",
-                log_dir, e
-            );
+            eprintln!("warning: failed to create log directory {}: {}", log_dir, e);
             tracing_subscriber::registry()
                 .with(console_layer)
                 .with(memory_layer)

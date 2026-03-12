@@ -54,16 +54,10 @@ fn make_sse_stream(
     tokio::spawn(async move {
         if let Err(e) = run_sse_session(state, query, tx.clone()).await {
             let _ = tx
-                .send(
-                    Event::default()
-                        .event("error")
-                        .data(e.to_string()),
-                )
+                .send(Event::default().event("error").data(e.to_string()))
                 .await;
         }
-        let _ = tx
-            .send(Event::default().event("done").data(""))
-            .await;
+        let _ = tx.send(Event::default().event("done").data("")).await;
     });
 
     tokio_stream::wrappers::ReceiverStream::new(rx).map(Ok)
@@ -147,11 +141,7 @@ async fn run_sse_session(
                                 content.to_string()
                             };
                             let _ = tx
-                                .send(
-                                    Event::default()
-                                        .event("tool_result")
-                                        .data(preview),
-                                )
+                                .send(Event::default().event("tool_result").data(preview))
                                 .await;
                         }
                         displayed += 1;
@@ -169,11 +159,7 @@ async fn run_sse_session(
                 }
                 Err(e) => {
                     let _ = tx
-                        .send(
-                            Event::default()
-                                .event("error")
-                                .data(e.to_string()),
-                        )
+                        .send(Event::default().event("error").data(e.to_string()))
                         .await;
                     break;
                 }
@@ -202,11 +188,7 @@ async fn run_sse_session(
                 }
                 Err(e) => {
                     let _ = tx
-                        .send(
-                            Event::default()
-                                .event("error")
-                                .data(e.to_string()),
-                        )
+                        .send(Event::default().event("error").data(e.to_string()))
                         .await;
                     break;
                 }
@@ -216,10 +198,7 @@ async fn run_sse_session(
         // Save AI response
         if !full_response.is_empty() {
             let ai_msg = Message::ai(&full_response);
-            memory
-                .append(&query.session_id, ai_msg)
-                .await
-                .ok();
+            memory.append(&query.session_id, ai_msg).await.ok();
         }
     }
 

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use synaptic::callbacks::{CostTrackingCallback, default_pricing};
-use synaptic::core::ChatModel;
+use synaptic::callbacks::{default_pricing, CostTrackingCallback};
+use synaptic::core::{ChatModel, Tool};
 use synaptic::session::SessionManager;
 use tokio::sync::RwLock;
 
@@ -48,19 +48,21 @@ pub struct AppState {
     pub write_lock: Arc<SessionWriteLock>,
     /// In-memory log buffer for the /api/logs endpoint.
     pub log_buffer: LogBuffer,
+    /// Pre-loaded MCP tools (loaded once at startup, shared across requests).
+    pub mcp_tools: Vec<Arc<dyn Tool>>,
 }
 
 impl AppState {
-    pub fn with_log_buffer(
+    pub async fn with_log_buffer(
         config: &SynapseConfig,
         log_buffer: LogBuffer,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut state = Self::new(config)?;
+        let mut state = Self::new(config).await?;
         state.log_buffer = log_buffer;
         Ok(state)
     }
 
-    pub fn new(config: &SynapseConfig) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(config: &SynapseConfig) -> Result<Self, Box<dyn std::error::Error>> {
         let model = agent::build_model(config, None)?;
         let session_mgr = crate::build_session_manager(config);
 
@@ -78,6 +80,9 @@ impl AppState {
         // In-memory log buffer (capacity from config)
         let log_buffer = LogBuffer::new(config.logging.memory.capacity);
 
+        // Load MCP tools once at startup
+        let mcp_tools = agent::load_mcp_tools(config).await;
+
         Ok(Self {
             config: config.clone(),
             model,
@@ -89,6 +94,7 @@ impl AppState {
             request_metrics: RequestMetrics::default(),
             write_lock,
             log_buffer,
+            mcp_tools,
         })
     }
 }

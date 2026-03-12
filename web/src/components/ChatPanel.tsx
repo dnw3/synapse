@@ -45,6 +45,8 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const userScrolledUp = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const commandsRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,8 +104,23 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
     cmd.action();
   }, []);
 
+  // Track whether user has scrolled up (away from bottom)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]") as HTMLElement | null;
+    if (!el) return;
+    const handleScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      userScrolledUp.current = !atBottom;
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Only auto-scroll if user is near the bottom
+  useEffect(() => {
+    if (!userScrolledUp.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -197,9 +214,26 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
 
   const visibleMessages = messages.filter((m) => m.role !== "system");
 
+  // Group consecutive assistant + tool messages into "turns" so they render
+  // under a single avatar instead of multiple separate bubbles.
+  const turns: Array<{ type: "human"; messages: Message[] } | { type: "assistant"; messages: Message[] }> = [];
+  for (const msg of visibleMessages) {
+    if (msg.role === "human") {
+      turns.push({ type: "human", messages: [msg] });
+    } else {
+      // assistant or tool — merge into the current assistant turn
+      const last = turns[turns.length - 1];
+      if (last && last.type === "assistant") {
+        last.messages.push(msg);
+      } else {
+        turns.push({ type: "assistant", messages: [msg] });
+      }
+    }
+  }
+
   return (
     <div className="flex flex-col flex-1 min-w-0 min-h-0">
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 min-h-0">
         <div className="max-w-2xl mx-auto px-5 py-6 space-y-5">
           {visibleMessages.length === 0 && (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -220,9 +254,13 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
             </div>
           )}
 
-          {visibleMessages.map((msg, i) => (
-            <MessageBubble key={i} message={msg} />
-          ))}
+          {turns.map((turn, i) =>
+            turn.type === "human" ? (
+              <MessageBubble key={i} message={turn.messages[0]} />
+            ) : (
+              <MessageBubble key={i} turn={turn.messages} />
+            )
+          )}
 
           {approvalRequest && onApprovalRespond && (
             <ApprovalDialog
@@ -232,9 +270,13 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
           )}
 
           {loading && !streaming && !approvalRequest && (
-            <div className="flex items-center gap-2.5 text-[var(--text-secondary)] text-sm py-2 animate-fade-in">
-              <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-light)]" />
-              <span>{t("chat.thinking")}</span>
+            <div className="flex gap-3 animate-fade-in">
+              <div className="w-7 h-7 rounded-full bg-[var(--accent-glow)] border border-[var(--accent)]/15 flex items-center justify-center flex-shrink-0">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-light)]" />
+              </div>
+              <div className="flex items-center text-[var(--text-secondary)] text-sm">
+                <span>{t("chat.thinking")}</span>
+              </div>
             </div>
           )}
 

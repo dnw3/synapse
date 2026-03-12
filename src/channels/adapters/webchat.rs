@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use axum::{
-    Json, Router,
     extract::State,
     http::{HeaderValue, Method, StatusCode},
     response::IntoResponse,
     routing::{get, post},
+    Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
@@ -111,10 +111,7 @@ async fn handle_chat(
     Json(req): Json<ChatRequest>,
 ) -> impl IntoResponse {
     // Allowlist check
-    if !state
-        .allowlist
-        .is_allowed(req.user_id.as_deref(), None)
-    {
+    if !state.allowlist.is_allowed(req.user_id.as_deref(), None) {
         return (
             StatusCode::FORBIDDEN,
             Json(serde_json::json!(ErrorResponse {

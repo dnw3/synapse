@@ -3,11 +3,13 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use synaptic::core::{ChatModel, ChatRequest, ContentBlock, HeuristicTokenCounter, MemoryStore, Message, TokenCounter};
+use futures::StreamExt;
+use synaptic::core::{
+    ChatModel, ChatRequest, ContentBlock, HeuristicTokenCounter, MemoryStore, Message, TokenCounter,
+};
 use synaptic::graph::{MessageState, StreamMode};
 use synaptic::session::SessionManager;
 use synaptic::store::FileStore;
-use futures::StreamExt;
 use tokio::sync::RwLock;
 use tracing;
 
@@ -46,6 +48,8 @@ pub struct AgentSession {
     config: Arc<SynapseConfig>,
     session_mgr: SessionManager,
     deep_agent: bool,
+    /// The channel name (e.g. "lark", "slack", "telegram") for self-awareness context.
+    channel: String,
     /// Tracks which session key maps to which session ID.
     session_map: RwLock<std::collections::HashMap<String, String>>,
 }
@@ -62,6 +66,7 @@ impl AgentSession {
             config,
             session_mgr,
             deep_agent,
+            channel: "unknown".to_string(),
             session_map: RwLock::new(std::collections::HashMap::new()),
         }
     }
@@ -98,8 +103,15 @@ impl AgentSession {
             config,
             session_mgr,
             deep_agent,
+            channel: "unknown".to_string(),
             session_map: RwLock::new(std::collections::HashMap::new()),
         }
+    }
+
+    /// Set the channel name for self-awareness context (e.g. "lark", "slack", "web").
+    pub fn with_channel(mut self, channel: &str) -> Self {
+        self.channel = channel.to_string();
+        self
     }
 
     /// Resolve or create a persistent session ID for a given chat key.
@@ -119,7 +131,14 @@ impl AgentSession {
         if let Ok(Some(item)) = store.get(ns, session_key).await {
             if let Some(sid) = item.value.as_str() {
                 // Verify the session still exists
-                if self.session_mgr.get_session(sid).await.ok().flatten().is_some() {
+                if self
+                    .session_mgr
+                    .get_session(sid)
+                    .await
+                    .ok()
+                    .flatten()
+                    .is_some()
+                {
                     let mut map = self.session_map.write().await;
                     map.insert(session_key.to_string(), sid.to_string());
                     return Ok(sid.to_string());
@@ -153,7 +172,8 @@ impl AgentSession {
         session_key: &str,
         text: &str,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        self.handle_message_inner(session_key, text, Vec::new()).await
+        self.handle_message_inner(session_key, text, Vec::new())
+            .await
     }
 
     /// Inner handler that supports optional multimodal content blocks.
@@ -183,8 +203,13 @@ impl AgentSession {
 
         let duration_ms = start.elapsed().as_millis();
         match &result {
-            Ok(_) => tracing::info!(duration_ms = duration_ms as u64, "channel message processed"),
-            Err(e) => tracing::error!(duration_ms = duration_ms as u64, error = %e, "channel message failed"),
+            Ok(_) => tracing::info!(
+                duration_ms = duration_ms as u64,
+                "channel message processed"
+            ),
+            Err(e) => {
+                tracing::error!(duration_ms = duration_ms as u64, error = %e, "channel message failed")
+            }
         }
 
         result
@@ -248,6 +273,8 @@ impl AgentSession {
             None, // no session tools in bot mode
             None, // no session overrides in bot mode
             None, // no cost tracking in bot mode
+            &self.channel,
+            None, // agent routing resolved at higher level
         )
         .await
         .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;
@@ -265,11 +292,7 @@ impl AgentSession {
         let response = extract_final_response(&final_state.messages);
 
         // Save new messages to history (skip the ones we already had)
-        let saved_count = memory
-            .load(session_id)
-            .await
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let saved_count = memory.load(session_id).await.map(|m| m.len()).unwrap_or(0);
         for msg in final_state.messages.iter().skip(saved_count) {
             memory.append(session_id, msg.clone()).await.ok();
         }
@@ -290,7 +313,8 @@ impl AgentSession {
             let keep_recent = self.config.memory.keep_recent;
             let discard_end = current.len().saturating_sub(keep_recent);
             if discard_end > 0 {
-                ltm.flush_before_compact(&current[..discard_end], self.model.as_ref()).await;
+                ltm.flush_before_compact(&current[..discard_end], self.model.as_ref())
+                    .await;
             }
 
             // Prune tool results before trimming
@@ -436,7 +460,10 @@ impl AgentSession {
                     match resp.bytes().await {
                         Ok(bytes) => {
                             if let Err(e) = std::fs::write(&file_path, &bytes) {
-                                eprintln!("warning: failed to write attachment {}: {}", att.filename, e);
+                                eprintln!(
+                                    "warning: failed to write attachment {}: {}",
+                                    att.filename, e
+                                );
                                 continue;
                             }
                             let file_url = format!("file://{}", file_path.display());
@@ -465,15 +492,24 @@ impl AgentSession {
                             }
                         }
                         Err(e) => {
-                            eprintln!("warning: failed to download attachment {}: {}", att.filename, e);
+                            eprintln!(
+                                "warning: failed to download attachment {}: {}",
+                                att.filename, e
+                            );
                         }
                     }
                 }
                 Ok(resp) => {
-                    eprintln!("warning: attachment download failed with HTTP {}", resp.status());
+                    eprintln!(
+                        "warning: attachment download failed with HTTP {}",
+                        resp.status()
+                    );
                 }
                 Err(e) => {
-                    eprintln!("warning: failed to fetch attachment {}: {}", att.filename, e);
+                    eprintln!(
+                        "warning: failed to fetch attachment {}: {}",
+                        att.filename, e
+                    );
                 }
             }
         }
@@ -515,7 +551,8 @@ impl AgentSession {
         let sid = self.resolve_session(session_key).await?;
 
         let result = if self.deep_agent {
-            self.handle_deep_agent_streaming(&sid, text, &content_blocks, output.clone()).await
+            self.handle_deep_agent_streaming(&sid, text, &content_blocks, output.clone())
+                .await
         } else {
             // Simple chat doesn't support streaming, fall back and emit via callbacks
             let res = self.handle_simple_chat(&sid, text, &content_blocks).await;
@@ -529,7 +566,10 @@ impl AgentSession {
         match &result {
             Ok(response) => {
                 output.on_complete(response).await;
-                tracing::info!(duration_ms = duration_ms as u64, "streaming message processed");
+                tracing::info!(
+                    duration_ms = duration_ms as u64,
+                    "streaming message processed"
+                );
             }
             Err(e) => {
                 output.on_error(&e.to_string()).await;
@@ -599,6 +639,8 @@ impl AgentSession {
             None,
             None,
             None,
+            &self.channel,
+            None, // agent routing resolved at higher level
         )
         .await
         .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;
@@ -639,11 +681,7 @@ impl AgentSession {
         let response = extract_final_response(&final_state.messages);
 
         // Save new messages to history (skip the ones we already had)
-        let saved_count = memory
-            .load(session_id)
-            .await
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let saved_count = memory.load(session_id).await.map(|m| m.len()).unwrap_or(0);
         for msg in final_state.messages.iter().skip(saved_count) {
             memory.append(session_id, msg.clone()).await.ok();
         }
@@ -664,7 +702,8 @@ impl AgentSession {
             let keep_recent = self.config.memory.keep_recent;
             let discard_end = current.len().saturating_sub(keep_recent);
             if discard_end > 0 {
-                ltm.flush_before_compact(&current[..discard_end], self.model.as_ref()).await;
+                ltm.flush_before_compact(&current[..discard_end], self.model.as_ref())
+                    .await;
             }
 
             // Prune tool results before trimming

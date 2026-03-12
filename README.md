@@ -9,7 +9,7 @@ A thin CLI shell wrapping the [Synaptic](https://github.com/synaptic-ai/synaptic
 cargo build --release
 
 # Copy and edit the config
-cp synaptic.toml.example synaptic.toml
+cp synapse.toml.example synapse.toml
 export OPENAI_API_KEY="sk-..."
 
 # Interactive REPL
@@ -44,10 +44,10 @@ synapse -c <FILE>          Specify config file path
 Synapse looks for configuration in this order:
 
 1. Path specified with `-c` flag
-2. `./synaptic.toml` in the current directory
+2. `./synapse.toml` in the current directory
 3. `~/.synaptic/config.toml`
 
-See `synaptic.toml.example` for the full configuration format.
+See `synapse.toml.example` for the full configuration format.
 
 ## Session Persistence
 

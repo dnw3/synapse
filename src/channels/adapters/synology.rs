@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{Json, Router, extract::State, http::StatusCode, response::IntoResponse, routing::post};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 
 use crate::agent;
@@ -69,18 +69,25 @@ async fn handle_webhook(
         return (StatusCode::OK, Json(serde_json::json!({"text": ""})));
     }
 
-    if !state.allowlist.is_allowed(
-        payload.user_id.as_deref(),
-        payload.channel_id.as_deref(),
-    ) {
-        return (StatusCode::FORBIDDEN, Json(serde_json::json!({"text": "not allowed"})));
+    if !state
+        .allowlist
+        .is_allowed(payload.user_id.as_deref(), payload.channel_id.as_deref())
+    {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"text": "not allowed"})),
+        );
     }
 
     let session_key = payload
         .channel_id
         .unwrap_or_else(|| payload.user_id.unwrap_or_else(|| "default".to_string()));
 
-    match state.agent_session.handle_message(&session_key, &text).await {
+    match state
+        .agent_session
+        .handle_message(&session_key, &text)
+        .await
+    {
         Ok(reply) => {
             // If outgoing webhook URL is configured, send there
             if let Some(ref url) = state.outgoing_url {

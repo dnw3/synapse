@@ -2,9 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use synaptic::core::{ChatModel, Message, SynapticError};
-use synaptic::middleware::{
-    AgentMiddleware, ModelFallbackMiddleware, ModelRequest, ModelResponse,
-};
+use synaptic::middleware::{AgentMiddleware, ModelFallbackMiddleware, ModelRequest, ModelResponse};
 use tokio::sync::Mutex;
 
 use crate::config::SynapseConfig;
@@ -97,7 +95,10 @@ pub fn build_fallback_middleware(config: &SynapseConfig) -> Option<ModelFallback
     // 1. Multi-key rotation fallbacks for the primary model
     let primary_model = &config.base.model.model;
     if let Some(key_fallbacks) = registry.rotation_fallbacks(primary_model) {
-        tracing::info!(count = key_fallbacks.len(), "Key-rotation fallback(s) for primary model");
+        tracing::info!(
+            count = key_fallbacks.len(),
+            "Key-rotation fallback(s) for primary model"
+        );
         fallbacks.extend(key_fallbacks);
     }
 

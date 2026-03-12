@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Bot, Plus, Trash2, Save, Sparkles, Wrench, Radio, Settings2,
+  FileText, Terminal, Brain, MessageSquare, Puzzle, FolderOpen,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import type { AgentEntry } from "../../types/dashboard";
+import type { AgentEntry, ToolCatalogGroup, SkillEntry } from "../../types/dashboard";
 import {
   SectionCard, SectionHeader, EmptyState, LoadingSkeleton, useToast, ToastContainer,
 } from "./shared";
@@ -33,6 +34,8 @@ export default function AgentsPage() {
   const { toasts, addToast } = useToast();
 
   const [agents, setAgents] = useState<AgentEntry[]>([]);
+  const [toolsCatalog, setToolsCatalog] = useState<ToolCatalogGroup[]>([]);
+  const [skills, setSkills] = useState<SkillEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("overview");
@@ -45,13 +48,17 @@ export default function AgentsPage() {
   const [saving, setSaving] = useState(false);
 
   const loadAgents = useCallback(async () => {
-    const data = await api.fetchAgents();
+    const [data, tools, sk] = await Promise.all([
+      api.fetchAgents(), api.fetchToolsCatalog(), api.fetchSkills(),
+    ]);
     if (data) {
       setAgents(data);
       if (!selected && data.length > 0) {
         setSelected(data[0].name);
       }
     }
+    if (tools) setToolsCatalog(tools);
+    if (sk) setSkills(sk);
     setLoading(false);
   }, [api, selected]);
 
@@ -331,35 +338,98 @@ export default function AgentsPage() {
                 )}
 
                 {detailTab === "tools" && (
-                  <div className="flex flex-col items-center justify-center py-10 gap-3 text-[var(--text-tertiary)]">
-                    <Wrench className="h-8 w-8 opacity-40" />
-                    <span className="text-[13px]">{t("agents.comingSoon")}</span>
-                    <span className="text-[11px] max-w-[280px] text-center">
-                      {t("agents.toolBindingWip")}
-                    </span>
+                  <div>
+                    {toolsCatalog.length === 0 ? (
+                      <EmptyState
+                        icon={<Wrench className="h-8 w-8 opacity-40" />}
+                        message={t("agents.noTools")}
+                      />
+                    ) : (
+                      <div className="space-y-4">
+                        {toolsCatalog.map((group) => (
+                          <div key={group.id}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <ToolGroupIcon id={group.id} />
+                              <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
+                                {group.label}
+                              </span>
+                              <span className="text-[10px] text-[var(--text-tertiary)]/60">
+                                {group.tools.length}
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {group.tools.map((tool) => (
+                                <div
+                                  key={tool.name}
+                                  className="flex items-start gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors"
+                                >
+                                  <Wrench className="h-3.5 w-3.5 text-[var(--accent)] mt-0.5 flex-shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <span className="text-[12px] font-medium text-[var(--text-primary)] font-mono">
+                                      {tool.name}
+                                    </span>
+                                    <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5 leading-relaxed">
+                                      {tool.description}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        <div className="text-[10px] text-[var(--text-tertiary)]/60 pt-2">
+                          {t("agents.toolsTotal", { count: toolsCatalog.reduce((s, g) => s + g.tools.length, 0) })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {detailTab === "skills" && (
                   <div>
-                    {(selectedAgent.skills ?? []).length === 0 ? (
+                    {skills.length === 0 ? (
                       <EmptyState
                         icon={<Sparkles className="h-8 w-8 opacity-40" />}
                         message={t("agents.noSkills")}
                       />
                     ) : (
-                      <div className="space-y-1.5">
-                        {(selectedAgent.skills ?? []).map((skill) => (
+                      <div className="space-y-1">
+                        {skills.map((skill) => (
                           <div
-                            key={skill}
-                            className="flex items-center gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors"
+                            key={skill.name}
+                            className="flex items-start gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors"
                           >
-                            <Sparkles className="h-3.5 w-3.5 text-[var(--accent)]" />
-                            <span className="text-[12px] text-[var(--text-secondary)] font-mono">
-                              {skill}
-                            </span>
+                            <Sparkles className="h-3.5 w-3.5 text-[var(--accent)] mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[12px] font-medium text-[var(--text-primary)] font-mono">
+                                  {skill.name}
+                                </span>
+                                {skill.user_invocable && (
+                                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-[var(--accent)]/10 text-[var(--accent)]">
+                                    /{skill.name}
+                                  </span>
+                                )}
+                                {skill.enabled === false && (
+                                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-[var(--error)]/10 text-[var(--error)]">
+                                    {t("agents.disabled")}
+                                  </span>
+                                )}
+                              </div>
+                              {skill.description && (
+                                <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5 leading-relaxed">
+                                  {skill.description}
+                                </p>
+                              )}
+                              <span className="text-[10px] text-[var(--text-tertiary)]/60">
+                                {skill.source}
+                              </span>
+                            </div>
                           </div>
                         ))}
+                        <div className="text-[10px] text-[var(--text-tertiary)]/60 pt-2">
+                          {t("agents.skillsTotal", { count: skills.length })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -403,6 +473,19 @@ export default function AgentsPage() {
       <ToastContainer toasts={toasts} />
     </div>
   );
+}
+
+function ToolGroupIcon({ id }: { id: string }) {
+  const cls = "h-3.5 w-3.5 text-[var(--text-tertiary)]";
+  switch (id) {
+    case "filesystem": return <FolderOpen className={cls} />;
+    case "core": return <FileText className={cls} />;
+    case "agent": return <Bot className={cls} />;
+    case "memory": return <Brain className={cls} />;
+    case "session": return <MessageSquare className={cls} />;
+    case "mcp": return <Puzzle className={cls} />;
+    default: return <Terminal className={cls} />;
+  }
 }
 
 function InfoCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {

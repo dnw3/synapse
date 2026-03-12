@@ -7,24 +7,24 @@
 /// - Korean: syllable-based unigram + bigram, trailing particle stripping
 pub fn extract_keywords(text: &str) -> Vec<String> {
     let en_stopwords = [
-        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has",
-        "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "shall",
-        "can", "need", "dare", "ought", "used", "to", "of", "in", "for", "on", "with", "at",
-        "by", "from", "as", "into", "through", "during", "before", "after", "above", "below",
-        "between", "out", "off", "over", "under", "again", "further", "then", "once", "here",
-        "there", "when", "where", "why", "how", "all", "both", "each", "few", "more", "most",
-        "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too",
-        "very", "just", "because", "but", "and", "or", "if", "while", "that", "this", "it", "i",
-        "you", "he", "she", "we", "they", "me", "him", "her", "us", "them", "my", "your", "his",
-        "its", "our", "their",
+        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should", "may", "might", "shall", "can",
+        "need", "dare", "ought", "used", "to", "of", "in", "for", "on", "with", "at", "by", "from",
+        "as", "into", "through", "during", "before", "after", "above", "below", "between", "out",
+        "off", "over", "under", "again", "further", "then", "once", "here", "there", "when",
+        "where", "why", "how", "all", "both", "each", "few", "more", "most", "other", "some",
+        "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "just",
+        "because", "but", "and", "or", "if", "while", "that", "this", "it", "i", "you", "he",
+        "she", "we", "they", "me", "him", "her", "us", "them", "my", "your", "his", "its", "our",
+        "their",
     ];
 
     let zh_stopwords: &[&str] = &[
-        "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一", "一个",
-        "上", "也", "很", "到", "说", "要", "去", "你", "会", "着", "没有", "看", "好",
-        "自己", "这", "他", "她", "它", "们", "那", "些", "被", "把", "从", "对", "让",
-        "与", "而", "及", "但", "或", "如果", "因为", "所以", "可以", "这个", "那个",
-        "什么", "怎么", "哪", "吗", "呢", "吧", "啊", "嗯", "哦",
+        "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都", "一", "一个", "上", "也",
+        "很", "到", "说", "要", "去", "你", "会", "着", "没有", "看", "好", "自己", "这", "他",
+        "她", "它", "们", "那", "些", "被", "把", "从", "对", "让", "与", "而", "及", "但", "或",
+        "如果", "因为", "所以", "可以", "这个", "那个", "什么", "怎么", "哪", "吗", "呢", "吧",
+        "啊", "嗯", "哦",
     ];
 
     let mut keywords = Vec::new();

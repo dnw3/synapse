@@ -126,7 +126,10 @@ theme_color: #ff6600
         let info = parse_identity(content);
         assert_eq!(info.name.as_deref(), Some("MyBot"));
         assert_eq!(info.emoji.as_deref(), Some("🤖"));
-        assert_eq!(info.avatar_url.as_deref(), Some("https://example.com/avatar.png"));
+        assert_eq!(
+            info.avatar_url.as_deref(),
+            Some("https://example.com/avatar.png")
+        );
         assert_eq!(info.theme_color.as_deref(), Some("#ff6600"));
     }
 

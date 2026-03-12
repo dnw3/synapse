@@ -41,7 +41,10 @@ pub fn build_ltm_store(config: &MemoryConfig, base_dir: &Path) -> Arc<dyn Store>
         }
         #[cfg(not(feature = "ltm-postgres"))]
         "postgres" | "pg" => {
-            tracing::warn!(backend = "postgres", "PostgreSQL backend requested but 'ltm-postgres' feature not enabled, using file");
+            tracing::warn!(
+                backend = "postgres",
+                "PostgreSQL backend requested but 'ltm-postgres' feature not enabled, using file"
+            );
         }
 
         #[cfg(feature = "ltm-redis")]
@@ -62,7 +65,10 @@ pub fn build_ltm_store(config: &MemoryConfig, base_dir: &Path) -> Arc<dyn Store>
         }
         #[cfg(not(feature = "ltm-redis"))]
         "redis" => {
-            tracing::warn!(backend = "redis", "Redis backend requested but 'ltm-redis' feature not enabled, using file");
+            tracing::warn!(
+                backend = "redis",
+                "Redis backend requested but 'ltm-redis' feature not enabled, using file"
+            );
         }
 
         "sqlite" => {
@@ -71,7 +77,8 @@ pub fn build_ltm_store(config: &MemoryConfig, base_dir: &Path) -> Arc<dyn Store>
                 .as_deref()
                 .map(PathBuf::from)
                 .unwrap_or_else(|| base_dir.join("ltm_store.db"));
-            let sqlite_cfg = synaptic::sqlite::SqliteStoreConfig::new(db_path.to_string_lossy().to_string());
+            let sqlite_cfg =
+                synaptic::sqlite::SqliteStoreConfig::new(db_path.to_string_lossy().to_string());
             match synaptic::sqlite::SqliteStore::new(sqlite_cfg) {
                 Ok(store) => {
                     tracing::info!(backend = "sqlite", "LTM using SQLite backend");
@@ -594,10 +601,7 @@ impl LongTermMemory {
                 }
             };
 
-            let store_path = ltm
-                .base_dir
-                .join("synapse")
-                .join("long_term_memory");
+            let store_path = ltm.base_dir.join("synapse").join("long_term_memory");
 
             if store_path.exists() {
                 if let Err(e) = watcher.watch(&store_path, RecursiveMode::Recursive) {

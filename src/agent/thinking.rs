@@ -66,11 +66,29 @@ impl ThinkingMiddleware {
         if let Some(last_human) = request.messages.iter().rev().find(|m| m.is_human()) {
             let content = last_human.content().to_lowercase();
             let complex_keywords = [
-                "analyze", "debug", "refactor", "architect", "design", "implement",
-                "optimize", "explain", "compare", "evaluate", "plan", "review",
-                "分析", "调试", "重构", "设计", "实现", "优化",
+                "analyze",
+                "debug",
+                "refactor",
+                "architect",
+                "design",
+                "implement",
+                "optimize",
+                "explain",
+                "compare",
+                "evaluate",
+                "plan",
+                "review",
+                "分析",
+                "调试",
+                "重构",
+                "设计",
+                "实现",
+                "优化",
             ];
-            let matches = complex_keywords.iter().filter(|k| content.contains(*k)).count();
+            let matches = complex_keywords
+                .iter()
+                .filter(|k| content.contains(*k))
+                .count();
             score += matches as u32;
         }
 

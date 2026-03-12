@@ -65,11 +65,7 @@ fn build_mistral_embeddings() -> (Arc<dyn Embeddings>, bool) {
     match std::env::var("MISTRAL_API_KEY") {
         Ok(key) if !key.is_empty() => {
             let backend = Arc::new(HttpBackend::new());
-            let emb = synaptic::openai::compat::mistral::embeddings(
-                key,
-                "mistral-embed",
-                backend,
-            );
+            let emb = synaptic::openai::compat::mistral::embeddings(key, "mistral-embed", backend);
             (Arc::new(emb), true)
         }
         _ => (Arc::new(FakeEmbeddings::new(384)), false),

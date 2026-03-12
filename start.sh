@@ -60,16 +60,63 @@ case "$MODE" in
     # Ctrl-C stops both.
     BACKEND_PORT="${1:-3000}"
     FRONTEND_PORT="${2:-5173}"
+    BINARY="$ROOT/target/debug/synapse"
 
+    # 1. Stop old processes: ports + any lingering synapse/vite processes
+    stop_port "$BACKEND_PORT"
+    stop_port "$FRONTEND_PORT"
+    pids=$(pgrep -f "target/(debug|release)/synapse" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+      echo "Killing old synapse processes..."
+      echo "$pids" | xargs kill -9 2>/dev/null || true
+      sleep 1
+    fi
+
+    # 2. Remove old binary to ensure we run the freshly compiled one
+    rm -f "$BINARY"
+
+    # 3. Build
     build_backend debug
 
-    stop_port "$BACKEND_PORT"
+    if [ ! -x "$BINARY" ]; then
+      echo "ERROR: Build failed, binary not found: $BINARY"
+      exit 1
+    fi
 
+    # 4. Load .env if present
+    if [ -f "$ROOT/.env" ]; then
+      set -a
+      # shellcheck disable=SC1091
+      source "$ROOT/.env"
+      set +a
+    fi
+
+    # 5. Start backend and verify it's alive
     echo ""
     echo "Starting backend on :$BACKEND_PORT ..."
-    "$ROOT/target/debug/synapse" serve --port "$BACKEND_PORT" &
+    "$BINARY" serve --port "$BACKEND_PORT" &
     BACKEND_PID=$!
 
+    # Wait up to 5s for backend to be ready (or detect crash)
+    for i in 1 2 3 4 5; do
+      if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+        echo ""
+        echo "ERROR: Backend failed to start (exited). Check logs above."
+        exit 1
+      fi
+      if lsof -ti:"$BACKEND_PORT" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+
+    if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+      echo ""
+      echo "ERROR: Backend crashed during startup."
+      exit 1
+    fi
+
+    # 6. Start frontend
     echo "Starting frontend on :$FRONTEND_PORT ..."
     cd "$ROOT/web"
     npx vite --port "$FRONTEND_PORT" &

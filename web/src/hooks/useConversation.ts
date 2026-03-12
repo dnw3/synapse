@@ -133,6 +133,14 @@ export function useConversation() {
     return msgs;
   }, []);
 
+  /** Ensure a conversation with the given id exists in the local list. */
+  const ensureConversation = useCallback((id: string) => {
+    setConversations((prev) => {
+      if (prev.some((c) => c.id === id)) return prev;
+      return [{ id, created_at: new Date().toISOString(), message_count: 0 }, ...prev];
+    });
+  }, []);
+
   return {
     conversations,
     activeId,
@@ -146,5 +154,6 @@ export function useConversation() {
     deleteConversation,
     sendMessage,
     refreshMessages,
+    ensureConversation,
   };
 }

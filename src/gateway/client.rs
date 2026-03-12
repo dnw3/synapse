@@ -132,8 +132,7 @@ impl GatewayClient {
                     std::io::stdout().flush().ok();
                 }
                 WsEvent::ToolCall { name, args } => {
-                    let args_preview = serde_json::to_string(&args)
-                        .unwrap_or_default();
+                    let args_preview = serde_json::to_string(&args).unwrap_or_default();
                     let preview = if args_preview.len() > 100 {
                         format!("{}...", &args_preview[..97])
                     } else {

@@ -128,7 +128,7 @@ function ChannelDetailPanel({
   if (!fields) {
     return (
       <div className="px-3.5 py-3 text-[12px] text-[var(--text-tertiary)] italic">
-        {t("dashboard.channelConfigToml", "Configuration managed via synaptic.toml")}
+        {t("dashboard.channelConfigToml", "Configuration managed via synapse.toml")}
       </div>
     );
   }

@@ -19,8 +19,12 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [matrix] section in config")?;
 
-    let password = resolve_secret(mx_config.password.as_deref(), mx_config.password_env.as_deref(), "Matrix password")
-        .map_err(|e| format!("{}", e))?;
+    let password = resolve_secret(
+        mx_config.password.as_deref(),
+        mx_config.password_env.as_deref(),
+        "Matrix password",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -224,10 +228,7 @@ async fn sync_once(
                 if let Some(ev_list) = timeline_events {
                     for ev in ev_list {
                         // Only handle m.room.message events with msgtype m.text
-                        let ev_type = ev
-                            .get("type")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("");
+                        let ev_type = ev.get("type").and_then(|v| v.as_str()).unwrap_or("");
                         if ev_type != "m.room.message" {
                             continue;
                         }

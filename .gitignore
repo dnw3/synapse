@@ -9,18 +9,26 @@ log/
 data/
 
 # Config (contains secrets)
-synaptic.toml
+synapse.toml
 .env
 
 # IDE / tooling
-.claude
-CLAUDE.md
-AGENTS.md
+.claude/
+.playwright-mcp/
 
 # OS
 .DS_Store
 *.swp
 *~
 
-CLAUDE.md
+# Screenshots (test artifacts)
+*.png
+
+# Evicted / temp
+.evicted/
+
+# Docs (generated)
 docs/
+
+CLAUDE.md
+AGENTS.md

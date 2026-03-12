@@ -80,7 +80,8 @@ pub async fn run_tui(
         .clone()
         .unwrap_or_else(|| "You are Synapse, a helpful AI assistant.".to_string());
 
-    let project_context = crate::agent::load_project_context(&cwd, &config.context);
+    let workspace_dir = config.workspace_dir();
+    let project_context = crate::agent::load_project_context(&workspace_dir, &cwd, &config.context);
     if !project_context.is_empty() {
         system_prompt.push_str("\n\n# Project Context\n\n");
         system_prompt.push_str(&project_context);
@@ -165,8 +166,7 @@ async fn run_event_loop(
                                     }
                                     Err(e) => {
                                         if let Some(last) = app.entries.last_mut() {
-                                            last.content =
-                                                format!("[error] {}", e);
+                                            last.content = format!("[error] {}", e);
                                         }
                                         break;
                                     }
@@ -210,7 +210,7 @@ fn draw_ui(f: &mut ratatui::Frame, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // status bar
-            Constraint::Min(5),   // chat area
+            Constraint::Min(5),    // chat area
             Constraint::Length(3), // input box
         ])
         .split(size);
@@ -253,9 +253,10 @@ fn draw_ui(f: &mut ratatui::Frame, app: &App) {
             _ => Style::default().fg(Color::Gray),
         };
 
-        chat_lines.push(Line::from(vec![
-            Span::styled(format!("[{}] ", entry.role), role_style),
-        ]));
+        chat_lines.push(Line::from(vec![Span::styled(
+            format!("[{}] ", entry.role),
+            role_style,
+        )]));
 
         // Wrap content lines
         for line in entry.content.lines() {

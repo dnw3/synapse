@@ -57,6 +57,7 @@ export interface SessionEntry {
   token_count: number;
   compaction_count?: number;
   label?: string;
+  title?: string;
   thinking_level?: string;
   verbose_level?: string;
   cost?: number;
@@ -105,6 +106,78 @@ export interface SkillEntry {
   user_invocable: boolean;
   source?: string;
   enabled?: boolean;
+  eligible?: boolean;
+  emoji?: string;
+  homepage?: string;
+  version?: string;
+  missing_env?: string[];
+  missing_bins?: string[];
+  has_install_specs?: boolean;
+}
+
+export interface StoreSearchResult {
+  score?: number;
+  slug: string;
+  displayName?: string;
+  summary?: string;
+  version?: string;
+  updatedAt?: number;
+}
+
+export interface StoreSkillItem {
+  slug: string;
+  displayName?: string;
+  summary?: string;
+  tags?: string[] | Record<string, unknown>;
+  stats?: {
+    downloads?: number;
+    stars?: number;
+    versions?: number;
+    installsAllTime?: number;
+    installsCurrentVersion?: number;
+    comments?: number;
+  };
+  createdAt?: number;
+  updatedAt?: number;
+  latestVersion?: {
+    version?: string;
+    createdAt?: number;
+    changelog?: string;
+    license?: string;
+  };
+  metadata?: {
+    os?: string[];
+    systems?: string[];
+  };
+}
+
+export interface StoreSkillDetail {
+  skill?: StoreSkillItem & {
+    createdAt?: number;
+    updatedAt?: number;
+  };
+  owner?: {
+    handle?: string;
+    image?: string;
+    displayName?: string;
+  };
+  latestVersion?: {
+    version?: string;
+    createdAt?: number;
+    changelog?: string;
+    license?: string;
+  };
+  metadata?: {
+    os?: string[];
+    systems?: string[];
+  };
+}
+
+export interface StoreStatus {
+  configured: boolean;
+  installedCount: number;
+  installed: string[];
+  source: string;
 }
 
 export interface McpEntry {
@@ -204,6 +277,20 @@ export interface AgentEntry {
   channels?: string[] | null;
   skills?: string[] | null;
   is_default: boolean;
+  workspace?: string;
+}
+
+// Tool catalog types
+export interface ToolCatalogEntry {
+  name: string;
+  description: string;
+  source: string;
+}
+
+export interface ToolCatalogGroup {
+  id: string;
+  label: string;
+  tools: ToolCatalogEntry[];
 }
 
 // Debug types

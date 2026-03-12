@@ -46,17 +46,19 @@ pub fn run_skill_command(
                     println!("{}", "No skills found on ClawHub.".dimmed());
                 } else {
                     println!(
-                        "{:<25} {:<12} {:<15} DESCRIPTION",
-                        "NAME", "VERSION", "AUTHOR"
+                        "{:<30} {:<12} SUMMARY",
+                        "SLUG", "VERSION"
                     );
                     println!("{}", "-".repeat(80));
                     for entry in &results {
                         println!(
-                            "{:<25} {:<12} {:<15} {}",
-                            entry.name, entry.version, entry.author, entry.description
+                            "{:<30} {:<12} {}",
+                            entry.slug,
+                            entry.version.as_deref().unwrap_or("-"),
+                            entry.summary.as_deref().unwrap_or("")
                         );
                     }
-                    println!("\n{} result(s). Install with: synapse skill install <name>", results.len());
+                    println!("\n{} result(s). Install with: synapse skill install <slug>", results.len());
                 }
                 Ok(())
             })
@@ -82,16 +84,104 @@ pub fn run_skill_command(
             let name = arg.ok_or("usage: synapse skill remove <name>")?;
             remove_skill(name)
         }
+        "publish" => {
+            let path = arg.ok_or("usage: synapse skill publish <path> [--version VER]")?;
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let config = crate::config::SynapseConfig::load_or_default(None)?;
+                let hub = crate::hub::ClawHubClient::from_config(&config);
+                publish_skill(&hub, path).await
+            })
+        }
+        "star" => {
+            let name = arg.ok_or("usage: synapse skill star <name>")?;
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let config = crate::config::SynapseConfig::load_or_default(None)?;
+                let hub = crate::hub::ClawHubClient::from_config(&config);
+                hub.star(name).await?;
+                println!("{} Starred '{}'", "star:".yellow().bold(), name);
+                Ok(())
+            })
+        }
+        "unstar" => {
+            let name = arg.ok_or("usage: synapse skill unstar <name>")?;
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let config = crate::config::SynapseConfig::load_or_default(None)?;
+                let hub = crate::hub::ClawHubClient::from_config(&config);
+                hub.unstar(name).await?;
+                println!("{} Unstarred '{}'", "unstar:".dimmed(), name);
+                Ok(())
+            })
+        }
+        "versions" => {
+            let name = arg.ok_or("usage: synapse skill versions <name>")?;
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let config = crate::config::SynapseConfig::load_or_default(None)?;
+                let hub = crate::hub::ClawHubClient::from_config(&config);
+                let versions = hub.list_versions(name).await?;
+                if versions.is_empty() {
+                    println!("{}", "No versions found.".dimmed());
+                } else {
+                    println!("{:<15} {:<25} DOWNLOADS", "VERSION", "CREATED");
+                    println!("{}", "-".repeat(50));
+                    for v in &versions {
+                        println!(
+                            "{:<15} {:<25} {}",
+                            v.version,
+                            v.created_at.as_deref().unwrap_or("-"),
+                            v.downloads.unwrap_or(0)
+                        );
+                    }
+                }
+                Ok(())
+            })
+        }
+        "doctor" => doctor_skills(),
+        "whoami" => {
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(async {
+                let config = crate::config::SynapseConfig::load_or_default(None)?;
+                let hub = crate::hub::ClawHubClient::from_config(&config);
+                let user = hub.whoami().await?;
+                println!(
+                    "{} {}",
+                    "Handle:".bold(),
+                    user.handle.as_deref().unwrap_or("(not set)")
+                );
+                println!(
+                    "{} {}",
+                    "Name:".bold(),
+                    user.name.as_deref().unwrap_or("(not set)")
+                );
+                println!(
+                    "{} {}",
+                    "Role:".bold(),
+                    user.role.as_deref().unwrap_or("user")
+                );
+                Ok(())
+            })
+        }
         _ => Err(format!(
-            "unknown skill action: '{}'. Use: list, info, install, search, update, enable, disable, remove",
+            "unknown skill action: '{}'. Use: list, info, install, search, update, publish, star, unstar, versions, doctor, whoami, enable, disable, remove",
             action
         )
         .into()),
     }
 }
 
-/// Global skills directory: `~/.claude/skills/`
+/// Primary global skills directory: `~/.synapse/skills/`
 fn global_skills_dir() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".synapse")
+        .join("skills")
+}
+
+/// Legacy global skills directory: `~/.claude/skills/` (OpenClaw compat)
+fn legacy_global_skills_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".claude")
@@ -172,6 +262,7 @@ fn parse_skill_md_info(content: &str) -> Option<SkillInfo> {
         return None;
     }
     let mut name = None;
+    let mut version = None;
     let mut description = None;
     for line in lines {
         let trimmed = line.trim();
@@ -180,23 +271,38 @@ fn parse_skill_md_info(content: &str) -> Option<SkillInfo> {
         }
         if let Some(val) = trimmed.strip_prefix("name:") {
             name = Some(val.trim().trim_matches('"').trim_matches('\'').to_string());
+        } else if let Some(val) = trimmed.strip_prefix("version:") {
+            version = Some(val.trim().trim_matches('"').trim_matches('\'').to_string());
         } else if let Some(val) = trimmed.strip_prefix("description:") {
             description = Some(val.trim().trim_matches('"').trim_matches('\'').to_string());
         }
     }
     Some(SkillInfo {
         name: name?,
-        version: "-".to_string(),
+        version: version.unwrap_or_else(|| "-".to_string()),
         description: description.unwrap_or_default(),
     })
 }
 
 fn list_skills() -> Result<(), Box<dyn std::error::Error>> {
     let global_dir = global_skills_dir();
+    let legacy_dir = legacy_global_skills_dir();
     let workspace_dir = workspace_skills_dir();
 
     let global_skills = if global_dir.exists() {
         discover_all_skills(&global_dir)
+    } else {
+        Vec::new()
+    };
+
+    // Legacy ~/.claude/skills/ — only include skills not already in global
+    let legacy_skills = if legacy_dir.exists() {
+        let global_names: std::collections::HashSet<_> =
+            global_skills.iter().map(|(_, i)| i.name.clone()).collect();
+        discover_all_skills(&legacy_dir)
+            .into_iter()
+            .filter(|(_, i)| !global_names.contains(&i.name))
+            .collect::<Vec<_>>()
     } else {
         Vec::new()
     };
@@ -206,7 +312,7 @@ fn list_skills() -> Result<(), Box<dyn std::error::Error>> {
         .map(|d| discover_all_skills(d))
         .unwrap_or_default();
 
-    if global_skills.is_empty() && workspace_skills.is_empty() {
+    if global_skills.is_empty() && legacy_skills.is_empty() && workspace_skills.is_empty() {
         println!("{}", "No skills found.".dimmed());
         println!("  Global:    {}", global_dir.display());
         if let Some(ref ws) = workspace_dir {
@@ -239,6 +345,18 @@ fn list_skills() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    for (path, info) in &legacy_skills {
+        let status = if is_disabled(path) {
+            "disabled".red().to_string()
+        } else {
+            "enabled".green().to_string()
+        };
+        println!(
+            "{:<20} {:<10} {:<10} {:<10} {}",
+            info.name, info.version, "compat", status, info.description
+        );
+    }
+
     for (path, info) in &workspace_skills {
         let status = if is_disabled(path) {
             "disabled".red().to_string()
@@ -251,7 +369,7 @@ fn list_skills() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let total = global_skills.len() + workspace_skills.len();
+    let total = global_skills.len() + legacy_skills.len() + workspace_skills.len();
     println!("\n{} skill(s) found", total);
     Ok(())
 }
@@ -263,6 +381,7 @@ fn skill_info(name: &str) -> Result<(), Box<dyn std::error::Error>> {
             v.push(("workspace", ws));
         }
         v.push(("global", global_skills_dir()));
+        v.push(("compat", legacy_global_skills_dir()));
         v
     };
 
@@ -294,8 +413,8 @@ fn skill_info(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 
         let manifest_path = skill_dir.join("manifest.toml");
         if manifest_path.exists() {
-            let manifest =
-                load_manifest(&manifest_path).map_err(|e| format!("failed to load manifest: {}", e))?;
+            let manifest = load_manifest(&manifest_path)
+                .map_err(|e| format!("failed to load manifest: {}", e))?;
 
             println!("{} {}", "Name:".bold(), manifest.name);
             println!("{} {}", "Version:".bold(), manifest.version);
@@ -391,11 +510,7 @@ fn enable_skill(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     std::fs::remove_file(&marker)?;
-    println!(
-        "{} Skill '{}' enabled",
-        "enable:".green().bold(),
-        name
-    );
+    println!("{} Skill '{}' enabled", "enable:".green().bold(), name);
     Ok(())
 }
 
@@ -410,11 +525,7 @@ fn disable_skill(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     std::fs::write(&marker, "")?;
-    println!(
-        "{} Skill '{}' disabled",
-        "disable:".yellow().bold(),
-        name
-    );
+    println!("{} Skill '{}' disabled", "disable:".yellow().bold(), name);
     Ok(())
 }
 
@@ -431,6 +542,188 @@ fn remove_skill(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Publish a skill directory to ClawHub.
+async fn publish_skill(
+    hub: &crate::hub::ClawHubClient,
+    source: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let source_path = Path::new(source);
+    if !source_path.exists() || !source_path.is_dir() {
+        return Err("source must be a directory containing SKILL.md".into());
+    }
+
+    let skill_md = source_path.join("SKILL.md");
+    if !skill_md.exists() {
+        return Err("no SKILL.md found in source directory".into());
+    }
+
+    let content = std::fs::read_to_string(&skill_md)?;
+    let info = parse_skill_md_info(&content)
+        .ok_or("SKILL.md missing required 'name' field in frontmatter")?;
+
+    // Collect all non-hidden files
+    let mut files: Vec<(String, Vec<u8>)> = Vec::new();
+    collect_publish_files(source_path, source_path, &mut files)?;
+
+    println!(
+        "Publishing '{}' v{} ({} files)...",
+        info.name,
+        info.version,
+        files.len()
+    );
+
+    let result = hub.publish(&info.name, &info.version, files).await?;
+    if result.ok {
+        println!(
+            "{} Published '{}' v{} to ClawHub",
+            "publish:".green().bold(),
+            info.name,
+            info.version
+        );
+    } else {
+        println!("{} Publish failed", "error:".red().bold());
+    }
+    Ok(())
+}
+
+fn collect_publish_files(
+    base: &Path,
+    dir: &Path,
+    out: &mut Vec<(String, Vec<u8>)>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if name.starts_with('.') {
+            continue; // skip hidden files/dirs
+        }
+        if path.is_dir() {
+            collect_publish_files(base, &path, out)?;
+        } else {
+            let rel = path.strip_prefix(base)?.to_string_lossy().to_string();
+            let content = std::fs::read(&path)?;
+            out.push((rel, content));
+        }
+    }
+    Ok(())
+}
+
+/// Run health checks on all installed skills.
+fn doctor_skills() -> Result<(), Box<dyn std::error::Error>> {
+    let global_dir = global_skills_dir();
+    let ws_dir = workspace_skills_dir();
+
+    println!("{}", "Skill Health Check".bold());
+    println!("{}", "=".repeat(60));
+
+    let mut total = 0;
+    let mut healthy = 0;
+    let mut issues = 0;
+
+    let dirs: Vec<(&str, PathBuf)> = {
+        let mut v = Vec::new();
+        v.push(("global", global_dir));
+        v.push(("compat", legacy_global_skills_dir()));
+        if let Some(ws) = ws_dir {
+            v.push(("workspace", ws));
+        }
+        v
+    };
+
+    for (scope, dir) in &dirs {
+        if !dir.exists() {
+            continue;
+        }
+        for (path, info) in discover_all_skills(dir) {
+            total += 1;
+            let disabled = is_disabled(&path);
+            let skill_md = path.join("SKILL.md");
+
+            let mut skill_issues: Vec<String> = Vec::new();
+
+            if disabled {
+                skill_issues.push("disabled".to_string());
+            }
+
+            // Check required env vars / bins from frontmatter
+            if let Ok(content) = std::fs::read_to_string(&skill_md) {
+                check_frontmatter_requirements(&content, &mut skill_issues);
+            }
+
+            if skill_issues.is_empty() {
+                healthy += 1;
+                println!(
+                    "  {} {} ({}) -- {}",
+                    "ok".green(),
+                    info.name,
+                    scope,
+                    "healthy".green()
+                );
+            } else {
+                issues += 1;
+                println!(
+                    "  {} {} ({}) -- {}",
+                    "!!".red(),
+                    info.name,
+                    scope,
+                    skill_issues.join(", ").yellow()
+                );
+            }
+        }
+    }
+
+    println!(
+        "\n{} total, {} healthy, {} with issues",
+        total, healthy, issues
+    );
+    Ok(())
+}
+
+fn check_frontmatter_requirements(content: &str, issues: &mut Vec<String>) {
+    let mut in_fm = false;
+    for line in content.lines() {
+        let t = line.trim();
+        if t == "---" {
+            if in_fm {
+                break;
+            }
+            in_fm = true;
+            continue;
+        }
+        if !in_fm {
+            continue;
+        }
+
+        if let Some(bins) = t
+            .strip_prefix("required-bins:")
+            .or_else(|| t.strip_prefix("required_bins:"))
+        {
+            for bin in bins.split(',').map(|s| {
+                s.trim()
+                    .trim_matches(|c| c == '"' || c == '\'' || c == '[' || c == ']')
+            }) {
+                if !bin.is_empty() && which::which(bin).is_err() {
+                    issues.push(format!("missing bin: {}", bin));
+                }
+            }
+        }
+        if let Some(envs) = t
+            .strip_prefix("required-env:")
+            .or_else(|| t.strip_prefix("required_env:"))
+        {
+            for env_var in envs.split(',').map(|s| {
+                s.trim()
+                    .trim_matches(|c| c == '"' || c == '\'' || c == '[' || c == ']')
+            }) {
+                if !env_var.is_empty() && std::env::var(env_var).is_err() {
+                    issues.push(format!("missing env: {}", env_var));
+                }
+            }
+        }
+    }
+}
+
 /// Find the directory for a named skill (checks workspace first, then global).
 fn find_skill_dir(name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     if let Some(ws) = workspace_skills_dir() {
@@ -441,6 +734,11 @@ fn find_skill_dir(name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     }
 
     let dir = global_skills_dir().join(name);
+    if dir.exists() {
+        return Ok(dir);
+    }
+
+    let dir = legacy_global_skills_dir().join(name);
     if dir.exists() {
         return Ok(dir);
     }

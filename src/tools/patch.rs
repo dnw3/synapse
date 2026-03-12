@@ -55,9 +55,7 @@ impl Tool for ApplyPatchTool {
         let results = apply_unified_diff(&self.work_dir, patch_text)?;
 
         if results.is_empty() {
-            return Err(SynapticError::Tool(
-                "no file changes found in patch".into(),
-            ));
+            return Err(SynapticError::Tool("no file changes found in patch".into()));
         }
 
         let summary: Vec<String> = results
@@ -74,10 +72,7 @@ impl Tool for ApplyPatchTool {
 
 /// Parse and apply a unified diff to files on disk.
 /// Returns a list of (file_path, hunks_applied) tuples.
-fn apply_unified_diff(
-    work_dir: &Path,
-    patch: &str,
-) -> Result<Vec<(String, usize)>, SynapticError> {
+fn apply_unified_diff(work_dir: &Path, patch: &str) -> Result<Vec<(String, usize)>, SynapticError> {
     let mut results = Vec::new();
     let mut current_file: Option<String> = None;
     let mut hunks: Vec<Hunk> = Vec::new();
@@ -251,9 +246,8 @@ fn apply_hunks_to_file(
 
     // Write result
     if let Some(parent) = full_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| {
-            SynapticError::Tool(format!("failed to create directory: {}", e))
-        })?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| SynapticError::Tool(format!("failed to create directory: {}", e)))?;
     }
 
     let result = lines.join("\n");

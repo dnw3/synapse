@@ -1,11 +1,15 @@
 use serde::Deserialize;
 
-fn default_true() -> bool { true }
-fn default_4000() -> usize { 4000 }
+fn default_true() -> bool {
+    true
+}
+fn default_4000() -> usize {
+    4000
+}
 
 /// Resolve a secret value: try direct value first, then environment variable.
 /// This allows dashboard UI to set values directly, while power users can
-/// reference env vars in `synaptic.toml`.
+/// reference env vars in `synapse.toml`.
 pub fn resolve_secret(
     direct: Option<&str>,
     env_name: Option<&str>,

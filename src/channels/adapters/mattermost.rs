@@ -22,8 +22,12 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [mattermost] section in config")?;
 
-    let token = resolve_secret(mm_config.token.as_deref(), mm_config.token_env.as_deref(), "Mattermost token")
-        .map_err(|e| format!("{}", e))?;
+    let token = resolve_secret(
+        mm_config.token.as_deref(),
+        mm_config.token_env.as_deref(),
+        "Mattermost token",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     // Get the bot's own user ID so we can skip our own messages
     let bot_user_id = get_bot_user_id(&mm_config.url, &token).await?;
@@ -66,10 +70,7 @@ pub async fn run(
 }
 
 /// Fetch the bot's own user ID via REST API.
-async fn get_bot_user_id(
-    url: &str,
-    token: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
+async fn get_bot_user_id(url: &str, token: &str) -> Result<String, Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     let resp = client
         .get(format!("{}/api/v4/users/me", url))
@@ -110,9 +111,7 @@ async fn run_ws(
         "action": "authentication_challenge",
         "data": { "token": token }
     });
-    write
-        .send(WsMsg::Text(auth_msg.to_string().into()))
-        .await?;
+    write.send(WsMsg::Text(auth_msg.to_string().into())).await?;
 
     tracing::info!(channel = "mattermost", "websocket connected");
 
@@ -127,10 +126,7 @@ async fn run_ws(
         };
 
         // Only handle "posted" events
-        let event = payload
-            .get("event")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let event = payload.get("event").and_then(|v| v.as_str()).unwrap_or("");
         if event != "posted" {
             continue;
         }
@@ -150,10 +146,7 @@ async fn run_ws(
             Err(_) => continue,
         };
 
-        let user_id = post
-            .get("user_id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let user_id = post.get("user_id").and_then(|v| v.as_str()).unwrap_or("");
         let channel_id = post
             .get("channel_id")
             .and_then(|v| v.as_str())

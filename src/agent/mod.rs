@@ -7,6 +7,7 @@ pub(crate) mod middleware;
 mod model;
 pub mod registry;
 pub mod runtime;
+pub mod self_awareness;
 pub mod templates;
 pub mod thinking;
 pub mod tool_policy;

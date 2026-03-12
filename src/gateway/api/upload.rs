@@ -37,8 +37,12 @@ async fn upload_file(
 ) -> Result<Json<UploadResponse>, (StatusCode, String)> {
     let upload_dir = std::path::Path::new("data/uploads");
     if !upload_dir.exists() {
-        std::fs::create_dir_all(upload_dir)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("failed to create upload dir: {}", e)))?;
+        std::fs::create_dir_all(upload_dir).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to create upload dir: {}", e),
+            )
+        })?;
     }
 
     while let Ok(Some(field)) = multipart.next_field().await {
@@ -47,25 +51,28 @@ async fn upload_file(
             continue;
         }
 
-        let original_filename = field
-            .file_name()
-            .unwrap_or("unknown")
-            .to_string();
+        let original_filename = field.file_name().unwrap_or("unknown").to_string();
 
         let mime_type = field
             .content_type()
             .unwrap_or("application/octet-stream")
             .to_string();
 
-        let data = field
-            .bytes()
-            .await
-            .map_err(|e| (StatusCode::BAD_REQUEST, format!("failed to read file: {}", e)))?;
+        let data = field.bytes().await.map_err(|e| {
+            (
+                StatusCode::BAD_REQUEST,
+                format!("failed to read file: {}", e),
+            )
+        })?;
 
         if data.len() > MAX_FILE_SIZE {
             return Err((
                 StatusCode::PAYLOAD_TOO_LARGE,
-                format!("file too large: {} bytes (max {})", data.len(), MAX_FILE_SIZE),
+                format!(
+                    "file too large: {} bytes (max {})",
+                    data.len(),
+                    MAX_FILE_SIZE
+                ),
             ));
         }
 
@@ -91,8 +98,12 @@ async fn upload_file(
         };
 
         let file_path = upload_dir.join(&stored_name);
-        std::fs::write(&file_path, &data)
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("failed to write file: {}", e)))?;
+        std::fs::write(&file_path, &data).map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("failed to write file: {}", e),
+            )
+        })?;
 
         let size = data.len();
         let name = &original_filename;

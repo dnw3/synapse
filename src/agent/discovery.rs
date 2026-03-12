@@ -41,30 +41,29 @@ pub fn discover_agents(cwd: &Path) -> Vec<SubAgentDef> {
 
         for entry in entries.flatten() {
             let path = entry.path();
-            let (agent_path, agent_name) = if path.is_file()
-                && path.extension().is_some_and(|e| e == "md")
-            {
-                let name = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("")
-                    .to_string();
-                (path.clone(), name)
-            } else if path.is_dir() {
-                let agent_md = path.join("AGENT.md");
-                if agent_md.exists() {
+            let (agent_path, agent_name) =
+                if path.is_file() && path.extension().is_some_and(|e| e == "md") {
                     let name = path
-                        .file_name()
+                        .file_stem()
                         .and_then(|s| s.to_str())
                         .unwrap_or("")
                         .to_string();
-                    (agent_md, name)
+                    (path.clone(), name)
+                } else if path.is_dir() {
+                    let agent_md = path.join("AGENT.md");
+                    if agent_md.exists() {
+                        let name = path
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("")
+                            .to_string();
+                        (agent_md, name)
+                    } else {
+                        continue;
+                    }
                 } else {
                     continue;
-                }
-            } else {
-                continue;
-            };
+                };
 
             if agent_name.is_empty() || seen.contains(&agent_name) {
                 continue;

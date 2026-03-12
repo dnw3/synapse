@@ -19,9 +19,18 @@ pub fn run_models_command(
                     "model:".dimmed()
                 );
                 println!();
-                println!("Current default: {} ({})", config.base.model.model.cyan(), config.base.model.provider.dimmed());
+                println!(
+                    "Current default: {} ({})",
+                    config.base.model.model.cyan(),
+                    config.base.model.provider.dimmed()
+                );
             } else {
-                println!("{:30} {:15} {}", "NAME".bold(), "PROVIDER".bold(), "ALIASES".bold());
+                println!(
+                    "{:30} {:15} {}",
+                    "NAME".bold(),
+                    "PROVIDER".bold(),
+                    "ALIASES".bold()
+                );
                 println!("{}", "-".repeat(65));
                 for entry in &entries {
                     let aliases = if entry.aliases.is_empty() {
@@ -38,14 +47,25 @@ pub fn run_models_command(
                     );
                 }
                 println!();
-                println!("Default: {} (from [model] config)", config.base.model.model.cyan());
+                println!(
+                    "Default: {} (from [model] config)",
+                    config.base.model.model.cyan()
+                );
             }
         }
 
         "status" => {
             println!("{}", "--- Model Status ---".bold());
-            println!("  {} {}", "Default model:".bold(), config.base.model.model.cyan());
-            println!("  {} {}", "Provider:".bold(), config.base.model.provider.dimmed());
+            println!(
+                "  {} {}",
+                "Default model:".bold(),
+                config.base.model.model.cyan()
+            );
+            println!(
+                "  {} {}",
+                "Provider:".bold(),
+                config.base.model.provider.dimmed()
+            );
 
             if let Some(ref url) = config.base.model.base_url {
                 println!("  {} {}", "Base URL:".bold(), url.dimmed());
@@ -61,16 +81,29 @@ pub fn run_models_command(
             println!(
                 "  {} {}",
                 "API key:".bold(),
-                if api_key_set { "set".green() } else { "missing".red() }
+                if api_key_set {
+                    "set".green()
+                } else {
+                    "missing".red()
+                }
             );
 
             if let Some(ref fallbacks) = config.fallback_models {
-                println!("  {} {}", "Fallbacks:".bold(), fallbacks.join(", ").dimmed());
+                println!(
+                    "  {} {}",
+                    "Fallbacks:".bold(),
+                    fallbacks.join(", ").dimmed()
+                );
             }
 
             let catalog_count = registry.list().len();
             let alias_count = registry.aliases().len();
-            println!("  {} {} models, {} aliases", "Catalog:".bold(), catalog_count, alias_count);
+            println!(
+                "  {} {} models, {} aliases",
+                "Catalog:".bold(),
+                catalog_count,
+                alias_count
+            );
 
             // Show provider key status
             if let Some(ref providers) = config.provider_catalog {
@@ -81,7 +114,8 @@ pub fn run_models_command(
                         let key_status = if let Some(ref env) = prov.api_keys_env {
                             match std::env::var(env) {
                                 Ok(val) => {
-                                    let count = val.split(',').filter(|s| !s.trim().is_empty()).count();
+                                    let count =
+                                        val.split(',').filter(|s| !s.trim().is_empty()).count();
                                     format!("{} keys (rotation)", count).green().to_string()
                                 }
                                 Err(_) => format!("{} not set", env).red().to_string(),
@@ -95,7 +129,12 @@ pub fn run_models_command(
                         } else {
                             "using default key".dimmed().to_string()
                         };
-                        println!("  {} [{}]: {}", prov.name.cyan(), prov.base_url.dimmed(), key_status);
+                        println!(
+                            "  {} [{}]: {}",
+                            prov.name.cyan(),
+                            prov.base_url.dimmed(),
+                            key_status
+                        );
                     }
                 }
             }
@@ -104,7 +143,10 @@ pub fn run_models_command(
         "aliases" => {
             let aliases = registry.aliases();
             if aliases.is_empty() {
-                println!("{}", "No aliases defined. Add `aliases` to [[models]] entries.".dimmed());
+                println!(
+                    "{}",
+                    "No aliases defined. Add `aliases` to [[models]] entries.".dimmed()
+                );
             } else {
                 println!("{:20} {}", "ALIAS".bold(), "MODEL".bold());
                 println!("{}", "-".repeat(50));

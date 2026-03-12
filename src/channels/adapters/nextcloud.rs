@@ -18,8 +18,12 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [nextcloud] section in config")?;
 
-    let password = resolve_secret(nc_config.password.as_deref(), nc_config.password_env.as_deref(), "Nextcloud password")
-        .map_err(|e| format!("{}", e))?;
+    let password = resolve_secret(
+        nc_config.password.as_deref(),
+        nc_config.password_env.as_deref(),
+        "Nextcloud password",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -69,21 +73,20 @@ pub async fn run(
                                 }
                                 last_known_id = msg_id;
 
-                                let content = msg
-                                    .get("message")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("");
-                                let actor = msg
-                                    .get("actorId")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("");
+                                let content =
+                                    msg.get("message").and_then(|v| v.as_str()).unwrap_or("");
+                                let actor =
+                                    msg.get("actorId").and_then(|v| v.as_str()).unwrap_or("");
 
                                 // Skip bot's own messages
                                 if actor == nc_config.username {
                                     continue;
                                 }
 
-                                if !nc_config.allowlist.is_allowed(Some(actor), Some(room_token)) {
+                                if !nc_config
+                                    .allowlist
+                                    .is_allowed(Some(actor), Some(room_token))
+                                {
                                     continue;
                                 }
 

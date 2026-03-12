@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::extract::ws::{Message as WsMessage, WebSocket};
 use axum::extract::{Path, State, WebSocketUpgrade};
 use axum::response::IntoResponse;
@@ -8,14 +9,13 @@ use axum::routing::get;
 use axum::Router;
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use async_trait::async_trait;
-use tracing::Instrument;
 use synaptic::core::{
     ChatModel, ChatRequest, ChatResponse, ChatStream, MemoryStore, Message, ModelProfile,
-    SynapticError,
+    SynapticError, ToolCall,
 };
 use synaptic::graph::{MessageState, StreamMode};
 use tokio::sync::mpsc;
+use tracing::Instrument;
 use uuid::Uuid;
 
 use regex::Regex;
@@ -32,6 +32,7 @@ use crate::gateway::state::AppState;
 struct StreamingProxy {
     inner: Arc<dyn ChatModel>,
     token_tx: mpsc::UnboundedSender<String>,
+    reasoning_tx: mpsc::UnboundedSender<String>,
 }
 
 #[async_trait]
@@ -39,7 +40,10 @@ impl ChatModel for StreamingProxy {
     async fn chat(&self, request: ChatRequest) -> Result<ChatResponse, SynapticError> {
         let mut stream = self.inner.stream_chat(request);
         let mut content = String::new();
-        let mut tool_calls = Vec::new();
+        // Accumulate tool call chunks by index — streaming sends partial data:
+        // chunk 1: id + name + partial args, chunk 2+: only partial args
+        let mut tc_map: std::collections::BTreeMap<usize, (String, String, String)> =
+            std::collections::BTreeMap::new(); // index -> (id, name, args_buffer)
         let mut usage = None;
 
         while let Some(chunk) = stream.next().await {
@@ -48,11 +52,48 @@ impl ChatModel for StreamingProxy {
                 let _ = self.token_tx.send(chunk.content.clone());
                 content.push_str(&chunk.content);
             }
-            tool_calls.extend(chunk.tool_calls);
+            if !chunk.reasoning.is_empty() {
+                let _ = self.reasoning_tx.send(chunk.reasoning.clone());
+            }
+            // Merge tool call chunks by index
+            for tc in &chunk.tool_call_chunks {
+                let idx = tc.index.unwrap_or(0);
+                let entry = tc_map
+                    .entry(idx)
+                    .or_insert_with(|| (String::new(), String::new(), String::new()));
+                if let Some(ref id) = tc.id {
+                    entry.0.clone_from(id);
+                }
+                if let Some(ref name) = tc.name {
+                    entry.1.clone_from(name);
+                }
+                if let Some(ref args) = tc.arguments {
+                    entry.2.push_str(args);
+                }
+            }
             if chunk.usage.is_some() {
                 usage = chunk.usage;
             }
         }
+
+        // Build final tool calls from accumulated chunks
+        let tool_calls: Vec<ToolCall> = tc_map
+            .into_values()
+            .filter(|(_, name, _)| !name.is_empty())
+            .map(|(id, name, args_buf)| {
+                let arguments = if args_buf.is_empty() {
+                    serde_json::Value::Object(Default::default())
+                } else {
+                    serde_json::from_str(&args_buf)
+                        .unwrap_or(serde_json::Value::Object(Default::default()))
+                };
+                ToolCall {
+                    id,
+                    name,
+                    arguments,
+                }
+            })
+            .collect();
 
         Ok(ChatResponse {
             message: Message::ai_with_tool_calls(content, tool_calls),
@@ -82,10 +123,15 @@ fn extract_canvas_directives(text: &str) -> Vec<WsEvent> {
 
         let mut attrs = serde_json::Map::new();
         for am in attr_re.captures_iter(attrs_str) {
-            attrs.insert(am[1].to_string(), serde_json::Value::String(am[2].to_string()));
+            attrs.insert(
+                am[1].to_string(),
+                serde_json::Value::String(am[2].to_string()),
+            );
         }
 
-        let language = attrs.remove("lang").and_then(|v| v.as_str().map(String::from));
+        let language = attrs
+            .remove("lang")
+            .and_then(|v| v.as_str().map(String::from));
         let attributes = if attrs.is_empty() {
             None
         } else {
@@ -109,6 +155,8 @@ fn extract_canvas_directives(text: &str) -> Vec<WsEvent> {
 enum WsEvent {
     #[serde(rename = "token")]
     Token { content: String },
+    #[serde(rename = "reasoning")]
+    Reasoning { content: String },
     #[serde(rename = "tool_call")]
     ToolCall {
         name: String,
@@ -136,10 +184,7 @@ enum WsEvent {
         risk_level: String,
     },
     #[serde(rename = "subagent_complete")]
-    SubagentComplete {
-        task_id: String,
-        summary: String,
-    },
+    SubagentComplete { task_id: String, summary: String },
     #[serde(rename = "done")]
     Done {},
     #[serde(rename = "error")]
@@ -325,7 +370,11 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                 let _ = sender.send(ws_json(&event)).await;
                 continue;
             }
-            WsCommand::SendMessage { content, attachments, idempotency_key } => {
+            WsCommand::SendMessage {
+                content,
+                attachments,
+                idempotency_key,
+            } => {
                 let request_id = crate::logging::generate_request_id();
 
                 // Per-request span: all logs in this request inherit request_id, conn_id, conversation_id
@@ -358,7 +407,11 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                 let execution_start = std::time::Instant::now();
 
                 // Acquire session write lock before processing.
-                if let Err(lock_err) = state.write_lock.try_acquire(&conversation_id, &conn_id).await {
+                if let Err(lock_err) = state
+                    .write_lock
+                    .try_acquire(&conversation_id, &conn_id)
+                    .await
+                {
                     tracing::warn!("session busy, rejected");
                     let _ = sender
                         .send(ws_json(&WsEvent::Error {
@@ -396,14 +449,22 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                 }
 
                 let (token_tx, mut token_rx) = mpsc::unbounded_channel::<String>();
+                let (reasoning_tx, mut reasoning_rx) = mpsc::unbounded_channel::<String>();
                 let proxy_model: Arc<dyn ChatModel> = Arc::new(StreamingProxy {
                     inner: state.model.clone(),
                     token_tx,
+                    reasoning_tx,
                 });
 
                 let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
                 let checkpointer = Arc::new(state.sessions.checkpointer());
                 let overrides = load_session_overrides(&conversation_id);
+                // Show reasoning when thinking is enabled (any level other than "off")
+                let show_reasoning = overrides
+                    .as_ref()
+                    .and_then(|o| o.thinking.as_deref())
+                    .unwrap_or("off")
+                    != "off";
                 let (approval_cb, mut approval_rx, approval_resp_tx) =
                     WebSocketApprovalCallback::new();
                 let agent = match build_deep_agent_with_callback(
@@ -411,13 +472,15 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                     &state.config,
                     &cwd,
                     checkpointer,
-                    vec![],
+                    state.mcp_tools.clone(),
                     None,
                     Some(approval_cb),
                     None,
                     None,
                     overrides,
                     Some(state.cost_tracker.clone()),
+                    "web",
+                    None, // web UI uses default agent workspace
                 )
                 .await
                 {
@@ -460,10 +523,10 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                     }
                 }
                 // Add human message to state (persisted by the graph save loop)
-                messages.push(
-                    Message::human(&final_content)
-                        .with_additional_kwarg("request_id", serde_json::Value::String(request_id.clone()))
-                );
+                messages.push(Message::human(&final_content).with_additional_kwarg(
+                    "request_id",
+                    serde_json::Value::String(request_id.clone()),
+                ));
 
                 let initial_state = MessageState::with_messages(messages);
                 // Snapshot token counts before execution so we can compute per-turn delta
@@ -493,6 +556,14 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                             token_buffer.push_str(&token);
                             if token_flush_interval.is_none() {
                                 token_flush_interval = Some(Box::pin(tokio::time::sleep(std::time::Duration::from_millis(150))));
+                            }
+                        }
+                        // Forward reasoning/thinking deltas (gated by session override)
+                        Some(reasoning) = reasoning_rx.recv() => {
+                            if show_reasoning {
+                                let _ = sender.send(ws_json(&WsEvent::Reasoning {
+                                    content: reasoning,
+                                })).await;
                             }
                         }
                         // Flush buffered tokens at 150ms intervals
@@ -612,6 +683,7 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                                 }
                                 None => {
                                     token_rx.close();
+                                    reasoning_rx.close();
                                     while let Some(token) = token_rx.recv().await {
                                         token_buffer.push_str(&token);
                                     }
@@ -620,6 +692,12 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                                         let _ = sender.send(ws_json(&WsEvent::Token {
                                             content: std::mem::take(&mut token_buffer),
                                         })).await;
+                                    }
+                                    // Drain remaining reasoning (gated)
+                                    while let Some(r) = reasoning_rx.recv().await {
+                                        if show_reasoning {
+                                            let _ = sender.send(ws_json(&WsEvent::Reasoning { content: r })).await;
+                                        }
                                     }
                                     // Update session token count: add only this turn's delta
                                     {
@@ -688,7 +766,11 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                 tracing::info!(msg_type = "form_submit", "ws message received");
                 let execution_start = std::time::Instant::now();
 
-                if let Err(lock_err) = state.write_lock.try_acquire(&conversation_id, &conn_id).await {
+                if let Err(lock_err) = state
+                    .write_lock
+                    .try_acquire(&conversation_id, &conn_id)
+                    .await
+                {
                     tracing::warn!("session busy, rejected");
                     let _ = sender
                         .send(ws_json(&WsEvent::Error {
@@ -717,14 +799,22 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                     .await;
 
                 let (token_tx, mut token_rx) = mpsc::unbounded_channel::<String>();
+                let (reasoning_tx, mut reasoning_rx) = mpsc::unbounded_channel::<String>();
                 let proxy_model: Arc<dyn ChatModel> = Arc::new(StreamingProxy {
                     inner: state.model.clone(),
                     token_tx,
+                    reasoning_tx,
                 });
 
                 let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
                 let checkpointer = Arc::new(state.sessions.checkpointer());
                 let overrides = load_session_overrides(&conversation_id);
+                // Show reasoning when thinking is enabled (any level other than "off")
+                let show_reasoning = overrides
+                    .as_ref()
+                    .and_then(|o| o.thinking.as_deref())
+                    .unwrap_or("off")
+                    != "off";
                 let (approval_cb, mut approval_rx, approval_resp_tx) =
                     WebSocketApprovalCallback::new();
                 let agent = match build_deep_agent_with_callback(
@@ -732,13 +822,15 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                     &state.config,
                     &cwd,
                     checkpointer,
-                    vec![],
+                    state.mcp_tools.clone(),
                     None,
                     Some(approval_cb),
                     None,
                     None,
                     overrides,
                     Some(state.cost_tracker.clone()),
+                    "web",
+                    None, // web UI uses default agent workspace
                 )
                 .await
                 {
@@ -793,6 +885,14 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                             token_buffer.push_str(&token);
                             if token_flush_interval.is_none() {
                                 token_flush_interval = Some(Box::pin(tokio::time::sleep(std::time::Duration::from_millis(150))));
+                            }
+                        }
+                        // Forward reasoning/thinking deltas (gated by session override)
+                        Some(reasoning) = reasoning_rx.recv() => {
+                            if show_reasoning {
+                                let _ = sender.send(ws_json(&WsEvent::Reasoning {
+                                    content: reasoning,
+                                })).await;
                             }
                         }
                         // Flush buffered tokens at 150ms intervals
@@ -909,6 +1009,7 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                                 }
                                 None => {
                                     token_rx.close();
+                                    reasoning_rx.close();
                                     while let Some(token) = token_rx.recv().await {
                                         token_buffer.push_str(&token);
                                     }
@@ -917,6 +1018,12 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
                                         let _ = sender.send(ws_json(&WsEvent::Token {
                                             content: std::mem::take(&mut token_buffer),
                                         })).await;
+                                    }
+                                    // Drain remaining reasoning (gated)
+                                    while let Some(r) = reasoning_rx.recv().await {
+                                        if show_reasoning {
+                                            let _ = sender.send(ws_json(&WsEvent::Reasoning { content: r })).await;
+                                        }
                                     }
                                     // Update session token count: add only this turn's delta
                                     {
@@ -1060,7 +1167,6 @@ async fn handle_rpc(
                 "conversation_id": conversation_id,
                 "message_count": messages.len(),
                 "thinking": overrides.as_ref().and_then(|o| o.thinking.as_deref()),
-                "verbose": overrides.as_ref().and_then(|o| o.verbose.as_deref()),
             }))
         }
         "check_execution" => {
@@ -1081,8 +1187,14 @@ fn load_session_overrides(conversation_id: &str) -> Option<SessionOverrides> {
     let map: std::collections::HashMap<String, serde_json::Value> =
         serde_json::from_str(&content).ok()?;
     let entry = map.get(conversation_id)?;
-    let thinking = entry.get("thinking").and_then(|v| v.as_str()).map(String::from);
-    let verbose = entry.get("verbose").and_then(|v| v.as_str()).map(String::from);
+    let thinking = entry
+        .get("thinking")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let verbose = entry
+        .get("verbose")
+        .and_then(|v| v.as_str())
+        .map(String::from);
     if thinking.is_none() && verbose.is_none() {
         return None;
     }

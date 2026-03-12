@@ -5,25 +5,12 @@ use synaptic::middleware::{
     AgentMiddleware, ModelCaller, ModelRequest, ModelResponse, ToolCallRequest, ToolCaller,
 };
 
-/// Logs model call and tool call metrics with content previews and latency tracking.
+/// Logs model call and tool call metrics with full content and latency tracking.
 pub struct AgentTracingMiddleware;
 
 impl AgentTracingMiddleware {
     pub fn new() -> Self {
         Self
-    }
-}
-
-/// Truncate a string to at most `max` chars, appending "…" if truncated.
-fn preview(s: &str, max: usize) -> String {
-    if s.len() <= max {
-        s.to_string()
-    } else {
-        let mut end = max;
-        while !s.is_char_boundary(end) && end > 0 {
-            end -= 1;
-        }
-        format!("{}…", &s[..end])
     }
 }
 
@@ -39,25 +26,21 @@ impl AgentMiddleware for AgentTracingMiddleware {
         let tool_count = request.tools.len();
         let has_thinking = request.thinking.is_some();
 
-        // Extract content previews for debugging
-        let system_prompt = request
-            .messages
-            .iter()
-            .find(|m| m.is_system())
-            .map(|m| preview(m.content(), 200))
-            .unwrap_or_default();
+        let system_prompt_len = request.system_prompt.as_ref().map(|s| s.len()).unwrap_or(0);
+        let system_prompt = request.system_prompt.clone().unwrap_or_default();
         let user_message = request
             .messages
             .iter()
             .rev()
             .find(|m| m.is_human())
-            .map(|m| preview(m.content(), 300))
+            .map(|m| m.content().to_string())
             .unwrap_or_default();
 
         tracing::info!(
             message_count,
             tool_count,
             has_thinking,
+            system_prompt_len,
             system_prompt = %system_prompt,
             user_message = %user_message,
             "model call starting"
@@ -70,17 +53,13 @@ impl AgentMiddleware for AgentTracingMiddleware {
         match &result {
             Ok(response) => {
                 let tool_calls_count = response.message.tool_calls().len();
-                let content_preview = preview(response.message.content(), 300);
+                let content = response.message.content().to_string();
 
-                // Log tool call details if any
                 let tool_names: Vec<String> = response
                     .message
                     .tool_calls()
                     .iter()
-                    .map(|tc| {
-                        let args = preview(&tc.arguments.to_string(), 150);
-                        format!("{}({})", tc.name, args)
-                    })
+                    .map(|tc| format!("{}({})", tc.name, tc.arguments))
                     .collect();
                 let tools_summary = tool_names.join(", ");
 
@@ -92,7 +71,7 @@ impl AgentMiddleware for AgentTracingMiddleware {
                         total_tokens = usage.total_tokens,
                         tool_calls = tool_calls_count,
                         tools = %tools_summary,
-                        response = %content_preview,
+                        response = %content,
                         "model call completed"
                     );
                 } else {
@@ -100,7 +79,7 @@ impl AgentMiddleware for AgentTracingMiddleware {
                         duration_ms,
                         tool_calls = tool_calls_count,
                         tools = %tools_summary,
-                        response = %content_preview,
+                        response = %content,
                         "model call completed (no usage)"
                     );
                 }
@@ -124,9 +103,9 @@ impl AgentMiddleware for AgentTracingMiddleware {
         next: &dyn ToolCaller,
     ) -> Result<Value, SynapticError> {
         let tool_name = request.call.name.clone();
-        let args_preview = preview(&request.call.arguments.to_string(), 200);
+        let args = request.call.arguments.to_string();
 
-        tracing::info!(tool = %tool_name, args = %args_preview, "tool call starting");
+        tracing::info!(tool = %tool_name, args = %args, "tool call starting");
 
         let start = std::time::Instant::now();
         let result = next.call(request).await;
@@ -134,11 +113,11 @@ impl AgentMiddleware for AgentTracingMiddleware {
 
         match &result {
             Ok(val) => {
-                let result_preview = preview(&val.to_string(), 300);
+                let result_str = val.to_string();
                 tracing::info!(
                     tool = %tool_name,
                     duration_ms,
-                    result = %result_preview,
+                    result = %result_str,
                     "tool call completed"
                 );
             }

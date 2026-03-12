@@ -1,5 +1,5 @@
 # Synapse Configuration
-# Copy to synaptic.toml and edit as needed.
+# Copy to synapse.toml and edit as needed.
 
 [model]
 provider = "openai"

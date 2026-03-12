@@ -115,7 +115,11 @@ impl Tool for SessionsHistoryTool {
         }
 
         let mut lines = Vec::new();
-        lines.push(format!("Session {} ({} messages):", session_id, messages.len()));
+        lines.push(format!(
+            "Session {} ({} messages):",
+            session_id,
+            messages.len()
+        ));
         for (i, msg) in messages.iter().enumerate() {
             let role = if msg.is_system() {
                 "system"

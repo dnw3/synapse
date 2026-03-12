@@ -97,10 +97,9 @@ impl Tool for FirecrawlTool {
             .map_err(|e| SynapticError::Tool(format!("Firecrawl request failed: {}", e)))?;
 
         let status = response.status();
-        let response_body: Value = response
-            .json()
-            .await
-            .map_err(|e| SynapticError::Tool(format!("Failed to parse Firecrawl response: {}", e)))?;
+        let response_body: Value = response.json().await.map_err(|e| {
+            SynapticError::Tool(format!("Failed to parse Firecrawl response: {}", e))
+        })?;
 
         if !status.is_success() {
             let error_msg = response_body

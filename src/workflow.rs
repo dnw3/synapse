@@ -10,12 +10,12 @@ use std::sync::Arc;
 use colored::Colorize;
 use serde::Deserialize;
 use serde_json::Value;
-use synaptic::graph::{CheckpointConfig, Checkpointer, StoreCheckpointer};
 use synaptic::graph::workflow::{
     Workflow, WorkflowContext, WorkflowError, WorkflowHandler, WorkflowResult, WorkflowStatus,
     WorkflowStep,
 };
 use synaptic::graph::workflow_runner::WorkflowRunner;
+use synaptic::graph::{CheckpointConfig, Checkpointer, StoreCheckpointer};
 use synaptic::store::FileStore;
 
 use crate::config::SynapseConfig;
@@ -222,24 +222,14 @@ pub async fn run_workflow_command(
                 if let Some(home) = dirs::home_dir() {
                     println!("  Global:   {}/.claude/workflows/*.toml", home.display());
                 }
-                println!(
-                    "\nCreate a workflow TOML file to get started. Example:"
-                );
+                println!("\nCreate a workflow TOML file to get started. Example:");
                 println!("{}", EXAMPLE_WORKFLOW.dimmed());
             } else {
-                println!(
-                    "{:<25} {:<6} DESCRIPTION",
-                    "NAME", "STEPS"
-                );
+                println!("{:<25} {:<6} DESCRIPTION", "NAME", "STEPS");
                 println!("{}", "-".repeat(65));
                 for wf in &registry.workflows {
                     let desc = wf.description.as_deref().unwrap_or("");
-                    println!(
-                        "{:<25} {:<6} {}",
-                        wf.name,
-                        wf.steps.len(),
-                        desc
-                    );
+                    println!("{:<25} {:<6} {}", wf.name, wf.steps.len(), desc);
                 }
                 println!("\n{} workflow(s) found", registry.workflows.len());
             }
@@ -268,7 +258,9 @@ pub async fn run_workflow_command(
                 def.steps.len()
             );
 
-            let execution = runner.start(&workflow, input_value).await
+            let execution = runner
+                .start(&workflow, input_value)
+                .await
                 .map_err(|e| format!("workflow execution failed: {}", e))?;
 
             print_execution_result(&execution.status, &execution.resume_token);
@@ -290,7 +282,8 @@ pub async fn run_workflow_command(
             }
         }
         "approve" => {
-            let token = name.ok_or("usage: synapse workflow approve <resume_token> [--data json]")?;
+            let token =
+                name.ok_or("usage: synapse workflow approve <resume_token> [--data json]")?;
 
             let approval_data: Option<Value> = if let Some(json_str) = data {
                 Some(
@@ -305,7 +298,9 @@ pub async fn run_workflow_command(
             let runner = WorkflowRunner::new(workflow_checkpointer());
 
             // Get the current status to find the workflow name
-            let status = runner.status(token).await
+            let status = runner
+                .status(token)
+                .await
                 .map_err(|e| format!("failed to query workflow: {}", e))?;
 
             match status {
@@ -321,12 +316,14 @@ pub async fn run_workflow_command(
                     // The checkpoint stores the workflow name but we need the full definition
                     let registry = WorkflowRegistry::discover();
                     let wf_name = find_workflow_name_from_token(&runner, token).await?;
-                    let def = registry
-                        .get(&wf_name)
-                        .ok_or_else(|| format!("workflow '{}' not found (needed for resume)", wf_name))?;
+                    let def = registry.get(&wf_name).ok_or_else(|| {
+                        format!("workflow '{}' not found (needed for resume)", wf_name)
+                    })?;
 
                     let workflow = build_workflow(def);
-                    let execution = runner.resume(&workflow, token, approval_data).await
+                    let execution = runner
+                        .resume(&workflow, token, approval_data)
+                        .await
                         .map_err(|e| format!("resume failed: {}", e))?;
 
                     print_execution_result(&execution.status, &execution.resume_token);
@@ -344,7 +341,9 @@ pub async fn run_workflow_command(
             let token = name.ok_or("usage: synapse workflow reject <resume_token>")?;
             let runner = WorkflowRunner::new(workflow_checkpointer());
 
-            let status = runner.status(token).await
+            let status = runner
+                .status(token)
+                .await
                 .map_err(|e| format!("failed to query workflow: {}", e))?;
 
             match status {
@@ -386,11 +385,7 @@ pub async fn run_workflow_command(
 fn print_execution_result(status: &WorkflowStatus, token: &str) {
     match status {
         WorkflowStatus::Running { step } => {
-            println!(
-                "{} Running step '{}'",
-                "workflow:".cyan().bold(),
-                step
-            );
+            println!("{} Running step '{}'", "workflow:".cyan().bold(), step);
         }
         WorkflowStatus::WaitingApproval {
             step,
@@ -403,28 +398,21 @@ fn print_execution_result(status: &WorkflowStatus, token: &str) {
                 step,
                 prompt
             );
-            println!(
-                "  Resume token: {}",
-                resume_token.cyan()
-            );
+            println!("  Resume token: {}", resume_token.cyan());
             println!("  Approve: synapse workflow approve {}", resume_token);
             println!("  Reject:  synapse workflow reject {}", resume_token);
         }
         WorkflowStatus::Completed { output } => {
-            println!(
-                "{} Workflow completed",
-                "workflow:".green().bold()
-            );
+            println!("{} Workflow completed", "workflow:".green().bold());
             if !output.is_null() {
-                println!("  Output: {}", serde_json::to_string_pretty(output).unwrap_or_default());
+                println!(
+                    "  Output: {}",
+                    serde_json::to_string_pretty(output).unwrap_or_default()
+                );
             }
         }
         WorkflowStatus::Failed { error } => {
-            println!(
-                "{} Workflow failed: {}",
-                "workflow:".red().bold(),
-                error
-            );
+            println!("{} Workflow failed: {}", "workflow:".red().bold(), error);
             println!("  Token: {}", token);
         }
     }

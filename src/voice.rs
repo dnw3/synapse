@@ -112,44 +112,38 @@ pub fn record_audio(
 
     // Build a stream that converts whatever sample format the device uses to i16.
     let stream = match config.sample_format() {
-        cpal::SampleFormat::I16 => {
-            device.build_input_stream(
-                &config.into(),
-                move |data: &[i16], _| {
-                    let mut buf = pcm_buf_clone.lock().unwrap();
-                    buf.extend_from_slice(data);
-                },
-                err_fn,
-                None,
-            )?
-        }
-        cpal::SampleFormat::U16 => {
-            device.build_input_stream(
-                &config.into(),
-                move |data: &[u16], _| {
-                    let mut buf = pcm_buf_clone.lock().unwrap();
-                    for &s in data {
-                        buf.push(s.wrapping_sub(0x8000) as i16);
-                    }
-                },
-                err_fn,
-                None,
-            )?
-        }
-        cpal::SampleFormat::F32 => {
-            device.build_input_stream(
-                &config.into(),
-                move |data: &[f32], _| {
-                    let mut buf = pcm_buf_clone.lock().unwrap();
-                    for &s in data {
-                        let clamped = s.clamp(-1.0, 1.0);
-                        buf.push((clamped * i16::MAX as f32) as i16);
-                    }
-                },
-                err_fn,
-                None,
-            )?
-        }
+        cpal::SampleFormat::I16 => device.build_input_stream(
+            &config.into(),
+            move |data: &[i16], _| {
+                let mut buf = pcm_buf_clone.lock().unwrap();
+                buf.extend_from_slice(data);
+            },
+            err_fn,
+            None,
+        )?,
+        cpal::SampleFormat::U16 => device.build_input_stream(
+            &config.into(),
+            move |data: &[u16], _| {
+                let mut buf = pcm_buf_clone.lock().unwrap();
+                for &s in data {
+                    buf.push(s.wrapping_sub(0x8000) as i16);
+                }
+            },
+            err_fn,
+            None,
+        )?,
+        cpal::SampleFormat::F32 => device.build_input_stream(
+            &config.into(),
+            move |data: &[f32], _| {
+                let mut buf = pcm_buf_clone.lock().unwrap();
+                for &s in data {
+                    let clamped = s.clamp(-1.0, 1.0);
+                    buf.push((clamped * i16::MAX as f32) as i16);
+                }
+            },
+            err_fn,
+            None,
+        )?,
         fmt => {
             return Err(format!("unsupported sample format: {:?}", fmt).into());
         }
@@ -191,10 +185,7 @@ pub fn record_audio(
     drop(stream);
 
     let samples = pcm_buf.lock().unwrap().clone();
-    let bytes: Vec<u8> = samples
-        .iter()
-        .flat_map(|s| s.to_le_bytes())
-        .collect();
+    let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
     Ok(bytes)
 }
 
@@ -235,81 +226,79 @@ pub fn play_audio(pcm_bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let err_fn = |e| eprintln!("  {} playback error: {}", "voice:".yellow(), e);
 
     let stream = match config.sample_format() {
-        cpal::SampleFormat::F32 => {
-            device.build_output_stream(
-                &config.into(),
-                move |output: &mut [f32], _| {
-                    let mut cur = cursor_clone.lock().unwrap();
-                    let src = &*samples_clone;
-                    for (i, frame) in output.chunks_mut(channels).enumerate() {
-                        let sample_idx = *cur + i;
-                        let sample = if sample_idx < src.len() {
-                            src[sample_idx] as f32 / i16::MAX as f32
-                        } else {
-                            0.0
-                        };
-                        for ch in frame.iter_mut() {
-                            *ch = sample;
-                        }
+        cpal::SampleFormat::F32 => device.build_output_stream(
+            &config.into(),
+            move |output: &mut [f32], _| {
+                let mut cur = cursor_clone.lock().unwrap();
+                let src = &*samples_clone;
+                for (i, frame) in output.chunks_mut(channels).enumerate() {
+                    let sample_idx = *cur + i;
+                    let sample = if sample_idx < src.len() {
+                        src[sample_idx] as f32 / i16::MAX as f32
+                    } else {
+                        0.0
+                    };
+                    for ch in frame.iter_mut() {
+                        *ch = sample;
                     }
-                    let frames = output.len() / channels;
-                    *cur += frames;
-                    if *cur >= samples_clone.len() {
-                        *done_flag_clone.lock().unwrap() = true;
+                }
+                let frames = output.len() / channels;
+                *cur += frames;
+                if *cur >= samples_clone.len() {
+                    *done_flag_clone.lock().unwrap() = true;
+                }
+            },
+            err_fn,
+            None,
+        )?,
+        cpal::SampleFormat::I16 => device.build_output_stream(
+            &config.into(),
+            move |output: &mut [i16], _| {
+                let mut cur = cursor_clone.lock().unwrap();
+                let src = &*samples_clone;
+                for (i, frame) in output.chunks_mut(channels).enumerate() {
+                    let sample = if *cur + i < src.len() {
+                        src[*cur + i]
+                    } else {
+                        0
+                    };
+                    for ch in frame.iter_mut() {
+                        *ch = sample;
                     }
-                },
-                err_fn,
-                None,
-            )?
-        }
-        cpal::SampleFormat::I16 => {
-            device.build_output_stream(
-                &config.into(),
-                move |output: &mut [i16], _| {
-                    let mut cur = cursor_clone.lock().unwrap();
-                    let src = &*samples_clone;
-                    for (i, frame) in output.chunks_mut(channels).enumerate() {
-                        let sample = if *cur + i < src.len() { src[*cur + i] } else { 0 };
-                        for ch in frame.iter_mut() {
-                            *ch = sample;
-                        }
+                }
+                let frames = output.len() / channels;
+                *cur += frames;
+                if *cur >= samples_clone.len() {
+                    *done_flag_clone.lock().unwrap() = true;
+                }
+            },
+            err_fn,
+            None,
+        )?,
+        cpal::SampleFormat::U16 => device.build_output_stream(
+            &config.into(),
+            move |output: &mut [u16], _| {
+                let mut cur = cursor_clone.lock().unwrap();
+                let src = &*samples_clone;
+                for (i, frame) in output.chunks_mut(channels).enumerate() {
+                    let sample = if *cur + i < src.len() {
+                        (src[*cur + i] as i32 + 0x8000) as u16
+                    } else {
+                        0x8000
+                    };
+                    for ch in frame.iter_mut() {
+                        *ch = sample;
                     }
-                    let frames = output.len() / channels;
-                    *cur += frames;
-                    if *cur >= samples_clone.len() {
-                        *done_flag_clone.lock().unwrap() = true;
-                    }
-                },
-                err_fn,
-                None,
-            )?
-        }
-        cpal::SampleFormat::U16 => {
-            device.build_output_stream(
-                &config.into(),
-                move |output: &mut [u16], _| {
-                    let mut cur = cursor_clone.lock().unwrap();
-                    let src = &*samples_clone;
-                    for (i, frame) in output.chunks_mut(channels).enumerate() {
-                        let sample = if *cur + i < src.len() {
-                            (src[*cur + i] as i32 + 0x8000) as u16
-                        } else {
-                            0x8000
-                        };
-                        for ch in frame.iter_mut() {
-                            *ch = sample;
-                        }
-                    }
-                    let frames = output.len() / channels;
-                    *cur += frames;
-                    if *cur >= samples_clone.len() {
-                        *done_flag_clone.lock().unwrap() = true;
-                    }
-                },
-                err_fn,
-                None,
-            )?
-        }
+                }
+                let frames = output.len() / channels;
+                *cur += frames;
+                if *cur >= samples_clone.len() {
+                    *done_flag_clone.lock().unwrap() = true;
+                }
+            },
+            err_fn,
+            None,
+        )?,
         fmt => {
             return Err(format!("unsupported output sample format: {:?}", fmt).into());
         }
@@ -442,11 +431,7 @@ pub async fn run_voice_loop(
                             };
                             match provider.transcribe(&pcm_bytes, &opts).await {
                                 Ok(t) => {
-                                    eprintln!(
-                                        "  {} \"{}\"",
-                                        "stt:".dimmed(),
-                                        t.text.trim()
-                                    );
+                                    eprintln!("  {} \"{}\"", "stt:".dimmed(), t.text.trim());
                                     t.text
                                 }
                                 Err(e) => {
@@ -548,11 +533,7 @@ pub async fn run_voice_loop(
                             );
                             if audio_available {
                                 if let Err(e) = play_audio(&audio_bytes) {
-                                    eprintln!(
-                                        "  {} playback failed: {}",
-                                        "warning:".yellow(),
-                                        e
-                                    );
+                                    eprintln!("  {} playback failed: {}", "warning:".yellow(), e);
                                 }
                             }
                         }

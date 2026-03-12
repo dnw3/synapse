@@ -20,10 +20,11 @@ pub async fn resolve_skill_slash_command(
 ) -> Option<SkillSlashResult> {
     use synaptic_deep::middleware::skills::substitute_arguments;
 
-    // Search order: personal > project > legacy commands
+    // Search order: synapse personal > claude personal > project > legacy commands
     let search_dirs = {
         let mut dirs = Vec::new();
         if let Some(home) = dirs::home_dir() {
+            dirs.push(home.join(".synapse/skills"));
             dirs.push(home.join(".claude/skills"));
         }
         dirs.push(cwd.join(".claude/skills"));
@@ -121,9 +122,7 @@ fn parse_skill_for_slash(content: &str) -> Option<(String, bool, Option<(String,
                 if let Some((_, val)) = trimmed.split_once(':') {
                     command_dispatch = Some(val.trim().to_string());
                 }
-            } else if trimmed.starts_with("command-tool:")
-                || trimmed.starts_with("command_tool:")
-            {
+            } else if trimmed.starts_with("command-tool:") || trimmed.starts_with("command_tool:") {
                 if let Some((_, val)) = trimmed.split_once(':') {
                     command_tool = Some(val.trim().to_string());
                 }

@@ -18,8 +18,12 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [tlon] section in config")?;
 
-    let api_key = resolve_secret(tlon_config.api_key.as_deref(), tlon_config.api_key_env.as_deref(), "Tlon API key")
-        .map_err(|e| format!("{}", e))?;
+    let api_key = resolve_secret(
+        tlon_config.api_key.as_deref(),
+        tlon_config.api_key_env.as_deref(),
+        "Tlon API key",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

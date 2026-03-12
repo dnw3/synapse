@@ -97,10 +97,7 @@ pub async fn start_scheduler(
     // Check leader election gate
     if let Some(ref gw) = config.gateway {
         if gw.leader_election.unwrap_or(false) {
-            let instance_id = gw
-                .instance_id
-                .as_deref()
-                .unwrap_or("default");
+            let instance_id = gw.instance_id.as_deref().unwrap_or("default");
 
             if !try_acquire_leader(instance_id) {
                 tracing::info!(

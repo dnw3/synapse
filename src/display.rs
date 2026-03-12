@@ -87,10 +87,7 @@ pub fn render_tool_call(name: &str, args: &serde_json::Value) {
                 .get("task")
                 .and_then(|v| v.as_str())
                 .unwrap_or("sub-task");
-            let role = args
-                .get("role")
-                .and_then(|v| v.as_str())
-                .unwrap_or("agent");
+            let role = args.get("role").and_then(|v| v.as_str()).unwrap_or("agent");
             let short_task = if task.len() > 50 {
                 format!("{}...", &task[..47])
             } else {

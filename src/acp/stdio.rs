@@ -44,14 +44,8 @@ pub async fn run_stdio(
             val.trim().parse().unwrap_or(0)
         } else {
             // Try reading as raw JSON (lenient mode)
-            let resp = handle_raw_request(
-                header_line,
-                &handler,
-                config,
-                &model,
-                &session_mgr,
-            )
-            .await;
+            let resp =
+                handle_raw_request(header_line, &handler, config, &model, &session_mgr).await;
             write_response(&stdout, &resp)?;
             continue;
         };
@@ -69,14 +63,7 @@ pub async fn run_stdio(
         io::Read::read_exact(&mut reader, &mut body)?;
         let body = String::from_utf8_lossy(&body);
 
-        let resp = handle_raw_request(
-            &body,
-            &handler,
-            config,
-            &model,
-            &session_mgr,
-        )
-        .await;
+        let resp = handle_raw_request(&body, &handler, config, &model, &session_mgr).await;
         write_response(&stdout, &resp)?;
     }
 
@@ -103,17 +90,17 @@ async fn handle_raw_request(
     // Handle agent methods
     match req.method.as_str() {
         "agent/run" => {
-            handle_agent_run(req.id.clone(), req.params.clone(), config, model, session_mgr).await
-        }
-        "agent/status" => {
-            JsonRpcResponse::success(
-                req.id,
-                serde_json::json!({"status": "idle"}),
+            handle_agent_run(
+                req.id.clone(),
+                req.params.clone(),
+                config,
+                model,
+                session_mgr,
             )
+            .await
         }
-        "agent/cancel" => {
-            JsonRpcResponse::success(req.id, serde_json::json!({"cancelled": true}))
-        }
+        "agent/status" => JsonRpcResponse::success(req.id, serde_json::json!({"status": "idle"})),
+        "agent/cancel" => JsonRpcResponse::success(req.id, serde_json::json!({"cancelled": true})),
         _ => JsonRpcResponse::error(req.id, METHOD_NOT_FOUND, "method not found"),
     }
 }

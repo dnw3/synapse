@@ -47,7 +47,11 @@ pub async fn run(
     );
 
     let client = reqwest::Client::new();
-    let receive_url = format!("{}/v1/receive/{}", api_url, urlencoding::encode(&phone_number));
+    let receive_url = format!(
+        "{}/v1/receive/{}",
+        api_url,
+        urlencoding::encode(&phone_number)
+    );
 
     loop {
         let resp = match client.get(&receive_url).send().await {
@@ -84,10 +88,7 @@ pub async fn run(
 
         for envelope in messages {
             // The envelope has a nested dataMessage for regular messages
-            let data_message = match envelope
-                .get("envelope")
-                .and_then(|e| e.get("dataMessage"))
-            {
+            let data_message = match envelope.get("envelope").and_then(|e| e.get("dataMessage")) {
                 Some(dm) => dm,
                 None => continue,
             };
@@ -131,12 +132,7 @@ pub async fn run(
                                 "number": our_number,
                                 "recipients": [recipient],
                             });
-                            if let Err(e) = http
-                                .post(&send_url)
-                                .json(&body)
-                                .send()
-                                .await
-                            {
+                            if let Err(e) = http.post(&send_url).json(&body).send().await {
                                 tracing::error!(channel = "signal", error = %e, "send error");
                             }
                         }

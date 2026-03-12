@@ -14,8 +14,7 @@ use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
 
 /// WeCom Bot Webhook URL template.
-const WECOM_WEBHOOK_BASE: &str =
-    "https://qyapi.weixin.qq.com/cgi-bin/webhook/send";
+const WECOM_WEBHOOK_BASE: &str = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send";
 
 /// Shared state for the axum callback server.
 #[allow(dead_code)]
@@ -198,8 +197,7 @@ async fn handle_callback(
         match session.handle_message(&session_key, &text).await {
             Ok(reply) => {
                 let client = reqwest::Client::new();
-                let webhook_url =
-                    format!("{}?key={}", WECOM_WEBHOOK_BASE, webhook_key);
+                let webhook_url = format!("{}?key={}", WECOM_WEBHOOK_BASE, webhook_key);
                 let chunks = formatter::chunk_wechat(&reply);
                 for chunk in chunks {
                     let body = serde_json::json!({
@@ -218,8 +216,7 @@ async fn handle_callback(
                 tracing::error!(channel = "wechat", error = %e, "handler error");
                 // Attempt to send error back via webhook
                 let client = reqwest::Client::new();
-                let webhook_url =
-                    format!("{}?key={}", WECOM_WEBHOOK_BASE, webhook_key);
+                let webhook_url = format!("{}?key={}", WECOM_WEBHOOK_BASE, webhook_key);
                 let body = serde_json::json!({
                     "msgtype": "text",
                     "text": {
@@ -244,13 +241,17 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [wechat] section in config")?;
 
-    let webhook_key = resolve_secret(wc_config.webhook_key.as_deref(), wc_config.webhook_key_env.as_deref(), "WeCom webhook key")
-        .map_err(|e| format!("{}", e))?;
+    let webhook_key = resolve_secret(
+        wc_config.webhook_key.as_deref(),
+        wc_config.webhook_key_env.as_deref(),
+        "WeCom webhook key",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
     let allowlist = wc_config.allowlist.clone();
-    let agent_session = Arc::new(AgentSession::new(model, config_arc, true));
+    let agent_session = Arc::new(AgentSession::new(model, config_arc, true).with_channel("wechat"));
 
     let port = wc_config.port.unwrap_or(8076);
 
@@ -326,10 +327,7 @@ mod tests {
     #[test]
     fn extract_cdata_plain_text() {
         let xml = "<xml><Tag>plain value</Tag></xml>";
-        assert_eq!(
-            extract_cdata(xml, "Tag").as_deref(),
-            Some("plain value")
-        );
+        assert_eq!(extract_cdata(xml, "Tag").as_deref(), Some("plain value"));
     }
 
     #[test]

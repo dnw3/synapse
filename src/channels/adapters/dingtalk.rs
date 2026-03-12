@@ -173,7 +173,10 @@ async fn handle_callback(
     let webhook_url = match payload.session_webhook.clone() {
         Some(url) if !url.is_empty() => url,
         _ => {
-            tracing::warn!(channel = "dingtalk", "no session_webhook in payload, cannot reply");
+            tracing::warn!(
+                channel = "dingtalk",
+                "no session_webhook in payload, cannot reply"
+            );
             return StatusCode::OK;
         }
     };
@@ -233,13 +236,18 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [dingtalk] section in config")?;
 
-    let app_secret = resolve_secret(dt_config.app_secret.as_deref(), dt_config.app_secret_env.as_deref(), "DingTalk app secret")
-        .map_err(|e| format!("{}", e))?;
+    let app_secret = resolve_secret(
+        dt_config.app_secret.as_deref(),
+        dt_config.app_secret_env.as_deref(),
+        "DingTalk app secret",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
     let allowlist = dt_config.allowlist.clone();
-    let agent_session = Arc::new(AgentSession::new(model, config_arc, true));
+    let agent_session =
+        Arc::new(AgentSession::new(model, config_arc, true).with_channel("dingtalk"));
 
     let port = dt_config.callback_port.unwrap_or(8075);
 

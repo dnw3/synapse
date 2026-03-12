@@ -20,20 +20,30 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [nostr] section in config")?;
 
-    let private_key = resolve_secret(nostr_config.private_key.as_deref(), nostr_config.private_key_env.as_deref(), "Nostr private key")
-        .map_err(|e| format!("{}", e))?;
+    let private_key = resolve_secret(
+        nostr_config.private_key.as_deref(),
+        nostr_config.private_key_env.as_deref(),
+        "Nostr private key",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
     let agent_session = Arc::new(AgentSession::new(model, config_arc, true));
 
-    tracing::info!(channel = "nostr", relays = nostr_config.relays.len(), "adapter started");
+    tracing::info!(
+        channel = "nostr",
+        relays = nostr_config.relays.len(),
+        "adapter started"
+    );
 
     // Simple polling loop using NIP-50 search or NIP-01 REQ subscriptions
     // via relay HTTP/WebSocket. For production, use nostr-sdk crate.
     loop {
         for relay in &nostr_config.relays {
-            if let Err(e) = poll_relay(relay, &private_key, &agent_session, &nostr_config.allowlist).await {
+            if let Err(e) =
+                poll_relay(relay, &private_key, &agent_session, &nostr_config.allowlist).await
+            {
                 tracing::warn!(channel = "nostr", relay = %relay, error = %e, "relay error");
             }
         }

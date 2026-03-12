@@ -392,9 +392,7 @@ fn find_shared_library(dir: &Path) -> Option<std::path::PathBuf> {
 /// extern "C" fn synapse_plugin_create() -> *mut dyn Plugin;
 /// ```
 #[cfg(feature = "plugins")]
-fn load_dynamic_plugin(
-    lib_path: &Path,
-) -> Result<Box<dyn Plugin>, Box<dyn std::error::Error>> {
+fn load_dynamic_plugin(lib_path: &Path) -> Result<Box<dyn Plugin>, Box<dyn std::error::Error>> {
     unsafe {
         let lib = libloading::Library::new(lib_path)?;
         let create_fn: libloading::Symbol<unsafe extern "C" fn() -> *mut dyn Plugin> =

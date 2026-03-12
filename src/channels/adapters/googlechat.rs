@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
+use crate::agent;
+use crate::channels::formatter;
+use crate::channels::handler::AgentSession;
+use crate::config::{BotAllowlist, SynapseConfig};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::post;
 use axum::Json;
 use axum::Router;
-use crate::agent;
-use crate::channels::formatter;
-use crate::channels::handler::AgentSession;
-use crate::config::{BotAllowlist, SynapseConfig};
 
 /// Shared state for the axum webhook server.
 struct AppState {
@@ -114,10 +114,10 @@ async fn handle_webhook(
         .map(|s| s.to_string());
 
     // Allowlist check: filter by sender resource name or space resource name.
-    if !state.allowlist.is_allowed(
-        sender_name.as_deref(),
-        space_name.as_deref(),
-    ) {
+    if !state
+        .allowlist
+        .is_allowed(sender_name.as_deref(), space_name.as_deref())
+    {
         // Silently ignore — return 200 with no text so Google Chat doesn't retry.
         return Err(StatusCode::OK);
     }
@@ -132,7 +132,11 @@ async fn handle_webhook(
     };
 
     // Process the message through the agent session.
-    let reply_text = match state.agent_session.handle_message(&session_key, &text).await {
+    let reply_text = match state
+        .agent_session
+        .handle_message(&session_key, &text)
+        .await
+    {
         Ok(reply) => {
             let chunks = formatter::chunk_googlechat(&reply);
             // Google Chat synchronous replies support only a single text body.
@@ -182,7 +186,11 @@ pub async fn run(
         tracing::info!(channel = "googlechat", project_id = %project_id, "project configured");
     }
 
-    tracing::info!(channel = "googlechat", port = port, "adapter started (webhook mode)");
+    tracing::info!(
+        channel = "googlechat",
+        port = port,
+        "adapter started (webhook mode)"
+    );
 
     let state = Arc::new(AppState {
         agent_session,

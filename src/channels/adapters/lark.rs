@@ -13,7 +13,9 @@ use crate::agent;
 use crate::channels::dedup::MessageDedup;
 use crate::channels::formatter;
 use crate::channels::handler::{AgentSession, Attachment, StreamingOutput};
-use crate::config::bot::{resolve_secret, DmPolicy, GroupPolicy, GroupSessionScope, LarkRenderMode};
+use crate::config::bot::{
+    resolve_secret, DmPolicy, GroupPolicy, GroupSessionScope, LarkRenderMode,
+};
 use crate::config::{BotAllowlist, SynapseConfig};
 
 // ---------------------------------------------------------------------------
@@ -74,7 +76,12 @@ fn compute_session_key(event: &LarkMessageEvent, scope: &GroupSessionScope) -> S
         }
         GroupSessionScope::GroupTopicSender => {
             let topic = event.root_id.as_deref().unwrap_or("_");
-            format!("lark:grp:{}:t:{}:{}", chat_id, topic, event.sender_open_id())
+            format!(
+                "lark:grp:{}:t:{}:{}",
+                chat_id,
+                topic,
+                event.sender_open_id()
+            )
         }
     }
 }
@@ -127,17 +134,16 @@ impl LarkHandler {
         if event.is_dm() {
             match self.config.dm_policy {
                 DmPolicy::Open => true,
-                DmPolicy::Allowlist => {
-                    self.config.allowlist.is_user_allowed(event.sender_open_id())
-                }
+                DmPolicy::Allowlist => self
+                    .config
+                    .allowlist
+                    .is_user_allowed(event.sender_open_id()),
             }
         } else {
             match self.config.group_policy {
                 GroupPolicy::Open => true,
                 GroupPolicy::Disabled => false,
-                GroupPolicy::Allowlist => {
-                    self.config.allowlist.is_channel_allowed(event.chat_id())
-                }
+                GroupPolicy::Allowlist => self.config.allowlist.is_channel_allowed(event.chat_id()),
             }
         }
     }
@@ -152,7 +158,9 @@ impl LarkHandler {
         let chunks = formatter::chunk_message(text, self.config.text_chunk_limit);
         for chunk in chunks {
             if self.config.reply_in_thread && event.has_thread() {
-                client.reply_text_in_thread(event.message_id(), &chunk).await?;
+                client
+                    .reply_text_in_thread(event.message_id(), &chunk)
+                    .await?;
             } else {
                 client.reply_text(event.message_id(), &chunk).await?;
             }
@@ -169,7 +177,10 @@ impl LarkHandler {
         text: &str,
     ) -> Result<(), SynapticError> {
         let use_streaming = self.config.streaming
-            && matches!(self.config.render_mode, LarkRenderMode::Card | LarkRenderMode::Auto);
+            && matches!(
+                self.config.render_mode,
+                LarkRenderMode::Card | LarkRenderMode::Auto
+            );
 
         if use_streaming {
             let writer = client
@@ -357,7 +368,10 @@ impl MessageHandler for LarkHandler {
                 self.handle_text_message(&event, client, &session_key, &text)
                     .await
             }
-            "image" => self.handle_image_message(&event, client, &session_key).await,
+            "image" => {
+                self.handle_image_message(&event, client, &session_key)
+                    .await
+            }
             "file" => self.handle_file_message(&event, client, &session_key).await,
             other => {
                 tracing::debug!(message_type = %other, "unsupported message type");
@@ -402,7 +416,10 @@ impl CardActionHandler for LarkCardHandler {
             .or_else(|| event.action_value.get("command").and_then(|v| v.as_str()))
             .map(String::from)
             .unwrap_or_else(|| {
-                format!("[Card action: {} = {}]", event.action_tag, event.action_value)
+                format!(
+                    "[Card action: {} = {}]",
+                    event.action_tag, event.action_value
+                )
             });
 
         let session_key = format!("lark:card:{}", event.chat_id);
@@ -443,7 +460,7 @@ pub async fn run(
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
-    let agent_session = Arc::new(AgentSession::new(model, config_arc, true));
+    let agent_session = Arc::new(AgentSession::new(model, config_arc, true).with_channel("lark"));
 
     let lark = LarkConfig::new(&lark_config.app_id, &app_secret);
     let client = LarkBotClient::new(lark.clone());

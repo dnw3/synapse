@@ -6,10 +6,14 @@ import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { User, Bot, Copy, Check } from "lucide-react";
 import type { Message } from "../types";
 import ToolCallCard from "./ToolCallCard";
+import ThinkingBlock from "./ThinkingBlock";
 import { useIdentity } from "../App";
 
 interface Props {
-  message: Message;
+  /** Single message (human) */
+  message?: Message;
+  /** Grouped assistant turn: multiple assistant + tool messages rendered under one avatar */
+  turn?: Message[];
 }
 
 function LogIdBadge({ requestId }: { requestId: string }) {
@@ -48,10 +52,67 @@ function LogIdBadge({ requestId }: { requestId: string }) {
   );
 }
 
-export default function MessageBubble({ message }: Props) {
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <div className="synapse-prose prose max-w-none prose-p:leading-[1.75] prose-li:leading-[1.75] prose-headings:mt-6 prose-headings:mb-3 prose-headings:tracking-tight prose-h2:text-lg prose-h2:border-b prose-h2:border-[var(--border-subtle)] prose-h2:pb-2 prose-pre:bg-[var(--bg-surface)] prose-pre:border prose-pre:border-[var(--border-subtle)] prose-headings:text-[var(--text-primary)] prose-a:text-[var(--accent-light)] prose-strong:text-[var(--text-primary)]">
+      <ReactMarkdown
+        components={{
+          code(props) {
+            const { children, className, ...rest } = props;
+            const match = /language-(\w+)/.exec(className || "");
+            const isMultiline = String(children).includes("\n");
+            const inline = !match && !isMultiline;
+            return inline ? (
+              <code
+                className="px-1.5 py-0.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[4px] text-[var(--accent-light)] text-[0.875em] font-mono"
+                {...rest}
+              >
+                {children}
+              </code>
+            ) : (
+              <SyntaxHighlighter
+                style={oneDark}
+                language={match?.[1] || "text"}
+                PreTag="div"
+                className="!rounded-[var(--radius-sm)] !text-[13px] !leading-relaxed !border !border-[var(--border-subtle)] !my-3"
+              >
+                {String(children).replace(/\n$/, "")}
+              </SyntaxHighlighter>
+            );
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+function ToolResultSnippet({ content }: { content: string }) {
+  // Try to unescape JSON-encoded strings (e.g. "\"[agent]\\nmax_turns..." → real content)
+  let display = content ?? "";
+  if (display.startsWith('"') && display.endsWith('"')) {
+    try {
+      display = JSON.parse(display);
+    } catch {
+      // keep original
+    }
+  }
+  const truncated = display.length > 500;
+  const shown = truncated ? display.slice(0, 500) + "\n..." : display || "(empty)";
+
+  return (
+    <pre className="text-xs text-[var(--text-tertiary)] font-mono bg-[var(--bg-surface)]/80 rounded-[var(--radius-sm)] px-3 py-2 max-h-24 overflow-auto border border-[var(--border-subtle)] whitespace-pre-wrap break-words">
+      {shown}
+    </pre>
+  );
+}
+
+export default function MessageBubble({ message, turn }: Props) {
   const identity = useIdentity();
 
-  if (message.role === "human") {
+  // Single human message
+  if (message && message.role === "human") {
     return (
       <div className="flex gap-3 justify-end animate-fade-in">
         <div className="max-w-[70%] px-4 py-2.5 bg-[var(--accent)] text-white rounded-[var(--radius-lg)] rounded-br-[var(--radius-sm)] text-[15px] leading-[1.75] shadow-[var(--shadow-sm)]">
@@ -64,22 +125,13 @@ export default function MessageBubble({ message }: Props) {
     );
   }
 
-  if (message.role === "tool") {
-    return (
-      <div className="ml-10 animate-fade-in">
-        <div className="text-xs text-[var(--text-tertiary)] font-mono bg-[var(--bg-surface)]/80 rounded-[var(--radius-sm)] px-3 py-2 max-h-24 overflow-auto border border-[var(--border-subtle)]">
-          {(message.content ?? "").length > 300
-            ? message.content.slice(0, 300) + "..."
-            : message.content || "(empty)"}
-        </div>
-      </div>
-    );
-  }
+  // Grouped assistant turn (multiple messages under one avatar)
+  const msgs = turn ?? (message ? [message] : []);
+  if (msgs.length === 0) return null;
 
-  // Assistant message
-  const hasToolCalls = (message.tool_calls ?? []).length > 0;
-  // Only show LogID on assistant messages with text content (skip tool-call-only messages)
-  const showLogId = message.request_id && message.content;
+  // Find the last request_id with text content for LogID badge
+  const msgsWithRid = msgs.filter((m) => m.role === "assistant" && m.content && m.request_id);
+  const lastRequestId = msgsWithRid.length > 0 ? msgsWithRid[msgsWithRid.length - 1].request_id : undefined;
 
   return (
     <div className="flex gap-3 animate-fade-in">
@@ -93,49 +145,28 @@ export default function MessageBubble({ message }: Props) {
         )}
       </div>
       <div className="flex-1 min-w-0 space-y-2">
-        {hasToolCalls && (
-          <div className="flex flex-col gap-1.5">
-            {message.tool_calls.map((tc, i) => (
-              <ToolCallCard key={i} name={tc.name} args={tc.arguments} />
-            ))}
-          </div>
-        )}
+        {msgs.map((msg, i) => {
+          if (msg.role === "tool") {
+            return <ToolResultSnippet key={i} content={msg.content} />;
+          }
+          // assistant message
+          const hasToolCalls = (msg.tool_calls ?? []).length > 0;
+          return (
+            <div key={i} className="space-y-2">
+              {msg.reasoning && <ThinkingBlock content={msg.reasoning} />}
+              {msg.content && <MarkdownContent content={msg.content} />}
+              {hasToolCalls && (
+                <div className="flex flex-col gap-1.5">
+                  {msg.tool_calls.map((tc, j) => (
+                    <ToolCallCard key={j} name={tc.name} args={tc.arguments} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
-        {message.content && (
-          <div className="synapse-prose prose max-w-none prose-p:leading-[1.75] prose-li:leading-[1.75] prose-headings:mt-6 prose-headings:mb-3 prose-headings:tracking-tight prose-h2:text-lg prose-h2:border-b prose-h2:border-[var(--border-subtle)] prose-h2:pb-2 prose-pre:bg-[var(--bg-surface)] prose-pre:border prose-pre:border-[var(--border-subtle)] prose-headings:text-[var(--text-primary)] prose-a:text-[var(--accent-light)] prose-strong:text-[var(--text-primary)]">
-            <ReactMarkdown
-              components={{
-                code(props) {
-                  const { children, className, ...rest } = props;
-                  const match = /language-(\w+)/.exec(className || "");
-                  const inline = !match;
-                  return inline ? (
-                    <code
-                      className="px-1.5 py-0.5 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[4px] text-[var(--accent-light)] text-[0.875em] font-mono"
-                      {...rest}
-                    >
-                      {children}
-                    </code>
-                  ) : (
-                    <SyntaxHighlighter
-                      style={oneDark}
-                      language={match[1]}
-                      PreTag="div"
-                      className="!rounded-[var(--radius-sm)] !text-[13px] !leading-relaxed !border !border-[var(--border-subtle)]"
-                      customStyle={{ background: "var(--bg-surface)" }}
-                    >
-                      {String(children).replace(/\n$/, "")}
-                    </SyntaxHighlighter>
-                  );
-                },
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
-          </div>
-        )}
-
-        {showLogId && <LogIdBadge requestId={message.request_id!} />}
+        {lastRequestId && <LogIdBadge requestId={lastRequestId} />}
       </div>
     </div>
   );

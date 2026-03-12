@@ -79,18 +79,25 @@ impl Default for SubAgentConfig {
         let mut tool_profiles = HashMap::new();
         tool_profiles.insert(
             "read_only".to_string(),
-            vec![
-                "read_file", "grep", "glob", "list_dir", "Skill", "llm_task",
-            ]
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect(),
+            vec!["read_file", "grep", "glob", "list_dir", "Skill", "llm_task"]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
         );
         tool_profiles.insert(
             "coding".to_string(),
             vec![
-                "read_file", "write_file", "edit_file", "execute", "grep",
-                "glob", "list_dir", "Skill", "task", "TaskOutput", "llm_task",
+                "read_file",
+                "write_file",
+                "edit_file",
+                "execute",
+                "grep",
+                "glob",
+                "list_dir",
+                "Skill",
+                "task",
+                "TaskOutput",
+                "llm_task",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -106,9 +113,18 @@ impl Default for SubAgentConfig {
         tool_profiles.insert(
             "messaging".to_string(),
             vec![
-                "read_file", "grep", "glob", "list_dir", "Skill", "llm_task",
-                "sessions_list", "sessions_history", "sessions_send", "sessions_spawn",
-                "memory_search", "memory_get",
+                "read_file",
+                "grep",
+                "glob",
+                "list_dir",
+                "Skill",
+                "llm_task",
+                "sessions_list",
+                "sessions_history",
+                "sessions_send",
+                "sessions_spawn",
+                "memory_search",
+                "memory_get",
             ]
             .into_iter()
             .map(|s| s.to_string())
@@ -139,6 +155,58 @@ pub struct SkillOverrideConfig {
     pub env: HashMap<String, String>,
 }
 
+/// Skills system configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SkillsConfig {
+    /// Bundled skills allowlist (empty = all allowed).
+    #[serde(default)]
+    pub allow_bundled: Vec<String>,
+    /// Additional skill directories to scan.
+    #[serde(default)]
+    pub extra_dirs: Vec<String>,
+    /// Maximum skills to inject into system prompt (default: 150).
+    #[serde(default = "default_max_skills_in_prompt")]
+    pub max_skills_in_prompt: usize,
+    /// Maximum characters for skill descriptions in prompt (default: 30000).
+    #[serde(default = "default_max_skills_prompt_chars")]
+    pub max_skills_prompt_chars: usize,
+    /// Maximum skill file size in bytes (default: 256000).
+    #[serde(default = "default_max_skill_file_bytes")]
+    pub max_skill_file_bytes: usize,
+    /// Maximum skill candidates to scan per directory (default: 300).
+    #[serde(default = "default_max_candidates_per_dir")]
+    pub max_candidates_per_dir: usize,
+}
+
+fn default_max_skills_in_prompt() -> usize {
+    150
+}
+
+fn default_max_skills_prompt_chars() -> usize {
+    30000
+}
+
+fn default_max_skill_file_bytes() -> usize {
+    256000
+}
+
+fn default_max_candidates_per_dir() -> usize {
+    300
+}
+
+impl Default for SkillsConfig {
+    fn default() -> Self {
+        Self {
+            allow_bundled: Vec::new(),
+            extra_dirs: Vec::new(),
+            max_skills_in_prompt: default_max_skills_in_prompt(),
+            max_skills_prompt_chars: default_max_skills_prompt_chars(),
+            max_skill_file_bytes: default_max_skill_file_bytes(),
+            max_candidates_per_dir: default_max_candidates_per_dir(),
+        }
+    }
+}
+
 /// Agent routing rule — maps messages to specific agents by pattern or channel.
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
@@ -161,4 +229,7 @@ pub struct AgentRouteConfig {
     pub users: Vec<String>,
     /// Manual priority override (higher wins). If unset, computed from specificity.
     pub priority: Option<u32>,
+    /// Per-agent workspace directory override.
+    /// If unset, non-default agents use `~/.synapse/workspace-{name}/`.
+    pub workspace: Option<String>,
 }

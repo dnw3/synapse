@@ -119,7 +119,10 @@ impl ModelRegistry {
     }
 
     /// Resolve a model name or alias to a ChatModel instance.
-    pub fn resolve(&self, name_or_alias: &str) -> Result<Arc<dyn ChatModel>, Box<dyn std::error::Error>> {
+    pub fn resolve(
+        &self,
+        name_or_alias: &str,
+    ) -> Result<Arc<dyn ChatModel>, Box<dyn std::error::Error>> {
         let canonical = self
             .canonical_name(name_or_alias)
             .ok_or_else(|| format!("model '{}' not found in catalog", name_or_alias))?;
@@ -181,10 +184,7 @@ impl ModelRegistry {
 
     /// Build additional fallback instances using different API keys from the same provider.
     /// Returns None if the provider only has a single key.
-    pub fn rotation_fallbacks(
-        &self,
-        model_name: &str,
-    ) -> Option<Vec<Arc<dyn ChatModel>>> {
+    pub fn rotation_fallbacks(&self, model_name: &str) -> Option<Vec<Arc<dyn ChatModel>>> {
         let canonical = self.canonical_name(model_name)?;
         let entry = self.catalog.get(canonical)?;
         let prov_name = entry.provider.as_ref()?;

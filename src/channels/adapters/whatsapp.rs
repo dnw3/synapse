@@ -40,9 +40,19 @@ pub async fn run(
         .ok_or("missing [whatsapp] section in config")?;
 
     // Optionally resolve an API key (used as Bearer token for bridge).
-    let api_key: Option<String> = resolve_secret(wa_config.access_token.as_deref(), wa_config.api_key_env.as_deref(), "WhatsApp API key").ok();
+    let api_key: Option<String> = resolve_secret(
+        wa_config.access_token.as_deref(),
+        wa_config.api_key_env.as_deref(),
+        "WhatsApp API key",
+    )
+    .ok();
 
-    let bridge_url = wa_config.bridge_url.trim_end_matches('/').to_string();
+    let bridge_url = wa_config
+        .bridge_url
+        .as_deref()
+        .unwrap_or("http://localhost:29318")
+        .trim_end_matches('/')
+        .to_string();
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
     let allowlist = wa_config.allowlist.clone();
@@ -60,7 +70,13 @@ pub async fn run(
     tracing::info!(channel = "whatsapp", "adapter started");
 
     loop {
-        match run_ws_loop(&bridge_url, api_key.as_deref(), agent_session.clone(), &allowlist).await
+        match run_ws_loop(
+            &bridge_url,
+            api_key.as_deref(),
+            agent_session.clone(),
+            &allowlist,
+        )
+        .await
         {
             Ok(()) => break,
             Err(e) => {
@@ -95,10 +111,8 @@ async fn run_ws_loop(
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut req = ws_url.as_str().into_client_request()?;
         if let Some(key) = api_key {
-            req.headers_mut().insert(
-                "Authorization",
-                format!("Bearer {}", key).parse()?,
-            );
+            req.headers_mut()
+                .insert("Authorization", format!("Bearer {}", key).parse()?);
         }
         req
     };
@@ -164,8 +178,16 @@ async fn run_ws_loop(
         }
 
         // Allowlist check — user is the JID sender, channel is the chat JID.
-        let user_id_opt = if from.is_empty() { None } else { Some(from.as_str()) };
-        let channel_opt = if chat_id.is_empty() { None } else { Some(chat_id.as_str()) };
+        let user_id_opt = if from.is_empty() {
+            None
+        } else {
+            Some(from.as_str())
+        };
+        let channel_opt = if chat_id.is_empty() {
+            None
+        } else {
+            Some(chat_id.as_str())
+        };
         if !allowlist.is_allowed(user_id_opt, channel_opt) {
             continue;
         }

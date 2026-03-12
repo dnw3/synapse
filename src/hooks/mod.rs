@@ -49,10 +49,7 @@ impl SkillHooksExecutor for SynapseHooksExecutor {
                 );
                 Ok(true)
             }
-            SkillHookEvent::Stop {
-                skill_name,
-                reason,
-            } => {
+            SkillHookEvent::Stop { skill_name, reason } => {
                 eprintln!(
                     "{} Skill '{}' stopped: {}",
                     "hooks:".blue().bold(),

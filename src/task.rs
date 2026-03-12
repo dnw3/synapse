@@ -88,6 +88,8 @@ pub async fn run_task(
         None,
         None,
         None,
+        "repl",
+        None,
     )
     .await?;
 

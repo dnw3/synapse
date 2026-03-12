@@ -113,7 +113,9 @@ impl AgentRouter {
                 .map(|u| !route.users.is_empty() && route.users.contains(&u.to_string()))
                 .unwrap_or(false);
 
-            if has_channel_match || has_pattern_match || has_user_match
+            if has_channel_match
+                || has_pattern_match
+                || has_user_match
                 || (route.channels.is_empty() && route.pattern.is_none() && route.users.is_empty())
             {
                 return priority as i32;

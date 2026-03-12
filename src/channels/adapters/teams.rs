@@ -80,10 +80,7 @@ struct ReplyActivity {
 /// Pattern: `{serviceUrl}/v3/conversations/{conversationId}/activities`
 fn reply_url(service_url: &str, conversation_id: &str) -> String {
     let base = service_url.trim_end_matches('/');
-    format!(
-        "{}/v3/conversations/{}/activities",
-        base, conversation_id
-    )
+    format!("{}/v3/conversations/{}/activities", base, conversation_id)
 }
 
 /// Obtain a Bearer token from Azure AD using the client-credentials flow.
@@ -142,7 +139,10 @@ async fn send_reply(
         .unwrap_or_default();
 
     if conversation_id.is_empty() {
-        tracing::warn!(channel = "teams", "no conversation ID in activity, cannot reply");
+        tracing::warn!(
+            channel = "teams",
+            "no conversation ID in activity, cannot reply"
+        );
         return;
     }
 
@@ -175,10 +175,7 @@ async fn handle_message(
     axum::Json(activity): axum::Json<Activity>,
 ) -> StatusCode {
     // Only handle "message" activity types.
-    let activity_type = activity
-        .activity_type
-        .as_deref()
-        .unwrap_or("");
+    let activity_type = activity.activity_type.as_deref().unwrap_or("");
 
     if activity_type != "message" {
         // Accept but do nothing (conversationUpdate, typing, etc.)
@@ -299,13 +296,17 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [teams] section in config")?;
 
-    let app_password = resolve_secret(teams_config.app_password.as_deref(), teams_config.app_password_env.as_deref(), "Teams app password")
-        .map_err(|e| format!("{}", e))?;
+    let app_password = resolve_secret(
+        teams_config.app_password.as_deref(),
+        teams_config.app_password_env.as_deref(),
+        "Teams app password",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
     let allowlist = teams_config.allowlist.clone();
-    let agent_session = Arc::new(AgentSession::new(model, config_arc, true));
+    let agent_session = Arc::new(AgentSession::new(model, config_arc, true).with_channel("teams"));
 
     let port = teams_config.port.unwrap_or(3978);
 

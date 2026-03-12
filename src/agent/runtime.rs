@@ -78,8 +78,7 @@ impl AgentRuntime for StreamingRuntime {
             match event {
                 Ok(graph_event) => {
                     if let Some(ref renderer) = self.on_messages {
-                        displayed_count =
-                            renderer(&graph_event.state.messages, displayed_count);
+                        displayed_count = renderer(&graph_event.state.messages, displayed_count);
                     }
                     final_messages = graph_event.state.messages;
                 }

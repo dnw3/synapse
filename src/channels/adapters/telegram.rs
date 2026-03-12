@@ -22,13 +22,18 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [telegram] section in config")?;
 
-    let bot_token = resolve_secret(tg_config.bot_token.as_deref(), tg_config.bot_token_env.as_deref(), "Telegram bot token")
-        .map_err(|e| format!("{}", e))?;
+    let bot_token = resolve_secret(
+        tg_config.bot_token.as_deref(),
+        tg_config.bot_token_env.as_deref(),
+        "Telegram bot token",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
     let allowlist = tg_config.allowlist.clone();
-    let agent_session = Arc::new(AgentSession::new(model, config_arc, true));
+    let agent_session =
+        Arc::new(AgentSession::new(model, config_arc, true).with_channel("telegram"));
 
     if !allowlist.is_empty() {
         eprintln!(
@@ -128,9 +133,14 @@ pub async fn run(
                 if let Some(largest) = photos.last() {
                     if let Some(file_id) = largest.get("file_id").and_then(|v| v.as_str()) {
                         // Resolve file_id to a download URL via getFile API
-                        if let Ok(file_url) = resolve_telegram_file(&client, &base_url, file_id).await {
+                        if let Ok(file_url) =
+                            resolve_telegram_file(&client, &base_url, file_id).await
+                        {
                             attachments.push(crate::channels::handler::Attachment {
-                                filename: format!("photo_{}.jpg", file_id.chars().take(8).collect::<String>()),
+                                filename: format!(
+                                    "photo_{}.jpg",
+                                    file_id.chars().take(8).collect::<String>()
+                                ),
                                 url: file_url,
                                 mime_type: Some("image/jpeg".to_string()),
                             });
@@ -167,10 +177,7 @@ pub async fn run(
             }
 
             // Allowlist check
-            if !allowlist.is_allowed(
-                user_id.as_deref(),
-                Some(&chat_id.to_string()),
-            ) {
+            if !allowlist.is_allowed(user_id.as_deref(), Some(&chat_id.to_string())) {
                 continue;
             }
 
@@ -203,7 +210,10 @@ pub async fn run(
                     .send()
                     .await;
 
-                match session.handle_message_with_attachments(&chat_id.to_string(), &text, &attachments).await {
+                match session
+                    .handle_message_with_attachments(&chat_id.to_string(), &text, &attachments)
+                    .await
+                {
                     Ok(reply) => {
                         // Split long replies into chunks
                         let chunks = formatter::chunk_telegram(&reply);

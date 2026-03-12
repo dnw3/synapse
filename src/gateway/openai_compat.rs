@@ -122,15 +122,19 @@ async fn chat_completions(
         // SSE streaming mode
         let chat_request = ChatRequest::new(messages);
         let stream = make_streaming_response(model, chat_request, model_name);
-        Ok(Sse::new(stream).keep_alive(KeepAlive::default()).into_response())
+        Ok(Sse::new(stream)
+            .keep_alive(KeepAlive::default())
+            .into_response())
     } else {
         // Non-streaming mode
         let chat_request = ChatRequest::new(messages);
 
-        let response = model
-            .chat(chat_request)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("model error: {e}")))?;
+        let response = model.chat(chat_request).await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("model error: {e}"),
+            )
+        })?;
 
         let content = response.message.content().to_string();
 
@@ -159,7 +163,8 @@ async fn chat_completions(
                 finish_reason: "stop".to_string(),
             }],
             usage,
-        }).into_response())
+        })
+        .into_response())
     }
 }
 
@@ -241,7 +246,10 @@ fn make_streaming_response(
                         }],
                     };
                     if tx
-                        .send(Event::default().data(serde_json::to_string(&chunk_data).unwrap_or_default()))
+                        .send(
+                            Event::default()
+                                .data(serde_json::to_string(&chunk_data).unwrap_or_default()),
+                        )
                         .await
                         .is_err()
                     {

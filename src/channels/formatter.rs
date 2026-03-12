@@ -39,7 +39,7 @@ pub fn chunk_message(text: &str, max_len: usize) -> Vec<String> {
             let after = &remaining[max_len..];
             if let Some(close_offset) = after.find("\n```") {
                 let full_block_end = max_len + close_offset + 4; // include "\n```"
-                // Skip trailing newline after the closing fence
+                                                                 // Skip trailing newline after the closing fence
                 let end = remaining[full_block_end..]
                     .find('\n')
                     .map(|i| full_block_end + i)
@@ -92,12 +92,7 @@ fn find_open_code_fence(text: &str) -> Option<usize> {
             fence_count += 1;
             if fence_count % 2 == 1 {
                 // This is an opening fence
-                last_open_pos = Some(
-                    text.lines()
-                        .take(i)
-                        .map(|l| l.len() + 1)
-                        .sum::<usize>(),
-                );
+                last_open_pos = Some(text.lines().take(i).map(|l| l.len() + 1).sum::<usize>());
             } else {
                 // This is a closing fence
                 last_open_pos = None;

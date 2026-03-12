@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Heart, User, Palette, Bot, Wrench, Rocket, Clock,
-  FileText, Plus, RotateCcw, Trash2, Save, FilePlus,
+  FileText, Plus, RotateCcw, Trash2, Save, FilePlus, ChevronDown,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
 import { LoadingSpinner, useToast, ToastContainer, useInlineConfirm } from "./shared";
-import type { WorkspaceFileEntry, IdentityInfo } from "../../types/dashboard";
+import type { WorkspaceFileEntry, IdentityInfo, AgentEntry } from "../../types/dashboard";
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   heart: <Heart className="h-4 w-4" />,
@@ -48,6 +48,12 @@ export default function WorkspacePage() {
   const [loading, setLoading] = useState(true);
   const [identity, setIdentity] = useState<IdentityInfo | null>(null);
 
+  // Agent selection for per-agent workspace
+  const [agents, setAgents] = useState<AgentEntry[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<string | undefined>(undefined);
+  const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
   // Editor state
   const [editingFile, setEditingFile] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -58,50 +64,72 @@ export default function WorkspacePage() {
   const [creating, setCreating] = useState(false);
   const [newFilename, setNewFilename] = useState("");
 
+  // Load agents list
+  useEffect(() => {
+    api.fetchAgents().then(data => {
+      if (data) setAgents(data);
+    });
+  }, [api]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setAgentDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const agentParam = selectedAgent === "default" ? undefined : selectedAgent;
+
   const loadFiles = useCallback(async () => {
-    const data = await api.fetchWorkspaceFiles();
+    const data = await api.fetchWorkspaceFiles(agentParam);
     if (data) setFiles(data);
     setLoading(false);
-  }, [api]);
+  }, [api, agentParam]);
 
   const loadIdentity = useCallback(async () => {
-    const data = await api.fetchIdentity();
+    const data = await api.fetchIdentity(agentParam);
     if (data) setIdentity(data);
-  }, [api]);
+  }, [api, agentParam]);
 
   useEffect(() => {
+    setEditingFile(null);
+    setLoading(true);
     loadFiles();
     loadIdentity();
   }, [loadFiles, loadIdentity]);
 
   const openEditor = useCallback(async (filename: string) => {
-    const data = await api.fetchWorkspaceFile(filename);
+    const data = await api.fetchWorkspaceFile(filename, agentParam);
     if (data) {
       setEditingFile(filename);
       setEditContent(data.content);
       setOriginalContent(data.content);
     }
-  }, [api]);
+  }, [api, agentParam]);
 
   const handleCreateFromTemplate = useCallback(async (filename: string) => {
     const tmpl = files.find(f => f.filename === filename && f.is_template);
     if (!tmpl) return;
-    const result = await api.resetWorkspaceFile(filename);
+    const result = await api.resetWorkspaceFile(filename, agentParam);
     if (result?.ok) {
       toast.addToast(t("workspace.created", { name: filename }), "success");
       await loadFiles();
       await loadIdentity();
       openEditor(filename);
     }
-  }, [api, files, loadFiles, loadIdentity, openEditor, toast, t]);
+  }, [api, agentParam, files, loadFiles, loadIdentity, openEditor, toast, t]);
 
   const handleSave = useCallback(async () => {
     if (!editingFile) return;
     setSaving(true);
     const fileExists = files.find(f => f.filename === editingFile)?.exists;
     const result = fileExists
-      ? await api.saveWorkspaceFile(editingFile, editContent)
-      : await api.createWorkspaceFile(editingFile, editContent);
+      ? await api.saveWorkspaceFile(editingFile, editContent, agentParam)
+      : await api.createWorkspaceFile(editingFile, editContent, agentParam);
     setSaving(false);
     if (result?.ok) {
       toast.addToast(t("workspace.saved"), "success");
@@ -111,14 +139,14 @@ export default function WorkspacePage() {
     } else {
       toast.addToast(t("workspace.saveFailed"), "error");
     }
-  }, [editingFile, editContent, files, api, loadFiles, loadIdentity, toast, t]);
+  }, [editingFile, editContent, files, api, agentParam, loadFiles, loadIdentity, toast, t]);
 
   const handleReset = useCallback(async () => {
     if (!editingFile) return;
-    const result = await api.resetWorkspaceFile(editingFile);
+    const result = await api.resetWorkspaceFile(editingFile, agentParam);
     if (result?.ok) {
       toast.addToast(t("workspace.resetDone"), "success");
-      const data = await api.fetchWorkspaceFile(editingFile);
+      const data = await api.fetchWorkspaceFile(editingFile, agentParam);
       if (data) {
         setEditContent(data.content);
         setOriginalContent(data.content);
@@ -126,12 +154,12 @@ export default function WorkspacePage() {
       await loadFiles();
       await loadIdentity();
     }
-  }, [editingFile, api, loadFiles, loadIdentity, toast, t]);
+  }, [editingFile, api, agentParam, loadFiles, loadIdentity, toast, t]);
 
   const deleteConfirm = useInlineConfirm();
   const handleDelete = useCallback(async () => {
     if (!editingFile) return;
-    const ok = await api.deleteWorkspaceFile(editingFile);
+    const ok = await api.deleteWorkspaceFile(editingFile, agentParam);
     if (ok) {
       toast.addToast(t("workspace.deleted"), "success");
       setEditingFile(null);
@@ -139,12 +167,12 @@ export default function WorkspacePage() {
       await loadFiles();
       await loadIdentity();
     }
-  }, [editingFile, api, loadFiles, loadIdentity, toast, t, deleteConfirm]);
+  }, [editingFile, api, agentParam, loadFiles, loadIdentity, toast, t, deleteConfirm]);
 
   const handleCreateNew = useCallback(async () => {
     const fname = newFilename.endsWith(".md") ? newFilename : `${newFilename}.md`;
     if (!fname || fname === ".md") return;
-    const result = await api.createWorkspaceFile(fname, `# ${fname.replace(".md", "")}\n\n`);
+    const result = await api.createWorkspaceFile(fname, `# ${fname.replace(".md", "")}\n\n`, agentParam);
     if (result?.ok) {
       toast.addToast(t("workspace.created", { name: fname }), "success");
       setCreating(false);
@@ -154,7 +182,7 @@ export default function WorkspacePage() {
     } else {
       toast.addToast(t("workspace.createFailed"), "error");
     }
-  }, [newFilename, api, loadFiles, openEditor, toast, t]);
+  }, [newFilename, api, agentParam, loadFiles, openEditor, toast, t]);
 
   // Group files by category
   const grouped = CATEGORY_ORDER
@@ -187,13 +215,56 @@ export default function WorkspacePage() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => setCreating(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:opacity-90 transition-opacity"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          {t("workspace.newFile")}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Agent selector */}
+          {agents.length > 1 && (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setAgentDropdownOpen(!agentDropdownOpen)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <Bot className="h-3.5 w-3.5" />
+                {selectedAgent || "default"}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {agentDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] shadow-[var(--shadow-lg)] py-1">
+                  {agents.map(agent => (
+                    <button
+                      key={agent.name}
+                      onClick={() => {
+                        setSelectedAgent(agent.name === "default" ? undefined : agent.name);
+                        setAgentDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-hover)] transition-colors",
+                        (selectedAgent || "default") === agent.name
+                          ? "text-[var(--accent)] font-medium"
+                          : "text-[var(--text-secondary)]"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{agent.name}</span>
+                        {agent.is_default && (
+                          <span className="text-[10px] text-[var(--text-tertiary)]">
+                            {t("agents.default")}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:opacity-90 transition-opacity"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t("workspace.newFile")}
+          </button>
+        </div>
       </div>
 
       {/* Identity preview bar */}

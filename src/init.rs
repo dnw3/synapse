@@ -65,9 +65,9 @@ pub async fn run_init() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     // Check if config already exists
-    let config_path = Path::new("synaptic.toml");
+    let config_path = Path::new("synapse.toml");
     if config_path.exists() {
-        println!("{} synaptic.toml already exists.", "note:".yellow().bold());
+        println!("{} synapse.toml already exists.", "note:".yellow().bold());
         if !confirm("Overwrite existing config?")? {
             println!("{}", "Aborted.".dimmed());
             return Ok(());
@@ -172,7 +172,7 @@ memory_file = "AGENTS.md"
     println!(
         "{} Config written to {}",
         "done:".green().bold(),
-        "synaptic.toml".cyan()
+        "synapse.toml".cyan()
     );
     println!();
 
@@ -228,11 +228,11 @@ memory_file = "AGENTS.md"
 "#,
     );
 
-    std::fs::write("synaptic.toml", &config)?;
+    std::fs::write("synapse.toml", &config)?;
     println!(
         "{} Config written to {}",
         "done:".green().bold(),
-        "synaptic.toml".cyan()
+        "synapse.toml".cyan()
     );
 
     Ok(())

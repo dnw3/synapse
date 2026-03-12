@@ -23,15 +23,23 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [slack] section in config")?;
 
-    let app_token = resolve_secret(slack_config.app_token.as_deref(), slack_config.app_token_env.as_deref(), "Slack app token")
-        .map_err(|e| format!("{}", e))?;
-    let bot_token = resolve_secret(slack_config.bot_token.as_deref(), slack_config.bot_token_env.as_deref(), "Slack bot token")
-        .map_err(|e| format!("{}", e))?;
+    let app_token = resolve_secret(
+        slack_config.app_token.as_deref(),
+        slack_config.app_token_env.as_deref(),
+        "Slack app token",
+    )
+    .map_err(|e| format!("{}", e))?;
+    let bot_token = resolve_secret(
+        slack_config.bot_token.as_deref(),
+        slack_config.bot_token_env.as_deref(),
+        "Slack bot token",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
     let allowlist = slack_config.allowlist.clone();
-    let agent_session = Arc::new(AgentSession::new(model, config_arc, true));
+    let agent_session = Arc::new(AgentSession::new(model, config_arc, true).with_channel("slack"));
 
     if !allowlist.is_empty() {
         tracing::info!(
@@ -147,10 +155,7 @@ async fn run_socket_mode(
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        let user_id = event
-            .get("user")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let user_id = event.get("user").and_then(|v| v.as_str()).unwrap_or("");
 
         let ts = event
             .get("ts")

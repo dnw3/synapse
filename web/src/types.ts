@@ -14,6 +14,7 @@ export interface Message {
   content: string;
   tool_calls: ToolCall[];
   request_id?: string;
+  reasoning?: string;
 }
 
 export interface FileEntry {
@@ -30,6 +31,7 @@ export interface FileContent {
 // WebSocket events from server
 export type WsEvent =
   | { type: "token"; content: string }
+  | { type: "reasoning"; content: string }
   | { type: "tool_call"; name: string; args: Record<string, unknown> }
   | { type: "tool_result"; name: string; content: string }
   | { type: "status"; state: "thinking" | "executing" | "idle" | "cancelled" | "pong"; request_id?: string }

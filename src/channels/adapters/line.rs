@@ -281,12 +281,7 @@ async fn handle_webhook(
                 }
                 Err(e) => {
                     tracing::error!(channel = "line", error = %e, "handler error");
-                    send_reply(
-                        &channel_token,
-                        &reply_token,
-                        &format!("Error: {}", e),
-                    )
-                    .await;
+                    send_reply(&channel_token, &reply_token, &format!("Error: {}", e)).await;
                 }
             }
         });
@@ -305,11 +300,19 @@ pub async fn run(
         .as_ref()
         .ok_or("missing [line] section in config")?;
 
-    let channel_secret = resolve_secret(line_config.channel_secret.as_deref(), line_config.channel_secret_env.as_deref(), "LINE channel secret")
-        .map_err(|e| format!("{}", e))?;
+    let channel_secret = resolve_secret(
+        line_config.channel_secret.as_deref(),
+        line_config.channel_secret_env.as_deref(),
+        "LINE channel secret",
+    )
+    .map_err(|e| format!("{}", e))?;
 
-    let channel_token = resolve_secret(line_config.channel_token.as_deref(), line_config.channel_token_env.as_deref(), "LINE channel token")
-        .map_err(|e| format!("{}", e))?;
+    let channel_token = resolve_secret(
+        line_config.channel_token.as_deref(),
+        line_config.channel_token_env.as_deref(),
+        "LINE channel token",
+    )
+    .map_err(|e| format!("{}", e))?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

@@ -56,10 +56,7 @@ impl Tool for MemorySearchTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| SynapticError::Tool("missing required parameter 'query'".into()))?;
 
-        let limit = args
-            .get("limit")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(5) as usize;
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
 
         tracing::debug!("memory search");
 

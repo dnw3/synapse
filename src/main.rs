@@ -1,18 +1,18 @@
-mod agent;
 #[cfg(feature = "web")]
 mod acp;
+mod agent;
 #[cfg(feature = "broadcast")]
 mod broadcast;
 mod cli;
 mod commands;
 mod config;
 mod display;
-mod heartbeat;
 mod doctor;
+mod heartbeat;
 mod hooks;
 mod hub;
-mod logging;
 mod init;
+mod logging;
 mod memory;
 mod notify;
 mod plugin;
@@ -108,10 +108,12 @@ async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
 
     // Clean up old log files on startup
     if config.logging.file.enabled {
-        let log_dir = std::path::PathBuf::from(
-            logging::expand_log_path(&config.logging.file.path),
+        let log_dir = std::path::PathBuf::from(logging::expand_log_path(&config.logging.file.path));
+        logging::cleanup_old_logs(
+            &log_dir,
+            config.logging.file.max_days,
+            config.logging.file.max_files,
         );
-        logging::cleanup_old_logs(&log_dir, config.logging.file.max_days, config.logging.file.max_files);
     }
 
     // Start scheduler if configured (runs in background)
@@ -179,8 +181,8 @@ async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(feature = "web")]
         Some(Command::Serve { host, port }) => {
             // Initialize workspace templates if needed
-            let cwd = std::env::current_dir().unwrap_or_default();
-            agent::workspace::initialize_workspace(&cwd);
+            let workspace_dir = config.workspace_dir();
+            agent::workspace::initialize_workspace(&workspace_dir);
 
             let host = host
                 .or_else(|| config.serve.as_ref().and_then(|s| s.host.clone()))
@@ -188,7 +190,8 @@ async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             let port = port
                 .or_else(|| config.serve.as_ref().and_then(|s| s.port))
                 .unwrap_or(3000);
-            gateway::run_server_with_log_buffer(&config, &host, port, Some(log_buffer.clone())).await
+            gateway::run_server_with_log_buffer(&config, &host, port, Some(log_buffer.clone()))
+                .await
         }
         #[cfg(any(
             feature = "bot-lark",
@@ -286,10 +289,15 @@ async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 "stdio" => acp::stdio::run_stdio(&config, model).await,
                 "http" => {
                     // Mount ACP routes on the gateway server
-                    tracing::info!(port = port, "ACP HTTP mode: use `synapse serve` with ACP routes enabled");
+                    tracing::info!(
+                        port = port,
+                        "ACP HTTP mode: use `synapse serve` with ACP routes enabled"
+                    );
                     Ok(())
                 }
-                _ => Err(format!("unknown ACP transport: '{}'. Use: stdio, http", transport).into()),
+                _ => {
+                    Err(format!("unknown ACP transport: '{}'. Use: stdio, http", transport).into())
+                }
             }
         }
         Some(Command::Models { action, name }) => {
@@ -300,7 +308,16 @@ async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             name,
             input,
             data,
-        }) => workflow::run_workflow_command(&config, &action, name.as_deref(), input.as_deref(), data.as_deref()).await,
+        }) => {
+            workflow::run_workflow_command(
+                &config,
+                &action,
+                name.as_deref(),
+                input.as_deref(),
+                data.as_deref(),
+            )
+            .await
+        }
         None => {
             // Backward compat: bare `synapse` or `synapse "message"` → chat mode
             run_chat(
@@ -327,7 +344,10 @@ async fn run_chat(
 
     // Long-term memory
     let sessions_dir = PathBuf::from(&config.base.paths.sessions_dir);
-    let ltm = Arc::new(memory::LongTermMemory::new(sessions_dir.join("long_term_memory"), config.memory.clone()));
+    let ltm = Arc::new(memory::LongTermMemory::new(
+        sessions_dir.join("long_term_memory"),
+        config.memory.clone(),
+    ));
     ltm.load().await.ok();
 
     // Resolve or create session
@@ -357,7 +377,8 @@ async fn run_chat(
         .clone()
         .unwrap_or_else(|| "You are Synapse, a helpful AI assistant.".to_string());
 
-    let project_context = agent::load_project_context(&cwd, &config.context);
+    let workspace_dir = config.workspace_dir();
+    let project_context = agent::load_project_context(&workspace_dir, &cwd, &config.context);
     if !project_context.is_empty() {
         system_prompt.push_str("\n\n# Project Context\n\n");
         system_prompt.push_str(&project_context);
@@ -394,10 +415,8 @@ async fn run_memory_command(
     limit: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sessions_dir = PathBuf::from(&config.base.paths.sessions_dir);
-    let ltm = memory::LongTermMemory::new(
-        sessions_dir.join("long_term_memory"),
-        config.memory.clone(),
-    );
+    let ltm =
+        memory::LongTermMemory::new(sessions_dir.join("long_term_memory"), config.memory.clone());
     ltm.load().await.ok();
 
     match action {
@@ -405,16 +424,18 @@ async fn run_memory_command(
             let count = ltm.count().await;
             let has_embeddings = ltm.uses_embeddings();
             let db_path = sessions_dir.join("long_term_memory").join("vectors.db");
-            let db_size = std::fs::metadata(&db_path)
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
 
             println!("{}", "--- Memory Status ---".bold());
             println!("  {} {}", "Entries:".bold(), count);
             println!(
                 "  {} {}",
                 "Embeddings:".bold(),
-                if has_embeddings { "active" } else { "disabled (fake)" }
+                if has_embeddings {
+                    "active"
+                } else {
+                    "disabled (fake)"
+                }
             );
             println!(
                 "  {} {}",
@@ -506,11 +527,7 @@ async fn run_memory_command(
         }
         "clear" => {
             let count = ltm.clear_all().await?;
-            println!(
-                "{} Cleared {} memories",
-                "memory:".green().bold(),
-                count
-            );
+            println!("{} Cleared {} memories", "memory:".green().bold(), count);
         }
         _ => {
             tracing::error!(action = %action, "Unknown memory action. Available: status, list, search, clear");

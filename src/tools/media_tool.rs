@@ -99,8 +99,7 @@ impl Tool for AnalyzeImageTool {
                 .map_err(|e| SynapticError::Tool(format!("Cannot read file: {}", e)))?;
             let mime = detect_mime(&path_clone);
             use base64::Engine as _;
-            let encoded =
-                base64::engine::general_purpose::STANDARD.encode(&bytes);
+            let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
             Ok::<_, SynapticError>((encoded, mime))
         })
         .await
@@ -118,11 +117,7 @@ impl Tool for AnalyzeImageTool {
 
 /// Detect MIME type from the file extension.
 fn detect_mime(path: &Path) -> &'static str {
-    match path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-    {
+    match path.extension().and_then(|e| e.to_str()).unwrap_or("") {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",

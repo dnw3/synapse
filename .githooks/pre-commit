@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Auto-format Rust code before commit
+# Install: git config core.hooksPath .githooks
+
+set -e
+
+# Only run if there are staged .rs files
+if git diff --cached --name-only --diff-filter=ACM | grep -q '\.rs$'; then
+    cargo fmt --all -- --check 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo "Running cargo fmt..."
+        cargo fmt --all
+        echo "Code formatted. Please review and re-stage the changes."
+        exit 1
+    fi
+fi

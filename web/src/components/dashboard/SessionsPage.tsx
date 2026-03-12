@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { MessageSquare, ChevronDown, ChevronRight, Trash2, Pencil, PackageMinus, Search, Filter, Clock } from "lucide-react";
+import { MessageSquare, ChevronDown, ChevronRight, Trash2, Pencil, PackageMinus, Search, Filter, Clock, ExternalLink } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
 import type { SessionEntry } from "../../types/dashboard";
@@ -24,10 +24,13 @@ type SortOrder = "asc" | "desc";
 
 const PAGE_LIMIT = 50;
 
-const THINKING_OPTIONS = ["off", "minimal", "low", "medium", "high"] as const;
-const VERBOSE_OPTIONS = ["inherit", "off", "on", "full"] as const;
+const THINKING_OPTIONS = ["off", "low", "medium", "high", "adaptive"] as const;
 
-export default function SessionsPage() {
+interface SessionsPageProps {
+  onNavigateToChat?: (conversationId: string) => void;
+}
+
+export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
   const { t, i18n } = useTranslation();
   const api = useDashboardAPI();
 
@@ -164,18 +167,6 @@ export default function SessionsPage() {
         prev.map((s) => (s.id === id ? { ...s, thinking_level: value } : s))
       );
       addToast(t("sessions.thinkingUpdated"), "success");
-    } else {
-      addToast(t("sessions.updateFailed"), "error");
-    }
-  };
-
-  const handleVerboseChange = async (id: string, value: string) => {
-    const result = await api.patchSessionOverrides(id, { verbose: value });
-    if (result) {
-      setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, verbose_level: value } : s))
-      );
-      addToast(t("sessions.verboseUpdated"), "success");
     } else {
       addToast(t("sessions.updateFailed"), "error");
     }
@@ -411,16 +402,13 @@ export default function SessionsPage() {
                     <th className="w-6 px-1 py-2.5 border-b border-[var(--border-subtle)]" />
                     <SortHeader field="id" label="ID" />
                     <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
-                      {t("sessions.label")}
+                      {t("sessions.title")}
                     </th>
                     <SortHeader field="created_at" label={t("sessions.created")} />
                     <SortHeader field="message_count" label={t("sessions.messages")} align="right" />
                     <SortHeader field="token_count" label="Tokens" align="right" />
                     <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
                       Thinking
-                    </th>
-                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
-                      Verbose
                     </th>
                     <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)] text-right">
                       {t("sessions.actions")}
@@ -476,8 +464,8 @@ export default function SessionsPage() {
                           )}
                         </td>
 
-                        {/* Label (inline editable) */}
-                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
+                        {/* Title / Label — click to navigate to chat */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] max-w-[200px]">
                           {editingLabelId === session.id ? (
                             <input
                               ref={labelEditRef}
@@ -490,20 +478,31 @@ export default function SessionsPage() {
                                 if (e.key === "Escape") setEditingLabelId(null);
                               }}
                               placeholder={t("sessions.enterLabel")}
-                              className="px-1.5 py-0.5 text-[12px] bg-[var(--bg-surface)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-28"
+                              className="px-1.5 py-0.5 text-[12px] bg-[var(--bg-surface)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-40"
                             />
                           ) : (
                             <span
-                              onClick={() => startLabelEdit(session)}
-                              className="text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-1 group"
-                              title={t("sessions.clickToEditLabel")}
+                              onClick={() => onNavigateToChat?.(session.id)}
+                              className={cn(
+                                "text-[var(--text-secondary)] inline-flex items-center gap-1 group truncate",
+                                onNavigateToChat
+                                  ? "cursor-pointer hover:text-[var(--accent)] transition-colors"
+                                  : "cursor-default"
+                              )}
+                              title={session.label || session.title || session.id}
                             >
-                              {session.label || (
+                              {session.label ? (
+                                <span className="font-medium">{session.label}</span>
+                              ) : session.title ? (
+                                <span className="truncate">{session.title}</span>
+                              ) : (
                                 <span className="text-[var(--text-tertiary)] italic text-[11px]">
                                   {t("sessions.noLabel")}
                                 </span>
                               )}
-                              <Pencil className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 transition-opacity" />
+                              {onNavigateToChat && (
+                                <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
+                              )}
                             </span>
                           )}
                         </td>
@@ -529,15 +528,6 @@ export default function SessionsPage() {
                             value={session.thinking_level ?? "off"}
                             options={THINKING_OPTIONS}
                             onChange={(v) => handleThinkingChange(session.id, v)}
-                          />
-                        </td>
-
-                        {/* Verbose */}
-                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
-                          <InlineSelect
-                            value={session.verbose_level ?? "inherit"}
-                            options={VERBOSE_OPTIONS}
-                            onChange={(v) => handleVerboseChange(session.id, v)}
                           />
                         </td>
 
@@ -589,7 +579,7 @@ export default function SessionsPage() {
                       {expandedId === session.id && (
                         <tr key={`${session.id}-detail`}>
                           <td
-                            colSpan={9}
+                            colSpan={8}
                             className="px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]"
                           >
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px]">

@@ -1,7 +1,7 @@
 pub mod adapters;
+pub mod dedup;
 pub mod formatter;
 pub mod handler;
-pub mod dedup;
 pub mod reactions;
 
 use crate::config::SynapseConfig;

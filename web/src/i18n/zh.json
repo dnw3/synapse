@@ -7,13 +7,16 @@
   },
   "sidebar": {
     "chats": "会话",
+    "conversations": "会话列表",
     "newChat": "新建会话",
     "noConversations": "暂无会话",
     "messages": "{{count}} 条消息",
     "noMessages": "刚刚创建",
     "deleteConfirm": "确认删除该会话？",
     "collapse": "收起侧栏",
-    "expand": "展开侧栏"
+    "expand": "展开侧栏",
+    "search": "搜索...",
+    "brand": "Synapse"
   },
   "chat": {
     "placeholder": "输入消息... (Enter 发送, Shift+Enter 换行)",

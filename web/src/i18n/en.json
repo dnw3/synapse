@@ -7,13 +7,16 @@
   },
   "sidebar": {
     "chats": "Chats",
+    "conversations": "CONVERSATIONS",
     "newChat": "New Chat",
     "noConversations": "No conversations yet",
     "messages": "{{count}} msgs",
     "noMessages": "Just created",
     "deleteConfirm": "Delete this conversation?",
     "collapse": "Collapse sidebar",
-    "expand": "Expand sidebar"
+    "expand": "Expand sidebar",
+    "search": "Search...",
+    "brand": "Synapse"
   },
   "chat": {
     "placeholder": "Send a message... (Enter to send, Shift+Enter for newline)",

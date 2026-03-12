@@ -1,33 +1,30 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Globe, PanelRightClose, PanelRightOpen,
-  Sun, Moon, Monitor, Menu, X,
-  MessageSquare as ChatIcon,
+  PanelRightClose, PanelRightOpen,
 } from "lucide-react";
 import { useConversation } from "./hooks/useConversation";
 import { useFiles } from "./hooks/useFiles";
 import { useGatewayWS } from "./hooks/useGatewayWS";
 import { useTheme } from "./hooks/useTheme";
 import { Button } from "./components/ui/button";
+import { SegmentedControl } from "./components/ui/segmented-control";
+import { Toaster, useToast } from "./components/ui/toast";
 import Sidebar from "./components/Sidebar";
+import Toolbar from "./components/Toolbar";
 import ChatPanel from "./components/ChatPanel";
 import FileTree from "./components/FileTree";
 import FileViewer from "./components/FileViewer";
 import Canvas from "./components/Canvas";
-import StatusBar from "./components/StatusBar";
 import Dashboard, { TABS, SIDEBAR_SECTIONS, type TabKey } from "./components/Dashboard";
 import type { Message, FileAttachment } from "./types";
 import type { CanvasBlock } from "./types/canvas";
 import type { IdentityInfo } from "./types/dashboard";
 import { CANVAS_OPEN_RE, CANVAS_CLOSE } from "./types/canvas";
-import { cn } from "./lib/cn";
 
 // Identity context for child components (e.g. MessageBubble)
 export const IdentityContext = createContext<IdentityInfo | null>(null);
 export const useIdentity = () => useContext(IdentityContext);
-
-const MODE_ICONS = { light: Sun, dark: Moon, system: Monitor } as const;
 
 // ---------------------------------------------------------------------------
 // Canvas helpers
@@ -103,14 +100,14 @@ type RightTab = "files" | "viewer" | "canvas";
 
 export default function App() {
   const { t, i18n } = useTranslation();
-  const isZh = i18n.language?.startsWith("zh");
   const conv = useConversation();
   const files = useFiles(".");
   const ws = useGatewayWS(conv.activeId);
   const theme = useTheme();
+  const { toast } = useToast();
   const [rightPanel, setRightPanel] = useState<RightTab>("files");
   const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [rightWidth, setRightWidth] = useState(360);
+  const [rightWidth, setRightWidth] = useState(260);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeView, setActiveView] = useState<ViewKey>("chat");
   const [identity, setIdentity] = useState<IdentityInfo | null>(null);
@@ -142,7 +139,7 @@ export default function App() {
     const onMove = (ev: MouseEvent) => {
       if (!draggingRef.current) return;
       const delta = startX - ev.clientX;
-      setRightWidth(Math.max(220, Math.min(700, startW + delta)));
+      setRightWidth(Math.max(220, Math.min(500, startW + delta)));
     };
     const onUp = () => {
       draggingRef.current = false;
@@ -182,8 +179,6 @@ export default function App() {
     Array<{ id: string; type: string; content: string; language?: string; timestamp: number }>
   >([]);
 
-  const [notification, setNotification] = useState<string | null>(null);
-
   // ── Request ID (LogID) tracking ──────────────────────────────────────
   // Captured from WS status events for streaming display.
   // Historical messages get request_id from the backend (stored in additional_kwargs).
@@ -199,9 +194,12 @@ export default function App() {
     }
 
     if (lastEvent.type === "subagent_complete") {
-      const msg = `Task ${lastEvent.task_id}: ${lastEvent.summary}`;
-      setNotification(msg);
-      setTimeout(() => setNotification(null), 5000);
+      toast({
+        variant: "info",
+        title: `Task ${lastEvent.task_id}`,
+        description: lastEvent.summary,
+        duration: 5000,
+      });
     }
 
     if (lastEvent.type === "canvas_update") {
@@ -414,8 +412,6 @@ export default function App() {
   const parsedBlocks = parseCanvasBlocks(allMessages);
   const allCanvasBlocks = [...parsedBlocks, ...extraBlocks];
 
-  const ModeIcon = MODE_ICONS[theme.mode];
-
   const RIGHT_TABS: { key: RightTab; label: string }[] = [
     { key: "files", label: t("files.title") },
     { key: "viewer", label: t("files.viewer") },
@@ -424,161 +420,70 @@ export default function App() {
 
   const isChatView = activeView === "chat";
 
+  // Toolbar title/subtitle computation
+  const toolbarTitle = isChatView
+    ? (conv.titles[conv.activeId ?? ""] || t("chat.newChat"))
+    : t(TABS.find((tb) => tb.key === activeView)?.i18nKey ?? "app.title");
+  const toolbarSubtitle = isChatView ? `${allMessages.length} msgs` : undefined;
+  const toolbarModel = isChatView ? "claude-3.5-sonnet" : undefined;
+  const toolbarStatus = (!["idle", "pong"].includes(ws.status)) ? t(`status.${ws.status}`) : undefined;
+
   return (
     <IdentityContext.Provider value={identity}>
-    <div className="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      {/* ── Header ─────────────────────────────────── */}
-      <header className="flex items-center justify-between px-3 sm:px-5 h-12 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/80 backdrop-blur-md flex-shrink-0">
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Mobile hamburger */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-[var(--radius-sm)]"
-          >
-            {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
-          {identity?.avatar_url ? (
-            <img src={identity.avatar_url} alt="" className="w-7 h-7 rounded-lg object-cover shadow-[0_2px_8px_var(--accent-glow)]" />
-          ) : identity?.emoji ? (
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--accent)] to-[var(--accent-gradient-end)] flex items-center justify-center text-sm shadow-[0_2px_8px_var(--accent-glow)]">
-              {identity.emoji}
-            </div>
-          ) : (
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--accent)] to-[var(--accent-gradient-end)] flex items-center justify-center text-white font-semibold text-xs shadow-[0_2px_8px_var(--accent-glow)]">
-              S
-            </div>
-          )}
-          <h1 className="text-[15px] font-semibold tracking-[-0.01em]">{identity?.name || t("app.title")}</h1>
-          <span className="text-xs text-[var(--text-tertiary)] hidden sm:inline">{t("app.subtitle")}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Theme mode toggle */}
-          <Button variant="ghost" size="icon" onClick={theme.cycleMode} title={t("settings.theme")} className="h-8 w-8">
-            <ModeIcon className="h-3.5 w-3.5" />
-          </Button>
+    <div className="flex h-screen bg-[var(--bg-window)] text-[var(--text-primary)]">
+      {/* Mobile backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
 
-          {/* Language toggle */}
-          <Button variant="ghost" size="icon" onClick={toggleLanguage} title={t("settings.language")} className="h-8 w-8">
-            <Globe className="h-3.5 w-3.5" />
-          </Button>
+      {/* Unified Sidebar */}
+      <Sidebar
+        conversations={conv.conversations}
+        activeConversationId={conv.activeId}
+        titles={conv.titles}
+        onSelectConversation={(id) => { conv.setActiveId(id); setMobileMenuOpen(false); }}
+        onNewConversation={() => { conv.createConversation(); setMobileMenuOpen(false); }}
+        onDeleteConversation={conv.deleteConversation}
+        activeView={activeView}
+        onViewChange={(v) => { setActiveView(v as ViewKey); setMobileMenuOpen(false); }}
+        tabs={TABS}
+        sidebarSections={SIDEBAR_SECTIONS}
+        identity={identity}
+        themeMode={theme.mode}
+        onCycleTheme={theme.cycleMode}
+        onToggleLanguage={toggleLanguage}
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+      />
 
-          {/* Connection status badge — only in chat view (Dashboard has its own health check) */}
-          {isChatView && (
-            <div className={cn(
-              "hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border",
-              ws.connected
-                ? "bg-[var(--success)]/8 text-[var(--success)] border-[var(--success)]/20"
-                : "bg-[var(--text-tertiary)]/8 text-[var(--text-tertiary)] border-[var(--text-tertiary)]/20"
-            )}>
-              <span className={cn(
-                "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                ws.connected ? "bg-[var(--success)]" : "bg-[var(--text-tertiary)]"
-              )} />
-              {ws.connected ? t("app.connected") : t("app.disconnected")}
-            </div>
-          )}
-          {isChatView && !["idle", "pong"].includes(ws.status) && (
-            <span className="px-2 py-0.5 text-[10px] font-medium bg-[var(--accent-glow)] text-[var(--accent-light)] border border-[var(--accent)]/20 rounded-full animate-pulse-glow">
-              {t(`status.${ws.status}`)}
-            </span>
-          )}
-        </div>
-      </header>
+      {/* Main content */}
+      <main className="flex-1 flex flex-col min-w-0">
+        <Toolbar
+          title={toolbarTitle}
+          subtitle={toolbarSubtitle}
+          modelBadge={toolbarModel}
+          connected={ws.connected}
+          status={toolbarStatus}
+          onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          showMenu={true}
+          actions={isChatView ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setRightCollapsed(!rightCollapsed)}
+              className="hidden md:flex"
+            >
+              {rightCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
+            </Button>
+          ) : undefined}
+        />
 
-      {/* ── Body: Unified Sidebar + Main Content ─── */}
-      <div className="flex flex-1 overflow-hidden relative">
-
-        {/* Mobile sidebar overlay */}
-        {mobileMenuOpen && (
-          <div
-            className="fixed inset-0 z-40 bg-black/50 md:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
-
-        {/* ── Unified Left Sidebar (OpenClaw-style) ── */}
-        <aside className={cn(
-          "flex flex-col h-full w-[220px] bg-[var(--bg-elevated)] border-r border-[var(--border-subtle)] flex-shrink-0",
-          // Mobile: fixed overlay
-          "fixed inset-y-12 left-0 z-50 md:relative md:inset-auto",
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        )}>
-          <nav className="flex-1 py-2 px-2 overflow-y-auto">
-            {/* ── 聊天 Section ── */}
-            <div>
-              <div className="flex items-center justify-between px-3 mb-1">
-                <span className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
-                  {t("dashboard.chat")}
-                </span>
-                <span className="text-[var(--text-tertiary)] text-[10px]">–</span>
-              </div>
-              <button
-                onClick={() => { setActiveView("chat"); setMobileMenuOpen(false); }}
-                className={cn(
-                  "relative flex items-center gap-2.5 w-full rounded-[var(--radius-md)] text-[13px] font-medium transition-all duration-150 cursor-pointer px-3 py-2",
-                  isChatView
-                    ? "bg-[var(--accent)]/10 text-[var(--accent)]"
-                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                )}
-              >
-                <ChatIcon className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate">{t("dashboard.chat")}</span>
-              </button>
-            </div>
-
-            {/* ── Dashboard Sections ── */}
-            {SIDEBAR_SECTIONS.map((section, si) => (
-              <div key={si} className="mt-4">
-                <div className="flex items-center justify-between px-3 mb-1">
-                  <span className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
-                    {t(section.i18nKey)}
-                  </span>
-                  <span className="text-[var(--text-tertiary)] text-[10px]">–</span>
-                </div>
-                <div className="space-y-0.5">
-                  {section.keys.map((key) => {
-                    const tab = TABS.find((t) => t.key === key);
-                    if (!tab) return null;
-                    const isActive = activeView === key;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => { setActiveView(key); setMobileMenuOpen(false); }}
-                        className={cn(
-                          "relative flex items-center gap-2.5 w-full rounded-[var(--radius-md)] text-[13px] font-medium transition-all duration-150 cursor-pointer px-3 py-2",
-                          isActive
-                            ? "bg-[var(--accent)]/10 text-[var(--accent)]"
-                            : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
-                        )}
-                      >
-                        <span className="flex-shrink-0">{tab.icon}</span>
-                        <span className="truncate">{t(tab.i18nKey)}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </nav>
-        </aside>
-
-        {/* ── Main Content Area ─────────────────────── */}
-        {isChatView ? (
-          <>
-            {/* Chat: Conversation sidebar + Chat panel + Right panel */}
-            <div className="flex flex-1 min-w-0 overflow-hidden">
-              {/* Conversation list sidebar */}
-              <Sidebar
-                conversations={conv.conversations}
-                activeId={conv.activeId}
-                titles={conv.titles}
-                collapsed={false}
-                onToggle={() => {}}
-                onSelect={(id) => { conv.setActiveId(id); setMobileMenuOpen(false); }}
-                onCreate={() => { conv.createConversation(); setMobileMenuOpen(false); }}
-                onDelete={conv.deleteConversation}
-              />
-
+        <div className="flex-1 flex overflow-hidden">
+          {isChatView ? (
+            <>
               {/* Chat panel */}
               <div className="flex-1 flex flex-col min-w-0 min-h-0">
                 <ChatPanel
@@ -603,51 +508,33 @@ export default function App() {
                 />
               </div>
 
-              {/* Resize handle + collapse toggle */}
-              <div className="hidden md:flex flex-col flex-shrink-0 border-l border-[var(--border-subtle)]">
-                <button
-                  onClick={() => setRightCollapsed(!rightCollapsed)}
-                  className="flex items-center justify-center h-12 w-5 hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
-                  title={rightCollapsed ? t("files.expand") : t("files.collapse")}
-                >
-                  {rightCollapsed ? <PanelRightOpen className="h-3.5 w-3.5" /> : <PanelRightClose className="h-3.5 w-3.5" />}
-                </button>
-                {!rightCollapsed && (
+              {/* Resize handle */}
+              {!rightCollapsed && (
+                <div className="hidden md:flex flex-shrink-0 items-center">
                   <div
                     onMouseDown={onResizeStart}
-                    className="flex-1 w-5 cursor-col-resize group flex items-center justify-center"
+                    className="w-[5px] h-full cursor-col-resize group flex items-center justify-center"
                   >
-                    <div className="w-[2px] h-8 rounded-full bg-[var(--border-subtle)] group-hover:bg-[var(--accent)]/40 transition-colors" />
+                    <div className="w-[1px] h-8 rounded-full bg-[var(--separator)] group-hover:bg-[var(--accent)]/40 transition-colors" />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* Right panel: Files / Viewer / Canvas */}
+              {/* Right panel */}
               {!rightCollapsed && (
-                <div className="hidden md:flex flex-col bg-[var(--bg-elevated)]/50 flex-shrink-0" style={{ width: rightWidth }}>
-                  <div className="flex h-10 border-b border-[var(--border-subtle)]">
-                    {RIGHT_TABS.map((tab) => (
-                      <button
-                        key={tab.key}
-                        onClick={() => setRightPanel(tab.key)}
-                        className={cn(
-                          "flex-1 text-xs font-medium transition-colors relative flex items-center justify-center gap-1",
-                          rightPanel === tab.key
-                            ? "text-[var(--text-primary)]"
-                            : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                        )}
-                      >
-                        {tab.label}
-                        {tab.key === "canvas" && allCanvasBlocks.length > 0 && (
-                          <span className="min-w-[16px] h-4 flex items-center justify-center text-[9px] font-semibold rounded-full bg-[var(--accent-glow)] text-[var(--accent-light)]">
-                            {allCanvasBlocks.length}
-                          </span>
-                        )}
-                        {rightPanel === tab.key && (
-                          <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-[2px] rounded-full bg-[var(--accent)]" />
-                        )}
-                      </button>
-                    ))}
+                <div className="hidden md:flex flex-col bg-[var(--bg-content)] flex-shrink-0 border-l border-[var(--separator)]" style={{ width: rightWidth }}>
+                  <div className="flex items-center justify-center px-2 py-2 border-b border-[var(--separator)]">
+                    <SegmentedControl
+                      items={RIGHT_TABS.map((tab) => ({
+                        label: tab.key === "canvas" && allCanvasBlocks.length > 0
+                          ? `${tab.label} (${allCanvasBlocks.length})`
+                          : tab.label,
+                        value: tab.key,
+                      }))}
+                      value={rightPanel}
+                      onChange={(v) => setRightPanel(v as RightTab)}
+                      className="w-full"
+                    />
                   </div>
                   <div className="flex-1 overflow-auto">
                     {rightPanel === "files" && (
@@ -679,42 +566,25 @@ export default function App() {
                   </div>
                 </div>
               )}
-            </div>
-          </>
-        ) : (
-          /* Dashboard content for the active tab */
-          <Dashboard
-            connected={ws.connected}
-            conversationCount={conv.conversations.length}
-            messageCount={allMessages.length}
-            activeTab={activeView as TabKey}
-            onNavigateToChat={(id) => {
-              conv.ensureConversation(id);
-              conv.setActiveId(id);
-              setActiveView("chat");
-            }}
-          />
-        )}
-      </div>
-
-      {/* Status bar — only in chat view */}
-      {isChatView && (
-        <StatusBar
-          conversationId={conv.activeId}
-          messageCount={allMessages.length}
-          status={ws.status}
-          connected={ws.connected}
-        />
-      )}
-
-      {/* Toast notifications */}
-      {notification && (
-        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-3">
-          <div className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-lg shadow-lg px-4 py-3 text-sm text-[var(--text-primary)] max-w-sm">
-            {notification}
-          </div>
+            </>
+          ) : (
+            /* Dashboard content for the active tab */
+            <Dashboard
+              connected={ws.connected}
+              conversationCount={conv.conversations.length}
+              messageCount={allMessages.length}
+              activeTab={activeView as TabKey}
+              onNavigateToChat={(id) => {
+                conv.ensureConversation(id);
+                conv.setActiveId(id);
+                setActiveView("chat");
+              }}
+            />
+          )}
         </div>
-      )}
+      </main>
+
+      <Toaster />
     </div>
     </IdentityContext.Provider>
   );

@@ -4,27 +4,28 @@ import { forwardRef } from "react";
 import { cn } from "../../lib/cn";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/40 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-primary)] disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-0 focus-visible:shadow-[0_0_0_3px_var(--accent-glow)] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 cursor-pointer active:scale-[0.97] active:duration-100",
   {
     variants: {
       variant: {
         default:
-          "bg-[var(--accent)] text-white shadow-[0_1px_2px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.1)] hover:brightness-110 active:scale-[0.97]",
-        destructive:
-          "bg-red-500/90 text-white shadow-sm hover:bg-red-500 active:scale-[0.97]",
-        outline:
-          "border border-[var(--border-default)] bg-transparent hover:bg-[var(--bg-hover)] hover:border-[var(--border-strong)] text-[var(--text-secondary)]",
+          "bg-[var(--accent)] text-white hover:brightness-110",
         secondary:
-          "bg-[var(--bg-surface)] text-[var(--text-secondary)] border border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]",
+          "bg-[var(--bg-grouped)] text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]",
         ghost:
-          "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
-        link: "text-[var(--accent-light)] underline-offset-4 hover:underline",
+          "bg-transparent text-[var(--accent)] hover:bg-[var(--bg-hover)]",
+        destructive:
+          "bg-[var(--error)] text-white hover:brightness-110",
+        outline:
+          "border border-[var(--border-subtle)] bg-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]",
+        link:
+          "text-[var(--accent)] underline-offset-4 hover:underline bg-transparent",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 px-3 text-xs",
-        lg: "h-10 px-6",
-        icon: "h-9 w-9",
+        sm: "h-7 px-3 text-[11px] rounded-[5px] [&_svg]:size-3",
+        default: "h-8 px-4 text-[13px] rounded-[var(--radius-sm)] [&_svg]:size-4",
+        lg: "h-9 px-5 text-[14px] rounded-[var(--radius-md)] [&_svg]:size-4",
+        icon: "h-8 w-8 rounded-[var(--radius-md)] [&_svg]:size-4",
       },
     },
     defaultVariants: {

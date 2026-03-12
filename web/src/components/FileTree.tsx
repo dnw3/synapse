@@ -57,7 +57,7 @@ export default function FileTree({
         <div className="flex items-center gap-0.5 font-mono text-[var(--text-secondary)] truncate">
           <button
             onClick={() => onSelect(".", true)}
-            className="hover:text-[var(--accent-light)] transition-colors flex-shrink-0"
+            className="text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors flex-shrink-0"
           >
             ~
           </button>
@@ -66,10 +66,10 @@ export default function FileTree({
               const segPath = arr.slice(0, i + 1).join("/");
               return (
                 <span key={segPath} className="flex items-center gap-0.5">
-                  <span className="text-[var(--text-tertiary)]">/</span>
+                  <span className="text-[var(--text-tertiary)] mx-0.5">›</span>
                   <button
                     onClick={() => onSelect(segPath, true)}
-                    className="hover:text-[var(--accent-light)] transition-colors"
+                    className="text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors"
                   >
                     {seg}
                   </button>
@@ -90,12 +90,12 @@ export default function FileTree({
                 key={entry.name}
                 onClick={() => onSelect(fullPath, entry.is_dir)}
                 className={cn(
-                  "w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors",
-                  "hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  "w-full flex items-center gap-2 px-3 text-left transition-colors",
+                  "h-8 min-h-[32px] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 )}
               >
                 {entry.is_dir ? (
-                  <Folder className="h-3.5 w-3.5 text-[var(--warning)]/80" />
+                  <Folder className="h-3.5 w-3.5 text-[var(--warning)] flex-shrink-0" />
                 ) : (
                   getFileIcon(entry.name)
                 )}

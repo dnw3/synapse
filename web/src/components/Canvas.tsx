@@ -29,9 +29,9 @@ function CodeBlock({ block }: { block: CanvasBlock }) {
   const { t } = useTranslation();
   const lang = block.language ?? "text";
   return (
-    <div className="rounded-[var(--radius-sm)] overflow-hidden border border-[var(--border-subtle)]">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)]">
-        <span className="text-xs font-mono text-[var(--text-tertiary)]">{lang}</span>
+    <div className="rounded-[var(--radius-lg)] overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-content)]">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-grouped)] border-b border-[var(--border-subtle)]">
+        <span className="text-xs font-mono font-medium text-[var(--text-secondary)]">{lang}</span>
         <button
           onClick={() => navigator.clipboard.writeText(block.content)}
           className="text-[10px] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
@@ -44,7 +44,7 @@ function CodeBlock({ block }: { block: CanvasBlock }) {
         language={lang}
         PreTag="div"
         className="!rounded-none !text-xs !m-0 !border-0"
-        customStyle={{ background: "var(--bg-surface)", margin: 0 }}
+        customStyle={{ background: "var(--bg-content)", margin: 0 }}
       >
         {block.content}
       </SyntaxHighlighter>
@@ -54,7 +54,7 @@ function CodeBlock({ block }: { block: CanvasBlock }) {
 
 function MarkdownBlock({ block }: { block: CanvasBlock }) {
   return (
-    <div className="synapse-prose prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-[var(--bg-surface)] prose-pre:border prose-pre:border-[var(--border-subtle)] px-1">
+    <div className="synapse-prose prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-[var(--bg-content)] prose-pre:border prose-pre:border-[var(--border-subtle)] px-1">
       <ReactMarkdown>{block.content}</ReactMarkdown>
     </div>
   );
@@ -91,7 +91,7 @@ function ChartBlock({ block }: { block: CanvasBlock }) {
 
   if (!parsed) {
     return (
-      <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+      <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-content)] p-4">
         <p className="text-xs text-[var(--error)]">{t("canvas.invalidChartData")}</p>
         <pre className="text-[10px] text-[var(--text-tertiary)] mt-2 overflow-auto max-h-20">{block.content}</pre>
       </div>
@@ -120,7 +120,7 @@ function ChartBlock({ block }: { block: CanvasBlock }) {
     dataKeys = parsed.datasets.map((ds, i) => ds.label ?? `series${i}`);
   }
 
-  const tooltipStyle = { background: "var(--bg-surface)", border: "1px solid var(--border-default)", borderRadius: 8, fontSize: 11, color: "var(--text-primary)" };
+  const tooltipStyle = { background: "var(--bg-content)", border: "1px solid var(--separator)", borderRadius: "var(--radius-md)", fontSize: 11, color: "var(--text-primary)" };
 
   const renderChart = () => {
     switch (chartType) {
@@ -176,7 +176,7 @@ function ChartBlock({ block }: { block: CanvasBlock }) {
   };
 
   return (
-    <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] overflow-hidden">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-content)] overflow-hidden">
       {meta?.title && (
         <div className="px-3 py-2 border-b border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)]">
           {meta.title}
@@ -220,7 +220,7 @@ function FormBlock({ block, onSubmit }: { block: CanvasBlock; onSubmit?: (blockI
       </label>
     );
 
-    const inputClasses = "bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]/40";
+    const inputClasses = "bg-[var(--bg-content)] border border-[var(--separator)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]/40";
 
     if (field.type === "boolean") {
       return (
@@ -273,7 +273,7 @@ function FormBlock({ block, onSubmit }: { block: CanvasBlock; onSubmit?: (blockI
   };
 
   return (
-    <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 space-y-3">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-content)] p-4 space-y-3">
       {schema.fields.map(renderField)}
       <Button
         size="sm"
@@ -384,7 +384,7 @@ export default function Canvas({ canvasBlocks, onClear, onFormSubmit }: CanvasPr
       <ScrollArea className="flex-1">
         {canvasBlocks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center gap-3">
-            <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-[var(--radius-lg)] bg-[var(--bg-content)] border border-[var(--border-subtle)] flex items-center justify-center">
               <BarChart2 className="h-5 w-5 text-[var(--text-tertiary)]" />
             </div>
             <p className="text-xs text-[var(--text-tertiary)] leading-relaxed">

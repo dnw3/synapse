@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ShieldAlert, Check, X, ShieldCheck } from "lucide-react";
 import { Button } from "./ui/button";
-import { cn } from "../lib/cn";
 
 interface ApprovalRequest {
   tool_name: string;
@@ -15,26 +14,17 @@ interface ApprovalDialogProps {
   onRespond: (approved: boolean, allowAll?: boolean) => void;
 }
 
-const RISK_STYLES: Record<string, { bg: string; border: string; icon: string; badge: string }> = {
-  High: {
-    bg: "bg-amber-50 dark:bg-amber-950/30",
-    border: "border-amber-300 dark:border-amber-700",
-    icon: "text-amber-600 dark:text-amber-400",
-    badge: "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300",
-  },
-  Critical: {
-    bg: "bg-red-50 dark:bg-red-950/30",
-    border: "border-red-300 dark:border-red-700",
-    icon: "text-red-600 dark:text-red-400",
-    badge: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
-  },
+const RISK_STYLES: Record<string, { accentVar: string }> = {
+  High: { accentVar: "var(--warning)" },
+  Critical: { accentVar: "var(--error)" },
 };
 
 export default function ApprovalDialog({ request, onRespond }: ApprovalDialogProps) {
   const { t } = useTranslation();
   const [responded, setResponded] = useState(false);
 
-  const style = RISK_STYLES[request.risk_level] ?? RISK_STYLES.High;
+  const riskStyle = RISK_STYLES[request.risk_level] ?? RISK_STYLES.High;
+  const accentColor = riskStyle.accentVar;
 
   const handleRespond = (approved: boolean, allowAll = false) => {
     if (responded) return;
@@ -46,19 +36,28 @@ export default function ApprovalDialog({ request, onRespond }: ApprovalDialogPro
 
   return (
     <div
-      className={cn(
-        "mx-4 my-2 rounded-lg border-2 p-4 shadow-lg animate-in slide-in-from-bottom-2",
-        style.bg,
-        style.border
-      )}
+      className="mx-4 my-2 rounded-[var(--radius-lg)] p-4 animate-fade-slide-in"
+      style={{
+        background: "var(--bg-content)",
+        borderLeft: `3px solid ${accentColor}`,
+        border: `1px solid color-mix(in srgb, ${accentColor} 25%, transparent)`,
+        borderLeftWidth: 3,
+        borderLeftColor: accentColor,
+      }}
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
-        <ShieldAlert className={cn("h-5 w-5", style.icon)} />
-        <span className="font-semibold text-sm">
+        <ShieldAlert className="h-5 w-5 flex-shrink-0" style={{ color: accentColor }} />
+        <span className="font-semibold text-sm text-[var(--text-primary)]">
           {t("approval.title", "Tool Approval Required")}
         </span>
-        <span className={cn("ml-auto px-2 py-0.5 rounded text-xs font-medium", style.badge)}>
+        <span
+          className="ml-auto px-2 py-0.5 rounded text-xs font-medium"
+          style={{
+            background: `color-mix(in srgb, ${accentColor} 15%, transparent)`,
+            color: accentColor,
+          }}
+        >
           {request.risk_level}
         </span>
       </div>
@@ -66,19 +65,25 @@ export default function ApprovalDialog({ request, onRespond }: ApprovalDialogPro
       {/* Tool info */}
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wide">
             {t("approval.tool", "Tool")}
           </span>
-          <code className="px-2 py-0.5 rounded bg-background/80 text-sm font-mono border">
+          <code
+            className="px-2 py-0.5 rounded text-sm font-mono text-[var(--text-primary)] border border-[var(--border-subtle)]"
+            style={{ background: "var(--bg-window)" }}
+          >
             {request.tool_name}
           </code>
         </div>
         {request.args_preview && request.args_preview !== "{}" && (
           <div>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wide">
               {t("approval.args", "Arguments")}
             </span>
-            <pre className="mt-1 p-2 rounded bg-background/80 border text-xs font-mono overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap break-all">
+            <pre
+              className="mt-1 p-2 rounded text-xs font-mono overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap break-all border border-[var(--border-subtle)] text-[var(--text-secondary)]"
+              style={{ background: "var(--bg-window)" }}
+            >
               {request.args_preview}
             </pre>
           </div>
@@ -86,16 +91,7 @@ export default function ApprovalDialog({ request, onRespond }: ApprovalDialogPro
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant="default"
-          onClick={() => handleRespond(true)}
-          className="gap-1.5"
-        >
-          <Check className="h-3.5 w-3.5" />
-          {t("approval.allow", "Allow")}
-        </Button>
+      <div className="flex items-center gap-2 justify-end">
         <Button
           size="sm"
           variant="destructive"
@@ -107,9 +103,18 @@ export default function ApprovalDialog({ request, onRespond }: ApprovalDialogPro
         </Button>
         <Button
           size="sm"
+          variant="default"
+          onClick={() => handleRespond(true)}
+          className="gap-1.5"
+        >
+          <Check className="h-3.5 w-3.5" />
+          {t("approval.allow", "Allow")}
+        </Button>
+        <Button
+          size="sm"
           variant="outline"
           onClick={() => handleRespond(true, true)}
-          className="gap-1.5 ml-auto"
+          className="gap-1.5"
         >
           <ShieldCheck className="h-3.5 w-3.5" />
           {t("approval.allowAll", "Allow All")}

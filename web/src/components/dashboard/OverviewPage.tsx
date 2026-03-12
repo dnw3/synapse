@@ -156,33 +156,41 @@ export default function OverviewPage({ connected, conversationCount, messageCoun
     <div className="animate-fade-in space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatsCard
-          icon={<MessageSquare className="h-5 w-5" />}
-          label={t("overview.sessions")}
-          value={stats?.session_count ?? conversationCount}
-          sub={t("overview.messageCount", { count: stats?.total_messages ?? messageCount })}
-          accent="var(--chart-1)"
-        />
-        <StatsCard
-          icon={<Zap className="h-5 w-5" />}
-          label={t("overview.tokens")}
-          value={formatTokens(totalTokens)}
-          sub={`${formatCost(stats?.total_cost_usd ?? usage?.total_cost_usd ?? 0)}`}
-          accent="var(--chart-2)"
-        />
-        <StatsCard
-          icon={<Wifi className="h-5 w-5" />}
-          label={t("overview.activeWs")}
-          value={stats?.active_ws_sessions ?? 0}
-          accent="var(--success)"
-          pulse={connected}
-        />
-        <StatsCard
-          icon={<Clock className="h-5 w-5" />}
-          label={t("overview.uptime")}
-          value={stats ? formatUptime(liveUptime) : "--"}
-          accent="var(--warning)"
-        />
+        <div style={{ animationDelay: "0ms" }} className="animate-fade-slide-in">
+          <StatsCard
+            icon={<MessageSquare className="h-5 w-5" />}
+            label={t("overview.sessions")}
+            value={stats?.session_count ?? conversationCount}
+            sub={t("overview.messageCount", { count: stats?.total_messages ?? messageCount })}
+            accent="var(--chart-1)"
+          />
+        </div>
+        <div style={{ animationDelay: "40ms" }} className="animate-fade-slide-in">
+          <StatsCard
+            icon={<Zap className="h-5 w-5" />}
+            label={t("overview.tokens")}
+            value={formatTokens(totalTokens)}
+            sub={`${formatCost(stats?.total_cost_usd ?? usage?.total_cost_usd ?? 0)}`}
+            accent="var(--chart-2)"
+          />
+        </div>
+        <div style={{ animationDelay: "80ms" }} className="animate-fade-slide-in">
+          <StatsCard
+            icon={<Wifi className="h-5 w-5" />}
+            label={t("overview.activeWs")}
+            value={stats?.active_ws_sessions ?? 0}
+            accent="var(--success)"
+            pulse={connected}
+          />
+        </div>
+        <div style={{ animationDelay: "120ms" }} className="animate-fade-slide-in">
+          <StatsCard
+            icon={<Clock className="h-5 w-5" />}
+            label={t("overview.uptime")}
+            value={stats ? formatUptime(liveUptime) : "--"}
+            accent="var(--warning)"
+          />
+        </div>
       </div>
 
       {/* Gateway Access + Snapshot Row */}
@@ -227,7 +235,7 @@ export default function OverviewPage({ connected, conversationCount, messageCoun
             right={
               <button
                 onClick={loadOverview}
-                className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-md)] text-[10px] text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/5 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-sm)] text-[11px] font-medium text-[var(--text-tertiary)] bg-[var(--bg-grouped)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 <RefreshCw className="h-3 w-3" />
                 {t("overview.refresh")}
@@ -381,7 +389,7 @@ export default function OverviewPage({ connected, conversationCount, messageCoun
               {providers.map((p) => (
                 <div
                   key={p.name}
-                  className="flex items-start justify-between gap-3 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors"
+                  className="flex items-start justify-between gap-3 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 hover:bg-[var(--bg-content)] transition-colors"
                 >
                   <div className="flex items-start gap-2.5 min-w-0">
                     <StatusDot status="online" />
@@ -426,7 +434,7 @@ export default function OverviewPage({ connected, conversationCount, messageCoun
                 return (
                   <div
                     key={`${r.method}-${r.path}`}
-                    className="flex items-center justify-between gap-3 p-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors"
+                    className="flex items-center justify-between gap-3 p-2 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 hover:bg-[var(--bg-content)] transition-colors"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className={cn(
@@ -435,7 +443,7 @@ export default function OverviewPage({ connected, conversationCount, messageCoun
                         r.method === "POST" && "bg-[var(--method-post)]/10 text-[var(--method-post)]",
                         r.method === "PUT" && "bg-[var(--method-put)]/10 text-[var(--method-put)]",
                         r.method === "DELETE" && "bg-[var(--method-delete)]/10 text-[var(--method-delete)]",
-                        !["GET", "POST", "PUT", "DELETE"].includes(r.method) && "bg-[var(--bg-surface)] text-[var(--text-tertiary)]",
+                        !["GET", "POST", "PUT", "DELETE"].includes(r.method) && "bg-[var(--bg-content)] text-[var(--text-tertiary)]",
                       )}>
                         {r.method}
                       </span>
@@ -510,7 +518,7 @@ function InfoItem({
   accent?: string;
 }) {
   return (
-    <div className="flex items-center gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50">
+    <div className="flex items-center gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50">
       <span className="text-[var(--text-tertiary)]">{icon}</span>
       <div className="min-w-0">
         <div className="text-[10px] uppercase tracking-[0.06em] text-[var(--text-tertiary)]">{label}</div>
@@ -544,11 +552,11 @@ function GatewayField({
             type={masked ? "password" : "text"}
             readOnly
             value={value}
-            className="flex-1 min-w-0 px-2.5 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-secondary)] font-mono outline-none truncate"
+            className="flex-1 min-w-0 px-2.5 py-1.5 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-secondary)] font-mono outline-none truncate"
           />
           <button
             onClick={() => onCopy(value, copyKey)}
-            className="flex-shrink-0 p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+            className="flex-shrink-0 p-1.5 rounded-[var(--radius-md)] hover:bg-[var(--bg-content)] transition-colors cursor-pointer text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
             title="Copy"
           >
             {copied === copyKey ? <Check className="h-3.5 w-3.5 text-[var(--success)]" /> : <Copy className="h-3.5 w-3.5" />}
@@ -567,7 +575,7 @@ function SnapshotItem({
   accent?: string;
 }) {
   return (
-    <div className="p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50">
+    <div className="p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50">
       <div className="text-[10px] uppercase tracking-[0.06em] text-[var(--text-tertiary)] mb-0.5">{label}</div>
       <div
         className="text-[13px] font-medium tabular-nums"

@@ -263,7 +263,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none pr-5"
+      className="px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-grouped)] border border-[var(--separator)] text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none pr-5"
       style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
         backgroundRepeat: "no-repeat",
@@ -316,7 +316,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                   "p-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer",
                   showFilters
                     ? "text-[var(--accent)] bg-[var(--accent)]/10"
-                    : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]"
+                    : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-content)]"
                 )}
                 title={t("sessions.filters")}
               >
@@ -330,7 +330,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                   placeholder={t("sessions.searchPlaceholder")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 text-[12px] rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] transition-colors w-48"
+                  className="pl-8 pr-3 py-1.5 text-[12px] rounded-[var(--radius-md)] bg-[var(--bg-grouped)] border border-[var(--border-subtle)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-glow)] transition-all w-52"
                 />
               </div>
             </div>
@@ -339,7 +339,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
 
         {/* Filter bar */}
         {showFilters && (
-          <div className="flex flex-wrap items-center gap-4 px-3 py-2.5 mb-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+          <div className="flex flex-wrap items-center gap-4 px-3 py-2.5 mb-2 rounded-[var(--radius-md)] bg-[var(--bg-grouped)] border border-[var(--separator)]">
             {/* Active within */}
             <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
               <Clock className="h-3 w-3 text-[var(--text-tertiary)]" />
@@ -350,7 +350,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                 value={activeWithinMin}
                 onChange={(e) => setActiveWithinMin(e.target.value)}
                 placeholder="--"
-                className="w-14 px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] text-center"
+                className="w-14 px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-window)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] text-center"
               />
               <span className="text-[var(--text-tertiary)]">{t("sessions.minutes")}</span>
             </label>
@@ -376,7 +376,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                 value={limitInput}
                 onChange={(e) => setLimitInput(e.target.value)}
                 placeholder={String(PAGE_LIMIT)}
-                className="w-16 px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-primary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] text-center"
+                className="w-16 px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-window)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] text-center"
               />
             </label>
           </div>
@@ -452,7 +452,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                                 if (e.key === "Enter") handleRename(session.id);
                                 if (e.key === "Escape") setEditingId(null);
                               }}
-                              className="px-1.5 py-0.5 text-[12px] font-mono bg-[var(--bg-surface)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-36"
+                              className="px-1.5 py-0.5 text-[12px] font-mono bg-[var(--bg-grouped)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-36"
                             />
                           ) : (
                             <span
@@ -478,7 +478,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                                 if (e.key === "Escape") setEditingLabelId(null);
                               }}
                               placeholder={t("sessions.enterLabel")}
-                              className="px-1.5 py-0.5 text-[12px] bg-[var(--bg-surface)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-40"
+                              className="px-1.5 py-0.5 text-[12px] bg-[var(--bg-grouped)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-40"
                             />
                           ) : (
                             <span
@@ -537,7 +537,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                             {/* Rename */}
                             <button
                               onClick={() => startEditing(session.id)}
-                              className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer"
+                              className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-content)] transition-colors cursor-pointer"
                               title={t("sessions.rename")}
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -546,7 +546,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                             {/* Compact */}
                             <button
                               onClick={() => handleCompact(session.id)}
-                              className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)] transition-colors cursor-pointer"
+                              className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-content)] transition-colors cursor-pointer"
                               title={t("sessions.compact")}
                             >
                               <PackageMinus className="h-3.5 w-3.5" />
@@ -559,7 +559,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                                 "p-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer",
                                 confirming === session.id
                                   ? "text-[var(--error)] bg-[var(--error)]/10"
-                                  : "text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--bg-surface)]"
+                                  : "text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--bg-content)]"
                               )}
                               title={confirming === session.id ? t("sessions.clickToConfirm") : t("sessions.delete")}
                             >
@@ -580,7 +580,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                         <tr key={`${session.id}-detail`}>
                           <td
                             colSpan={8}
-                            className="px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]"
+                            className="px-6 py-3 border-b border-[var(--separator)] bg-[var(--bg-grouped)]"
                           >
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px]">
                               {/* Token breakdown */}

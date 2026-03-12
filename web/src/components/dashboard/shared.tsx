@@ -5,7 +5,7 @@ import type { StatsCardProps } from "../../types/dashboard";
 
 export function StatsCard({ icon, label, value, sub, trend, accent, pulse }: StatsCardProps) {
   return (
-    <div className="group relative overflow-hidden rounded-[var(--radius-lg)] bg-[var(--bg-elevated)]/70 border border-[var(--border-subtle)] p-4 sm:p-5 transition-all duration-300 hover:border-[var(--border-default)] hover:shadow-[var(--shadow-md)]">
+    <div className="group relative overflow-hidden rounded-[var(--radius-xl)] bg-[var(--bg-content)] border border-[var(--border-subtle)] p-4 sm:p-5 transition-all duration-300 hover:border-[var(--separator)] hover:shadow-[var(--shadow-md)] animate-fade-slide-in">
       <div
         className="absolute top-0 left-0 right-0 h-[2px] opacity-60 group-hover:opacity-100 transition-opacity"
         style={{ background: accent || "var(--accent)" }}
@@ -16,13 +16,18 @@ export function StatsCard({ icon, label, value, sub, trend, accent, pulse }: Sta
             {label}
           </span>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl sm:text-[28px] font-semibold tracking-[-0.02em] text-[var(--text-primary)] tabular-nums">
+            <span
+              className="text-[26px] font-bold tracking-[-0.02em] text-[var(--text-primary)] tabular-nums"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
               {value}
             </span>
             {trend && (
               <span className={cn(
-                "flex items-center gap-0.5 text-[11px] font-medium",
-                trend.up ? "text-[var(--success)]" : "text-[var(--error)]"
+                "inline-flex items-center gap-0.5 px-2 py-[2px] rounded-full text-[11px] font-medium",
+                trend.up
+                  ? "bg-[var(--success)]/10 text-[var(--success)]"
+                  : "bg-[var(--error)]/10 text-[var(--error)]"
               )}>
                 {trend.up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                 {trend.value}%
@@ -63,7 +68,7 @@ export function StatusDot({ status }: { status: "online" | "degraded" | "offline
 export function SectionCard({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={cn(
-      "rounded-[var(--radius-lg)] bg-[var(--bg-elevated)]/70 border border-[var(--border-subtle)] p-4 sm:p-5",
+      "rounded-[var(--radius-xl)] bg-[var(--bg-content)] border border-[var(--border-subtle)] p-4 sm:p-5",
       className
     )}>
       {children}
@@ -76,25 +81,51 @@ export function SectionHeader({ icon, title, right }: { icon: React.ReactNode; t
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2">
         <span className="text-[var(--text-tertiary)]">{icon}</span>
-        <span className="text-[13px] font-medium text-[var(--text-primary)]">{title}</span>
+        <span
+          className="text-[18px] font-semibold text-[var(--text-primary)]"
+          style={{ fontFamily: "var(--font-heading)" }}
+        >
+          {title}
+        </span>
       </div>
       {right}
     </div>
   );
 }
 
-export function EmptyState({ icon, message }: { icon: React.ReactNode; message: string }) {
+export function EmptyState({ icon, message, description, action }: {
+  icon: React.ReactNode;
+  message: string;
+  description?: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 gap-3 text-[var(--text-tertiary)]">
-      {icon}
-      <span className="text-[13px]">{message}</span>
+    <div className="flex flex-col items-center justify-center py-16 gap-3 text-[var(--text-tertiary)]">
+      <div className="text-[var(--text-tertiary)] opacity-40">{icon}</div>
+      <span
+        className="text-[16px] font-semibold text-[var(--text-secondary)]"
+        style={{ fontFamily: "var(--font-heading)" }}
+      >
+        {message}
+      </span>
+      {description && (
+        <span className="text-[13px] text-[var(--text-tertiary)] text-center max-w-[280px]">{description}</span>
+      )}
+      {action && <div className="mt-2">{action}</div>}
     </div>
   );
 }
 
 export function LoadingSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("animate-pulse rounded-[var(--radius-md)] bg-[var(--bg-surface)]", className)} />
+    <div
+      className={cn("rounded-[var(--radius-md)]", className)}
+      style={{
+        background: "linear-gradient(90deg, var(--bg-content) 25%, var(--bg-elevated) 50%, var(--bg-content) 75%)",
+        backgroundSize: "200% 100%",
+        animation: "skeleton-shimmer 1.5s ease-in-out infinite",
+      }}
+    />
   );
 }
 
@@ -109,8 +140,8 @@ export function LoadingSpinner() {
 export function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--border-default)] shadow-[var(--shadow-md)] px-3 py-2 text-[11px]">
-      <div className="font-medium text-[var(--text-primary)] mb-1">{label}</div>
+    <div className="rounded-[var(--radius-md)] bg-[var(--bg-elevated)] border border-[var(--separator)] shadow-[var(--shadow-md)] px-3 py-2 text-[11px]">
+      <div className="font-semibold text-[var(--text-primary)] mb-1" style={{ fontFamily: "var(--font-heading)" }}>{label}</div>
       {payload.map((p, i) => (
         <div key={i} className="flex items-center gap-2 text-[var(--text-secondary)]">
           <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
@@ -198,23 +229,23 @@ export function Pagination({
   return (
     <div className="flex items-center justify-between pt-3 text-[11px]">
       <span className="text-[var(--text-tertiary)] font-mono tabular-nums">
-        {from}-{to} of {total}
+        {from}–{to} of {total}
       </span>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onChange(Math.max(0, offset - limit))}
           disabled={currentPage <= 1}
-          className="px-2 py-1 rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="px-3 py-1.5 rounded-[var(--radius-sm)] text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-grouped)] hover:bg-[var(--bg-elevated)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           {t("pagination.prev")}
         </button>
-        <span className="px-2 py-1 text-[var(--text-tertiary)] font-mono tabular-nums">
+        <span className="px-2 py-1 text-[var(--text-tertiary)] font-mono tabular-nums text-[11px]">
           {currentPage}/{totalPages}
         </span>
         <button
           onClick={() => onChange(Math.min((totalPages - 1) * limit, offset + limit))}
           disabled={currentPage >= totalPages}
-          className="px-2 py-1 rounded-[var(--radius-sm)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="px-3 py-1.5 rounded-[var(--radius-sm)] text-[12px] font-medium text-[var(--text-secondary)] bg-[var(--bg-grouped)] hover:bg-[var(--bg-elevated)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           {t("pagination.next")}
         </button>
@@ -246,7 +277,7 @@ export function Toggle({
       className={cn(
         "relative inline-flex flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 cursor-pointer",
         w,
-        checked ? "bg-[var(--accent)]" : "bg-[var(--bg-surface)] border-[var(--border-default)]",
+        checked ? "bg-[var(--accent)]" : "bg-[var(--bg-content)] border-[var(--separator)]",
         disabled && "opacity-50 cursor-not-allowed"
       )}
     >

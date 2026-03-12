@@ -358,7 +358,7 @@ export default function SchedulesPage() {
                     disabled={editing}
                     placeholder={t("schedules.taskNamePlaceholder")}
                     className={cn(
-                      "w-full px-3 py-2 text-[12px] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
+                      "w-full px-3 py-2 text-[12px] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-content)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
                       "focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/50 transition-all",
                       editing && "opacity-60 cursor-not-allowed"
                     )}
@@ -379,7 +379,7 @@ export default function SchedulesPage() {
                     onChange={(e) => updateField("prompt", e.target.value)}
                     placeholder={t("schedules.promptPlaceholder")}
                     rows={3}
-                    className="w-full px-3 py-2 text-[12px] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/50 transition-all resize-none"
+                    className="w-full px-3 py-2 text-[12px] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-content)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/50 transition-all resize-none"
                   />
                 </div>
               </div>
@@ -423,7 +423,7 @@ export default function SchedulesPage() {
                       value={form.cron}
                       onChange={(e) => updateField("cron", e.target.value)}
                       placeholder="0 */6 * * *"
-                      className="w-full px-3 py-2 text-[12px] font-mono rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/50 transition-all"
+                      className="w-full px-3 py-2 text-[12px] font-mono rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-content)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/50 transition-all"
                     />
                     <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
                       {t("schedules.cronHint")}
@@ -439,7 +439,7 @@ export default function SchedulesPage() {
                       value={form.interval_secs}
                       onChange={(e) => updateField("interval_secs", Math.max(1, parseInt(e.target.value) || 1))}
                       min={1}
-                      className="w-full px-3 py-2 text-[12px] font-mono rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/50 transition-all"
+                      className="w-full px-3 py-2 text-[12px] font-mono rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-content)] text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/50 transition-all"
                     />
                     <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
                       {t("schedules.intervalHint")}
@@ -463,7 +463,7 @@ export default function SchedulesPage() {
                     value={form.description}
                     onChange={(e) => updateField("description", e.target.value)}
                     placeholder={t("schedules.descriptionPlaceholder")}
-                    className="w-full px-3 py-2 text-[12px] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/50 transition-all"
+                    className="w-full px-3 py-2 text-[12px] rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-content)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)]/50 transition-all"
                   />
                 </div>
 

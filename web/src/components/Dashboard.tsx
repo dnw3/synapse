@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../lib/cn";
 import { StatusDot } from "./dashboard/shared";
+import { Badge } from "./ui/badge";
 import type { TabKey, TabDef, SidebarSection } from "../types/dashboard";
 
 // Lazy-loaded page components
@@ -99,26 +100,26 @@ export default function Dashboard({ connected: wsConnected, conversationCount, m
   return (
     <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden">
       {/* Sticky Header */}
-      <div className="flex-shrink-0 bg-[var(--bg-primary)]/80 backdrop-blur-sm border-b border-[var(--border-subtle)] z-10">
-        <div className="flex items-center justify-between px-6 h-12">
-          <div className="flex items-center gap-3">
-            <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">
+      <div className="flex-shrink-0 bg-[var(--bg-window)]/80 backdrop-blur-sm border-b border-[var(--border-subtle)] z-10">
+        <div className="flex items-center justify-between px-6 h-14">
+          <div className="flex flex-col gap-0.5">
+            <h2
+              className="text-[24px] font-bold text-[var(--text-primary)] leading-tight"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
               {tab ? t(tab.i18nKey) : ""}
             </h2>
-            <span className="text-[11px] text-[var(--text-tertiary)] font-mono hidden sm:inline">
+            <span className="text-[14px] text-[var(--text-secondary)] hidden sm:inline">
               {new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className={cn(
-              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border",
-              gatewayOnline
-                ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20"
-                : "bg-[var(--error)]/10 text-[var(--error)] border-[var(--error)]/20"
-            )}>
-              <StatusDot status={gatewayOnline ? "online" : "offline"} />
-              {gatewayOnline ? t("dashboard.allOperational", "All Systems Operational") : t("dashboard.gatewayDisconnected", "Gateway Disconnected")}
-            </span>
+            <Badge variant={gatewayOnline ? "success" : "error"}>
+              <span className="inline-flex items-center gap-1.5">
+                <StatusDot status={gatewayOnline ? "online" : "offline"} />
+                {gatewayOnline ? t("dashboard.allOperational", "All Systems Operational") : t("dashboard.gatewayDisconnected", "Gateway Disconnected")}
+              </span>
+            </Badge>
           </div>
         </div>
       </div>
@@ -146,11 +147,11 @@ export default function Dashboard({ connected: wsConnected, conversationCount, m
 
         {/* Footer — pinned at bottom of scroll for normal pages, hidden for self-scroll */}
         {!SELF_SCROLL_TABS.has(activeTab) && (
-          <div className="flex items-center justify-between pt-2 pb-4 mt-auto border-t border-[var(--border-subtle)] flex-shrink-0">
-            <span className="text-[10px] text-[var(--text-tertiary)]/50 font-mono">
+          <div className="flex items-center justify-between pt-3 pb-4 mt-auto border-t border-[var(--border-subtle)] flex-shrink-0">
+            <span className="text-[11px] text-[var(--text-tertiary)] font-mono">
               Synapse · Powered by Synaptic Framework
             </span>
-            <span className="text-[10px] text-[var(--text-tertiary)]/50 font-mono">
+            <span className="text-[11px] text-[var(--text-tertiary)] font-mono">
               {t("dashboard.lastRefresh")}: {new Date().toLocaleTimeString()}
             </span>
           </div>

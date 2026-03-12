@@ -65,7 +65,7 @@ export default function SkillsPage() {
           icon={<Sparkles className="h-4 w-4" />}
           title={t("dashboard.skills", "Skills")}
           right={
-            <div className="flex items-center gap-1 bg-[var(--bg-base)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-0.5">
+            <div className="flex items-center gap-1 bg-[var(--bg-window)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-0.5">
               <TabButton active={tab === "local"} onClick={() => setTab("local")}>
                 <FolderOpen className="h-3 w-3" />
                 {t("dashboard.skillsLocal", "Local")}
@@ -196,7 +196,7 @@ function LocalTab({ addToast }: { addToast: (msg: string, type: "success" | "err
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("dashboard.searchSkills", "Search skills...")}
-          className="w-full pl-9 pr-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-base)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-colors"
+          className="w-full pl-9 pr-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-window)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-colors"
         />
       </div>
 
@@ -432,7 +432,7 @@ function LocalSkillDetailModal({
               {/* Right side: version + toggle — matches store's version card + install button */}
               <div className="flex flex-col items-end gap-2 shrink-0">
                 {skill.version && (
-                  <div className="text-center px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                  <div className="text-center px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)]">
                     <div className="text-[9px] uppercase tracking-wider text-[var(--text-tertiary)] mb-0.5">
                       {t("dashboard.storeCurrentVersion", "Current Version")}
                     </div>
@@ -451,7 +451,7 @@ function LocalSkillDetailModal({
                 ) : (
                   <button
                     onClick={onToggle}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] text-[var(--text-tertiary)] text-[12px] font-medium border border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--bg-content)] text-[var(--text-tertiary)] text-[12px] font-medium border border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
                   >
                     <EyeOff className="h-4 w-4" />
                     {t("schedules.disabled", "Disabled")}
@@ -463,9 +463,9 @@ function LocalSkillDetailModal({
 
           {/* Path bar — like install command bar in store modal */}
           {skill.path && (
-            <div className="shrink-0 px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/30">
+            <div className="shrink-0 px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-content)]/30">
               <div className="flex items-center gap-2">
-                <code className="flex-1 text-[12px] font-mono text-[var(--text-secondary)] bg-[var(--bg-base)] px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] truncate">
+                <code className="flex-1 text-[12px] font-mono text-[var(--text-secondary)] bg-[var(--bg-window)] px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] truncate">
                   {skill.path}
                 </code>
                 <button
@@ -521,7 +521,7 @@ function LocalSkillDetailModal({
                 </div>
               ) : content ? (
                 <div className="p-6">
-                  <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-[1.8] text-[var(--text-secondary)] [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3 [&_h2]:text-[17px] [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 [&_h1]:text-[var(--text-primary)] [&_h2]:text-[var(--text-primary)] [&_h3]:text-[var(--text-primary)] [&_code]:text-[12px] [&_code]:bg-[var(--bg-surface)] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-[var(--bg-surface)] [&_pre]:border [&_pre]:border-[var(--border-subtle)] [&_pre]:rounded-[var(--radius-md)] [&_pre]:p-4 [&_pre]:text-[12px] [&_table]:text-[12px] [&_table]:w-full [&_th]:bg-[var(--bg-surface)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-1.5 [&_td]:border-t [&_td]:border-[var(--border-subtle)] [&_a]:text-[var(--accent)] [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent)]/30 [&_blockquote]:pl-4 [&_blockquote]:italic [&_li]:mb-1 [&_p]:mb-3 [&_hr]:border-[var(--border-subtle)] [&_hr]:my-6">
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-[1.8] text-[var(--text-secondary)] [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3 [&_h2]:text-[17px] [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 [&_h1]:text-[var(--text-primary)] [&_h2]:text-[var(--text-primary)] [&_h3]:text-[var(--text-primary)] [&_code]:text-[12px] [&_code]:bg-[var(--bg-content)] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-[var(--bg-content)] [&_pre]:border [&_pre]:border-[var(--border-subtle)] [&_pre]:rounded-[var(--radius-md)] [&_pre]:p-4 [&_pre]:text-[12px] [&_table]:text-[12px] [&_table]:w-full [&_th]:bg-[var(--bg-content)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-1.5 [&_td]:border-t [&_td]:border-[var(--border-subtle)] [&_a]:text-[var(--accent)] [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent)]/30 [&_blockquote]:pl-4 [&_blockquote]:italic [&_li]:mb-1 [&_p]:mb-3 [&_hr]:border-[var(--border-subtle)] [&_hr]:my-6">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
                   </div>
                 </div>
@@ -541,7 +541,7 @@ function LocalSkillDetailModal({
               ) : fileList.length > 0 ? (
                 <>
                   {/* Left: file tree */}
-                  <div className="w-[240px] shrink-0 border-r border-[var(--border-subtle)] overflow-y-auto bg-[var(--bg-surface)]/40">
+                  <div className="w-[240px] shrink-0 border-r border-[var(--border-subtle)] overflow-y-auto bg-[var(--bg-content)]/40">
                     {fileList.map((f) => (
                       <div
                         key={f.name}
@@ -603,7 +603,7 @@ function LocalSkillDetailModal({
                         ) : selectedFileContent != null ? (
                           <div className="p-5">
                             {selectedFile.endsWith(".md") ? (
-                              <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-[1.8] text-[var(--text-secondary)] [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3 [&_h2]:text-[17px] [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 [&_h1]:text-[var(--text-primary)] [&_h2]:text-[var(--text-primary)] [&_h3]:text-[var(--text-primary)] [&_code]:text-[12px] [&_code]:bg-[var(--bg-surface)] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-[var(--bg-surface)] [&_pre]:border [&_pre]:border-[var(--border-subtle)] [&_pre]:rounded-[var(--radius-md)] [&_pre]:p-4 [&_pre]:text-[12px] [&_table]:text-[12px] [&_table]:w-full [&_th]:bg-[var(--bg-surface)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-1.5 [&_td]:border-t [&_td]:border-[var(--border-subtle)] [&_a]:text-[var(--accent)] [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent)]/30 [&_blockquote]:pl-4 [&_blockquote]:italic [&_li]:mb-1 [&_p]:mb-3 [&_hr]:border-[var(--border-subtle)] [&_hr]:my-6">
+                              <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-[1.8] text-[var(--text-secondary)] [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3 [&_h2]:text-[17px] [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 [&_h1]:text-[var(--text-primary)] [&_h2]:text-[var(--text-primary)] [&_h3]:text-[var(--text-primary)] [&_code]:text-[12px] [&_code]:bg-[var(--bg-content)] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-[var(--bg-content)] [&_pre]:border [&_pre]:border-[var(--border-subtle)] [&_pre]:rounded-[var(--radius-md)] [&_pre]:p-4 [&_pre]:text-[12px] [&_table]:text-[12px] [&_table]:w-full [&_th]:bg-[var(--bg-content)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-1.5 [&_td]:border-t [&_td]:border-[var(--border-subtle)] [&_a]:text-[var(--accent)] [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent)]/30 [&_blockquote]:pl-4 [&_blockquote]:italic [&_li]:mb-1 [&_p]:mb-3 [&_hr]:border-[var(--border-subtle)] [&_hr]:my-6">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedFileContent}</ReactMarkdown>
                               </div>
                             ) : (
@@ -785,11 +785,11 @@ function StoreTab({ addToast }: { addToast: (msg: string, type: "success" | "err
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("dashboard.storeSearch", "Search skills store...")}
-            className="w-full pl-9 pr-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-base)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-colors"
+            className="w-full pl-9 pr-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-window)] border border-[var(--border-subtle)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-colors"
           />
         </div>
         {!searchResults && (
-          <div className="flex items-center gap-1 bg-[var(--bg-base)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-0.5">
+          <div className="flex items-center gap-1 bg-[var(--bg-window)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-0.5">
             <SortButton active={sort === "downloads"} onClick={() => setSort("downloads")}>
               <Download className="h-3 w-3" />
               {t("dashboard.storeSortDownloads", "Downloads")}
@@ -805,7 +805,7 @@ function StoreTab({ addToast }: { addToast: (msg: string, type: "success" | "err
           </div>
         )}
         {/* Filter */}
-        <div className="flex items-center gap-1 bg-[var(--bg-base)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-0.5">
+        <div className="flex items-center gap-1 bg-[var(--bg-window)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-0.5">
           <SortButton active={filter === "all"} onClick={() => setFilter("all")}>
             {t("dashboard.storeFilterAll", "All")}
           </SortButton>
@@ -924,7 +924,7 @@ function StoreSkillCard({
 
   return (
     <div
-      className="group relative rounded-[var(--radius-lg)] border bg-[var(--bg-elevated)]/70 border-[var(--border-subtle)] hover:border-[var(--border-default)] hover:shadow-[var(--shadow-md)] overflow-hidden transition-all duration-200 cursor-pointer"
+      className="group relative rounded-[var(--radius-lg)] border bg-[var(--bg-elevated)]/70 border-[var(--border-subtle)] hover:border-[var(--separator)] hover:shadow-[var(--shadow-md)] overflow-hidden transition-all duration-200 cursor-pointer"
       onMouseEnter={onHover}
       onClick={onDetail}
     >
@@ -940,7 +940,7 @@ function StoreSkillCard({
                 {item.displayName || item.slug}
               </span>
               {version && (
-                <span className="px-1.5 py-[1px] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[9px] font-mono text-[var(--text-tertiary)] border border-[var(--border-subtle)] shrink-0">
+                <span className="px-1.5 py-[1px] rounded-[var(--radius-sm)] bg-[var(--bg-content)] text-[9px] font-mono text-[var(--text-tertiary)] border border-[var(--border-subtle)] shrink-0">
                   v{version}
                 </span>
               )}
@@ -968,7 +968,7 @@ function StoreSkillCard({
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[10px] font-medium transition-all shrink-0 cursor-pointer",
                 isInstalling
-                  ? "bg-[var(--bg-surface)] text-[var(--text-tertiary)] border border-[var(--border-subtle)]"
+                  ? "bg-[var(--bg-content)] text-[var(--text-tertiary)] border border-[var(--border-subtle)]"
                   : "bg-[var(--accent)] text-white hover:opacity-90 active:scale-[0.97]"
               )}
             >
@@ -1203,7 +1203,7 @@ function StoreSkillDetailModal({
                 {/* Right side: version + install */}
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   {version && (
-                    <div className="text-center px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+                    <div className="text-center px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)]">
                       <div className="text-[9px] uppercase tracking-wider text-[var(--text-tertiary)] mb-0.5">
                         {t("dashboard.storeCurrentVersion", "Current Version")}
                       </div>
@@ -1223,7 +1223,7 @@ function StoreSkillDetailModal({
                       className={cn(
                         "flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] text-[12px] font-medium transition-all cursor-pointer",
                         isInstalling
-                          ? "bg-[var(--bg-surface)] text-[var(--text-tertiary)] border border-[var(--border-subtle)]"
+                          ? "bg-[var(--bg-content)] text-[var(--text-tertiary)] border border-[var(--border-subtle)]"
                           : "bg-[var(--accent)] text-white hover:opacity-90 active:scale-[0.97]"
                       )}
                     >
@@ -1266,9 +1266,9 @@ function StoreSkillDetailModal({
             </div>
 
             {/* Install command — fixed */}
-            <div className="shrink-0 px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/30">
+            <div className="shrink-0 px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-content)]/30">
               <div className="flex items-center gap-2">
-                <code className="flex-1 text-[12px] font-mono text-[var(--text-secondary)] bg-[var(--bg-base)] px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)]">
+                <code className="flex-1 text-[12px] font-mono text-[var(--text-secondary)] bg-[var(--bg-window)] px-3 py-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)]">
                   clawhub install {slug}
                 </code>
                 <button
@@ -1319,7 +1319,7 @@ function StoreSkillDetailModal({
                       <FileText className="h-3.5 w-3.5" />
                       {t("dashboard.storeChangelog", "Changelog")}
                     </h3>
-                    <div className="text-[12px] text-[var(--text-secondary)] leading-[1.7] whitespace-pre-wrap bg-[var(--bg-base)] p-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] max-h-[200px] overflow-y-auto">
+                    <div className="text-[12px] text-[var(--text-secondary)] leading-[1.7] whitespace-pre-wrap bg-[var(--bg-window)] p-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] max-h-[200px] overflow-y-auto">
                       {changelog}
                     </div>
                   </div>
@@ -1341,7 +1341,7 @@ function StoreSkillDetailModal({
                 ) : fileList.length > 0 ? (
                   <>
                     {/* Left: file tree */}
-                    <div className="w-[240px] shrink-0 border-r border-[var(--border-subtle)] overflow-y-auto bg-[var(--bg-surface)]/40">
+                    <div className="w-[240px] shrink-0 border-r border-[var(--border-subtle)] overflow-y-auto bg-[var(--bg-content)]/40">
                       {fileList.map((f) => (
                         <div
                           key={f.name}
@@ -1406,7 +1406,7 @@ function StoreSkillDetailModal({
                           ) : selectedFileContent != null ? (
                             <div className="p-5">
                               {selectedFile.endsWith(".md") ? (
-                                <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-[1.8] text-[var(--text-secondary)] [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3 [&_h2]:text-[17px] [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 [&_h1]:text-[var(--text-primary)] [&_h2]:text-[var(--text-primary)] [&_h3]:text-[var(--text-primary)] [&_code]:text-[12px] [&_code]:bg-[var(--bg-surface)] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-[var(--bg-surface)] [&_pre]:border [&_pre]:border-[var(--border-subtle)] [&_pre]:rounded-[var(--radius-md)] [&_pre]:p-4 [&_pre]:text-[12px] [&_table]:text-[12px] [&_table]:w-full [&_th]:bg-[var(--bg-surface)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-1.5 [&_td]:border-t [&_td]:border-[var(--border-subtle)] [&_a]:text-[var(--accent)] [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent)]/30 [&_blockquote]:pl-4 [&_blockquote]:italic [&_li]:mb-1 [&_p]:mb-3 [&_hr]:border-[var(--border-subtle)] [&_hr]:my-6">
+                                <div className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-[1.8] text-[var(--text-secondary)] [&_h1]:text-[20px] [&_h1]:font-bold [&_h1]:mt-6 [&_h1]:mb-3 [&_h2]:text-[17px] [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 [&_h1]:text-[var(--text-primary)] [&_h2]:text-[var(--text-primary)] [&_h3]:text-[var(--text-primary)] [&_code]:text-[12px] [&_code]:bg-[var(--bg-content)] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-[var(--bg-content)] [&_pre]:border [&_pre]:border-[var(--border-subtle)] [&_pre]:rounded-[var(--radius-md)] [&_pre]:p-4 [&_pre]:text-[12px] [&_table]:text-[12px] [&_table]:w-full [&_th]:bg-[var(--bg-content)] [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_td]:px-3 [&_td]:py-1.5 [&_td]:border-t [&_td]:border-[var(--border-subtle)] [&_a]:text-[var(--accent)] [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--accent)]/30 [&_blockquote]:pl-4 [&_blockquote]:italic [&_li]:mb-1 [&_p]:mb-3 [&_hr]:border-[var(--border-subtle)] [&_hr]:my-6">
                                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedFileContent}</ReactMarkdown>
                                 </div>
                               ) : (
@@ -1501,7 +1501,7 @@ function SkillCard({
       className={cn(
         "group relative rounded-[var(--radius-lg)] border overflow-hidden transition-all duration-200",
         enabled
-          ? "bg-[var(--bg-elevated)]/70 border-[var(--border-subtle)] hover:border-[var(--border-default)] hover:shadow-[var(--shadow-md)]"
+          ? "bg-[var(--bg-elevated)]/70 border-[var(--border-subtle)] hover:border-[var(--separator)] hover:shadow-[var(--shadow-md)]"
           : "bg-[var(--bg-elevated)]/30 border-[var(--border-subtle)]/50 opacity-50",
         !eligible && enabled && "border-[var(--warning)]/40",
         onClick && "cursor-pointer"
@@ -1530,7 +1530,7 @@ function SkillCard({
                   {skill.name}
                 </span>
                 {skill.version && (
-                  <span className="px-1.5 py-[1px] rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[9px] font-mono text-[var(--text-tertiary)] border border-[var(--border-subtle)] shrink-0">
+                  <span className="px-1.5 py-[1px] rounded-[var(--radius-sm)] bg-[var(--bg-content)] text-[9px] font-mono text-[var(--text-tertiary)] border border-[var(--border-subtle)] shrink-0">
                     v{skill.version}
                   </span>
                 )}
@@ -1576,13 +1576,13 @@ function SkillCard({
             <div className="text-[10px] leading-[1.6] space-y-1 pl-[18px]">
               {(skill.missing_env?.length ?? 0) > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="px-1 py-[1px] rounded bg-[var(--bg-surface)] text-[9px] font-mono text-[var(--text-tertiary)] border border-[var(--border-subtle)]">ENV</span>
+                  <span className="px-1 py-[1px] rounded bg-[var(--bg-content)] text-[9px] font-mono text-[var(--text-tertiary)] border border-[var(--border-subtle)]">ENV</span>
                   <span className="font-mono text-[var(--text-secondary)]">{skill.missing_env!.join(", ")}</span>
                 </div>
               )}
               {(skill.missing_bins?.length ?? 0) > 0 && (
                 <div className="flex items-center gap-2">
-                  <span className="px-1 py-[1px] rounded bg-[var(--bg-surface)] text-[9px] font-mono text-[var(--text-tertiary)] border border-[var(--border-subtle)]">BIN</span>
+                  <span className="px-1 py-[1px] rounded bg-[var(--bg-content)] text-[9px] font-mono text-[var(--text-tertiary)] border border-[var(--border-subtle)]">BIN</span>
                   <span className="font-mono text-[var(--text-secondary)]">{skill.missing_bins!.join(", ")}</span>
                 </div>
               )}
@@ -1596,7 +1596,7 @@ function SkillCard({
             <div className="flex items-center gap-1.5">
               {skill.has_install_specs && (
                 <span
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--bg-surface)] text-[10px] text-[var(--text-tertiary)] border border-[var(--border-subtle)] pointer-events-none select-none opacity-70"
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--bg-content)] text-[10px] text-[var(--text-tertiary)] border border-[var(--border-subtle)] pointer-events-none select-none opacity-70"
                   title={t("dashboard.hasInstallLabel", "Has install instructions")}
                 >
                   <Package className="h-2.5 w-2.5" />
@@ -1654,12 +1654,12 @@ function SkillContentPreview({ path }: { path: string }) {
   }, [path]);
 
   if (loading) {
-    return <div className="mx-4 mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--bg-base)] animate-pulse h-24" />;
+    return <div className="mx-4 mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--bg-window)] animate-pulse h-24" />;
   }
 
   if (!content) {
     return (
-      <div className="mx-4 mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--bg-base)] text-[10px] text-[var(--text-tertiary)] text-center">
+      <div className="mx-4 mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--bg-window)] text-[10px] text-[var(--text-tertiary)] text-center">
         Unable to load skill content
       </div>
     );
@@ -1669,8 +1669,8 @@ function SkillContentPreview({ path }: { path: string }) {
   const truncated = content.split("\n").length > 30;
 
   return (
-    <div className="mx-4 mb-4 rounded-[var(--radius-md)] bg-[var(--bg-base)] border border-[var(--border-subtle)] overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border-subtle)]/50 bg-[var(--bg-surface)]/50">
+    <div className="mx-4 mb-4 rounded-[var(--radius-md)] bg-[var(--bg-window)] border border-[var(--border-subtle)] overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border-subtle)]/50 bg-[var(--bg-content)]/50">
         <span className="text-[9px] font-mono text-[var(--text-tertiary)] truncate">{path.split("/").pop()}</span>
         {truncated && <span className="text-[9px] text-[var(--text-tertiary)]">30/{content.split("\n").length} lines</span>}
       </div>

@@ -234,7 +234,7 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
   return (
     <div className="flex flex-col flex-1 min-w-0 min-h-0">
       <ScrollArea ref={scrollAreaRef} className="flex-1 min-h-0">
-        <div className="max-w-2xl mx-auto px-5 py-6 space-y-5">
+        <div className="max-w-2xl mx-auto px-5 py-5 space-y-5" style={{ background: "var(--bg-window)" }}>
           {visibleMessages.length === 0 && (
             <div className="flex items-center justify-center min-h-[60vh]">
               <div className="text-center space-y-4">
@@ -296,14 +296,14 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
       )}
 
       {/* Input */}
-      <div className="border-t border-[var(--border-subtle)] p-3 bg-[var(--bg-elevated)]/80 backdrop-blur-md">
+      <div className="border-t border-[var(--separator)] p-3 bg-[var(--bg-grouped)] backdrop-blur-md">
         <div className="max-w-3xl mx-auto relative">
           {/* Slash command palette */}
           {showCommands && filteredCommands.length > 0 && (
             <div
               ref={commandsRef}
-              className="absolute bottom-full left-0 mb-1 w-72 max-h-[200px] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-elevated)] shadow-lg animate-fade-in z-50"
-              style={{ animation: "fadeIn 120ms ease-out" }}
+              className="absolute bottom-full left-0 mb-1 w-72 max-h-[200px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--separator)] bg-[var(--bg-content)] animate-fade-in z-50"
+              style={{ animation: "fadeIn 120ms ease-out", boxShadow: "var(--shadow-md)" }}
             >
               {filteredCommands.map((cmd, i) => (
                 <button
@@ -312,7 +312,7 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
                   className={`w-full text-left px-3 py-2 flex items-baseline gap-2 text-sm transition-colors duration-75 ${
                     i === selectedCommandIndex
                       ? "bg-[var(--accent)]/10 text-[var(--text-primary)]"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-surface)]"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                   }`}
                   onMouseEnter={() => setSelectedCommandIndex(i)}
                   onMouseDown={(e) => {
@@ -337,7 +337,7 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
               {attachments.map((att) => (
                 <div
                   key={att.id}
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-default)] text-xs text-[var(--text-secondary)] max-w-[200px]"
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--separator)] text-xs text-[var(--text-secondary)] max-w-[200px]"
                 >
                   {isImageMime(att.mime_type) && (
                     <img
@@ -388,23 +388,23 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder={t("chat.placeholder")}
-              className="flex-1 resize-none bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-[var(--radius-md)] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]/40 min-h-[44px] max-h-[140px] transition-all duration-150"
+              className="flex-1 resize-none bg-[var(--bg-content)] border border-[var(--separator)] rounded-[var(--radius-xl)] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]/40 min-h-[44px] max-h-[140px] transition-all duration-150"
               rows={1}
             />
             {loading ? (
               <div className="flex gap-1.5">
-                <Button variant="destructive" size="icon" onClick={onCancel} className="h-[44px] w-[44px] rounded-[var(--radius-md)]" title={t("chat.stop")}>
-                  <Square className="h-4 w-4" />
+                <Button variant="destructive" size="icon" onClick={onCancel} className="h-7 w-7 rounded-full" title={t("chat.stop")}>
+                  <Square className="h-3.5 w-3.5" />
                 </Button>
                 {/* Queue button: allow sending even when busy (OpenClaw pattern) */}
                 <Button
                   size="icon"
                   onClick={handleSubmit}
                   disabled={!input.trim() && attachments.length === 0}
-                  className="h-[44px] w-[44px] rounded-[var(--radius-md)] relative"
+                  className="h-7 w-7 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-light)] relative"
                   title={t("chat.queue")}
                 >
-                  <Send className="h-4 w-4" />
+                  <Send className="h-3.5 w-3.5" />
                   {(queueSize ?? 0) > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center text-[9px] font-bold rounded-full bg-[var(--accent)] text-white">
                       {queueSize}
@@ -417,9 +417,9 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
                 size="icon"
                 onClick={handleSubmit}
                 disabled={!input.trim() && attachments.length === 0}
-                className="h-[44px] w-[44px] rounded-[var(--radius-md)]"
+                className="h-7 w-7 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-light)]"
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>

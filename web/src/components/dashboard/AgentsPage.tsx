@@ -144,7 +144,7 @@ export default function AgentsPage() {
         <div className="space-y-3">
           <button
             onClick={startCreate}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-default)] text-[12px] text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-[var(--radius-lg)] border border-dashed border-[var(--separator)] text-[12px] text-[var(--text-tertiary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors cursor-pointer"
           >
             <Plus className="h-3.5 w-3.5" />
             {t("agents.createAgent")}
@@ -164,7 +164,7 @@ export default function AgentsPage() {
                   "w-full flex items-center gap-3 p-3 rounded-[var(--radius-lg)] border transition-all cursor-pointer text-left",
                   selected === agent.name
                     ? "bg-[var(--bg-elevated)] border-[var(--accent)]/30 shadow-sm"
-                    : "bg-[var(--bg-elevated)]/50 border-[var(--border-subtle)] hover:border-[var(--border-default)]"
+                    : "bg-[var(--bg-elevated)]/50 border-[var(--border-subtle)] hover:border-[var(--separator)]"
                 )}
               >
                 <span className="text-xl flex-shrink-0">{agentEmoji(agent.name)}</span>
@@ -206,7 +206,7 @@ export default function AgentsPage() {
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     disabled={!!selected}
-                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors disabled:opacity-50"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors disabled:opacity-50"
                     placeholder="my-agent"
                   />
                 </div>
@@ -217,7 +217,7 @@ export default function AgentsPage() {
                   <input
                     value={editModel}
                     onChange={(e) => setEditModel(e.target.value)}
-                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent)] transition-colors"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent)] transition-colors"
                     placeholder="gpt-4o"
                   />
                 </div>
@@ -229,7 +229,7 @@ export default function AgentsPage() {
                     value={editPrompt}
                     onChange={(e) => setEditPrompt(e.target.value)}
                     rows={5}
-                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors resize-none"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors resize-none"
                     placeholder={t("agents.promptPlaceholder")}
                   />
                 </div>
@@ -361,7 +361,7 @@ export default function AgentsPage() {
                               {group.tools.map((tool) => (
                                 <div
                                   key={tool.name}
-                                  className="flex items-start gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors"
+                                  className="flex items-start gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 hover:bg-[var(--bg-content)] transition-colors"
                                 >
                                   <Wrench className="h-3.5 w-3.5 text-[var(--accent)] mt-0.5 flex-shrink-0" />
                                   <div className="min-w-0 flex-1">
@@ -397,7 +397,7 @@ export default function AgentsPage() {
                         {skills.map((skill) => (
                           <div
                             key={skill.name}
-                            className="flex items-start gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors"
+                            className="flex items-start gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 hover:bg-[var(--bg-content)] transition-colors"
                           >
                             <Sparkles className="h-3.5 w-3.5 text-[var(--accent)] mt-0.5 flex-shrink-0" />
                             <div className="min-w-0 flex-1">
@@ -447,7 +447,7 @@ export default function AgentsPage() {
                         {(selectedAgent.channels ?? []).map((ch) => (
                           <div
                             key={ch}
-                            className="flex items-center gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors"
+                            className="flex items-center gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 hover:bg-[var(--bg-content)] transition-colors"
                           >
                             <Radio className="h-3.5 w-3.5 text-[var(--success)]" />
                             <span className="text-[12px] text-[var(--text-secondary)]">
@@ -490,7 +490,7 @@ function ToolGroupIcon({ id }: { id: string }) {
 
 function InfoCell({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50">
+    <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50">
       <div className="text-[10px] uppercase tracking-[0.06em] text-[var(--text-tertiary)] mb-1">
         {label}
       </div>

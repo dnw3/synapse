@@ -221,16 +221,17 @@ export default function UsagePage() {
 
       {/* Filters */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-1">
+        {/* Time range segmented control */}
+        <div className="flex items-center gap-0.5 bg-[var(--bg-grouped)] rounded-[var(--radius-md)] p-[3px] border border-[var(--border-subtle)]">
           {(["today", "7d", "30d"] as TimeRange[]).map((r) => (
             <button
               key={r}
               onClick={() => { setRange(r); setSessOffset(0); }}
               className={cn(
-                "px-3 py-1.5 rounded-full text-[11px] font-medium transition-all cursor-pointer",
+                "px-3 py-1.5 rounded-[var(--radius-sm)] text-[12px] font-medium transition-all cursor-pointer",
                 range === r
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                  ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm"
+                  : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
               )}
             >
               {r === "today" ? (isZh ? "今天" : "Today") : r}
@@ -238,13 +239,14 @@ export default function UsagePage() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5 bg-[var(--bg-surface)] rounded-full p-0.5">
+          {/* View mode segmented control */}
+          <div className="flex items-center gap-0.5 bg-[var(--bg-grouped)] rounded-[var(--radius-md)] p-[3px] border border-[var(--border-subtle)]">
             {(["tokens", "cost"] as ViewMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setViewMode(m)}
                 className={cn(
-                  "px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer",
+                  "px-3 py-1.5 rounded-[var(--radius-sm)] text-[12px] font-medium transition-all cursor-pointer",
                   viewMode === m
                     ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm"
                     : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
@@ -356,7 +358,7 @@ export default function UsagePage() {
               {usage.per_model.map((m) => (
                 <div
                   key={m.model}
-                  className="grid grid-cols-[1fr_80px_80px_60px] gap-2 items-center px-2 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-surface)]/50 transition-colors text-[12px]"
+                  className="grid grid-cols-[1fr_80px_80px_60px] gap-2 items-center px-2 py-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg-elevated)]/60 transition-colors text-[12px]"
                 >
                   <span className="text-[var(--text-secondary)] truncate font-mono" title={m.model}>
                     {m.model}
@@ -388,10 +390,10 @@ export default function UsagePage() {
                     key={s}
                     onClick={() => { setSessSort(s); setSessOffset(0); }}
                     className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-medium transition-all cursor-pointer",
+                      "px-2.5 py-1 rounded-[var(--radius-sm)] text-[11px] font-medium transition-all cursor-pointer",
                       sessSort === s
                         ? "bg-[var(--accent)]/10 text-[var(--accent)]"
-                        : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                        : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-grouped)]"
                     )}
                   >
                     {s === "cost" ? (isZh ? "费用" : "Cost") : "Tokens"}
@@ -411,7 +413,7 @@ export default function UsagePage() {
                 {sortedSessions.slice(0, sessLimit).map((s) => (
                   <div
                     key={s.session_id}
-                    className="flex items-center justify-between gap-3 p-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors"
+                    className="flex items-center justify-between gap-3 p-2 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 hover:bg-[var(--bg-elevated)] transition-colors"
                   >
                     <div className="min-w-0">
                       <div className="text-[12px] text-[var(--text-secondary)] font-mono truncate" title={s.session_id}>

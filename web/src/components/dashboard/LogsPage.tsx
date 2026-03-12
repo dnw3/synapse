@@ -397,7 +397,7 @@ function LogRow({
                 "text-[11px] font-mono tabular-nums px-1.5 py-[1px] rounded shrink-0",
                 Number(durationMs) > 5000
                   ? "bg-[var(--warning)]/15 text-[var(--warning)] border border-[var(--warning)]/20"
-                  : "bg-[var(--bg-surface)]/60 text-[var(--text-secondary)] border border-[var(--border-subtle)]/30",
+                  : "bg-[var(--bg-content)]/60 text-[var(--text-secondary)] border border-[var(--border-subtle)]/30",
               )}>
                 {Number(durationMs).toLocaleString()}ms
               </span>
@@ -411,7 +411,7 @@ function LogRow({
                 .map(([k, v]) => (
                   <span
                     key={k}
-                    className="text-[10px] font-mono px-1.5 py-[1px] rounded bg-[var(--bg-surface)]/50 border border-[var(--border-subtle)]/30 text-[var(--text-tertiary)] truncate max-w-[140px]"
+                    className="text-[10px] font-mono px-1.5 py-[1px] rounded bg-[var(--bg-content)]/50 border border-[var(--border-subtle)]/30 text-[var(--text-tertiary)] truncate max-w-[140px]"
                   >
                     <span className="opacity-40">{k.replace(/_/g, " ")}=</span>{v}
                   </span>
@@ -437,7 +437,7 @@ function LogRow({
       {/* Expanded panel */}
       {expanded && (
         <div className="pl-[52px] pr-4 pb-3">
-          <div className="rounded-lg bg-[var(--bg-base)]/80 border border-[var(--border-subtle)]/40 overflow-hidden backdrop-blur-sm">
+          <div className="rounded-[var(--radius-md)] bg-[var(--bg-grouped)] border border-[var(--separator)] overflow-hidden">
             {/* Content fields — shown as preformatted blocks */}
             {contentFields.length > 0 && (
               <div className="border-b border-[var(--border-subtle)]/30">
@@ -627,10 +627,10 @@ export default function LogsPage() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="rounded-xl bg-[var(--bg-elevated)]/80 border border-[var(--border-subtle)] overflow-hidden backdrop-blur-sm flex flex-col flex-1 min-h-0">
+      <div className="rounded-[var(--radius-xl)] bg-[var(--bg-content)] border border-[var(--separator)] overflow-hidden flex flex-col flex-1 min-h-0">
 
         {/* ── Header bar ── */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border-subtle)]/60">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--separator)]">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent)]/10">
               <ScrollText className="h-4 w-4 text-[var(--accent-light)]" />
@@ -654,7 +654,7 @@ export default function LogsPage() {
             <select
               value={limit}
               onChange={(e) => setLimit(Number(e.target.value))}
-              className="text-[11px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-1.5 text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)]/40 cursor-pointer transition-colors"
+              className="text-[11px] bg-[var(--bg-grouped)] border border-[var(--separator)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] cursor-pointer transition-colors"
             >
               <option value={50}>50</option>
               <option value={100}>100</option>
@@ -697,10 +697,10 @@ export default function LogsPage() {
         </div>
 
         {/* ── Filter bar ── */}
-        <div className="px-5 py-3 space-y-2.5 border-b border-[var(--border-subtle)]/40 bg-[var(--bg-surface)]/30">
+        <div className="px-5 py-3 space-y-2.5 border-b border-[var(--separator)] bg-[var(--bg-grouped)]/40">
           <div className="flex flex-wrap items-center gap-3">
             {/* Level pills */}
-            <div className="flex items-center gap-0.5 bg-[var(--bg-base)]/60 rounded-lg p-[3px] border border-[var(--border-subtle)]/40">
+            <div className="flex items-center gap-0.5 bg-[var(--bg-grouped)] rounded-[var(--radius-md)] p-[3px] border border-[var(--separator)]">
               {LOG_LEVELS.map((level) => {
                 const active = levelFilter === level;
                 const count = level === "ALL" ? entries.length : (levelCounts[level] || 0);
@@ -739,7 +739,7 @@ export default function LogsPage() {
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search logs or paste LogID to trace"
-                className="w-full pl-9 pr-9 py-2 rounded-lg bg-[var(--bg-base)]/80 border border-[var(--border-subtle)]/60 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]/60 focus:outline-none focus:border-[var(--accent)]/40 focus:ring-1 focus:ring-[var(--accent)]/10 transition-all"
+                className="w-full pl-9 pr-9 py-2 rounded-[var(--radius-md)] bg-[var(--bg-grouped)] border border-[var(--separator)] text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-glow)] transition-all"
               />
               {search && (
                 <button
@@ -817,7 +817,7 @@ export default function LogsPage() {
         </div>
 
         {/* ── Column headers (resizable, drag border to resize) ── */}
-        <div className="flex items-center gap-3 pl-4 pr-3 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-tertiary)]/50 border-b border-[var(--border-subtle)]/40 bg-[var(--bg-surface)]/20">
+        <div className="flex items-center gap-3 pl-4 pr-3 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-tertiary)] border-b border-[var(--separator)] bg-[var(--bg-grouped)]/30">
           <span className="w-3.5 shrink-0" />
           {!isTracing && (
             <span className="shrink-0 relative select-none" style={{ width: colWidths.traceId }}>
@@ -875,7 +875,7 @@ export default function LogsPage() {
         )}
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between px-5 py-2.5 text-[10px] text-[var(--text-tertiary)]/60 border-t border-[var(--border-subtle)]/30 bg-[var(--bg-surface)]/20">
+        <div className="flex items-center justify-between px-5 py-2.5 text-[10px] text-[var(--text-tertiary)] border-t border-[var(--separator)] bg-[var(--bg-grouped)]/30">
           <div className="flex items-center gap-4 font-mono tabular-nums">
             <span>{entries.length} shown</span>
             {Object.entries(levelCounts).filter(([, v]) => v > 0).map(([k, v]) => {

@@ -221,14 +221,14 @@ export default function WorkspacePage() {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setAgentDropdownOpen(!agentDropdownOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <Bot className="h-3.5 w-3.5" />
                 {selectedAgent || "default"}
                 <ChevronDown className="h-3 w-3" />
               </button>
               {agentDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-md)] shadow-[var(--shadow-lg)] py-1">
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-[var(--bg-elevated)] border border-[var(--separator)] rounded-[var(--radius-md)] shadow-[var(--shadow-lg)] py-1">
                   {agents.map(agent => (
                     <button
                       key={agent.name}
@@ -285,7 +285,7 @@ export default function WorkspacePage() {
           </div>
           {identity.theme_color && (
             <span
-              className="w-5 h-5 rounded-full border border-[var(--border-default)]"
+              className="w-5 h-5 rounded-full border border-[var(--separator)]"
               style={{ background: identity.theme_color }}
               title={`Theme: ${identity.theme_color}`}
             />
@@ -427,7 +427,7 @@ export default function WorkspacePage() {
                 <textarea
                   value={editContent}
                   onChange={e => setEditContent(e.target.value)}
-                  className="w-full h-full p-3 text-[13px] font-mono leading-relaxed bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30 text-[var(--text-primary)] placeholder-[var(--text-tertiary)]"
+                  className="w-full h-full p-3 text-[13px] font-mono leading-relaxed bg-[var(--bg-content)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] resize-none focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30 text-[var(--text-primary)] placeholder-[var(--text-tertiary)]"
                   spellCheck={false}
                 />
               </div>
@@ -441,7 +441,7 @@ export default function WorkspacePage() {
                     "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] transition-all",
                     hasChanges
                       ? "bg-[var(--accent)] text-white hover:opacity-90"
-                      : "bg-[var(--bg-surface)] text-[var(--text-tertiary)] cursor-not-allowed"
+                      : "bg-[var(--bg-content)] text-[var(--text-tertiary)] cursor-not-allowed"
                   )}
                 >
                   <Save className="h-3.5 w-3.5" />
@@ -466,7 +466,7 @@ export default function WorkspacePage() {
       {/* New file modal */}
       {creating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setCreating(false)}>
-          <div className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6 w-96 max-w-[90vw]" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-elevated)] border border-[var(--separator)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6 w-96 max-w-[90vw]" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">
               {t("workspace.newFileTitle")}
             </h3>
@@ -474,7 +474,7 @@ export default function WorkspacePage() {
               value={newFilename}
               onChange={e => setNewFilename(e.target.value)}
               placeholder="CUSTOM.md"
-              className="w-full px-3 py-2 text-sm bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30 text-[var(--text-primary)] placeholder-[var(--text-tertiary)]"
+              className="w-full px-3 py-2 text-sm bg-[var(--bg-content)] border border-[var(--border-subtle)] rounded-[var(--radius-md)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]/30 text-[var(--text-primary)] placeholder-[var(--text-tertiary)]"
               autoFocus
               onKeyDown={e => e.key === "Enter" && handleCreateNew()}
             />
@@ -484,7 +484,7 @@ export default function WorkspacePage() {
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => setCreating(false)}
-                className="px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--bg-content)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 {t("workspace.cancel")}
               </button>

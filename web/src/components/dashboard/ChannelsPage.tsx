@@ -24,7 +24,7 @@ function transportBadgeClass(transport: string): string {
     case "streamable-http":
       return "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30";
     default:
-      return "bg-[var(--bg-surface)] text-[var(--text-secondary)] border-[var(--border-default)]";
+      return "bg-[var(--bg-content)] text-[var(--text-secondary)] border-[var(--separator)]";
   }
 }
 
@@ -183,7 +183,7 @@ function ChannelDetailPanel({
                 placeholder={field.placeholder}
                 className={cn(
                   "flex-1 px-2.5 py-1.5 rounded-[var(--radius-sm)] text-[12px] font-mono",
-                  "bg-[var(--bg-base)] border",
+                  "bg-[var(--bg-window)] border",
                   "text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]/50",
                   "focus:outline-none focus:border-[var(--accent)]/50 focus:ring-1 focus:ring-[var(--accent)]/20",
                   "transition-colors",
@@ -224,7 +224,7 @@ function ChannelDetailPanel({
             "flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-[12px] font-medium transition-all cursor-pointer",
             hasChanges
               ? "bg-[var(--accent)] text-white hover:bg-[var(--accent-light)]"
-              : "bg-[var(--bg-surface)] text-[var(--text-tertiary)] cursor-not-allowed"
+              : "bg-[var(--bg-content)] text-[var(--text-tertiary)] cursor-not-allowed"
           )}
         >
           <Save className="h-3 w-3" />
@@ -363,7 +363,7 @@ export default function ChannelsPage() {
           title={t("dashboard.botChannels", "Bot Channels")}
           right={
             <div className="flex items-center gap-2">
-              <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-surface)] text-[10px] font-mono text-[var(--text-tertiary)] tabular-nums">
+              <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-content)] text-[10px] font-mono text-[var(--text-tertiary)] tabular-nums">
                 {channels.length}
               </span>
               <button
@@ -393,8 +393,8 @@ export default function ChannelsPage() {
                   className={cn(
                     "rounded-[var(--radius-md)] border transition-all overflow-hidden",
                     channel.enabled
-                      ? "bg-[var(--bg-surface)]/60 border-[var(--border-subtle)] hover:border-[var(--border-default)]"
-                      : "bg-[var(--bg-surface)]/30 border-[var(--border-subtle)]/50 opacity-80"
+                      ? "bg-[var(--bg-content)]/60 border-[var(--border-subtle)] hover:border-[var(--separator)]"
+                      : "bg-[var(--bg-content)]/30 border-[var(--border-subtle)]/50 opacity-80"
                   )}
                 >
                   {/* Channel header row */}
@@ -463,7 +463,7 @@ export default function ChannelsPage() {
           icon={<Globe className="h-4 w-4" />}
           title={t("dashboard.mcpServers", "MCP Servers")}
           right={
-            <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-surface)] text-[10px] font-mono text-[var(--text-tertiary)] tabular-nums">
+            <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-content)] text-[10px] font-mono text-[var(--text-tertiary)] tabular-nums">
               {mcpServers.length}
             </span>
           }
@@ -479,7 +479,7 @@ export default function ChannelsPage() {
             {mcpServers.map((mcp) => (
               <div
                 key={mcp.name}
-                className="px-3.5 py-3 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/60 border border-[var(--border-subtle)] hover:border-[var(--border-default)] transition-all"
+                className="px-3.5 py-3 rounded-[var(--radius-md)] bg-[var(--bg-content)]/60 border border-[var(--border-subtle)] hover:border-[var(--separator)] transition-all"
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[13px] font-medium text-[var(--text-primary)] truncate">

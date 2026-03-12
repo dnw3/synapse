@@ -239,7 +239,7 @@ function BooleanField({ value, onChange }: { value: boolean; onChange: (v: boole
       onClick={() => onChange(!value)}
       className={cn(
         "relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer flex-shrink-0",
-        value ? "bg-[var(--accent)]" : "bg-[var(--bg-surface)] border border-[var(--border-subtle)]"
+        value ? "bg-[var(--accent)]" : "bg-[var(--bg-content)] border border-[var(--border-subtle)]"
       )}
     >
       <span className={cn(
@@ -261,7 +261,7 @@ function SecretField({ value, onChange, placeholder }: {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2 pr-9 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-all"
+        className="w-full px-3 py-2 pr-9 rounded-[var(--radius-lg)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-all"
       />
       <button
         onClick={() => setRevealed(!revealed)}
@@ -280,7 +280,7 @@ function EnumField({ value, options, onChange }: {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-all cursor-pointer"
+      className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-all cursor-pointer"
     >
       <option value="">—</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -297,7 +297,7 @@ function NumberField({ value, onChange, placeholder }: {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+      className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-all [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
     />
   );
 }
@@ -311,7 +311,7 @@ function TextField({ value, onChange, placeholder }: {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-all"
+      className="w-full px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/20 transition-all"
     />
   );
 }
@@ -320,7 +320,7 @@ function TextField({ value, onChange, placeholder }: {
 function ReadOnlyField({ value, label }: { value: string; label?: string }) {
   const displayVal = value.startsWith("[") ? formatArrayValue(value) : unquote(value);
   return (
-    <div className="px-3 py-2 rounded-lg bg-[var(--bg-surface)]/60 border border-[var(--border-subtle)] border-dashed text-[13px] font-mono text-[var(--text-secondary)]">
+    <div className="px-3 py-2 rounded-[var(--radius-lg)] bg-[var(--bg-content)]/60 border border-[var(--border-subtle)] border-dashed text-[13px] font-mono text-[var(--text-secondary)]">
       {displayVal}
       {label && <span className="ml-2 text-[10px] text-[var(--text-tertiary)]">({label})</span>}
     </div>
@@ -564,7 +564,7 @@ export default function ConfigPage() {
               </span>
               {sensitive && <Lock className="h-3 w-3 text-[var(--warning)] flex-shrink-0" />}
               {fieldSchema.default_value && !hasValue && (
-                <span className="text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded-md">
+                <span className="text-[10px] text-[var(--text-tertiary)] bg-[var(--bg-content)] px-1.5 py-0.5 rounded-md">
                   {t("config.default")}: {fieldSchema.default_value}
                 </span>
               )}
@@ -618,7 +618,7 @@ export default function ConfigPage() {
           </span>
           {sensitive && <Lock className="h-3 w-3 text-[var(--warning)]" />}
           {hasSchema && (
-            <span className="text-[9px] text-[var(--text-tertiary)] bg-[var(--bg-surface)] px-1.5 py-0.5 rounded-md">
+            <span className="text-[9px] text-[var(--text-tertiary)] bg-[var(--bg-content)] px-1.5 py-0.5 rounded-md">
               {t("config.customField")}
             </span>
           )}
@@ -687,20 +687,20 @@ export default function ConfigPage() {
         <div className="flex-1" />
 
         {hasChanges && (
-          <button onClick={handleDiscard} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--error)]/5 transition-colors cursor-pointer">
+          <button onClick={handleDiscard} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--error)]/5 transition-colors cursor-pointer">
             <X className="h-3.5 w-3.5" />
             {t("config.discard")}
           </button>
         )}
 
-        <button onClick={handleReload} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
+        <button onClick={handleReload} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
           <RefreshCw className="h-3.5 w-3.5" />
           {t("config.reload")}
         </button>
 
         <button onClick={handleSave} disabled={!hasChanges || saving || !isValid}
-          className={cn("flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[11px] font-medium transition-colors cursor-pointer",
-            hasChanges && isValid ? "bg-[var(--accent)] text-white hover:opacity-90" : "bg-[var(--bg-surface)] text-[var(--text-tertiary)] cursor-not-allowed"
+          className={cn("flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium transition-colors cursor-pointer",
+            hasChanges && isValid ? "bg-[var(--accent)] text-white hover:opacity-90" : "bg-[var(--bg-content)] text-[var(--text-tertiary)] cursor-not-allowed"
           )}>
           {saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
           {saving ? t("config.saving") : t("config.save")}
@@ -737,7 +737,7 @@ export default function ConfigPage() {
                   <input
                     type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t("config.searchFields")}
-                    className="w-full pl-7 pr-2 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]"
+                    className="w-full pl-7 pr-2 py-1.5 rounded-[var(--radius-lg)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[11px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent)]"
                   />
                 </div>
                 <div className="flex-1 overflow-y-auto space-y-0.5">
@@ -747,14 +747,14 @@ export default function ConfigPage() {
                     return (
                       <button key={s.schema.key} onClick={() => setActiveSection(s.schema.key)}
                         className={cn(
-                          "w-full text-left px-2.5 py-2 rounded-lg text-[12px] font-medium transition-colors cursor-pointer flex items-center gap-2",
+                          "w-full text-left px-2.5 py-2 rounded-[var(--radius-lg)] text-[12px] font-medium transition-colors cursor-pointer flex items-center gap-2",
                           isActive ? "bg-[var(--accent)]/10 text-[var(--accent)]"
                             : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                         )} title={s.schema.description}>
                         <span className={cn("flex-shrink-0", isActive ? "opacity-100" : "opacity-50")}>{icon}</span>
                         <span className="truncate">{s.schema.label}</span>
                         {s.hasData && (
-                          <span className="ml-auto text-[10px] text-[var(--text-tertiary)] tabular-nums flex-shrink-0 bg-[var(--bg-surface)] px-1.5 rounded-full">
+                          <span className="ml-auto text-[10px] text-[var(--text-tertiary)] tabular-nums flex-shrink-0 bg-[var(--bg-content)] px-1.5 rounded-full">
                             {s.toml!.fields.length}
                           </span>
                         )}
@@ -787,7 +787,7 @@ export default function ConfigPage() {
                           </p>
                         )}
                       </div>
-                      <span className="ml-auto text-[10px] font-mono text-[var(--text-tertiary)] bg-[var(--bg-surface)] px-2 py-0.5 rounded-md">
+                      <span className="ml-auto text-[10px] font-mono text-[var(--text-tertiary)] bg-[var(--bg-content)] px-2 py-0.5 rounded-md">
                         [{activeMerged.schema.key}]
                       </span>
                     </div>
@@ -843,7 +843,7 @@ export default function ConfigPage() {
 
       {/* Bottom mode toggle */}
       <div className="flex items-center justify-center pt-3 flex-shrink-0">
-        <div className="inline-flex rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] p-0.5">
+        <div className="inline-flex rounded-[var(--radius-lg)] bg-[var(--bg-content)] border border-[var(--border-subtle)] p-0.5">
           <button onClick={() => setMode("form")}
             className={cn("flex items-center gap-1.5 px-3 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer",
               mode === "form" ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm" : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"

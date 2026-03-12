@@ -36,7 +36,7 @@ export default function FileViewer({ path, content, theme = "dark", onNavigate }
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-3 py-1.5 text-xs font-mono border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 flex items-center gap-0.5 text-[var(--text-secondary)]">
+      <div className="px-3 py-1.5 text-xs font-mono border-b border-[var(--separator)] bg-[var(--bg-elevated)]/60 flex items-center gap-0.5 text-[var(--text-secondary)]">
         {(() => {
           const parts = path.split("/");
           const fileName = parts.pop()!;
@@ -45,7 +45,7 @@ export default function FileViewer({ path, content, theme = "dark", onNavigate }
               {onNavigate && (
                 <button
                   onClick={() => onNavigate(".")}
-                  className="text-[var(--text-tertiary)] hover:text-[var(--accent-light)] transition-colors flex-shrink-0"
+                  className="text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors flex-shrink-0"
                 >
                   ~
                 </button>
@@ -54,11 +54,11 @@ export default function FileViewer({ path, content, theme = "dark", onNavigate }
                 const segPath = parts.slice(0, i + 1).join("/");
                 return (
                   <span key={segPath} className="flex items-center gap-0.5">
-                    <span className="text-[var(--text-tertiary)]">/</span>
+                    <span className="text-[var(--text-tertiary)] mx-0.5">›</span>
                     {onNavigate ? (
                       <button
                         onClick={() => onNavigate(segPath)}
-                        className="text-[var(--text-tertiary)] hover:text-[var(--accent-light)] transition-colors"
+                        className="text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors"
                       >
                         {seg}
                       </button>
@@ -68,8 +68,8 @@ export default function FileViewer({ path, content, theme = "dark", onNavigate }
                   </span>
                 );
               })}
-              <span className="text-[var(--text-tertiary)]">/</span>
-              <span className="text-[var(--text-primary)] truncate">{fileName}</span>
+              <span className="text-[var(--text-tertiary)] mx-0.5">›</span>
+              <span className="text-[var(--text-primary)] font-medium truncate">{fileName}</span>
             </>
           );
         })()}

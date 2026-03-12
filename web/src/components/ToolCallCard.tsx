@@ -38,16 +38,19 @@ export default function ToolCallCard({ name, args }: Props) {
 
   return (
     <div
-      className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-sm)] text-xs font-mono border transition-colors"
+      className="flex items-center gap-2.5 px-3 py-1.5 rounded-[var(--radius-md)] text-xs border transition-colors"
       style={{
-        color: colorVal,
-        backgroundColor: `color-mix(in srgb, ${colorVal} 6%, transparent)`,
-        borderColor: `color-mix(in srgb, ${colorVal} 12%, transparent)`,
+        backgroundColor: `color-mix(in srgb, ${colorVal} 8%, transparent)`,
+        borderColor: `color-mix(in srgb, ${colorVal} 15%, transparent)`,
       }}
     >
-      <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-      <span className="font-medium">{label}</span>
-      <span className="text-[var(--text-tertiary)] truncate">{summary}</span>
+      {/* Color dot */}
+      <span
+        className="flex-shrink-0 rounded-full"
+        style={{ width: 8, height: 8, background: colorVal }}
+      />
+      <span className="font-bold" style={{ color: colorVal }}>{label}</span>
+      <span className="font-mono text-[var(--text-tertiary)] truncate">{summary}</span>
     </div>
   );
 }

@@ -17,16 +17,16 @@ export default function ThinkingBlock({ content }: Props) {
   const preview = firstLine.length > 80 ? firstLine.slice(0, 80) + "..." : firstLine;
 
   return (
-    <div className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-surface)]/60 text-sm">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-sm overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 w-full px-3 py-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors cursor-pointer select-none"
+        className="flex items-center gap-1.5 w-full px-3 py-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer select-none"
       >
         <ChevronRight
-          className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-90" : ""}`}
+          className={`h-3.5 w-3.5 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
         />
         <Brain className="h-3.5 w-3.5" />
-        <span className="font-medium text-xs">{t("reasoning.title")}</span>
+        <span className="text-xs text-[var(--text-secondary)]" style={{ fontWeight: 500 }}>{t("reasoning.title")}</span>
         {!expanded && (
           <span className="text-xs text-[var(--text-tertiary)]/60 truncate ml-1">
             {preview}

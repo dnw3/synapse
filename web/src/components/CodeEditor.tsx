@@ -59,21 +59,21 @@ export function CodeEditor({ filePath, language, initialContent = '', onSave }: 
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] text-sm">
-        <span className="text-[var(--text-tertiary)] font-mono text-xs">
+    <div className="flex flex-col h-full bg-[var(--bg-content)] border border-[var(--separator)] rounded-[var(--radius-md)] overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--bg-grouped)] border-b border-[var(--border-subtle)] text-sm flex-shrink-0">
+        <span className="text-[var(--text-secondary)] font-mono text-xs font-medium">
           {filePath || 'untitled'}
           {isDirty && <span className="text-[var(--warning)] ml-1">{'\u25cf'}</span>}
         </span>
         <button
           onClick={handleSave}
           disabled={!isDirty}
-          className="px-2 py-0.5 text-xs rounded bg-[var(--accent)] text-white disabled:opacity-40 hover:opacity-90 transition-colors"
+          className="px-2 py-0.5 text-xs rounded-[var(--radius-sm)] bg-[var(--accent)] text-white disabled:opacity-40 hover:opacity-90 transition-colors"
         >
           Save
         </button>
       </div>
-      <div className="flex-1">
+      <div className="flex-1 min-h-0">
         <Editor
           height="100%"
           language={detectLanguage(filePath)}
@@ -99,6 +99,11 @@ export function CodeEditor({ filePath, language, initialContent = '', onSave }: 
             );
           }}
         />
+      </div>
+      <div className="flex items-center px-3 h-6 bg-[var(--bg-grouped)] border-t border-[var(--border-subtle)] flex-shrink-0">
+        <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
+          {detectLanguage(filePath)}
+        </span>
       </div>
     </div>
   );

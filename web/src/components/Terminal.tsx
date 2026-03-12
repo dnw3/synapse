@@ -16,15 +16,15 @@ export default function Terminal({ conversationId }: Props) {
     if (!terminalRef.current) return;
 
     const style = getComputedStyle(document.documentElement);
-    const bgColor = style.getPropertyValue("--bg-primary").trim() || "#0a0a0f";
-    const fgColor = style.getPropertyValue("--text-primary").trim() || "#e4e4ef";
-    const cursorColor = style.getPropertyValue("--accent").trim() || "#6366f1";
-    const selectionBg = (style.getPropertyValue("--accent").trim() || "#6366f1") + "40";
+    const bgColor = style.getPropertyValue("--bg-window").trim() || "#1C1C1E";
+    const fgColor = style.getPropertyValue("--text-primary").trim() || "#F5F5F7";
+    const cursorColor = style.getPropertyValue("--accent").trim() || "#0A84FF";
+    const selectionBg = (style.getPropertyValue("--accent").trim() || "#0A84FF") + "40";
 
     const term = new XTerm({
       cursorBlink: true,
-      fontSize: 12,
-      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+      fontSize: 13,
+      fontFamily: 'var(--font-mono, "JetBrains Mono", ui-monospace, monospace)',
       theme: {
         background: bgColor,
         foreground: fgColor,
@@ -89,7 +89,7 @@ export default function Terminal({ conversationId }: Props) {
   }, [conversationId]);
 
   return (
-    <div className="h-full bg-[var(--bg-primary)]">
+    <div className="h-full bg-[var(--bg-window)] border-t border-[var(--separator)]">
       <div ref={terminalRef} className="h-full" />
     </div>
   );

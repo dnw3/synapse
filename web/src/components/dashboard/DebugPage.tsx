@@ -239,7 +239,7 @@ export default function DebugPage() {
               )}
             </button>
             {snapshotOpen[key] && (
-              <div className="mt-3 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-auto max-h-[280px]">
+              <div className="mt-3 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] overflow-auto max-h-[280px]">
                 <pre className="text-[11px] font-mono text-[var(--text-secondary)] leading-5 whitespace-pre-wrap">
                   {highlightJSON(JSON.stringify(data, null, 2))}
                 </pre>
@@ -265,7 +265,7 @@ export default function DebugPage() {
                     value={method}
                     onChange={(e) => setMethod(e.target.value)}
                     list="method-suggestions"
-                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent)] transition-colors"
+                    className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent)] transition-colors"
                     placeholder={t("debug.methodName")}
                   />
                   <datalist id="method-suggestions">
@@ -291,7 +291,7 @@ export default function DebugPage() {
                   value={paramsText}
                   onChange={(e) => setParamsText(e.target.value)}
                   rows={4}
-                  className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent)] transition-colors resize-none"
+                  className="w-full px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent)] transition-colors resize-none"
                   placeholder="{}"
                 />
               </div>
@@ -317,7 +317,7 @@ export default function DebugPage() {
               }
             />
             {responseJSON ? (
-              <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-base)] border border-[var(--border-subtle)] overflow-x-auto max-h-[400px] overflow-y-auto">
+              <div className="p-3 rounded-[var(--radius-md)] bg-[var(--bg-window)] border border-[var(--border-subtle)] overflow-x-auto max-h-[400px] overflow-y-auto">
                 <pre className="text-[12px] font-mono text-[var(--text-secondary)] leading-5">
                   {highlightJSON(responseJSON)}
                 </pre>
@@ -359,7 +359,7 @@ export default function DebugPage() {
                 <button
                   key={item.id}
                   onClick={() => replayItem(item)}
-                  className="w-full flex items-center justify-between gap-2 p-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)]/50 hover:bg-[var(--bg-surface)] transition-colors cursor-pointer text-left"
+                  className="w-full flex items-center justify-between gap-2 p-2 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 hover:bg-[var(--bg-content)] transition-colors cursor-pointer text-left"
                 >
                   <div className="min-w-0">
                     <div className="text-[12px] text-[var(--text-secondary)] font-mono truncate">

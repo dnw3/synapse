@@ -4,6 +4,7 @@ import {
   ScrollText, Search, Download, Play, Pause, RefreshCw,
   ChevronDown, ChevronRight, X, Link2, Clock, Timer,
   AlertTriangle, AlertCircle, Info, Bug, Radio,
+  ArrowDownLeft, ArrowUpRight, MessageSquare, Filter,
 } from "lucide-react";
 import { EmptyState, LoadingSpinner } from "./shared";
 import { cn } from "../../lib/cn";
@@ -102,6 +103,326 @@ function ResizeHandle({ columnId, widths, setWidths }: {
     </div>
   );
 }
+
+// ─── Message Stream Types ────────────────────────────────────────────────────
+
+type MessageDirection = "in" | "out";
+
+interface ChannelMessage {
+  id: string;
+  direction: MessageDirection;
+  channel: string;
+  sessionKey?: string;
+  contentPreview: string;
+  timestampMs: number;
+  requestId?: string;
+  to?: string;
+}
+
+/** Channel → badge color classes */
+const CHANNEL_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  slack:     { bg: "bg-purple-500/15",   text: "text-purple-400",  border: "border-purple-500/25" },
+  telegram:  { bg: "bg-blue-500/15",     text: "text-blue-400",    border: "border-blue-500/25" },
+  lark:      { bg: "bg-green-500/15",    text: "text-green-400",   border: "border-green-500/25" },
+  discord:   { bg: "bg-indigo-500/15",   text: "text-indigo-400",  border: "border-indigo-500/25" },
+  webchat:   { bg: "bg-[var(--bg-content)]/60", text: "text-[var(--text-secondary)]", border: "border-[var(--border-subtle)]/40" },
+  dingtalk:  { bg: "bg-orange-500/15",   text: "text-orange-400",  border: "border-orange-500/25" },
+  whatsapp:  { bg: "bg-emerald-500/15",  text: "text-emerald-400", border: "border-emerald-500/25" },
+  line:      { bg: "bg-lime-500/15",     text: "text-lime-400",    border: "border-lime-500/25" },
+  mattermost:{ bg: "bg-cyan-500/15",     text: "text-cyan-400",    border: "border-cyan-500/25" },
+  wechat:    { bg: "bg-green-600/15",    text: "text-green-500",   border: "border-green-600/25" },
+};
+
+function getChannelColors(channel: string) {
+  const key = channel.toLowerCase();
+  return CHANNEL_COLORS[key] ?? { bg: "bg-[var(--accent)]/10", text: "text-[var(--accent-light)]", border: "border-[var(--accent)]/20" };
+}
+
+const MAX_MESSAGES = 200;
+
+/** Ring-buffer push: keep last N items */
+function ringPush<T>(arr: T[], item: T, maxLen: number): T[] {
+  const next = [...arr, item];
+  return next.length > maxLen ? next.slice(next.length - maxLen) : next;
+}
+
+/** Hook: subscribe to message.received / message.sent via a dashboard WebSocket. */
+function useMessageStream() {
+  const [messages, setMessages] = useState<ChannelMessage[]>([]);
+  const [connected, setConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountedRef = useRef(false);
+
+  const connect = useCallback(() => {
+    if (unmountedRef.current) return;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const url = `${protocol}//${window.location.host}/ws/_dashboard_events`;
+    const ws = new WebSocket(url);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      if (!unmountedRef.current) setConnected(true);
+    };
+
+    ws.onclose = () => {
+      if (unmountedRef.current) return;
+      setConnected(false);
+      reconnectRef.current = setTimeout(connect, 3000);
+    };
+
+    ws.onerror = () => { /* onclose fires after */ };
+
+    ws.onmessage = (evt) => {
+      if (unmountedRef.current) return;
+      try {
+        const frame = JSON.parse(evt.data as string);
+        if (frame.type !== "event") return;
+        const { event, payload } = frame as { event: string; payload: Record<string, unknown> };
+
+        if (event === "message.received") {
+          const msg: ChannelMessage = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            direction: "in",
+            channel: String(payload.channel ?? "unknown"),
+            sessionKey: payload.session_key ? String(payload.session_key) : undefined,
+            contentPreview: String(payload.content_preview ?? ""),
+            timestampMs: typeof payload.timestamp_ms === "number" ? payload.timestamp_ms : Date.now(),
+            requestId: payload.request_id ? String(payload.request_id) : undefined,
+            to: payload.to ? String(payload.to) : undefined,
+          };
+          setMessages(prev => ringPush(prev, msg, MAX_MESSAGES));
+        } else if (event === "message.sent") {
+          const msg: ChannelMessage = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            direction: "out",
+            channel: String(payload.channel ?? "unknown"),
+            sessionKey: undefined,
+            contentPreview: payload.message_id ? `[msg:${String(payload.message_id)}]` : "(sent)",
+            timestampMs: typeof payload.timestamp_ms === "number" ? payload.timestamp_ms : Date.now(),
+            requestId: payload.request_id ? String(payload.request_id) : undefined,
+            to: payload.to ? String(payload.to) : undefined,
+          };
+          setMessages(prev => ringPush(prev, msg, MAX_MESSAGES));
+        }
+      } catch { /* ignore */ }
+    };
+  }, []);
+
+  useEffect(() => {
+    unmountedRef.current = false;
+    connect();
+    return () => {
+      unmountedRef.current = true;
+      if (reconnectRef.current !== null) {
+        clearTimeout(reconnectRef.current);
+        reconnectRef.current = null;
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [connect]);
+
+  const clearMessages = useCallback(() => setMessages([]), []);
+
+  return { messages, connected, clearMessages };
+}
+
+// ─── Messages Tab ────────────────────────────────────────────────────────────
+
+function MessagesTab() {
+  const { t } = useTranslation();
+  const { messages, connected, clearMessages } = useMessageStream();
+  const [channelFilter, setChannelFilter] = useState("all");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [autoFollow, setAutoFollow] = useState(true);
+
+  // Collect unique channels for filter dropdown
+  const allChannels = useMemo(() => {
+    const seen = new Set<string>();
+    for (const m of messages) seen.add(m.channel.toLowerCase());
+    return Array.from(seen).sort();
+  }, [messages]);
+
+  // Filtered view
+  const filtered = useMemo(() => {
+    if (channelFilter === "all") return messages;
+    return messages.filter(m => m.channel.toLowerCase() === channelFilter);
+  }, [messages, channelFilter]);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (autoFollow && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [filtered, autoFollow]);
+
+  function formatTs(ms: number): string {
+    const d = new Date(ms);
+    return d.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      + "." + String(d.getMilliseconds()).padStart(3, "0");
+  }
+
+  function truncateSessionKey(key?: string): string {
+    if (!key) return "—";
+    // session keys can be long like "lark:user:xxx" — show last 16 chars
+    return key.length > 20 ? "…" + key.slice(-16) : key;
+  }
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-[var(--separator)] bg-[var(--bg-grouped)]/40">
+        {/* Channel filter */}
+        <div className="flex items-center gap-1.5">
+          <Filter className="h-3.5 w-3.5 text-[var(--text-tertiary)] shrink-0" />
+          <select
+            value={channelFilter}
+            onChange={e => setChannelFilter(e.target.value)}
+            className="text-[11px] bg-[var(--bg-grouped)] border border-[var(--separator)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] cursor-pointer transition-colors"
+          >
+            <option value="all">{t("logs.allChannels")}</option>
+            {allChannels.map(ch => (
+              <option key={ch} value={ch}>{ch}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="w-px h-5 bg-[var(--border-subtle)]/50 mx-1" />
+
+        {/* Live/Paused toggle */}
+        <button
+          onClick={() => setAutoFollow(v => !v)}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border",
+            autoFollow
+              ? "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/25 shadow-[0_0_8px_-2px_var(--success)]/20"
+              : "text-[var(--text-tertiary)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+          )}
+        >
+          {autoFollow ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+          {autoFollow ? t("logs.live") : t("logs.paused2")}
+        </button>
+
+        <button
+          onClick={clearMessages}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--text-tertiary)] border border-[var(--border-subtle)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer"
+        >
+          <X className="h-3 w-3" />
+          {t("debug.clear")}
+        </button>
+
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-[11px] font-mono tabular-nums text-[var(--text-tertiary)]">
+            {filtered.length} / {MAX_MESSAGES}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className={cn(
+              "w-1.5 h-1.5 rounded-full",
+              connected ? "bg-[var(--success)] animate-pulse" : "bg-[var(--text-tertiary)]"
+            )} />
+            <span className="text-[10px] text-[var(--text-tertiary)]">
+              {connected ? "Live" : "Reconnecting..."}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Column headers */}
+      <div className="flex items-center gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--text-tertiary)] border-b border-[var(--separator)] bg-[var(--bg-grouped)]/30 shrink-0">
+        <span className="w-[86px] shrink-0">Time</span>
+        <span className="w-[72px] shrink-0">Channel</span>
+        <span className="w-[40px] shrink-0">Dir</span>
+        <span className="w-[140px] shrink-0">Session</span>
+        <span className="flex-1">Content Preview</span>
+      </div>
+
+      {/* Message rows */}
+      {filtered.length === 0 ? (
+        <div className="py-16">
+          <EmptyState
+            icon={<MessageSquare className="h-6 w-6" />}
+            message={t("logs.noMessages")}
+          />
+        </div>
+      ) : (
+        <div
+          ref={scrollRef}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+          style={{ scrollbarGutter: "stable" }}
+        >
+          {filtered.map((msg, i) => {
+            const colors = getChannelColors(msg.channel);
+            const isIn = msg.direction === "in";
+            return (
+              <div
+                key={msg.id}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-2 border-b border-[var(--border-subtle)]/20 transition-colors",
+                  i % 2 === 0 ? "bg-[var(--bg-elevated)]/20" : "bg-transparent",
+                  "hover:bg-[var(--bg-hover)]/40",
+                  isIn
+                    ? "border-l-2 border-l-[var(--accent)]/30"
+                    : "border-l-2 border-l-[var(--success)]/30",
+                )}
+              >
+                {/* Timestamp */}
+                <span className="text-[11px] font-mono tabular-nums text-[var(--text-tertiary)] shrink-0 w-[86px]">
+                  {formatTs(msg.timestampMs)}
+                </span>
+
+                {/* Channel badge */}
+                <span className={cn(
+                  "inline-flex items-center px-1.5 py-[1px] rounded-full text-[10px] font-semibold border shrink-0 w-[72px] justify-center truncate",
+                  colors.bg, colors.text, colors.border,
+                )}>
+                  {msg.channel}
+                </span>
+
+                {/* Direction */}
+                <span className={cn(
+                  "flex items-center gap-0.5 text-[10px] font-bold shrink-0 w-[40px]",
+                  isIn ? "text-[var(--accent-light)]" : "text-[var(--success)]",
+                )}>
+                  {isIn
+                    ? <ArrowDownLeft className="h-3 w-3" />
+                    : <ArrowUpRight className="h-3 w-3" />
+                  }
+                  {isIn ? t("logs.inbound").slice(0, 2) : t("logs.outbound").slice(0, 2)}
+                </span>
+
+                {/* Session key */}
+                <span
+                  className="text-[11px] font-mono text-[var(--text-tertiary)] shrink-0 w-[140px] truncate"
+                  title={msg.sessionKey}
+                >
+                  {truncateSessionKey(msg.sessionKey)}
+                </span>
+
+                {/* Content preview */}
+                <span className="flex-1 min-w-0 text-[12px] text-[var(--text-primary)] truncate leading-snug">
+                  {msg.contentPreview || <span className="text-[var(--text-tertiary)] italic">(empty)</span>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between px-5 py-2.5 text-[10px] text-[var(--text-tertiary)] border-t border-[var(--separator)] bg-[var(--bg-grouped)]/30">
+        <span className="font-mono tabular-nums">{filtered.length} {t("logs.messagesTab").toLowerCase()}</span>
+        <span>Ring buffer · max {MAX_MESSAGES}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab type ─────────────────────────────────────────────────────────────────
+
+type LogsViewTab = "logs" | "messages";
 
 const LOG_LEVELS: LogLevel[] = ["ALL", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"];
 
@@ -489,6 +810,7 @@ function LogRow({
 export default function LogsPage() {
   const { t } = useTranslation();
 
+  const [activeTab, setActiveTab] = useState<LogsViewTab>("logs");
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [levelFilter, setLevelFilter] = useState<LogLevel>("ALL");
@@ -623,7 +945,7 @@ export default function LogsPage() {
 
   const isTracing = !!requestIdFilter;
 
-  if (loading && entries.length === 0) return <LoadingSpinner />;
+  if (loading && entries.length === 0 && activeTab === "logs") return <LoadingSpinner />;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -640,61 +962,107 @@ export default function LogsPage() {
                 {t("dashboard.logs", "Log Explorer")}
               </h3>
               <span className="text-[11px] font-mono tabular-nums text-[var(--text-tertiary)]">
-                {entries.length} entries
-                {isTracing && logidDecodedTime && (
-                  <span className="ml-2 text-[var(--accent-light)] opacity-70">
-                    tracing from {formatTimeShort(logidDecodedTime)}
-                  </span>
+                {activeTab === "logs" ? (
+                  <>
+                    {entries.length} entries
+                    {isTracing && logidDecodedTime && (
+                      <span className="ml-2 text-[var(--accent-light)] opacity-70">
+                        tracing from {formatTimeShort(logidDecodedTime)}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  t("logs.messagesTab")
                 )}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <select
-              value={limit}
-              onChange={(e) => setLimit(Number(e.target.value))}
-              className="text-[11px] bg-[var(--bg-grouped)] border border-[var(--separator)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] cursor-pointer transition-colors"
-            >
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={200}>200</option>
-              <option value={500}>500</option>
-              <option value={1000}>1000</option>
-            </select>
+          <div className="flex items-center gap-2">
+            {/* Tab switcher */}
+            <div className="flex items-center gap-0.5 bg-[var(--bg-grouped)] rounded-[var(--radius-md)] p-[3px] border border-[var(--separator)]">
+              <button
+                onClick={() => setActiveTab("logs")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-[5px] rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                  activeTab === "logs"
+                    ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                )}
+              >
+                <ScrollText className="h-3 w-3" />
+                {t("logs.logsTab")}
+              </button>
+              <button
+                onClick={() => setActiveTab("messages")}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-[5px] rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                  activeTab === "messages"
+                    ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm"
+                    : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                )}
+              >
+                <MessageSquare className="h-3 w-3" />
+                {t("logs.messagesTab")}
+              </button>
+            </div>
 
-            <div className="w-px h-5 bg-[var(--border-subtle)]/50 mx-1" />
+            {activeTab === "logs" && (
+              <>
+                <div className="w-px h-5 bg-[var(--border-subtle)]/50 mx-1" />
 
-            <button
-              onClick={() => loadLogs()}
-              className="flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer"
-              title="Refresh"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
+                <select
+                  value={limit}
+                  onChange={(e) => setLimit(Number(e.target.value))}
+                  className="text-[11px] bg-[var(--bg-grouped)] border border-[var(--separator)] rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] cursor-pointer transition-colors"
+                >
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                  <option value={500}>500</option>
+                  <option value={1000}>1000</option>
+                </select>
 
-            <button
-              onClick={() => setAutoFollow((v) => !v)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border",
-                autoFollow
-                  ? "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/25 shadow-[0_0_8px_-2px_var(--success)]/20"
-                  : "text-[var(--text-tertiary)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-              )}
-            >
-              {autoFollow ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
-              {autoFollow ? "Live" : "Paused"}
-            </button>
+                <div className="w-px h-5 bg-[var(--border-subtle)]/50 mx-1" />
 
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--text-tertiary)] border border-[var(--border-subtle)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer"
-            >
-              <Download className="h-3 w-3" />
-              Export
-            </button>
+                <button
+                  onClick={() => loadLogs()}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer"
+                  title="Refresh"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+
+                <button
+                  onClick={() => setAutoFollow((v) => !v)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer border",
+                    autoFollow
+                      ? "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/25 shadow-[0_0_8px_-2px_var(--success)]/20"
+                      : "text-[var(--text-tertiary)] border-[var(--border-subtle)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                  )}
+                >
+                  {autoFollow ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+                  {autoFollow ? t("logs.live") : t("logs.paused2")}
+                </button>
+
+                <button
+                  onClick={handleExport}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-[var(--text-tertiary)] border border-[var(--border-subtle)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-all cursor-pointer"
+                >
+                  <Download className="h-3 w-3" />
+                  {t("logs.export")}
+                </button>
+              </>
+            )}
           </div>
         </div>
+
+        {/* ── Messages tab view ── */}
+        {activeTab === "messages" && <MessagesTab />}
+
+        {/* ── Logs tab view ── */}
+        {activeTab === "logs" && <>
 
         {/* ── Filter bar ── */}
         <div className="px-5 py-3 space-y-2.5 border-b border-[var(--separator)] bg-[var(--bg-grouped)]/40">
@@ -877,7 +1245,7 @@ export default function LogsPage() {
         {/* ── Footer ── */}
         <div className="flex items-center justify-between px-5 py-2.5 text-[10px] text-[var(--text-tertiary)] border-t border-[var(--separator)] bg-[var(--bg-grouped)]/30">
           <div className="flex items-center gap-4 font-mono tabular-nums">
-            <span>{entries.length} shown</span>
+            <span>{entries.length} {t("logs.shown").replace("{{count}} ", "")}</span>
             {Object.entries(levelCounts).filter(([, v]) => v > 0).map(([k, v]) => {
               const lc = getLevelConfig(k);
               return (
@@ -892,9 +1260,11 @@ export default function LogsPage() {
               "w-1.5 h-1.5 rounded-full",
               autoFollow ? "bg-[var(--success)] animate-pulse" : "bg-[var(--text-tertiary)]"
             )} />
-            <span>In-memory buffer{autoFollow ? " · Live 3s" : " · Paused"}</span>
+            <span>{autoFollow ? t("logs.livePolling") : t("logs.paused")}</span>
           </div>
         </div>
+
+        </>}
       </div>
     </div>
   );

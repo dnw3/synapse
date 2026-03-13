@@ -159,7 +159,14 @@
       "30m": "30 分钟",
       "1h": "1 小时",
       "all": "全部"
-    }
+    },
+    "logsTab": "日志",
+    "messagesTab": "消息",
+    "noMessages": "暂无消息",
+    "inbound": "入站",
+    "outbound": "出站",
+    "allChannels": "所有频道",
+    "messageFrom": "来自"
   },
   "agents": {
     "createAgent": "创建 Agent",

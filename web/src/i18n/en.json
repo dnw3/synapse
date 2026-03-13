@@ -30,7 +30,35 @@
     "queued": "Queued ({{count}})",
     "errorPrefix": "Error",
     "newChat": "New Chat",
-    "attachFile": "Attach file"
+    "attachFile": "Attach file",
+    "searchPlaceholder": "Search messages...",
+    "copyMarkdown": "Copy as Markdown",
+    "deleteMessage": "Delete message",
+    "exportTitle": "Export Conversation"
+  },
+  "commands": {
+    "stop": "Cancel current execution",
+    "new": "New conversation",
+    "reset": "Reset conversation",
+    "compact": "Compact context",
+    "focus": "Toggle focus mode",
+    "model": "Switch model",
+    "think": "Set thinking level",
+    "verbose": "Set verbose level",
+    "fast": "Toggle fast mode",
+    "help": "Show all commands",
+    "status": "Show session status",
+    "export": "Export as Markdown",
+    "usage": "Show token usage",
+    "agents": "List agents",
+    "skill": "Run a skill",
+    "clear": "Clear messages"
+  },
+  "focus": {
+    "exit": "Exit focus mode"
+  },
+  "context": {
+    "warning": "Context: {{tokens}} / {{limit}} ({{pct}}%)"
   },
   "tools": {
     "read_file": "Reading",

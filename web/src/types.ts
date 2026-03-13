@@ -9,12 +9,23 @@ export interface ToolCall {
   arguments: Record<string, unknown>;
 }
 
+export interface MessageUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_tokens?: number;
+  cache_write_tokens?: number;
+  cost_usd?: number;
+}
+
 export interface Message {
   role: "system" | "human" | "assistant" | "tool";
   content: string;
   tool_calls: ToolCall[];
   request_id?: string;
   reasoning?: string;
+  usage?: MessageUsage;
+  model?: string;
+  stop_reason?: string;
 }
 
 export interface FileEntry {

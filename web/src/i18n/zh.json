@@ -30,7 +30,35 @@
     "queued": "排队中 ({{count}})",
     "errorPrefix": "错误",
     "newChat": "新建会话",
-    "attachFile": "附件"
+    "attachFile": "附件",
+    "searchPlaceholder": "搜索消息...",
+    "copyMarkdown": "复制为 Markdown",
+    "deleteMessage": "删除消息",
+    "exportTitle": "导出对话"
+  },
+  "commands": {
+    "stop": "取消当前执行",
+    "new": "新建对话",
+    "reset": "重置对话",
+    "compact": "压缩上下文",
+    "focus": "切换专注模式",
+    "model": "切换模型",
+    "think": "设置思考级别",
+    "verbose": "设置详细级别",
+    "fast": "切换快速模式",
+    "help": "显示所有命令",
+    "status": "显示会话状态",
+    "export": "导出为 Markdown",
+    "usage": "显示 Token 用量",
+    "agents": "列出 Agent",
+    "skill": "运行技能",
+    "clear": "清空消息"
+  },
+  "focus": {
+    "exit": "退出专注模式"
+  },
+  "context": {
+    "warning": "上下文: {{tokens}} / {{limit}} ({{pct}}%)"
   },
   "tools": {
     "read_file": "读取",

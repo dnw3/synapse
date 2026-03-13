@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { User, Bot, Copy, Check } from "lucide-react";
+import { User, Bot, Copy, Check, Trash2 } from "lucide-react";
 import type { Message } from "../types";
 import ToolCallCard from "./ToolCallCard";
 import ThinkingBlock from "./ThinkingBlock";
@@ -14,6 +14,32 @@ interface Props {
   message?: Message;
   /** Grouped assistant turn: multiple assistant + tool messages rendered under one avatar */
   turn?: Message[];
+  /** Called when user deletes this message group */
+  onDelete?: () => void;
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function shortenModel(model: string): string {
+  return model
+    .replace(/^(openai\/|anthropic\/|google\/)/, "")
+    .replace(/-\d{8}$/, "");
+}
+
+function copyAsMarkdown(msgs: Message[]) {
+  const md = msgs
+    .map((msg) => {
+      if (msg.role === "assistant" && msg.content) return msg.content;
+      if (msg.role === "tool") return `> Tool: ${msg.content.slice(0, 200)}`;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+  navigator.clipboard.writeText(md).catch(() => {});
 }
 
 function LogIdBadge({ requestId }: { requestId: string }) {
@@ -108,8 +134,10 @@ function ToolResultSnippet({ content }: { content: string }) {
   );
 }
 
-export default function MessageBubble({ message, turn }: Props) {
+export default function MessageBubble({ message, turn, onDelete }: Props) {
+  const { t } = useTranslation();
   const identity = useIdentity();
+  const [copyDone, setCopyDone] = useState(false);
 
   // Single human message
   if (message && message.role === "human") {
@@ -140,8 +168,17 @@ export default function MessageBubble({ message, turn }: Props) {
   const msgsWithRid = msgs.filter((m) => m.role === "assistant" && m.content && m.request_id);
   const lastRequestId = msgsWithRid.length > 0 ? msgsWithRid[msgsWithRid.length - 1].request_id : undefined;
 
+  // Find the last assistant message for metadata footer
+  const lastAssistantMsg = [...msgs].reverse().find((m) => m.role === "assistant");
+
+  const handleCopy = () => {
+    copyAsMarkdown(msgs);
+    setCopyDone(true);
+    setTimeout(() => setCopyDone(false), 1500);
+  };
+
   return (
-    <div className="flex gap-3 animate-message-in-left">
+    <div className="flex gap-3 animate-message-in-left group/turn">
       <div className="w-7 h-7 rounded-full bg-[var(--accent-glow)] border border-[var(--accent)]/15 flex items-center justify-center flex-shrink-0 overflow-hidden">
         {identity?.avatar_url ? (
           <img src={identity.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -151,7 +188,27 @@ export default function MessageBubble({ message, turn }: Props) {
           <Bot className="h-3.5 w-3.5 text-[var(--accent-light)]" />
         )}
       </div>
-      <div className="flex-1 min-w-0 space-y-2">
+      <div className="flex-1 min-w-0 space-y-2 relative">
+        {/* Hover action buttons */}
+        <div className="absolute -top-2 right-0 hidden group-hover/turn:flex items-center gap-0.5 bg-[var(--bg-content)] border border-[var(--separator)] rounded-[var(--radius-md)] px-0.5 py-0.5 shadow-sm z-10">
+          <button
+            onClick={handleCopy}
+            title={t("chat.copyMarkdown")}
+            className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            {copyDone ? <Check className="w-3 h-3 text-[var(--success)]" /> : <Copy className="w-3 h-3" />}
+          </button>
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              title={t("chat.deleteMessage")}
+              className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:text-[var(--error)] transition-colors"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
         {msgs.map((msg, i) => {
           if (msg.role === "tool") {
             return <ToolResultSnippet key={i} content={msg.content} />;
@@ -183,6 +240,24 @@ export default function MessageBubble({ message, turn }: Props) {
             </div>
           );
         })}
+
+        {/* Metadata footer */}
+        {lastAssistantMsg?.usage && (
+          <div className="flex items-center gap-2 mt-1 text-[10px] text-[var(--text-tertiary)] font-mono flex-wrap">
+            {lastAssistantMsg.usage.input_tokens != null && (
+              <span>↑{formatTokens(lastAssistantMsg.usage.input_tokens)}</span>
+            )}
+            {lastAssistantMsg.usage.output_tokens != null && (
+              <span>↓{formatTokens(lastAssistantMsg.usage.output_tokens)}</span>
+            )}
+            {lastAssistantMsg.usage.cost_usd != null && (
+              <span>${lastAssistantMsg.usage.cost_usd.toFixed(4)}</span>
+            )}
+            {lastAssistantMsg.model && (
+              <span>{shortenModel(lastAssistantMsg.model)}</span>
+            )}
+          </div>
+        )}
 
         {lastRequestId && <LogIdBadge requestId={lastRequestId} />}
       </div>

@@ -6,7 +6,7 @@ import { useTheme } from "./hooks/useTheme";
 import { Toaster, useToast } from "./components/ui/toast";
 import Sidebar from "./components/Sidebar";
 import Toolbar from "./components/Toolbar";
-import ChatPanel from "./components/ChatPanel";
+import ChatPanel, { FocusModeExitButton } from "./components/ChatPanel";
 import Dashboard, { TABS, SIDEBAR_SECTIONS, type TabKey } from "./components/Dashboard";
 import type { Message, FileAttachment } from "./types";
 import type { IdentityInfo } from "./types/dashboard";
@@ -35,6 +35,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<ViewKey>("chat");
   const [identity, setIdentity] = useState<IdentityInfo | null>(null);
   const [modelName, setModelName] = useState<string | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
 
   // Fetch agent identity + model name from health
   useEffect(() => {
@@ -266,88 +267,106 @@ export default function App() {
   const toolbarModel = isChatView ? (modelName ?? undefined) : undefined;
   const toolbarStatus = (!["idle", "pong"].includes(ws.status)) ? t(`status.${ws.status}`) : undefined;
 
+  const chatPanel = (
+    <ChatPanel
+      messages={allMessages}
+      loading={sendLock || conv.loading || ws.status === "executing" || ws.status === "thinking"}
+      streaming={currentAssistantContent.length > 0}
+      approvalRequest={pendingApproval}
+      onSend={handleSendMessage}
+      onCancel={handleCancel}
+      onApprovalRespond={handleApprovalRespond}
+      onNewChat={() => conv.createConversation()}
+      onReset={() => {
+        if (conv.activeId) {
+          conv.deleteConversation(conv.activeId);
+          conv.createConversation();
+        }
+      }}
+      onToggleFocus={() => setFocusMode((f) => !f)}
+      onClearMessages={() => conv.setMessages([])}
+      queueSize={messageQueue.length}
+      chatError={chatError}
+      onDismissError={() => setChatError(null)}
+    />
+  );
+
   return (
     <IdentityContext.Provider value={identity}>
     <div className="flex h-screen bg-[var(--bg-window)] text-[var(--text-primary)]">
-      {/* Mobile backdrop */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Unified Sidebar */}
-      <Sidebar
-        conversations={conv.conversations}
-        activeConversationId={conv.activeId}
-        titles={conv.titles}
-        onSelectConversation={(id) => { conv.setActiveId(id); setMobileMenuOpen(false); }}
-        onNewConversation={() => { conv.createConversation(); setMobileMenuOpen(false); }}
-        onDeleteConversation={conv.deleteConversation}
-        activeView={activeView}
-        onViewChange={(v) => { setActiveView(v as ViewKey); setMobileMenuOpen(false); }}
-        tabs={TABS}
-        sidebarSections={SIDEBAR_SECTIONS}
-        identity={identity}
-        themeMode={theme.mode}
-        onCycleTheme={theme.cycleMode}
-        onToggleLanguage={toggleLanguage}
-        isOpen={mobileMenuOpen}
-        onClose={() => setMobileMenuOpen(false)}
-      />
-
-      {/* Main content */}
-      <main className="flex-1 flex flex-col min-w-0">
-        <Toolbar
-          title={toolbarTitle}
-          subtitle={toolbarSubtitle}
-          modelBadge={toolbarModel}
-          connected={ws.connected}
-          status={toolbarStatus}
-          onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          showMenu={true}
-        />
-
-        <div className="flex-1 flex overflow-hidden">
-          {isChatView ? (
-            <div className="flex-1 flex flex-col min-w-0 min-h-0">
-              <ChatPanel
-                messages={allMessages}
-                loading={sendLock || conv.loading || ws.status === "executing" || ws.status === "thinking"}
-                streaming={currentAssistantContent.length > 0}
-                approvalRequest={pendingApproval}
-                onSend={handleSendMessage}
-                onCancel={handleCancel}
-                onApprovalRespond={handleApprovalRespond}
-                onNewChat={() => conv.createConversation()}
-                onReset={() => {
-                  if (conv.activeId) {
-                    conv.deleteConversation(conv.activeId);
-                    conv.createConversation();
-                  }
-                }}
-                queueSize={messageQueue.length}
-                chatError={chatError}
-                onDismissError={() => setChatError(null)}
-              />
-            </div>
-          ) : (
-            /* Dashboard content for the active tab */
-            <Dashboard
-              connected={ws.connected}
-              conversationCount={conv.conversations.length}
-              messageCount={allMessages.length}
-              activeTab={activeView as TabKey}
-              onNavigateToChat={(id) => {
-                conv.ensureConversation(id);
-                conv.setActiveId(id);
-                setActiveView("chat");
-              }}
+      {/* Focus mode: show only chat with exit button */}
+      {focusMode ? (
+        <>
+          <main className="flex-1 flex flex-col min-w-0 min-h-0">
+            {chatPanel}
+          </main>
+          <FocusModeExitButton onExit={() => setFocusMode(false)} />
+        </>
+      ) : (
+        <>
+          {/* Mobile backdrop */}
+          {mobileMenuOpen && (
+            <div
+              className="fixed inset-0 z-40 bg-black/50 md:hidden"
+              onClick={() => setMobileMenuOpen(false)}
             />
           )}
-        </div>
-      </main>
+
+          {/* Unified Sidebar */}
+          <Sidebar
+            conversations={conv.conversations}
+            activeConversationId={conv.activeId}
+            titles={conv.titles}
+            onSelectConversation={(id) => { conv.setActiveId(id); setMobileMenuOpen(false); }}
+            onNewConversation={() => { conv.createConversation(); setMobileMenuOpen(false); }}
+            onDeleteConversation={conv.deleteConversation}
+            activeView={activeView}
+            onViewChange={(v) => { setActiveView(v as ViewKey); setMobileMenuOpen(false); }}
+            tabs={TABS}
+            sidebarSections={SIDEBAR_SECTIONS}
+            identity={identity}
+            themeMode={theme.mode}
+            onCycleTheme={theme.cycleMode}
+            onToggleLanguage={toggleLanguage}
+            isOpen={mobileMenuOpen}
+            onClose={() => setMobileMenuOpen(false)}
+          />
+
+          {/* Main content */}
+          <main className="flex-1 flex flex-col min-w-0">
+            <Toolbar
+              title={toolbarTitle}
+              subtitle={toolbarSubtitle}
+              modelBadge={toolbarModel}
+              connected={ws.connected}
+              status={toolbarStatus}
+              onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              showMenu={true}
+            />
+
+            <div className="flex-1 flex overflow-hidden">
+              {isChatView ? (
+                <div className="flex-1 flex flex-col min-w-0 min-h-0">
+                  {chatPanel}
+                </div>
+              ) : (
+                /* Dashboard content for the active tab */
+                <Dashboard
+                  connected={ws.connected}
+                  conversationCount={conv.conversations.length}
+                  messageCount={allMessages.length}
+                  activeTab={activeView as TabKey}
+                  onNavigateToChat={(id) => {
+                    conv.ensureConversation(id);
+                    conv.setActiveId(id);
+                    setActiveView("chat");
+                  }}
+                />
+              )}
+            </div>
+          </main>
+        </>
+      )}
 
       <Toaster />
     </div>

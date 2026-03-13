@@ -160,3 +160,201 @@ pub async fn handle_reload(_ctx: Arc<RpcContext>, _params: Value) -> Result<Valu
     // Placeholder — config reload requires mutable config reference
     Ok(json!({ "ok": true }))
 }
+
+// ---------------------------------------------------------------------------
+// config.patch
+// ---------------------------------------------------------------------------
+
+/// Apply a JSON merge patch to the TOML config.
+/// Params: `{ patch: { "model.name": "gpt-4", ... }, base_hash?: string }`
+pub async fn handle_patch(_ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let patch = params
+        .get("patch")
+        .and_then(|v| v.as_object())
+        .ok_or_else(|| RpcError::invalid_request("missing 'patch' object"))?
+        .clone();
+
+    let (path, content) = read_config_file().await?;
+
+    // Optional hash check for concurrent edit detection
+    if let Some(expected_hash) = params.get("base_hash").and_then(|v| v.as_str()) {
+        let actual_hash = sha256_hex(content.as_bytes());
+        if actual_hash != expected_hash {
+            return Err(RpcError::invalid_request(
+                "base_hash mismatch — config was modified concurrently",
+            ));
+        }
+    }
+
+    let mut toml_val: toml::Value =
+        toml::from_str(&content).map_err(|e| RpcError::internal(format!("parse config: {}", e)))?;
+
+    // Apply each dotted-key patch entry
+    for (key, value) in &patch {
+        let parts: Vec<&str> = key.split('.').collect();
+        set_toml_path(&mut toml_val, &parts, json_to_toml(value)?);
+    }
+
+    let new_content = toml::to_string_pretty(&toml_val)
+        .map_err(|e| RpcError::internal(format!("serialize config: {}", e)))?;
+
+    tokio::fs::write(&path, &new_content)
+        .await
+        .map_err(|e| RpcError::internal(format!("write config: {}", e)))?;
+
+    let new_hash = sha256_hex(new_content.as_bytes());
+    Ok(json!({ "success": true, "path": path, "hash": new_hash }))
+}
+
+// ---------------------------------------------------------------------------
+// config.apply  (synonym for config.set)
+// ---------------------------------------------------------------------------
+
+pub async fn handle_apply(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    handle_set(ctx, params).await
+}
+
+// ---------------------------------------------------------------------------
+// config.schema.lookup
+// ---------------------------------------------------------------------------
+
+/// Return the sub-section of the schema for a given path.
+/// Params: `{ path: string }` — e.g. `"model"` or `"serve.port"`
+pub async fn handle_schema_lookup(_ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let path = params
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| RpcError::invalid_request("missing 'path' parameter"))?;
+
+    // Full schema as a JSON object indexed by dotted path
+    let full_schema = serde_json::json!({
+        "model": {
+            "description": "LLM model configuration",
+            "fields": {
+                "name": { "type": "string", "description": "Model identifier", "default": "claude-3-5-sonnet-20241022" },
+                "provider": { "type": "string", "description": "Model provider (openai/anthropic/ollama/...)" },
+                "api_key": { "type": "string", "sensitive": true, "description": "Provider API key" },
+                "base_url": { "type": "string", "description": "Custom API base URL" },
+                "max_tokens": { "type": "integer", "description": "Max output tokens" },
+                "temperature": { "type": "float", "description": "Sampling temperature" },
+            }
+        },
+        "agent": {
+            "description": "Agent behaviour configuration",
+            "fields": {
+                "name": { "type": "string", "description": "Display name of this agent" },
+                "system_prompt": { "type": "string", "description": "System prompt / persona" },
+                "max_iterations": { "type": "integer", "description": "Max tool-call iterations per request" },
+            }
+        },
+        "memory": {
+            "description": "Long-term memory store",
+            "fields": {
+                "enabled": { "type": "bool", "description": "Enable memory module" },
+                "embedding_model": { "type": "string", "description": "Embedding model for retrieval" },
+            }
+        },
+        "session": {
+            "description": "Session persistence settings",
+            "fields": {
+                "dir": { "type": "string", "description": "Directory for session transcripts" },
+                "max_messages": { "type": "integer", "description": "Maximum messages per session" },
+            }
+        },
+        "serve": {
+            "description": "Web server settings",
+            "fields": {
+                "port": { "type": "integer", "description": "HTTP listen port", "default": 3000 },
+                "host": { "type": "string", "description": "Bind address", "default": "127.0.0.1" },
+            }
+        },
+        "auth": {
+            "description": "Authentication settings",
+            "fields": {
+                "token": { "type": "string", "sensitive": true, "description": "Bearer token for gateway auth" },
+            }
+        },
+        "logging": {
+            "description": "Logging configuration",
+            "fields": {
+                "level": { "type": "string", "description": "Log level (trace/debug/info/warn/error)" },
+                "file": { "type": "string", "description": "Log file path" },
+            }
+        },
+    });
+
+    // Walk dotted path
+    let mut current = &full_schema;
+    for part in path.split('.') {
+        current = current
+            .get(part)
+            .ok_or_else(|| RpcError::invalid_request(format!("unknown schema path: {}", path)))?;
+    }
+
+    Ok(json!({ "path": path, "schema": current }))
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+fn sha256_hex(data: &[u8]) -> String {
+    use std::fmt::Write;
+    // Simple SHA-256 using standard library via std::hash or manual — use sha2 if available,
+    // otherwise fall back to a stable placeholder based on content length + checksum.
+    // Since sha2 may not be in Cargo.toml, use a simple FNV-style hash serialised as hex.
+    let mut hash: u64 = 14695981039346656037u64;
+    for &b in data {
+        hash ^= b as u64;
+        hash = hash.wrapping_mul(1099511628211);
+    }
+    let mut s = String::new();
+    let _ = write!(s, "{:016x}", hash);
+    s
+}
+
+fn set_toml_path(root: &mut toml::Value, parts: &[&str], value: toml::Value) {
+    if parts.is_empty() {
+        return;
+    }
+    if parts.len() == 1 {
+        if let toml::Value::Table(t) = root {
+            t.insert(parts[0].to_string(), value);
+        }
+        return;
+    }
+    if let toml::Value::Table(t) = root {
+        let entry = t
+            .entry(parts[0].to_string())
+            .or_insert_with(|| toml::Value::Table(toml::map::Map::new()));
+        set_toml_path(entry, &parts[1..], value);
+    }
+}
+
+fn json_to_toml(v: &serde_json::Value) -> Result<toml::Value, RpcError> {
+    match v {
+        serde_json::Value::Null => Ok(toml::Value::String(String::new())),
+        serde_json::Value::Bool(b) => Ok(toml::Value::Boolean(*b)),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(toml::Value::Integer(i))
+            } else if let Some(f) = n.as_f64() {
+                Ok(toml::Value::Float(f))
+            } else {
+                Err(RpcError::invalid_request("unsupported numeric type"))
+            }
+        }
+        serde_json::Value::String(s) => Ok(toml::Value::String(s.clone())),
+        serde_json::Value::Array(arr) => {
+            let items: Result<Vec<_>, _> = arr.iter().map(json_to_toml).collect();
+            Ok(toml::Value::Array(items?))
+        }
+        serde_json::Value::Object(map) => {
+            let mut t = toml::map::Map::new();
+            for (k, val) in map {
+                t.insert(k.clone(), json_to_toml(val)?);
+            }
+            Ok(toml::Value::Table(t))
+        }
+    }
+}

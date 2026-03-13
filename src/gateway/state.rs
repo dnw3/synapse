@@ -10,6 +10,7 @@ use super::auth::AuthState;
 use super::rpc::{Broadcaster, RpcRouter};
 use crate::agent;
 use crate::config::SynapseConfig;
+use crate::gateway::rpc::wizard::WizardSession;
 use crate::logging::LogBuffer;
 use crate::session::SessionWriteLock;
 
@@ -67,6 +68,8 @@ pub struct AppState {
     pub exec_approvals_config: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalsConfig>>,
     /// Connection IDs subscribed to session change events.
     pub session_subscribers: Arc<RwLock<HashSet<String>>>,
+    /// Active wizard sessions keyed by session UUID.
+    pub wizard_sessions: Arc<RwLock<HashMap<String, WizardSession>>>,
 }
 
 impl AppState {
@@ -137,6 +140,7 @@ impl AppState {
             exec_approval_manager,
             exec_approvals_config,
             session_subscribers: Arc::new(RwLock::new(HashSet::new())),
+            wizard_sessions: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 }

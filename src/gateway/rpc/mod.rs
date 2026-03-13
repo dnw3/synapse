@@ -3,6 +3,7 @@
 //! Provides typed frames, method routing with scope-based access control,
 //! connection broadcasting, and built-in health/status methods.
 
+mod agent_files;
 mod agents;
 mod channels;
 mod chat;
@@ -27,6 +28,7 @@ mod store;
 mod tools_rpc;
 mod tts;
 mod usage;
+pub mod wizard;
 mod workspace;
 
 pub mod router;
@@ -175,6 +177,18 @@ pub fn register_all(router: &mut RpcRouter) {
         "config.reload",
         Box::new(|ctx, params| Box::pin(config_rpc::handle_reload(ctx, params))),
     );
+    router.register(
+        "config.patch",
+        Box::new(|ctx, params| Box::pin(config_rpc::handle_patch(ctx, params))),
+    );
+    router.register(
+        "config.apply",
+        Box::new(|ctx, params| Box::pin(config_rpc::handle_apply(ctx, params))),
+    );
+    router.register(
+        "config.schema.lookup",
+        Box::new(|ctx, params| Box::pin(config_rpc::handle_schema_lookup(ctx, params))),
+    );
 
     // Schedules (cron)
     router.register(
@@ -296,6 +310,42 @@ pub fn register_all(router: &mut RpcRouter) {
     router.register(
         "agent.identity.get",
         Box::new(|ctx, params| Box::pin(identity::handle_get(ctx, params))),
+    );
+    router.register(
+        "gateway.identity.get",
+        Box::new(|ctx, params| Box::pin(identity::handle_gateway_identity(ctx, params))),
+    );
+
+    // Wizard
+    router.register(
+        "wizard.start",
+        Box::new(|ctx, params| Box::pin(wizard::handle_start(ctx, params))),
+    );
+    router.register(
+        "wizard.next",
+        Box::new(|ctx, params| Box::pin(wizard::handle_next(ctx, params))),
+    );
+    router.register(
+        "wizard.cancel",
+        Box::new(|ctx, params| Box::pin(wizard::handle_cancel(ctx, params))),
+    );
+    router.register(
+        "wizard.status",
+        Box::new(|ctx, params| Box::pin(wizard::handle_status(ctx, params))),
+    );
+
+    // Agent files
+    router.register(
+        "agents.files.list",
+        Box::new(|ctx, params| Box::pin(agent_files::handle_list(ctx, params))),
+    );
+    router.register(
+        "agents.files.get",
+        Box::new(|ctx, params| Box::pin(agent_files::handle_get(ctx, params))),
+    );
+    router.register(
+        "agents.files.set",
+        Box::new(|ctx, params| Box::pin(agent_files::handle_set(ctx, params))),
     );
 
     // Chat / Agent control

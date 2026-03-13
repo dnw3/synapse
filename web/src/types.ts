@@ -52,7 +52,8 @@ export type WsEvent =
   | { type: "done" }
   | { type: "error"; message: string; request_id?: string }
   | { type: "rpc_response"; id: string; result?: unknown; error?: string }
-  | { type: "hello"; version: string; features: string[] };
+  | { type: "hello"; version: string; features: string[] }
+  | { type: "event"; event: string; payload: unknown };
 
 export interface FileAttachment {
   id: string;

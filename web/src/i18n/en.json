@@ -463,5 +463,29 @@
   "logid": {
     "copied": "Copied",
     "tooltip": "Click to copy LogID for tracing"
+  },
+  "palette": {
+    "title": "Command Palette",
+    "placeholder": "Search commands...",
+    "navigation": "Navigation",
+    "commands": "Commands",
+    "sessions": "Sessions",
+    "empty": "No results"
+  },
+  "wizard": {
+    "title": "Setup Wizard",
+    "next": "Next",
+    "back": "Back",
+    "finish": "Finish",
+    "cancel": "Cancel",
+    "success": "Setup complete!",
+    "error": "Setup failed"
+  },
+  "agentFiles": {
+    "title": "Agent Files",
+    "noAgent": "Select an agent to view files",
+    "save": "Save",
+    "saved": "Saved",
+    "loading": "Loading..."
   }
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Bot, Plus, Trash2, Save, Sparkles, Wrench, Radio, Settings2,
-  FileText, Terminal, Brain, MessageSquare, Puzzle, FolderOpen,
+  FileText, Terminal, Brain, MessageSquare, Puzzle, FolderOpen, Files,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
@@ -11,13 +11,14 @@ import {
   SectionCard, SectionHeader, EmptyState, LoadingSkeleton, useToast, ToastContainer,
 } from "./shared";
 
-type DetailTab = "overview" | "tools" | "skills" | "channels";
+type DetailTab = "overview" | "tools" | "skills" | "channels" | "files";
 
 const DETAIL_TABS: { key: DetailTab; i18nKey: string; icon: React.ReactNode }[] = [
   { key: "overview", i18nKey: "agents.tabOverview", icon: <Settings2 className="h-3.5 w-3.5" /> },
   { key: "tools", i18nKey: "agents.tabTools", icon: <Wrench className="h-3.5 w-3.5" /> },
   { key: "skills", i18nKey: "agents.tabSkills", icon: <Sparkles className="h-3.5 w-3.5" /> },
   { key: "channels", i18nKey: "agents.tabChannels", icon: <Radio className="h-3.5 w-3.5" /> },
+  { key: "files", i18nKey: "agentFiles.title", icon: <Files className="h-3.5 w-3.5" /> },
 ];
 
 const EMOJI_PLACEHOLDERS = ["🤖", "🧠", "⚡", "🔮", "🎯", "🛠️", "💎", "🌟"];
@@ -46,6 +47,51 @@ export default function AgentsPage() {
   const [editModel, setEditModel] = useState("");
   const [editPrompt, setEditPrompt] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Agent files tab state
+  const AGENT_FILES = ["AGENTS.md", "SOUL.md", "MEMORY.md", "BOOTSTRAP.md"];
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState("");
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileSaving, setFileSaving] = useState(false);
+  const [fileSaved, setFileSaved] = useState(false);
+
+  const loadFile = useCallback(async (filename: string) => {
+    setSelectedFile(filename);
+    setFileContent("");
+    setFileSaved(false);
+    setFileLoading(true);
+    try {
+      const res = await fetch(`/api/dashboard/agents/files/${encodeURIComponent(filename)}`);
+      if (res.ok) {
+        const data = await res.json() as { content?: string };
+        setFileContent(data.content ?? "");
+      } else {
+        setFileContent("");
+      }
+    } catch {
+      setFileContent("");
+    } finally {
+      setFileLoading(false);
+    }
+  }, []);
+
+  const saveFile = useCallback(async () => {
+    if (!selectedFile) return;
+    setFileSaving(true);
+    try {
+      await fetch(`/api/dashboard/agents/files/${encodeURIComponent(selectedFile)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: fileContent }),
+      });
+      setFileSaved(true);
+      setTimeout(() => setFileSaved(false), 2000);
+    } catch { /* ignore */ }
+    finally {
+      setFileSaving(false);
+    }
+  }, [selectedFile, fileContent]);
 
   const loadAgents = useCallback(async () => {
     const [data, tools, sk] = await Promise.all([
@@ -455,6 +501,65 @@ export default function AgentsPage() {
                             </span>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {detailTab === "files" && (
+                  <div className="space-y-3">
+                    {/* File buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      {AGENT_FILES.map((fname) => (
+                        <button
+                          key={fname}
+                          onClick={() => loadFile(fname)}
+                          className={cn(
+                            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-md)] text-[12px] font-mono border transition-colors cursor-pointer",
+                            selectedFile === fname
+                              ? "bg-[var(--accent)]/10 border-[var(--accent)]/40 text-[var(--accent)]"
+                              : "bg-[var(--bg-content)]/50 border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--separator)]"
+                          )}
+                        >
+                          <FileText className="h-3 w-3" />
+                          {fname}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Editor */}
+                    {fileLoading ? (
+                      <div className="text-[12px] text-[var(--text-tertiary)] py-4">
+                        {t("agentFiles.loading")}
+                      </div>
+                    ) : selectedFile ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={fileContent}
+                          onChange={(e) => { setFileContent(e.target.value); setFileSaved(false); }}
+                          rows={14}
+                          className="w-full px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[12px] font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors resize-y"
+                          spellCheck={false}
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={saveFile}
+                            disabled={fileSaving}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[12px] font-medium hover:brightness-110 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-40"
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                            {fileSaving ? t("agentFiles.loading") : t("agentFiles.save")}
+                          </button>
+                          {fileSaved && (
+                            <span className="text-[12px] text-[var(--success)]">
+                              {t("agentFiles.saved")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[12px] text-[var(--text-tertiary)] py-4">
+                        {t("agentFiles.noAgent")}
                       </div>
                     )}
                   </div>

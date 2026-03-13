@@ -8,8 +8,13 @@ import Sidebar from "./components/Sidebar";
 import Toolbar from "./components/Toolbar";
 import ChatPanel, { FocusModeExitButton } from "./components/ChatPanel";
 import Dashboard, { TABS, SIDEBAR_SECTIONS, type TabKey } from "./components/Dashboard";
+import CommandPalette, { type PaletteEntry } from "./components/CommandPalette";
+import SetupWizard from "./components/SetupWizard";
 import type { Message, FileAttachment } from "./types";
 import type { IdentityInfo } from "./types/dashboard";
+import {
+  LayoutDashboard, MessageSquare, Terminal,
+} from "lucide-react";
 
 // Identity context for child components (e.g. MessageBubble)
 export const IdentityContext = createContext<IdentityInfo | null>(null);
@@ -36,6 +41,8 @@ export default function App() {
   const [identity, setIdentity] = useState<IdentityInfo | null>(null);
   const [modelName, setModelName] = useState<string | null>(null);
   const [focusMode, setFocusMode] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   // Fetch agent identity + model name from health
   useEffect(() => {
@@ -60,6 +67,18 @@ export default function App() {
       .catch(() => {});
   }, []);
 
+  // ── Cmd+K / Ctrl+K → Command Palette ─────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setShowPalette((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   // ── Request ID (LogID) tracking ──────────────────────────────────────
   // Captured from WS status events for streaming display.
   // Historical messages get request_id from the backend (stored in additional_kwargs).
@@ -72,6 +91,11 @@ export default function App() {
     // Capture request_id from status events
     if (lastEvent.type === "status" && lastEvent.request_id) {
       currentRequestIdRef.current = lastEvent.request_id;
+    }
+
+    // Handle sessions.changed push event from v3 protocol
+    if (lastEvent.type === "event" && (lastEvent as { type: "event"; event: string; payload: unknown }).event === "sessions.changed") {
+      conv.refreshMessages();
     }
 
     if (lastEvent.type === "subagent_complete") {
@@ -291,6 +315,64 @@ export default function App() {
     />
   );
 
+  // ── Command Palette entries ───────────────────────────────────────────
+  const paletteEntries: PaletteEntry[] = [
+    // Navigation — one entry per dashboard tab + chat
+    {
+      id: "nav:chat",
+      label: "Chat",
+      labelZh: "聊天",
+      category: "navigation",
+      icon: <MessageSquare className="h-3.5 w-3.5" />,
+      action: () => setActiveView("chat"),
+    },
+    ...TABS.map((tab) => ({
+      id: `nav:${tab.key}`,
+      label: tab.labelEn,
+      labelZh: tab.labelZh,
+      category: "navigation" as const,
+      icon: <LayoutDashboard className="h-3.5 w-3.5" />,
+      action: () => setActiveView(tab.key as ViewKey),
+    })),
+    // Commands — slash commands
+    {
+      id: "cmd:new",
+      label: "New chat",
+      labelZh: "新建会话",
+      category: "command",
+      icon: <Terminal className="h-3.5 w-3.5" />,
+      action: () => conv.createConversation(),
+    },
+    {
+      id: "cmd:focus",
+      label: "Toggle focus mode",
+      labelZh: "切换专注模式",
+      category: "command",
+      icon: <Terminal className="h-3.5 w-3.5" />,
+      action: () => setFocusMode((f) => !f),
+    },
+    {
+      id: "cmd:wizard",
+      label: "Setup Wizard",
+      labelZh: "设置向导",
+      category: "command",
+      icon: <Terminal className="h-3.5 w-3.5" />,
+      action: () => setShowWizard(true),
+    },
+    // Sessions — recent conversations
+    ...conv.conversations.slice(0, 10).map((c) => ({
+      id: `session:${c.id}`,
+      label: conv.titles[c.id] || c.id.slice(0, 8),
+      labelZh: conv.titles[c.id] || c.id.slice(0, 8),
+      category: "session" as const,
+      icon: <MessageSquare className="h-3.5 w-3.5" />,
+      action: () => {
+        conv.setActiveId(c.id);
+        setActiveView("chat");
+      },
+    })),
+  ];
+
   return (
     <IdentityContext.Provider value={identity}>
     <div className="flex h-screen bg-[var(--bg-window)] text-[var(--text-primary)]">
@@ -369,6 +451,20 @@ export default function App() {
       )}
 
       <Toaster />
+
+      {/* Command Palette */}
+      <CommandPalette
+        open={showPalette}
+        onClose={() => setShowPalette(false)}
+        entries={paletteEntries}
+      />
+
+      {/* Setup Wizard */}
+      <SetupWizard
+        open={showWizard}
+        onClose={() => setShowWizard(false)}
+        onCall={ws.call}
+      />
     </div>
     </IdentityContext.Provider>
   );

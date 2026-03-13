@@ -463,5 +463,29 @@
   "logid": {
     "copied": "已复制",
     "tooltip": "点击复制 LogID 用于追踪"
+  },
+  "palette": {
+    "title": "命令面板",
+    "placeholder": "搜索命令...",
+    "navigation": "导航",
+    "commands": "命令",
+    "sessions": "会话",
+    "empty": "无结果"
+  },
+  "wizard": {
+    "title": "设置向导",
+    "next": "下一步",
+    "back": "上一步",
+    "finish": "完成",
+    "cancel": "取消",
+    "success": "设置完成！",
+    "error": "设置失败"
+  },
+  "agentFiles": {
+    "title": "Agent 文件",
+    "noAgent": "选择一个 Agent 查看文件",
+    "save": "保存",
+    "saved": "已保存",
+    "loading": "加载中..."
   }
 }

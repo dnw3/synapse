@@ -70,6 +70,8 @@ pub struct AppState {
     pub session_subscribers: Arc<RwLock<HashSet<String>>>,
     /// Active wizard sessions keyed by session UUID.
     pub wizard_sessions: Arc<RwLock<HashMap<String, WizardSession>>>,
+    /// Bootstrap token store for device pairing QR codes.
+    pub bootstrap_store: Arc<RwLock<crate::gateway::nodes::BootstrapStore>>,
 }
 
 impl AppState {
@@ -141,6 +143,7 @@ impl AppState {
             exec_approvals_config,
             session_subscribers: Arc::new(RwLock::new(HashSet::new())),
             wizard_sessions: Arc::new(RwLock::new(HashMap::new())),
+            bootstrap_store: Arc::new(RwLock::new(crate::gateway::nodes::BootstrapStore::new())),
         })
     }
 }

@@ -3,6 +3,7 @@ pub mod auth;
 pub mod client;
 pub mod error;
 pub mod exec_approvals;
+pub mod messages;
 mod metrics;
 pub mod nodes;
 mod openai_compat;

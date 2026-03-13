@@ -1,7 +1,20 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Network, Shield, CheckCircle, XCircle, RefreshCw, Clock, Laptop, AlertTriangle } from "lucide-react";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import {
+  Network,
+  Shield,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Clock,
+  Laptop,
+  AlertTriangle,
+  QrCode,
+  Copy,
+  Trash2,
+  RotateCw,
+  KeyRound,
+} from "lucide-react";
 import {
   SectionCard,
   SectionHeader,
@@ -35,6 +48,14 @@ interface ExecApprovalConfig {
   allowlist: string[];
 }
 
+interface QrData {
+  qr_svg: string;
+  setup_code: string;
+  gateway_url: string;
+  bootstrap_token: string;
+  ttl_ms: number;
+}
+
 function relativeTime(isoDate?: string): string {
   if (!isoDate) return "";
   const diff = Date.now() - new Date(isoDate).getTime();
@@ -48,7 +69,6 @@ function relativeTime(isoDate?: string): string {
 
 export default function NodesPage() {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
   const { toasts, addToast } = useToast();
   const [nodes, setNodes] = useState<PairedNode[]>([]);
   const [pending, setPending] = useState<PendingRequest[]>([]);
@@ -58,11 +78,14 @@ export default function NodesPage() {
     allowlist: [],
   });
   const [loading, setLoading] = useState(true);
+  const [qrData, setQrData] = useState<QrData | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrExpiry, setQrExpiry] = useState(0);
+  const qrTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch nodes and approval config via REST fallback
       const [nodesRes, configRes] = await Promise.allSettled([
         fetch("/api/dashboard/nodes").then((r) => r.ok ? r.json() : null),
         fetch("/api/dashboard/exec-approvals").then((r) => r.ok ? r.json() : null),
@@ -80,7 +103,7 @@ export default function NodesPage() {
         });
       }
     } catch {
-      // silently fail — pages may not have backend support yet
+      // silently fail
     }
     setLoading(false);
   }, []);
@@ -88,6 +111,56 @@ export default function NodesPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // QR expiry countdown
+  useEffect(() => {
+    if (qrExpiry <= 0) {
+      if (qrTimerRef.current) clearInterval(qrTimerRef.current);
+      if (qrData) setQrData(null);
+      return;
+    }
+    qrTimerRef.current = setInterval(() => {
+      setQrExpiry((prev) => {
+        if (prev <= 1) {
+          setQrData(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (qrTimerRef.current) clearInterval(qrTimerRef.current);
+    };
+  }, [qrExpiry > 0]);
+
+  const handleGenerateQr = async () => {
+    setQrLoading(true);
+    try {
+      const res = await fetch("/api/dashboard/nodes/qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setQrData(data);
+        setQrExpiry(Math.floor((data.ttl_ms ?? 600000) / 1000));
+        addToast(t("nodes.qrGenerated"), "success");
+      } else {
+        addToast(t("nodes.qrFailed"), "error");
+      }
+    } catch {
+      addToast(t("nodes.qrFailed"), "error");
+    }
+    setQrLoading(false);
+  };
+
+  const handleCopySetupCode = () => {
+    if (qrData?.setup_code) {
+      navigator.clipboard.writeText(qrData.setup_code);
+      addToast(t("nodes.setupCodeCopied"), "success");
+    }
+  };
 
   const handleApprove = async (requestId: string) => {
     try {
@@ -125,12 +198,124 @@ export default function NodesPage() {
     }
   };
 
+  const handleRemove = async (nodeId: string) => {
+    try {
+      const res = await fetch(`/api/dashboard/nodes/remove`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ node_id: nodeId }),
+      });
+      if (res.ok) {
+        addToast(t("nodes.removed"), "success");
+        loadData();
+      } else {
+        addToast(t("nodes.removeFailed"), "error");
+      }
+    } catch {
+      addToast(t("nodes.removeFailed"), "error");
+    }
+  };
+
   if (loading) {
     return <LoadingSkeleton />;
   }
 
+  const formatExpiry = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
   return (
     <div className="flex flex-col gap-6">
+      {/* QR Code Pairing */}
+      <SectionCard>
+        <SectionHeader
+          icon={<QrCode className="h-4 w-4" />}
+          title={t("nodes.devicePairing")}
+          right={
+            <button
+              onClick={handleGenerateQr}
+              disabled={qrLoading}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[12px] font-medium transition-colors",
+                "bg-[var(--accent)] text-white hover:opacity-90",
+                qrLoading && "opacity-50 cursor-not-allowed",
+              )}
+            >
+              {qrLoading ? (
+                <RotateCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <QrCode className="h-3.5 w-3.5" />
+              )}
+              {qrData ? t("nodes.regenerateQr") : t("nodes.generateQr")}
+            </button>
+          }
+        />
+
+        {qrData ? (
+          <div className="mt-4 flex flex-col sm:flex-row items-start gap-6">
+            {/* QR Code SVG */}
+            <div className="flex-shrink-0 p-4 rounded-[var(--radius-lg)] bg-white border border-[var(--border-subtle)]">
+              <div
+                className="w-[200px] h-[200px]"
+                dangerouslySetInnerHTML={{ __html: qrData.qr_svg }}
+              />
+            </div>
+
+            {/* Pairing Info */}
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5 text-[var(--text-tertiary)]" />
+                <span className={cn(
+                  "text-[12px] font-mono font-medium",
+                  qrExpiry < 60 ? "text-[var(--error)]" : "text-[var(--text-secondary)]",
+                )}>
+                  {t("nodes.expiresIn", { time: formatExpiry(qrExpiry) })}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
+                  {t("nodes.setupCode")}
+                </label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[11px] font-mono text-[var(--text-secondary)] truncate select-all">
+                    {qrData.setup_code}
+                  </code>
+                  <button
+                    onClick={handleCopySetupCode}
+                    className="p-2 rounded-[var(--radius-md)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
+                  {t("nodes.gatewayUrl")}
+                </label>
+                <span className="text-[12px] font-mono text-[var(--text-secondary)]">
+                  {qrData.gateway_url}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-[var(--text-tertiary)] leading-relaxed mt-1">
+                {t("nodes.qrHint")}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-col items-center justify-center py-8 text-center">
+            <QrCode className="h-10 w-10 text-[var(--text-tertiary)] opacity-40 mb-3" />
+            <p className="text-[13px] text-[var(--text-secondary)]">
+              {t("nodes.qrDescription")}
+            </p>
+          </div>
+        )}
+      </SectionCard>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Panel: Exec Approvals */}
         <SectionCard>
@@ -235,6 +420,13 @@ export default function NodesPage() {
                         </span>
                       )}
                       <StatusDot status={node.status === "online" ? "online" : "offline"} />
+                      <button
+                        onClick={() => handleRemove(node.id)}
+                        className="p-1 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 transition-colors"
+                        title={t("nodes.remove")}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
                     </div>
                   </div>
                 ))}

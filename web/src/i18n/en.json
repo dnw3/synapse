@@ -16,7 +16,9 @@
     "collapse": "Collapse sidebar",
     "expand": "Expand sidebar",
     "search": "Search...",
-    "brand": "Synapse"
+    "brand": "Synapse",
+    "switchToChat": "Switch to Chat",
+    "switchToDashboard": "Switch to Dashboard"
   },
   "chat": {
     "placeholder": "Send a message... (Enter to send, Shift+Enter for newline)",
@@ -458,7 +460,21 @@
     "allowlist": "Allowlist",
     "empty": "No nodes paired",
     "approve": "Approve",
-    "reject": "Reject"
+    "reject": "Reject",
+    "remove": "Remove device",
+    "removed": "Device removed",
+    "removeFailed": "Failed to remove device",
+    "devicePairing": "Device Pairing",
+    "generateQr": "Generate QR Code",
+    "regenerateQr": "Regenerate",
+    "qrGenerated": "QR code generated",
+    "qrFailed": "Failed to generate QR code",
+    "qrDescription": "Generate a QR code to pair a new device with this gateway",
+    "qrHint": "Scan this QR code with the Synapse app on another device to pair it. The code expires after 10 minutes.",
+    "setupCode": "Setup Code",
+    "setupCodeCopied": "Setup code copied",
+    "gatewayUrl": "Gateway URL",
+    "expiresIn": "Expires in {{time}}"
   },
   "logid": {
     "copied": "Copied",

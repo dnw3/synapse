@@ -9,6 +9,9 @@ import Toolbar from "./components/Toolbar";
 import ChatPanel, { FocusModeExitButton } from "./components/ChatPanel";
 import Dashboard, { TABS, SIDEBAR_SECTIONS, type TabKey } from "./components/Dashboard";
 import CommandPalette, { type PaletteEntry } from "./components/CommandPalette";
+
+// All dashboard tab keys for mode derivation
+const DASHBOARD_TABS = new Set<string>(TABS.map((t) => t.key));
 import SetupWizard from "./components/SetupWizard";
 import ToolOutputSidebar from "./components/ToolOutputSidebar";
 import type { Message, FileAttachment } from "./types";
@@ -48,6 +51,21 @@ export default function App() {
     open: false,
     content: "",
   });
+
+  // Derived sidebar mode: "chat" or "dashboard"
+  const sidebarMode = DASHBOARD_TABS.has(activeView) ? "dashboard" : "chat";
+  const lastDashboardTabRef = useRef<TabKey>("overview");
+  // Track last dashboard tab for mode switching
+  if (DASHBOARD_TABS.has(activeView)) {
+    lastDashboardTabRef.current = activeView as TabKey;
+  }
+  const handleSwitchSidebarMode = () => {
+    if (sidebarMode === "chat") {
+      setActiveView(lastDashboardTabRef.current);
+    } else {
+      setActiveView("chat");
+    }
+  };
 
   // Fetch agent identity + model name from health
   useEffect(() => {
@@ -429,13 +447,13 @@ export default function App() {
             conversations={conv.conversations}
             activeConversationId={conv.activeId}
             titles={conv.titles}
-            onSelectConversation={(id) => { conv.setActiveId(id); setMobileMenuOpen(false); }}
-            onNewConversation={() => { conv.createConversation(); setMobileMenuOpen(false); }}
+            onSelectConversation={(id) => { conv.setActiveId(id); setActiveView("chat"); setMobileMenuOpen(false); }}
+            onNewConversation={() => { conv.createConversation(); setActiveView("chat"); setMobileMenuOpen(false); }}
             onDeleteConversation={conv.deleteConversation}
             activeView={activeView}
             onViewChange={(v) => { setActiveView(v as ViewKey); setMobileMenuOpen(false); }}
-            tabs={TABS}
-            sidebarSections={SIDEBAR_SECTIONS}
+            sidebarMode={sidebarMode as "chat" | "dashboard"}
+            onSwitchMode={() => { handleSwitchSidebarMode(); setMobileMenuOpen(false); }}
             identity={identity}
             themeMode={theme.mode}
             onCycleTheme={theme.cycleMode}

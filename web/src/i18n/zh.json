@@ -16,7 +16,9 @@
     "collapse": "收起侧栏",
     "expand": "展开侧栏",
     "search": "搜索...",
-    "brand": "Synapse"
+    "brand": "Synapse",
+    "switchToChat": "切换到聊天",
+    "switchToDashboard": "切换到仪表盘"
   },
   "chat": {
     "placeholder": "输入消息... (Enter 发送, Shift+Enter 换行)",
@@ -458,7 +460,21 @@
     "allowlist": "白名单",
     "empty": "暂无配对节点",
     "approve": "批准",
-    "reject": "拒绝"
+    "reject": "拒绝",
+    "remove": "移除设备",
+    "removed": "设备已移除",
+    "removeFailed": "移除设备失败",
+    "devicePairing": "设备配对",
+    "generateQr": "生成二维码",
+    "regenerateQr": "重新生成",
+    "qrGenerated": "二维码已生成",
+    "qrFailed": "生成二维码失败",
+    "qrDescription": "生成二维码以将新设备与此网关配对",
+    "qrHint": "使用其他设备上的 Synapse 应用扫描此二维码进行配对，二维码将在 10 分钟后过期。",
+    "setupCode": "配对码",
+    "setupCodeCopied": "配对码已复制",
+    "gatewayUrl": "网关地址",
+    "expiresIn": "{{time}} 后过期"
   },
   "logid": {
     "copied": "已复制",

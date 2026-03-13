@@ -480,6 +480,28 @@ pub fn register_all(router: &mut RpcRouter) {
         Box::new(|ctx, params| Box::pin(devices::handle_token_revoke(ctx, params))),
     );
 
+    // Bootstrap tokens & QR codes
+    router.register(
+        "device.bootstrap.issue",
+        Box::new(|ctx, params| Box::pin(devices::handle_bootstrap_issue(ctx, params))),
+    );
+    router.register(
+        "device.bootstrap.verify",
+        Box::new(|ctx, params| Box::pin(devices::handle_bootstrap_verify(ctx, params))),
+    );
+    router.register(
+        "device.bootstrap.list",
+        Box::new(|ctx, params| Box::pin(devices::handle_bootstrap_list(ctx, params))),
+    );
+    router.register(
+        "device.qr.generate",
+        Box::new(|ctx, params| Box::pin(devices::handle_qr_generate(ctx, params))),
+    );
+    router.register(
+        "device.setup-code.decode",
+        Box::new(|ctx, params| Box::pin(devices::handle_setup_code_decode(ctx, params))),
+    );
+
     // Exec approvals
     router.register(
         "exec.approval.request",

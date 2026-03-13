@@ -142,6 +142,21 @@ impl PairingStore {
         removed
     }
 
+    /// Update a paired node's token hash (for rotation/revocation).
+    pub fn update_token_hash(&mut self, node_id: &str, token_hash: &str) -> bool {
+        if let Some(node) = self.data.paired.iter_mut().find(|n| n.node_id == node_id) {
+            node.token_hash = if token_hash.is_empty() {
+                None
+            } else {
+                Some(token_hash.to_string())
+            };
+            self.save();
+            true
+        } else {
+            false
+        }
+    }
+
     /// Rename a paired node.
     pub fn rename(&mut self, node_id: &str, new_name: &str) -> bool {
         if let Some(node) = self.data.paired.iter_mut().find(|n| n.node_id == node_id) {

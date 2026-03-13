@@ -62,9 +62,18 @@ export interface FileAttachment {
   url: string;
 }
 
+/** Delivery routing target for chat.send v3 protocol.
+ * When omitted the server defaults to webchat (current behaviour). */
+export interface DeliveryTarget {
+  channel: string;
+  to?: string;
+  account_id?: string;
+  thread_id?: string;
+}
+
 // WebSocket commands to server
 export type WsCommand =
-  | { type: "message"; content: string; attachments?: FileAttachment[]; idempotency_key?: string }
+  | { type: "message"; content: string; attachments?: FileAttachment[]; idempotency_key?: string; delivery?: DeliveryTarget }
   | { type: "form_submit"; block_id: string; values: Record<string, unknown> }
   | { type: "approval_response"; approved: boolean; allow_all?: boolean }
   | { type: "cancel" }

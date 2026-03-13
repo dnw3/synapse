@@ -4,12 +4,15 @@ use std::time::Duration;
 use colored::Colorize;
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::channels::reactions;
 use crate::config::bot::resolve_secret;
 use crate::config::SynapseConfig;
+use crate::gateway::messages::{Attachment, MessageEnvelope};
 use crate::logging;
 
 /// Run the Telegram bot adapter using Long Polling.
@@ -136,7 +139,7 @@ pub async fn run(
                         if let Ok(file_url) =
                             resolve_telegram_file(&client, &base_url, file_id).await
                         {
-                            attachments.push(crate::channels::handler::Attachment {
+                            attachments.push(Attachment {
                                 filename: format!(
                                     "photo_{}.jpg",
                                     file_id.chars().take(8).collect::<String>()
@@ -162,7 +165,7 @@ pub async fn run(
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
                     if let Ok(file_url) = resolve_telegram_file(&client, &base_url, file_id).await {
-                        attachments.push(crate::channels::handler::Attachment {
+                        attachments.push(Attachment {
                             filename,
                             url: file_url,
                             mime_type: mime,
@@ -210,13 +213,18 @@ pub async fn run(
                     .send()
                     .await;
 
-                match session
-                    .handle_message_with_attachments(&chat_id.to_string(), &text, &attachments)
-                    .await
-                {
+                let delivery = DeliveryContext {
+                    channel: "telegram".into(),
+                    to: Some(format!("chat:{}", chat_id)),
+                    ..Default::default()
+                };
+                let mut envelope = MessageEnvelope::channel(chat_id.to_string(), text, delivery);
+                envelope.attachments = attachments;
+
+                match session.handle_message(envelope).await {
                     Ok(reply) => {
                         // Split long replies into chunks
-                        let chunks = formatter::chunk_telegram(&reply);
+                        let chunks = formatter::chunk_telegram(&reply.content);
                         for chunk in chunks {
                             let _ = http
                                 .post(&format!("{}/sendMessage", base))

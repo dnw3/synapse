@@ -9,12 +9,15 @@ use serde_json::json;
 use tokio_tungstenite::tungstenite::Message as WsMsg;
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::channels::reactions;
 use crate::config::bot::resolve_secret;
 use crate::config::SynapseConfig;
+use crate::gateway::messages::{Attachment, MessageEnvelope};
 use crate::logging;
 
 /// Run the Discord bot.
@@ -154,6 +157,7 @@ pub async fn run(
                 let channel_id = data["channel_id"].as_str().unwrap_or("").to_string();
                 let message_id = data["id"].as_str().unwrap_or("").to_string();
                 let author_id = data["author"]["id"].as_str().unwrap_or("");
+                let guild_id = data["guild_id"].as_str().map(|s| s.to_string());
 
                 // Extract attachments (Discord gives direct CDN URLs)
                 let mut attachments = Vec::new();
@@ -163,7 +167,7 @@ pub async fn run(
                         let url = att["url"].as_str().unwrap_or("").to_string();
                         let content_type = att["content_type"].as_str().map(|s| s.to_string());
                         if !url.is_empty() {
-                            attachments.push(crate::channels::handler::Attachment {
+                            attachments.push(Attachment {
                                 filename,
                                 url,
                                 mime_type: content_type,
@@ -210,13 +214,20 @@ pub async fn run(
                         .send()
                         .await;
 
-                    match session
-                        .handle_message_with_attachments(&channel_id, &content, &attachments)
-                        .await
-                    {
+                    let delivery = DeliveryContext {
+                        channel: "discord".into(),
+                        to: Some(format!("channel:{}", channel_id)),
+                        account_id: guild_id,
+                        ..Default::default()
+                    };
+                    let mut envelope =
+                        MessageEnvelope::channel(channel_id.clone(), content, delivery);
+                    envelope.attachments = attachments;
+
+                    match session.handle_message(envelope).await {
                         Ok(reply) => {
                             // Split long replies into chunks (Discord 2000 char limit)
-                            let chunks = formatter::chunk_discord(&reply);
+                            let chunks = formatter::chunk_discord(&reply.content);
                             for chunk in chunks {
                                 let _ = http
                                     .post(format!(

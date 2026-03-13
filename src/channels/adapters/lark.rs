@@ -9,14 +9,17 @@ use synaptic::lark::{
     StreamingCardWriter,
 };
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::dedup::MessageDedup;
 use crate::channels::formatter;
-use crate::channels::handler::{AgentSession, Attachment, StreamingOutput};
+use crate::channels::handler::{AgentSession, StreamingOutput};
 use crate::config::bot::{
     resolve_secret, DmPolicy, GroupPolicy, GroupSessionScope, LarkRenderMode,
 };
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::{Attachment, MessageEnvelope};
 
 // ---------------------------------------------------------------------------
 // Streaming output adapter
@@ -182,6 +185,12 @@ impl LarkHandler {
                 LarkRenderMode::Card | LarkRenderMode::Auto
             );
 
+        let delivery = DeliveryContext {
+            channel: "lark".into(),
+            to: Some(format!("chat:{}", event.chat_id())),
+            ..Default::default()
+        };
+
         if use_streaming {
             let writer = client
                 .streaming_reply(
@@ -192,16 +201,20 @@ impl LarkHandler {
 
             let output: Arc<dyn StreamingOutput> = Arc::new(LarkStreamingOutput { writer });
 
+            let envelope =
+                MessageEnvelope::channel(session_key.to_string(), text.to_string(), delivery);
             self.agent_session
-                .handle_message_streaming(session_key, text, Vec::new(), output)
+                .handle_message_streaming(envelope, output)
                 .await
                 .map_err(|e| SynapticError::Tool(e.to_string()))?;
         } else {
-            match self.agent_session.handle_message(session_key, text).await {
+            let envelope =
+                MessageEnvelope::channel(session_key.to_string(), text.to_string(), delivery);
+            match self.agent_session.handle_message(envelope).await {
                 Ok(reply) => {
                     // Auto mode: use card for rich content even without streaming
                     if matches!(self.config.render_mode, LarkRenderMode::Auto)
-                        && has_rich_content(&reply)
+                        && has_rich_content(&reply.content)
                     {
                         let writer = client
                             .streaming_reply(
@@ -209,10 +222,10 @@ impl LarkHandler {
                                 StreamingCardOptions::new().with_title("Synapse"),
                             )
                             .await?;
-                        writer.write(&reply).await.ok();
+                        writer.write(&reply.content).await.ok();
                         writer.finish().await.ok();
                     } else {
-                        self.send_reply(event, client, &reply).await?;
+                        self.send_reply(event, client, &reply.content).await?;
                     }
                 }
                 Err(e) => {
@@ -251,12 +264,20 @@ impl LarkHandler {
             mime_type: Some("image/png".into()),
         }];
 
-        match self
-            .agent_session
-            .handle_message_with_attachments(session_key, "[User sent an image]", &attachments)
-            .await
-        {
-            Ok(reply) => self.send_reply(event, client, &reply).await?,
+        let delivery = DeliveryContext {
+            channel: "lark".into(),
+            to: Some(format!("chat:{}", event.chat_id())),
+            ..Default::default()
+        };
+        let mut envelope = MessageEnvelope::channel(
+            session_key.to_string(),
+            "[User sent an image]".to_string(),
+            delivery,
+        );
+        envelope.attachments = attachments;
+
+        match self.agent_session.handle_message(envelope).await {
+            Ok(reply) => self.send_reply(event, client, &reply.content).await?,
             Err(e) => {
                 client
                     .reply_text(event.message_id(), &format!("Error: {}", e))
@@ -295,16 +316,20 @@ impl LarkHandler {
             mime_type: None,
         }];
 
-        match self
-            .agent_session
-            .handle_message_with_attachments(
-                session_key,
-                &format!("[User sent file: {}]", filename),
-                &attachments,
-            )
-            .await
-        {
-            Ok(reply) => self.send_reply(event, client, &reply).await?,
+        let delivery = DeliveryContext {
+            channel: "lark".into(),
+            to: Some(format!("chat:{}", event.chat_id())),
+            ..Default::default()
+        };
+        let mut envelope = MessageEnvelope::channel(
+            session_key.to_string(),
+            format!("[User sent file: {}]", filename),
+            delivery,
+        );
+        envelope.attachments = attachments;
+
+        match self.agent_session.handle_message(envelope).await {
+            Ok(reply) => self.send_reply(event, client, &reply.content).await?,
             Err(e) => {
                 client
                     .reply_text(event.message_id(), &format!("Error: {}", e))
@@ -423,9 +448,17 @@ impl CardActionHandler for LarkCardHandler {
             });
 
         let session_key = format!("lark:card:{}", event.chat_id);
-        match self.agent_session.handle_message(&session_key, &text).await {
+        let delivery = DeliveryContext {
+            channel: "lark".into(),
+            to: Some(format!("chat:{}", event.chat_id)),
+            ..Default::default()
+        };
+        let envelope = MessageEnvelope::channel(session_key, text, delivery);
+        match self.agent_session.handle_message(envelope).await {
             Ok(reply) => {
-                client.send_text("chat_id", &event.chat_id, &reply).await?;
+                client
+                    .send_text("chat_id", &event.chat_id, &reply.content)
+                    .await?;
             }
             Err(e) => {
                 client

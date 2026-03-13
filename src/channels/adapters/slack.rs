@@ -6,12 +6,15 @@ use tokio_tungstenite::tungstenite::Message as WsMsg;
 
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::channels::reactions;
 use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 /// Run the Slack bot adapter using Socket Mode.
 pub async fn run(
@@ -182,10 +185,18 @@ async fn run_socket_mode(
             // Send typing indicator
             send_typing(&bot_token, &channel).await;
 
-            match session.handle_message(&channel, &text).await {
+            let delivery = DeliveryContext {
+                channel: "slack".into(),
+                to: Some(format!("channel:{}", channel)),
+                thread_id: Some(ts.clone()),
+                ..Default::default()
+            };
+            let envelope = MessageEnvelope::channel(channel.clone(), text, delivery);
+
+            match session.handle_message(envelope).await {
                 Ok(reply) => {
                     // Split long replies into chunks
-                    let chunks = formatter::chunk_slack(&reply);
+                    let chunks = formatter::chunk_slack(&reply.content);
                     let client = reqwest::Client::new();
                     for chunk in chunks {
                         let _ = client

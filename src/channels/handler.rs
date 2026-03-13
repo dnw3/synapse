@@ -16,7 +16,7 @@ use tracing;
 use crate::agent;
 use crate::agent::registry::ModelRegistry;
 use crate::config::SynapseConfig;
-use crate::logging;
+use crate::gateway::messages::{AgentReply, Attachment, MessageEnvelope};
 use crate::memory::LongTermMemory;
 
 /// Callback for streaming token output to bot adapters.
@@ -163,42 +163,38 @@ impl AgentSession {
         Ok(sid)
     }
 
-    /// Handle a message from a chat session, returning the AI response.
-    ///
-    /// In deep agent mode, this runs the full agent loop with tool calling.
-    /// In simple mode, this does a direct model.chat() call.
+    /// Process a message through the agent pipeline.
+    /// This is the unified entry point for all channels.
     pub async fn handle_message(
         &self,
-        session_key: &str,
-        text: &str,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        self.handle_message_inner(session_key, text, Vec::new())
-            .await
-    }
+        envelope: MessageEnvelope,
+    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
+        let request_id = envelope.request_id.clone();
+        let session_key = envelope.session_key.clone();
+        let channel = envelope.delivery.channel.clone();
 
-    /// Inner handler that supports optional multimodal content blocks.
-    async fn handle_message_inner(
-        &self,
-        session_key: &str,
-        text: &str,
-        content_blocks: Vec<ContentBlock>,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let request_id = logging::generate_request_id();
         let start = Instant::now();
-        let span = tracing::info_span!("channel_message",
+        let span = tracing::info_span!("agent_message",
             request_id = %request_id,
+            channel = %channel,
             session_key = %session_key,
+            provenance = ?envelope.provenance.kind,
         );
         let _guard = span.enter();
 
         tracing::info!("processing channel message");
 
-        let sid = self.resolve_session(session_key).await?;
+        let sid = self.resolve_session(&session_key).await?;
+
+        // Build content blocks from attachments
+        let content_blocks = self.download_attachments(&envelope.attachments).await;
 
         let result = if self.deep_agent {
-            self.handle_deep_agent(&sid, text, &content_blocks).await
+            self.handle_deep_agent(&sid, &envelope.content, &content_blocks)
+                .await
         } else {
-            self.handle_simple_chat(&sid, text, &content_blocks).await
+            self.handle_simple_chat(&sid, &envelope.content, &content_blocks)
+                .await
         };
 
         let duration_ms = start.elapsed().as_millis();
@@ -212,7 +208,154 @@ impl AgentSession {
             }
         }
 
-        result
+        let response = result?;
+        let delivery_target = envelope.delivery.clone();
+
+        Ok(AgentReply {
+            content: response,
+            delivery_target,
+            turn_id: request_id,
+        })
+    }
+
+    /// Process a message with real-time streaming output.
+    pub async fn handle_message_streaming(
+        &self,
+        envelope: MessageEnvelope,
+        output: Arc<dyn StreamingOutput>,
+    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
+        let request_id = envelope.request_id.clone();
+        let session_key = envelope.session_key.clone();
+        let channel = envelope.delivery.channel.clone();
+
+        let start = Instant::now();
+        let span = tracing::info_span!("agent_message",
+            request_id = %request_id,
+            channel = %channel,
+            session_key = %session_key,
+            provenance = ?envelope.provenance.kind,
+        );
+        let _guard = span.enter();
+
+        tracing::info!("processing streaming channel message");
+
+        let sid = self.resolve_session(&session_key).await?;
+
+        // Build content blocks from attachments
+        let content_blocks = self.download_attachments(&envelope.attachments).await;
+
+        let result = if self.deep_agent {
+            self.handle_deep_agent_streaming(
+                &sid,
+                &envelope.content,
+                &content_blocks,
+                output.clone(),
+            )
+            .await
+        } else {
+            // Simple chat doesn't support streaming, fall back and emit via callbacks
+            let res = self
+                .handle_simple_chat(&sid, &envelope.content, &content_blocks)
+                .await;
+            if let Ok(ref response) = res {
+                output.on_token(response).await;
+            }
+            res
+        };
+
+        let duration_ms = start.elapsed().as_millis();
+        match &result {
+            Ok(response) => {
+                output.on_complete(response).await;
+                tracing::info!(
+                    duration_ms = duration_ms as u64,
+                    "streaming message processed"
+                );
+            }
+            Err(e) => {
+                output.on_error(&e.to_string()).await;
+                tracing::error!(duration_ms = duration_ms as u64, error = %e, "streaming message failed");
+            }
+        }
+
+        let response = result?;
+        let delivery_target = envelope.delivery.clone();
+
+        Ok(AgentReply {
+            content: response,
+            delivery_target,
+            turn_id: request_id,
+        })
+    }
+
+    /// Download attachments and convert to ContentBlocks.
+    /// Images and audio become multimodal blocks; other files become text references.
+    async fn download_attachments(&self, attachments: &[Attachment]) -> Vec<ContentBlock> {
+        if attachments.is_empty() {
+            return Vec::new();
+        }
+
+        let tmp_dir = std::env::temp_dir().join(format!("synapse_{}", uuid::Uuid::new_v4()));
+        if let Err(e) = std::fs::create_dir_all(&tmp_dir) {
+            tracing::warn!("failed to create temp dir: {}", e);
+            return Vec::new();
+        }
+
+        let client = reqwest::Client::new();
+        let mut content_blocks = Vec::new();
+
+        for att in attachments {
+            match client.get(&att.url).send().await {
+                Ok(resp) if resp.status().is_success() => {
+                    let file_path = tmp_dir.join(&att.filename);
+                    match resp.bytes().await {
+                        Ok(bytes) => {
+                            if let Err(e) = std::fs::write(&file_path, &bytes) {
+                                tracing::warn!(
+                                    "failed to write attachment {}: {}",
+                                    att.filename,
+                                    e
+                                );
+                                continue;
+                            }
+                            let file_url = format!("file://{}", file_path.display());
+                            let mime = att
+                                .mime_type
+                                .as_deref()
+                                .or_else(|| detect_mime_from_extension(&att.filename));
+
+                            match mime {
+                                Some(m) if m.starts_with("image/") => {
+                                    content_blocks.push(ContentBlock::Image {
+                                        url: file_url,
+                                        detail: None,
+                                    });
+                                }
+                                Some(m) if m.starts_with("audio/") => {
+                                    content_blocks.push(ContentBlock::Audio { url: file_url });
+                                }
+                                _ => {
+                                    content_blocks.push(ContentBlock::Text {
+                                        text: format!("[Attached file: {}]", file_path.display()),
+                                    });
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("failed to download attachment {}: {}", att.filename, e);
+                        }
+                    }
+                }
+                Ok(resp) => {
+                    tracing::warn!("attachment download failed with HTTP {}", resp.status());
+                }
+                Err(e) => {
+                    tracing::warn!("failed to fetch attachment {}: {}", att.filename, e);
+                }
+            }
+        }
+
+        content_blocks
     }
 
     /// Deep Agent mode: full tool calling loop.
@@ -401,184 +544,6 @@ impl AgentSession {
 
         Ok(content)
     }
-}
-
-/// Extract the final AI response text from the message list.
-///
-/// In a deep agent loop, the last AI message with non-empty content
-/// (that isn't just tool calls) is the final response.
-fn extract_final_response(messages: &[Message]) -> String {
-    // Walk backwards to find the last AI message with text content
-    for msg in messages.iter().rev() {
-        if msg.is_ai() {
-            let content = msg.content();
-            if !content.is_empty() {
-                return content.to_string();
-            }
-        }
-    }
-    "I processed your request but have no text response.".to_string()
-}
-
-/// Attachment metadata for files sent via bot adapters.
-#[derive(Debug, Clone)]
-pub struct Attachment {
-    pub filename: String,
-    pub url: String,
-    pub mime_type: Option<String>,
-}
-
-impl AgentSession {
-    /// Handle a message with file/image attachments.
-    ///
-    /// Downloads attachments to a temporary directory. Image and audio
-    /// attachments are passed as multimodal `ContentBlock`s so the model can
-    /// actually see/hear them. Other file types are appended as text paths.
-    pub async fn handle_message_with_attachments(
-        &self,
-        session_key: &str,
-        message: &str,
-        attachments: &[Attachment],
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        if attachments.is_empty() {
-            return self.handle_message(session_key, message).await;
-        }
-
-        // Download attachments to temp directory
-        let tmp_dir = std::env::temp_dir().join(format!("synapse_{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&tmp_dir)
-            .map_err(|e| AgentError(format!("failed to create temp dir: {}", e)))?;
-
-        let client = reqwest::Client::new();
-        let mut content_blocks: Vec<ContentBlock> = Vec::new();
-        let mut extra_text = String::new();
-
-        for att in attachments {
-            match client.get(&att.url).send().await {
-                Ok(resp) if resp.status().is_success() => {
-                    let file_path = tmp_dir.join(&att.filename);
-                    match resp.bytes().await {
-                        Ok(bytes) => {
-                            if let Err(e) = std::fs::write(&file_path, &bytes) {
-                                eprintln!(
-                                    "warning: failed to write attachment {}: {}",
-                                    att.filename, e
-                                );
-                                continue;
-                            }
-                            let file_url = format!("file://{}", file_path.display());
-                            let mime = att
-                                .mime_type
-                                .as_deref()
-                                .or_else(|| detect_mime_from_extension(&att.filename));
-
-                            match mime {
-                                Some(m) if m.starts_with("image/") => {
-                                    content_blocks.push(ContentBlock::Image {
-                                        url: file_url,
-                                        detail: None,
-                                    });
-                                }
-                                Some(m) if m.starts_with("audio/") => {
-                                    content_blocks.push(ContentBlock::Audio { url: file_url });
-                                }
-                                _ => {
-                                    // Non-media or unknown MIME: fall back to text reference
-                                    extra_text.push_str(&format!(
-                                        "\n[Attached file: {}]",
-                                        file_path.display()
-                                    ));
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "warning: failed to download attachment {}: {}",
-                                att.filename, e
-                            );
-                        }
-                    }
-                }
-                Ok(resp) => {
-                    eprintln!(
-                        "warning: attachment download failed with HTTP {}",
-                        resp.status()
-                    );
-                }
-                Err(e) => {
-                    eprintln!(
-                        "warning: failed to fetch attachment {}: {}",
-                        att.filename, e
-                    );
-                }
-            }
-        }
-
-        let full_message = if extra_text.is_empty() {
-            message.to_string()
-        } else {
-            format!("{}{}", message, extra_text)
-        };
-
-        self.handle_message_inner(session_key, &full_message, content_blocks)
-            .await
-    }
-}
-
-impl AgentSession {
-    /// Handle a message with streaming output callbacks.
-    ///
-    /// Uses the deep agent in streaming mode, calling the output callbacks
-    /// as tokens are generated. Falls back to non-streaming if streaming
-    /// is not available (simple chat mode).
-    pub async fn handle_message_streaming(
-        &self,
-        session_key: &str,
-        text: &str,
-        content_blocks: Vec<ContentBlock>,
-        output: Arc<dyn StreamingOutput>,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let request_id = logging::generate_request_id();
-        let start = Instant::now();
-        let span = tracing::info_span!("channel_message_streaming",
-            request_id = %request_id,
-            session_key = %session_key,
-        );
-        let _guard = span.enter();
-
-        tracing::info!("processing streaming channel message");
-
-        let sid = self.resolve_session(session_key).await?;
-
-        let result = if self.deep_agent {
-            self.handle_deep_agent_streaming(&sid, text, &content_blocks, output.clone())
-                .await
-        } else {
-            // Simple chat doesn't support streaming, fall back and emit via callbacks
-            let res = self.handle_simple_chat(&sid, text, &content_blocks).await;
-            if let Ok(ref response) = res {
-                output.on_token(response).await;
-            }
-            res
-        };
-
-        let duration_ms = start.elapsed().as_millis();
-        match &result {
-            Ok(response) => {
-                output.on_complete(response).await;
-                tracing::info!(
-                    duration_ms = duration_ms as u64,
-                    "streaming message processed"
-                );
-            }
-            Err(e) => {
-                output.on_error(&e.to_string()).await;
-                tracing::error!(duration_ms = duration_ms as u64, error = %e, "streaming message failed");
-            }
-        }
-
-        result
-    }
 
     /// Deep Agent mode with streaming: full tool calling loop with incremental output.
     async fn handle_deep_agent_streaming(
@@ -726,6 +691,23 @@ impl AgentSession {
 
         Ok(response)
     }
+}
+
+/// Extract the final AI response text from the message list.
+///
+/// In a deep agent loop, the last AI message with non-empty content
+/// (that isn't just tool calls) is the final response.
+fn extract_final_response(messages: &[Message]) -> String {
+    // Walk backwards to find the last AI message with text content
+    for msg in messages.iter().rev() {
+        if msg.is_ai() {
+            let content = msg.content();
+            if !content.is_empty() {
+                return content.to_string();
+            }
+        }
+    }
+    "I processed your request but have no text response.".to_string()
 }
 
 /// Detect MIME type from a filename extension. Returns `None` for unknown types.

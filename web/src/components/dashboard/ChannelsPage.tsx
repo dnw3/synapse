@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Radio, Globe, Terminal, RefreshCw, ChevronDown, ChevronRight, Save, Wifi, WifiOff } from "lucide-react";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
@@ -14,6 +14,96 @@ import {
   ToastContainer,
 } from "./shared";
 import { cn } from "../../lib/cn";
+
+interface LiveChannelEntry {
+  name: string;
+  enabled: boolean;
+}
+
+// ---------- Live Status Section ----------
+
+function LiveStatusSection({ api }: { api: ReturnType<typeof import("../../hooks/useDashboardAPI").useDashboardAPI> }) {
+  const { t } = useTranslation();
+  const [liveChannels, setLiveChannels] = useState<LiveChannelEntry[] | null>(null);
+  const [loadingLive, setLoadingLive] = useState(true);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchLiveStatus = useCallback(async () => {
+    const resp = await api.debugInvoke({ method: "channels.status", params: {} });
+    if (resp?.ok && Array.isArray(resp.result)) {
+      setLiveChannels(resp.result as LiveChannelEntry[]);
+    } else {
+      setLiveChannels([]);
+    }
+    setLoadingLive(false);
+  }, [api]);
+
+  useEffect(() => {
+    fetchLiveStatus();
+    intervalRef.current = setInterval(fetchLiveStatus, 30_000);
+    return () => {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [fetchLiveStatus]);
+
+  const online = liveChannels?.filter((c) => c.enabled) ?? [];
+
+  return (
+    <SectionCard className="lg:col-span-2">
+      <SectionHeader
+        icon={<Wifi className="h-4 w-4" />}
+        title={t("channels.liveStatus")}
+        right={
+          online.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-[var(--success)]/15 text-[var(--success)] text-[10px] font-mono tabular-nums border border-[var(--success)]/25">
+              {online.length} {t("channels.registered")}
+            </span>
+          )
+        }
+      />
+      {loadingLive ? (
+        <div className="flex gap-2 flex-wrap px-0.5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <LoadingSkeleton key={i} className="h-7 w-24" />
+          ))}
+        </div>
+      ) : !liveChannels || liveChannels.length === 0 ? (
+        <EmptyState
+          icon={<WifiOff className="h-5 w-5" />}
+          message={t("channels.noChannels")}
+        />
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {liveChannels.map((ch) => (
+            <div
+              key={ch.name}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-md)] border text-[12px] font-medium transition-all",
+                ch.enabled
+                  ? "bg-[var(--success)]/10 border-[var(--success)]/25 text-[var(--text-primary)]"
+                  : "bg-[var(--bg-content)]/50 border-[var(--border-subtle)] text-[var(--text-tertiary)]"
+              )}
+            >
+              <span
+                className={cn(
+                  "w-2 h-2 rounded-full flex-shrink-0",
+                  ch.enabled ? "bg-[var(--success)]" : "bg-[var(--text-tertiary)]/40"
+                )}
+              />
+              <span>{ch.name}</span>
+              <span className="text-[10px] font-normal opacity-70">
+                {ch.enabled ? t("channels.online") : t("channels.offline")}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
 
 function transportBadgeClass(transport: string): string {
   switch (transport.toLowerCase()) {
@@ -356,6 +446,9 @@ export default function ChannelsPage() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Live Channel Status */}
+      <LiveStatusSection api={api} />
+
       {/* Bot Channels */}
       <SectionCard>
         <SectionHeader

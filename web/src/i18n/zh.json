@@ -438,6 +438,13 @@
     "enabled": "已启用",
     "notSet": "未设置"
   },
+  "channels": {
+    "liveStatus": "实时频道状态",
+    "online": "在线",
+    "offline": "离线",
+    "noChannels": "暂无已连接频道",
+    "registered": "已注册"
+  },
   "reasoning": {
     "title": "思考过程"
   },

@@ -159,7 +159,14 @@
       "30m": "30 min",
       "1h": "1 hour",
       "all": "All"
-    }
+    },
+    "logsTab": "Logs",
+    "messagesTab": "Messages",
+    "noMessages": "No messages yet",
+    "inbound": "Inbound",
+    "outbound": "Outbound",
+    "allChannels": "All Channels",
+    "messageFrom": "from"
   },
   "agents": {
     "createAgent": "Create Agent",
@@ -437,6 +444,13 @@
     "editInRaw": "edit in TOML mode",
     "enabled": "Enabled",
     "notSet": "Not set"
+  },
+  "channels": {
+    "liveStatus": "Live Channel Status",
+    "online": "Online",
+    "offline": "Offline",
+    "noChannels": "No channels connected",
+    "registered": "registered"
   },
   "reasoning": {
     "title": "Thinking"

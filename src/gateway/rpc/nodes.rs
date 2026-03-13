@@ -235,6 +235,33 @@ pub async fn handle_pending_pull(ctx: Arc<RpcContext>, params: Value) -> Result<
     Ok(json!({"pending": pending}))
 }
 
+pub async fn handle_pending_drain(_ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let node_id = params
+        .get("node_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| RpcError::invalid_request("missing 'node_id'"))?;
+    // Placeholder: would clear all pending invocations for this node
+    Ok(json!({ "ok": true, "drained": 0, "node_id": node_id }))
+}
+
+pub async fn handle_pending_enqueue(
+    _ctx: Arc<RpcContext>,
+    params: Value,
+) -> Result<Value, RpcError> {
+    let node_id = params
+        .get("node_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| RpcError::invalid_request("missing 'node_id'"))?;
+    let method = params
+        .get("method")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| RpcError::invalid_request("missing 'method'"))?;
+    let _task_params = params.get("params").cloned().unwrap_or(json!({}));
+    let task_id = uuid::Uuid::new_v4().to_string();
+    // Placeholder: would enqueue to the node's pending queue
+    Ok(json!({ "ok": true, "task_id": task_id, "node_id": node_id, "method": method }))
+}
+
 pub async fn handle_pending_ack(_ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     // Acknowledge receipt of pending invokes (no-op for now, invokes are resolved via result)
     let _invoke_ids: Vec<String> = params

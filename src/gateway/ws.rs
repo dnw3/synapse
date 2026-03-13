@@ -156,6 +156,14 @@ fn extract_canvas_directives(text: &str) -> Vec<WsEvent> {
     events
 }
 
+/// Usage data included in the `done` event.
+#[derive(Serialize)]
+struct DoneUsage {
+    input_tokens: u64,
+    output_tokens: u64,
+    cost_usd: f64,
+}
+
 /// WebSocket event types sent from server to client.
 #[derive(Serialize)]
 #[serde(tag = "type")]
@@ -193,7 +201,14 @@ enum WsEvent {
     #[serde(rename = "subagent_complete")]
     SubagentComplete { task_id: String, summary: String },
     #[serde(rename = "done")]
-    Done {},
+    Done {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        usage: Option<DoneUsage>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stop_reason: Option<String>,
+    },
     #[serde(rename = "error")]
     Error {
         message: String,
@@ -472,7 +487,13 @@ async fn handle_legacy_connection(
                 if let Some(ref key) = idempotency_key {
                     if !processed_idempotency_keys.insert(key.clone()) {
                         tracing::warn!(idempotency_key = %key, "duplicate message deduplicated");
-                        let _ = sender.send(ws_json(&WsEvent::Done {})).await;
+                        let _ = sender
+                            .send(ws_json(&WsEvent::Done {
+                                usage: None,
+                                model: None,
+                                stop_reason: None,
+                            }))
+                            .await;
                         continue;
                     }
                 }
@@ -782,7 +803,7 @@ async fn handle_legacy_connection(
                                         }
                                     }
                                     // Update session token count: add only this turn's delta
-                                    {
+                                    let done_usage = {
                                         let snap = state.cost_tracker.snapshot().await;
                                         let post_tokens = snap.total_input_tokens + snap.total_output_tokens;
                                         let delta = post_tokens.saturating_sub(pre_tokens);
@@ -792,10 +813,22 @@ async fn handle_legacy_connection(
                                                 let _ = state.sessions.update_session(&info).await;
                                             }
                                         }
-                                    }
+                                        // Compute per-turn usage from snapshot delta
+                                        let turn_cost = (snap.estimated_cost_usd - pre_snap.estimated_cost_usd).max(0.0);
+                                        DoneUsage {
+                                            input_tokens: snap.total_input_tokens.saturating_sub(pre_snap.total_input_tokens),
+                                            output_tokens: snap.total_output_tokens.saturating_sub(pre_snap.total_output_tokens),
+                                            cost_usd: turn_cost,
+                                        }
+                                    };
+                                    let model_name = state.model.profile().map(|p| p.name);
                                     let elapsed = execution_start.elapsed().as_millis();
                                     tracing::info!(duration_ms = %elapsed, "turn completed");
-                                    let _ = sender.send(ws_json(&WsEvent::Done {})).await;
+                                    let _ = sender.send(ws_json(&WsEvent::Done {
+                                        usage: Some(done_usage),
+                                        model: model_name,
+                                        stop_reason: Some("end_turn".to_string()),
+                                    })).await;
                                     break;
                                 }
                             }
@@ -1108,7 +1141,7 @@ async fn handle_legacy_connection(
                                         }
                                     }
                                     // Update session token count: add only this turn's delta
-                                    {
+                                    let done_usage = {
                                         let snap = state.cost_tracker.snapshot().await;
                                         let post_tokens = snap.total_input_tokens + snap.total_output_tokens;
                                         let delta = post_tokens.saturating_sub(pre_tokens);
@@ -1118,10 +1151,22 @@ async fn handle_legacy_connection(
                                                 let _ = state.sessions.update_session(&info).await;
                                             }
                                         }
-                                    }
+                                        // Compute per-turn usage from snapshot delta
+                                        let turn_cost = (snap.estimated_cost_usd - pre_snap.estimated_cost_usd).max(0.0);
+                                        DoneUsage {
+                                            input_tokens: snap.total_input_tokens.saturating_sub(pre_snap.total_input_tokens),
+                                            output_tokens: snap.total_output_tokens.saturating_sub(pre_snap.total_output_tokens),
+                                            cost_usd: turn_cost,
+                                        }
+                                    };
+                                    let model_name = state.model.profile().map(|p| p.name);
                                     let elapsed = execution_start.elapsed().as_millis();
                                     tracing::info!(duration_ms = %elapsed, "turn completed");
-                                    let _ = sender.send(ws_json(&WsEvent::Done {})).await;
+                                    let _ = sender.send(ws_json(&WsEvent::Done {
+                                        usage: Some(done_usage),
+                                        model: model_name,
+                                        stop_reason: Some("end_turn".to_string()),
+                                    })).await;
                                     break;
                                 }
                             }

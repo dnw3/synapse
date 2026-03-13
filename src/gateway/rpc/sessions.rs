@@ -268,13 +268,36 @@ pub async fn handle_delete(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 // sessions.compact
 // ---------------------------------------------------------------------------
 
-pub async fn handle_compact(_ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
-    let _id = params
+pub async fn handle_compact(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let id = params
         .get("id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing 'id' parameter"))?;
 
+    // Broadcast compaction starting
+    ctx.broadcaster
+        .broadcast(
+            "session.compacting",
+            json!({
+                "session_id": id,
+                "progress": 0.0,
+            }),
+        )
+        .await;
+
     // Compaction trigger — would need condenser integration
+    // Broadcast compaction done (placeholder: before/after tokens both 0)
+    ctx.broadcaster
+        .broadcast(
+            "session.compacted",
+            json!({
+                "session_id": id,
+                "before_tokens": 0,
+                "after_tokens": 0,
+            }),
+        )
+        .await;
+
     Ok(json!({ "ok": true }))
 }
 

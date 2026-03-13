@@ -442,6 +442,14 @@ pub fn register_all(router: &mut RpcRouter) {
         Box::new(|ctx, params| Box::pin(nodes::handle_pending_ack(ctx, params))),
     );
     router.register(
+        "node.pending.drain",
+        Box::new(|ctx, params| Box::pin(nodes::handle_pending_drain(ctx, params))),
+    );
+    router.register(
+        "node.pending.enqueue",
+        Box::new(|ctx, params| Box::pin(nodes::handle_pending_enqueue(ctx, params))),
+    );
+    router.register(
         "node.event",
         Box::new(|ctx, params| Box::pin(nodes::handle_node_event(ctx, params))),
     );

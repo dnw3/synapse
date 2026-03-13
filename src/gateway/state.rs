@@ -7,6 +7,7 @@ use synaptic::session::SessionManager;
 use tokio::sync::RwLock;
 
 use super::auth::AuthState;
+use super::rpc::{Broadcaster, RpcRouter};
 use crate::agent;
 use crate::config::SynapseConfig;
 use crate::logging::LogBuffer;
@@ -50,6 +51,10 @@ pub struct AppState {
     pub log_buffer: LogBuffer,
     /// Pre-loaded MCP tools (loaded once at startup, shared across requests).
     pub mcp_tools: Vec<Arc<dyn Tool>>,
+    /// RPC event broadcaster for connected clients.
+    pub broadcaster: Arc<Broadcaster>,
+    /// RPC method router.
+    pub rpc_router: Arc<RpcRouter>,
 }
 
 impl AppState {
@@ -83,6 +88,12 @@ impl AppState {
         // Load MCP tools once at startup
         let mcp_tools = agent::load_mcp_tools(config).await;
 
+        // RPC infrastructure
+        let broadcaster = Arc::new(Broadcaster::new());
+        let mut rpc_router = RpcRouter::new();
+        super::rpc::register_all(&mut rpc_router);
+        let rpc_router = Arc::new(rpc_router);
+
         Ok(Self {
             config: config.clone(),
             model,
@@ -95,6 +106,8 @@ impl AppState {
             write_lock,
             log_buffer,
             mcp_tools,
+            broadcaster,
+            rpc_router,
         })
     }
 }

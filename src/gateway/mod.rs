@@ -5,6 +5,7 @@ pub mod error;
 mod metrics;
 mod openai_compat;
 mod request_id;
+pub mod rpc;
 mod sse;
 pub mod state;
 mod terminal;

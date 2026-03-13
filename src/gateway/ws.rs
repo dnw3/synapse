@@ -25,6 +25,7 @@ use regex::Regex;
 
 use crate::agent::callbacks::{ApprovalResponse, WebSocketApprovalCallback};
 use crate::agent::{build_deep_agent_with_callback, SessionOverrides};
+use crate::gateway::messages::{Attachment as EnvelopeAttachment, MessageEnvelope};
 use crate::gateway::rpc::{
     AuthResult, ClientFrame, ConnectParams, FeatureInfo, HelloOk, Role, RpcContext, RpcError,
     ServerFrame, ServerInfo, SnapshotInfo, StateVersion, GATEWAY_EVENTS, PROTOCOL_VERSION,
@@ -474,12 +475,31 @@ async fn handle_legacy_connection(
             } => {
                 let request_id = crate::logging::generate_request_id();
 
-                // Per-request span: all logs in this request inherit request_id, conn_id, conversation_id
+                // Construct a MessageEnvelope for standardized tracing/metadata
+                let mut envelope = MessageEnvelope::webchat(
+                    request_id.clone(),
+                    conversation_id.clone(),
+                    content.clone(),
+                    &conn_id,
+                );
+                envelope.attachments = attachments
+                    .iter()
+                    .map(|a| EnvelopeAttachment {
+                        filename: a.filename.clone(),
+                        url: a.url.clone(),
+                        mime_type: Some(a.mime_type.clone()),
+                    })
+                    .collect();
+                envelope.idempotency_key = idempotency_key.clone();
+
+                // Per-request span: all logs in this request inherit envelope metadata
                 let req_span = tracing::info_span!(
                     "ws_request",
-                    %request_id,
+                    request_id = %envelope.request_id,
+                    channel = %envelope.delivery.channel,
+                    session_key = %envelope.session_key,
+                    provenance = ?envelope.provenance.kind,
                     %conn_id,
-                    %conversation_id,
                 );
                 let _req_guard = req_span.enter();
 

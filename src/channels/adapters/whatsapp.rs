@@ -6,11 +6,14 @@ use tokio_tungstenite::tungstenite::Message as WsMsg;
 
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::SynapseConfig;
+use crate::gateway::messages::MessageEnvelope;
 
 /// Run the WhatsApp bot adapter using a Baileys-compatible REST/WebSocket bridge.
 ///
@@ -197,9 +200,20 @@ async fn run_ws_loop(
         let bridge = bridge_url.to_string();
         let api_key_owned = api_key.map(|k| k.to_string());
         tokio::spawn(async move {
-            match session.handle_message(&chat_id, &body).await {
+            let envelope = MessageEnvelope::channel(
+                chat_id.clone(),
+                body.clone(),
+                DeliveryContext {
+                    channel: "whatsapp".into(),
+                    to: Some(format!("user:{}", chat_id)),
+                    account_id: None,
+                    thread_id: None,
+                    meta: None,
+                },
+            );
+            match session.handle_message(envelope).await {
                 Ok(reply) => {
-                    let chunks = formatter::chunk_whatsapp(&reply);
+                    let chunks = formatter::chunk_whatsapp(&reply.content);
                     let http = reqwest::Client::new();
                     for chunk in chunks {
                         let send_url = format!("{}/send", bridge);

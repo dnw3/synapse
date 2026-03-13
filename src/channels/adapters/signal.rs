@@ -3,10 +3,13 @@ use std::time::Duration;
 
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::SynapseConfig;
+use crate::gateway::messages::MessageEnvelope;
 
 /// Run the Signal bot adapter using the signal-cli REST API bridge.
 ///
@@ -123,9 +126,20 @@ pub async fn run(
             let recipient = sender.clone();
 
             tokio::spawn(async move {
-                match session.handle_message(&recipient, &text).await {
+                let envelope = MessageEnvelope::channel(
+                    recipient.clone(),
+                    text.clone(),
+                    DeliveryContext {
+                        channel: "signal".into(),
+                        to: Some(format!("user:{}", recipient)),
+                        account_id: None,
+                        thread_id: None,
+                        meta: None,
+                    },
+                );
+                match session.handle_message(envelope).await {
                     Ok(reply) => {
-                        let chunks = formatter::chunk_signal(&reply);
+                        let chunks = formatter::chunk_signal(&reply.content);
                         for chunk in chunks {
                             let body = serde_json::json!({
                                 "message": chunk,

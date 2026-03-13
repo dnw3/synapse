@@ -4,11 +4,14 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig, TwitchBotConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 /// Run the Twitch bot adapter using IRC over TCP (irc.chat.twitch.tv:6667).
 pub async fn run(
@@ -137,9 +140,20 @@ async fn run_twitch_irc(
         let message = parsed.message.clone();
 
         tokio::spawn(async move {
-            match session.handle_message(&session_key, &message).await {
+            let envelope = MessageEnvelope::channel(
+                session_key.clone(),
+                message.clone(),
+                DeliveryContext {
+                    channel: "twitch".into(),
+                    to: Some(format!("channel:{}", session_key)),
+                    account_id: None,
+                    thread_id: None,
+                    meta: None,
+                },
+            );
+            match session.handle_message(envelope).await {
                 Ok(reply) => {
-                    let chunks = formatter::chunk_irc(&reply);
+                    let chunks = formatter::chunk_irc(&reply.content);
                     for chunk in chunks {
                         for irc_line in chunk.lines() {
                             let _ =

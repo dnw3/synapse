@@ -3,10 +3,13 @@ use std::sync::Arc;
 use reqwest::Client;
 use tokio::time::Duration;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::{NextcloudBotConfig, SynapseConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 /// Run the Nextcloud Talk bot adapter using REST long-polling.
 pub async fn run(
@@ -106,13 +109,26 @@ pub async fn run(
                                 let msg_text = content.to_string();
 
                                 tokio::spawn(async move {
-                                    match session.handle_message(&session_key, &msg_text).await {
+                                    let envelope = MessageEnvelope::channel(
+                                        session_key.clone(),
+                                        msg_text.clone(),
+                                        DeliveryContext {
+                                            channel: "nextcloud".into(),
+                                            to: Some(format!("room:{}", session_key)),
+                                            account_id: None,
+                                            thread_id: None,
+                                            meta: None,
+                                        },
+                                    );
+                                    match session.handle_message(envelope).await {
                                         Ok(reply) => {
                                             let _ = client
                                                 .post(&reply_url)
                                                 .basic_auth(&username, Some(&pw))
                                                 .header("OCS-APIRequest", "true")
-                                                .json(&serde_json::json!({"message": reply}))
+                                                .json(
+                                                    &serde_json::json!({"message": reply.content}),
+                                                )
                                                 .send()
                                                 .await;
                                         }

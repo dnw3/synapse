@@ -9,11 +9,14 @@ use sha2::Sha256;
 
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -191,10 +194,21 @@ async fn handle_callback(
     // Process in background so we respond to DingTalk quickly
     let session = state.agent_session.clone();
     tokio::spawn(async move {
-        match session.handle_message(&session_key, &text).await {
+        let envelope = MessageEnvelope::channel(
+            session_key.clone(),
+            text.clone(),
+            DeliveryContext {
+                channel: "dingtalk".into(),
+                to: Some(format!("conversation:{}", session_key)),
+                account_id: None,
+                thread_id: None,
+                meta: None,
+            },
+        );
+        match session.handle_message(envelope).await {
             Ok(reply) => {
                 let client = reqwest::Client::new();
-                let chunks = formatter::chunk_dingtalk(&reply);
+                let chunks = formatter::chunk_dingtalk(&reply.content);
                 for chunk in chunks {
                     let body = serde_json::json!({
                         "msgtype": "text",

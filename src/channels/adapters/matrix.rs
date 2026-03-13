@@ -3,11 +3,14 @@ use std::time::Duration;
 
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::SynapseConfig;
+use crate::gateway::messages::MessageEnvelope;
 
 /// Run the Matrix bot adapter using the Client-Server REST API (long-polling sync).
 pub async fn run(
@@ -92,9 +95,20 @@ pub async fn run(
                     let token = access_token.clone();
                     let rid = room_id.clone();
                     tokio::spawn(async move {
-                        match session.handle_message(&rid, &text).await {
+                        let envelope = MessageEnvelope::channel(
+                            rid.clone(),
+                            text.clone(),
+                            DeliveryContext {
+                                channel: "matrix".into(),
+                                to: Some(format!("room:{}", rid)),
+                                account_id: None,
+                                thread_id: None,
+                                meta: None,
+                            },
+                        );
+                        match session.handle_message(envelope).await {
                             Ok(reply) => {
-                                let chunks = formatter::chunk_matrix(&reply);
+                                let chunks = formatter::chunk_matrix(&reply.content);
                                 for chunk in chunks {
                                     send_message(&http, &hs, &token, &rid, &chunk).await;
                                 }

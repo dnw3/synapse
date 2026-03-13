@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::MessageEnvelope;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::post;
@@ -132,17 +135,24 @@ async fn handle_webhook(
     };
 
     // Process the message through the agent session.
-    let reply_text = match state
-        .agent_session
-        .handle_message(&session_key, &text)
-        .await
-    {
+    let envelope = MessageEnvelope::channel(
+        session_key.clone(),
+        text.clone(),
+        DeliveryContext {
+            channel: "googlechat".into(),
+            to: Some(format!("space:{}", session_key)),
+            account_id: None,
+            thread_id: None,
+            meta: None,
+        },
+    );
+    let reply_text = match state.agent_session.handle_message(envelope).await {
         Ok(reply) => {
-            let chunks = formatter::chunk_googlechat(&reply);
+            let chunks = formatter::chunk_googlechat(&reply.content);
             // Google Chat synchronous replies support only a single text body.
             // If the response is chunked, join all chunks separated by a blank line.
             if chunks.is_empty() {
-                reply
+                reply.content
             } else {
                 chunks.join("\n\n")
             }

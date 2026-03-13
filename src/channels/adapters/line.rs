@@ -10,11 +10,14 @@ use sha2::Sha256;
 
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -275,13 +278,24 @@ async fn handle_webhook(
         let session = state.agent_session.clone();
         let channel_token = state.channel_token.clone();
         tokio::spawn(async move {
-            match session.handle_message(&session_key, &text).await {
+            let envelope = MessageEnvelope::channel(
+                session_key.clone(),
+                text.clone(),
+                DeliveryContext {
+                    channel: "line".into(),
+                    to: Some(format!("user:{}", session_key)),
+                    account_id: None,
+                    thread_id: None,
+                    meta: None,
+                },
+            );
+            match session.handle_message(envelope).await {
                 Ok(reply) => {
-                    send_reply(&channel_token, &reply_token, &reply).await;
+                    send_reply(&channel_token, &reply_token, &reply.content).await;
                 }
                 Err(e) => {
                     tracing::error!(channel = "line", error = %e, "handler error");
-                    send_reply(&channel_token, &reply_token, &format!("Error: {}", e)).await;
+                    send_reply(&channel_token, &reply_token, &format!("Error: {e}")).await;
                 }
             }
         });

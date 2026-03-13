@@ -3,11 +3,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::SynapseConfig;
+use crate::gateway::messages::MessageEnvelope;
 
 /// Run the iMessage bot adapter using the BlueBubbles REST API bridge.
 ///
@@ -151,9 +154,20 @@ pub async fn run(
             let session_key = sender.clone();
 
             tokio::spawn(async move {
-                match session.handle_message(&session_key, &text).await {
+                let envelope = MessageEnvelope::channel(
+                    session_key.clone(),
+                    text.clone(),
+                    DeliveryContext {
+                        channel: "imessage".into(),
+                        to: Some(format!("user:{}", session_key)),
+                        account_id: None,
+                        thread_id: None,
+                        meta: None,
+                    },
+                );
+                match session.handle_message(envelope).await {
                     Ok(reply) => {
-                        let chunks = formatter::chunk_imessage(&reply);
+                        let chunks = formatter::chunk_imessage(&reply.content);
                         for chunk in chunks {
                             let body = serde_json::json!({
                                 "chatGuid": reply_chat_guid,

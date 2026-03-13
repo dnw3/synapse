@@ -3,10 +3,13 @@ use std::sync::Arc;
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::{SynapseConfig, ZaloBotConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 #[derive(Clone)]
 struct AppState {
@@ -107,7 +110,18 @@ async fn handle_webhook(
     let access_token = state.access_token.clone();
 
     tokio::spawn(async move {
-        match session.handle_message(&sender_id, &text).await {
+        let envelope = MessageEnvelope::channel(
+            sender_id.clone(),
+            text.clone(),
+            DeliveryContext {
+                channel: "zalo".into(),
+                to: Some(format!("user:{}", sender_id)),
+                account_id: None,
+                thread_id: None,
+                meta: None,
+            },
+        );
+        match session.handle_message(envelope).await {
             Ok(reply) => {
                 // Send reply via Zalo OA API
                 let client = reqwest::Client::new();
@@ -116,7 +130,7 @@ async fn handle_webhook(
                     .header("access_token", &access_token)
                     .json(&serde_json::json!({
                         "recipient": {"user_id": sender_id},
-                        "message": {"text": reply}
+                        "message": {"text": reply.content}
                     }))
                     .send()
                     .await;

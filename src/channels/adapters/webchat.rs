@@ -10,9 +10,12 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::handler::AgentSession;
 use crate::config::{SynapseConfig, WebChatBotConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 #[derive(Clone)]
 struct AppState {
@@ -120,15 +123,23 @@ async fn handle_chat(
         );
     }
 
-    match state
-        .agent_session
-        .handle_message(&req.session_id, &req.message)
-        .await
-    {
-        Ok(response) => (
+    let session_id = req.session_id.clone();
+    let envelope = MessageEnvelope::channel(
+        session_id.clone(),
+        req.message.clone(),
+        DeliveryContext {
+            channel: "webchat-bot".into(),
+            to: Some(format!("user:{}", session_id)),
+            account_id: None,
+            thread_id: None,
+            meta: None,
+        },
+    );
+    match state.agent_session.handle_message(envelope).await {
+        Ok(reply) => (
             StatusCode::OK,
             Json(serde_json::json!(ChatResponse {
-                response,
+                response: reply.content,
                 session_id: req.session_id,
             })),
         ),

@@ -6,11 +6,14 @@ use axum::routing::post;
 use axum::Router;
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 /// Shared state for the axum webhook server.
 #[allow(dead_code)]
@@ -252,9 +255,20 @@ async fn handle_message(
     tokio::spawn(async move {
         let client = reqwest::Client::new();
 
-        match session.handle_message(&session_key, &text).await {
+        let envelope = MessageEnvelope::channel(
+            session_key.clone(),
+            text.clone(),
+            DeliveryContext {
+                channel: "teams".into(),
+                to: Some(format!("conversation:{}", session_key)),
+                account_id: None,
+                thread_id: None,
+                meta: None,
+            },
+        );
+        match session.handle_message(envelope).await {
             Ok(reply) => {
-                let chunks = formatter::chunk_teams(&reply);
+                let chunks = formatter::chunk_teams(&reply.content);
                 for chunk in &chunks {
                     send_reply(
                         &client,

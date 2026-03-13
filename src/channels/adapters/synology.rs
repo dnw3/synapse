@@ -3,9 +3,12 @@ use std::sync::Arc;
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::handler::AgentSession;
 use crate::config::{SynapseConfig, SynologyBotConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 #[derive(Clone)]
 struct AppState {
@@ -83,22 +86,32 @@ async fn handle_webhook(
         .channel_id
         .unwrap_or_else(|| payload.user_id.unwrap_or_else(|| "default".to_string()));
 
-    match state
-        .agent_session
-        .handle_message(&session_key, &text)
-        .await
-    {
+    let envelope = MessageEnvelope::channel(
+        session_key.clone(),
+        text.clone(),
+        DeliveryContext {
+            channel: "synology".into(),
+            to: Some(format!("chat:{}", session_key)),
+            account_id: None,
+            thread_id: None,
+            meta: None,
+        },
+    );
+    match state.agent_session.handle_message(envelope).await {
         Ok(reply) => {
             // If outgoing webhook URL is configured, send there
             if let Some(ref url) = state.outgoing_url {
                 let client = reqwest::Client::new();
                 let _ = client
                     .post(url)
-                    .json(&serde_json::json!({"text": reply}))
+                    .json(&serde_json::json!({"text": reply.content}))
                     .send()
                     .await;
             }
-            (StatusCode::OK, Json(serde_json::json!({"text": reply})))
+            (
+                StatusCode::OK,
+                Json(serde_json::json!({"text": reply.content})),
+            )
         }
         Err(e) => {
             tracing::error!(channel = "synology", error = %e, "agent error");

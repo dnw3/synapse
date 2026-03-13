@@ -6,11 +6,14 @@ use tokio_tungstenite::tungstenite::Message as WsMsg;
 
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 /// Run the Mattermost bot adapter using WebSocket events.
 pub async fn run(
@@ -177,9 +180,20 @@ async fn run_ws(
         let api_url = url.to_string();
         let api_token = token.to_string();
         tokio::spawn(async move {
-            match session.handle_message(&channel_id, &message).await {
+            let envelope = MessageEnvelope::channel(
+                channel_id.clone(),
+                message.clone(),
+                DeliveryContext {
+                    channel: "mattermost".into(),
+                    to: Some(format!("channel:{}", channel_id)),
+                    account_id: None,
+                    thread_id: None,
+                    meta: None,
+                },
+            );
+            match session.handle_message(envelope).await {
                 Ok(reply) => {
-                    let chunks = formatter::chunk_mattermost(&reply);
+                    let chunks = formatter::chunk_mattermost(&reply.content);
                     let client = reqwest::Client::new();
                     for chunk in chunks {
                         let _ = client

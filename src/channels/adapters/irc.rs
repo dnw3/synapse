@@ -4,11 +4,14 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, IrcBotConfig, SynapseConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 /// Run the IRC bot adapter using raw TCP.
 pub async fn run(
@@ -173,9 +176,20 @@ async fn run_tcp(
         let session_key = reply_target.clone();
 
         tokio::spawn(async move {
-            match session.handle_message(&session_key, &message).await {
+            let envelope = MessageEnvelope::channel(
+                session_key.clone(),
+                message.clone(),
+                DeliveryContext {
+                    channel: "irc".into(),
+                    to: Some(format!("channel:{}", session_key)),
+                    account_id: None,
+                    thread_id: None,
+                    meta: None,
+                },
+            );
+            match session.handle_message(envelope).await {
                 Ok(reply) => {
-                    let chunks = formatter::chunk_irc(&reply);
+                    let chunks = formatter::chunk_irc(&reply.content);
                     for chunk in chunks {
                         // Each chunk is already ≤400 chars; send line-by-line
                         // in case the agent included embedded newlines.

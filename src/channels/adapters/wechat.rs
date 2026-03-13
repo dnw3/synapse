@@ -7,11 +7,14 @@ use axum::Router;
 
 use tracing;
 
+use synaptic::DeliveryContext;
+
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::MessageEnvelope;
 
 /// WeCom Bot Webhook URL template.
 const WECOM_WEBHOOK_BASE: &str = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send";
@@ -194,11 +197,22 @@ async fn handle_callback(
     // Process in background so we respond to WeCom quickly (5s timeout requirement)
     let session = state.agent_session.clone();
     tokio::spawn(async move {
-        match session.handle_message(&session_key, &text).await {
+        let envelope = MessageEnvelope::channel(
+            session_key.clone(),
+            text.clone(),
+            DeliveryContext {
+                channel: "wechat".into(),
+                to: Some(format!("user:{}", session_key)),
+                account_id: None,
+                thread_id: None,
+                meta: None,
+            },
+        );
+        match session.handle_message(envelope).await {
             Ok(reply) => {
                 let client = reqwest::Client::new();
                 let webhook_url = format!("{}?key={}", WECOM_WEBHOOK_BASE, webhook_key);
-                let chunks = formatter::chunk_wechat(&reply);
+                let chunks = formatter::chunk_wechat(&reply.content);
                 for chunk in chunks {
                     let body = serde_json::json!({
                         "msgtype": "text",

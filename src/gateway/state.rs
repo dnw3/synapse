@@ -10,6 +10,7 @@ use super::auth::AuthState;
 use super::rpc::{Broadcaster, RpcRouter};
 use crate::agent;
 use crate::config::SynapseConfig;
+use crate::gateway::messages::ChannelRegistry;
 use crate::gateway::rpc::wizard::WizardSession;
 use crate::logging::LogBuffer;
 use crate::session::SessionWriteLock;
@@ -72,6 +73,8 @@ pub struct AppState {
     pub wizard_sessions: Arc<RwLock<HashMap<String, WizardSession>>>,
     /// Bootstrap token store for device pairing QR codes.
     pub bootstrap_store: Arc<RwLock<crate::gateway::nodes::BootstrapStore>>,
+    /// Registry of active channel senders for outbound delivery.
+    pub channel_registry: Arc<RwLock<ChannelRegistry>>,
 }
 
 impl AppState {
@@ -144,6 +147,7 @@ impl AppState {
             session_subscribers: Arc::new(RwLock::new(HashSet::new())),
             wizard_sessions: Arc::new(RwLock::new(HashMap::new())),
             bootstrap_store: Arc::new(RwLock::new(crate::gateway::nodes::BootstrapStore::new())),
+            channel_registry: Arc::new(RwLock::new(ChannelRegistry::new())),
         })
     }
 }

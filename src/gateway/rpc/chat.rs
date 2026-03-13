@@ -100,6 +100,42 @@ pub async fn handle_inject(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 }
 
 // ---------------------------------------------------------------------------
+// sessions.send — store a human message and signal start of execution
+// ---------------------------------------------------------------------------
+
+pub async fn handle_session_send(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let session_id = params
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| RpcError::invalid_request("missing 'session_id'"))?;
+    let message = params
+        .get("message")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| RpcError::invalid_request("missing 'message'"))?;
+
+    // Store the human message
+    let memory = ctx.state.sessions.memory();
+    memory
+        .append(session_id, Message::human(message))
+        .await
+        .map_err(|e| RpcError::internal(e.to_string()))?;
+
+    // Broadcast session.message event
+    ctx.broadcaster
+        .broadcast(
+            "session.message",
+            json!({
+                "session_id": session_id,
+                "message": { "role": "human", "content": message },
+            }),
+        )
+        .await;
+
+    let run_id = uuid::Uuid::new_v4().to_string();
+    Ok(json!({ "run_id": run_id, "status": "started" }))
+}
+
+// ---------------------------------------------------------------------------
 // agent.wait — wait for a running agent to complete (placeholder)
 // ---------------------------------------------------------------------------
 

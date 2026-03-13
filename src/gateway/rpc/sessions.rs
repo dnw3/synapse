@@ -193,6 +193,48 @@ pub async fn handle_patch(_ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 }
 
 // ---------------------------------------------------------------------------
+// sessions.create
+// ---------------------------------------------------------------------------
+
+pub async fn handle_create(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let session_id = ctx
+        .state
+        .sessions
+        .create_session()
+        .await
+        .map_err(|e| RpcError::internal(e.to_string()))?;
+
+    // Apply optional overrides (label, thinking_level)
+    let label = params.get("label").and_then(|v| v.as_str());
+    let thinking_level = params.get("thinking_level").and_then(|v| v.as_str());
+
+    if label.is_some() || thinking_level.is_some() {
+        let mut overrides = load_overrides();
+        let entry = overrides.entry(session_id.clone()).or_default();
+        if let Some(l) = label {
+            entry.label = Some(l.to_string());
+        }
+        if let Some(t) = thinking_level {
+            entry.thinking = Some(t.to_string());
+        }
+        save_overrides(&overrides).map_err(|e| RpcError::internal(e))?;
+    }
+
+    // Broadcast sessions.changed event
+    ctx.broadcaster
+        .broadcast(
+            "sessions.changed",
+            json!({
+                "action": "created",
+                "session_id": &session_id,
+            }),
+        )
+        .await;
+
+    Ok(json!({ "session_id": session_id, "ok": true }))
+}
+
+// ---------------------------------------------------------------------------
 // sessions.delete
 // ---------------------------------------------------------------------------
 
@@ -207,6 +249,17 @@ pub async fn handle_delete(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         .delete_session(id)
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
+
+    // Broadcast sessions.changed event
+    ctx.broadcaster
+        .broadcast(
+            "sessions.changed",
+            json!({
+                "action": "deleted",
+                "session_id": id,
+            }),
+        )
+        .await;
 
     Ok(json!({ "ok": true }))
 }
@@ -286,6 +339,116 @@ pub async fn handle_usage_timeseries(
     };
 
     Ok(json!(entries))
+}
+
+// ---------------------------------------------------------------------------
+// sessions.abort
+// ---------------------------------------------------------------------------
+
+pub async fn handle_abort(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let session_id = params
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .or_else(|| params.get("id").and_then(|v| v.as_str()))
+        .ok_or_else(|| RpcError::invalid_request("missing 'session_id' or 'id'"))?;
+
+    let tokens = ctx.state.cancel_tokens.read().await;
+    let aborted = if let Some(sender) = tokens.get(session_id) {
+        let _ = sender.send(true);
+        true
+    } else {
+        false
+    };
+
+    Ok(json!({ "ok": true, "aborted": aborted }))
+}
+
+// ---------------------------------------------------------------------------
+// sessions.subscribe / sessions.unsubscribe
+// ---------------------------------------------------------------------------
+
+pub async fn handle_subscribe(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
+    let mut subs = ctx.state.session_subscribers.write().await;
+    subs.insert(ctx.conn_id.clone());
+    Ok(json!({ "ok": true }))
+}
+
+pub async fn handle_unsubscribe(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
+    let mut subs = ctx.state.session_subscribers.write().await;
+    subs.remove(&ctx.conn_id);
+    Ok(json!({ "ok": true }))
+}
+
+// ---------------------------------------------------------------------------
+// sessions.preview
+// ---------------------------------------------------------------------------
+
+pub async fn handle_preview(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let session_ids: Vec<String> = params
+        .get("session_ids")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .ok_or_else(|| RpcError::invalid_request("missing 'session_ids' array"))?;
+    let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(5) as usize;
+    let max_chars = params
+        .get("max_chars")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(200) as usize;
+
+    let memory = ctx.state.sessions.memory();
+    let mut previews = Vec::new();
+
+    for sid in &session_ids {
+        let messages = memory.load(sid).await.unwrap_or_default();
+        let preview_msgs: Vec<Value> = messages
+            .iter()
+            .rev()
+            .take(limit)
+            .rev()
+            .map(|m| {
+                let content = m.content();
+                let truncated = if content.chars().count() > max_chars {
+                    format!("{}...", content.chars().take(max_chars).collect::<String>())
+                } else {
+                    content.to_string()
+                };
+                json!({ "role": m.role(), "content": truncated })
+            })
+            .collect();
+        previews.push(json!({ "session_id": sid, "messages": preview_msgs }));
+    }
+
+    Ok(json!({ "previews": previews }))
+}
+
+// ---------------------------------------------------------------------------
+// sessions.reset
+// ---------------------------------------------------------------------------
+
+pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let session_id = params
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .or_else(|| params.get("id").and_then(|v| v.as_str()))
+        .ok_or_else(|| RpcError::invalid_request("missing 'session_id' or 'id'"))?;
+
+    let memory = ctx.state.sessions.memory();
+    memory
+        .clear(session_id)
+        .await
+        .map_err(|e| RpcError::internal(e.to_string()))?;
+
+    // Broadcast sessions.changed event
+    ctx.broadcaster
+        .broadcast(
+            "sessions.changed",
+            json!({
+                "action": "reset",
+                "session_id": session_id,
+            }),
+        )
+        .await;
+
+    Ok(json!({ "ok": true }))
 }
 
 // ---------------------------------------------------------------------------

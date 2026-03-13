@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use synaptic::callbacks::{default_pricing, CostTrackingCallback};
@@ -65,6 +65,8 @@ pub struct AppState {
     pub exec_approval_manager: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalManager>>,
     /// Exec approvals config (persisted).
     pub exec_approvals_config: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalsConfig>>,
+    /// Connection IDs subscribed to session change events.
+    pub session_subscribers: Arc<RwLock<HashSet<String>>>,
 }
 
 impl AppState {
@@ -134,6 +136,7 @@ impl AppState {
             pairing_store,
             exec_approval_manager,
             exec_approvals_config,
+            session_subscribers: Arc::new(RwLock::new(HashSet::new())),
         })
     }
 }

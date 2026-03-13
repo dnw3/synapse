@@ -60,12 +60,36 @@ pub fn register_all(router: &mut RpcRouter) {
         Box::new(|ctx, params| Box::pin(sessions::handle_get(ctx, params))),
     );
     router.register(
+        "sessions.create",
+        Box::new(|ctx, params| Box::pin(sessions::handle_create(ctx, params))),
+    );
+    router.register(
         "sessions.patch",
         Box::new(|ctx, params| Box::pin(sessions::handle_patch(ctx, params))),
     );
     router.register(
         "sessions.delete",
         Box::new(|ctx, params| Box::pin(sessions::handle_delete(ctx, params))),
+    );
+    router.register(
+        "sessions.abort",
+        Box::new(|ctx, params| Box::pin(sessions::handle_abort(ctx, params))),
+    );
+    router.register(
+        "sessions.subscribe",
+        Box::new(|ctx, params| Box::pin(sessions::handle_subscribe(ctx, params))),
+    );
+    router.register(
+        "sessions.unsubscribe",
+        Box::new(|ctx, params| Box::pin(sessions::handle_unsubscribe(ctx, params))),
+    );
+    router.register(
+        "sessions.preview",
+        Box::new(|ctx, params| Box::pin(sessions::handle_preview(ctx, params))),
+    );
+    router.register(
+        "sessions.reset",
+        Box::new(|ctx, params| Box::pin(sessions::handle_reset(ctx, params))),
     );
     router.register(
         "sessions.compact",
@@ -282,6 +306,10 @@ pub fn register_all(router: &mut RpcRouter) {
     router.register(
         "chat.abort",
         Box::new(|ctx, params| Box::pin(chat::handle_abort(ctx, params))),
+    );
+    router.register(
+        "sessions.send",
+        Box::new(|ctx, params| Box::pin(chat::handle_session_send(ctx, params))),
     );
     router.register(
         "chat.inject",

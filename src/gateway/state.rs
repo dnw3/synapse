@@ -55,6 +55,16 @@ pub struct AppState {
     pub broadcaster: Arc<Broadcaster>,
     /// RPC method router.
     pub rpc_router: Arc<RpcRouter>,
+    /// Presence tracking for connected clients.
+    pub presence: Arc<RwLock<crate::gateway::presence::PresenceStore>>,
+    /// Live node registry.
+    pub node_registry: Arc<RwLock<crate::gateway::nodes::NodeRegistry>>,
+    /// Node pairing store (persisted).
+    pub pairing_store: Arc<RwLock<crate::gateway::nodes::PairingStore>>,
+    /// Exec approval manager (in-memory pending requests).
+    pub exec_approval_manager: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalManager>>,
+    /// Exec approvals config (persisted).
+    pub exec_approvals_config: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalsConfig>>,
 }
 
 impl AppState {
@@ -94,6 +104,17 @@ impl AppState {
         super::rpc::register_all(&mut rpc_router);
         let rpc_router = Arc::new(rpc_router);
 
+        // Presence, nodes, exec approvals
+        let presence = Arc::new(RwLock::new(crate::gateway::presence::PresenceStore::new()));
+        let node_registry = Arc::new(RwLock::new(crate::gateway::nodes::NodeRegistry::new()));
+        let pairing_store = Arc::new(RwLock::new(crate::gateway::nodes::PairingStore::new()));
+        let exec_approval_manager = Arc::new(RwLock::new(
+            crate::gateway::exec_approvals::ExecApprovalManager::new(),
+        ));
+        let exec_approvals_config = Arc::new(RwLock::new(
+            crate::gateway::exec_approvals::ExecApprovalsConfig::load(),
+        ));
+
         Ok(Self {
             config: config.clone(),
             model,
@@ -108,6 +129,11 @@ impl AppState {
             mcp_tools,
             broadcaster,
             rpc_router,
+            presence,
+            node_registry,
+            pairing_store,
+            exec_approval_manager,
+            exec_approvals_config,
         })
     }
 }

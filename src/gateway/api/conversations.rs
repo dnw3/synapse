@@ -9,6 +9,18 @@ use tracing;
 
 use crate::gateway::state::AppState;
 
+fn parse_system_time_string(s: &str) -> String {
+    if let Some(sec_start) = s.find("tv_sec: ") {
+        let rest = &s[sec_start + 8..];
+        if let Some(end) = rest.find(|c: char| !c.is_ascii_digit()) {
+            if let Ok(secs) = rest[..end].parse::<u64>() {
+                return (secs * 1000).to_string();
+            }
+        }
+    }
+    s.to_string()
+}
+
 #[derive(Serialize)]
 struct ConversationResponse {
     id: String,
@@ -50,7 +62,7 @@ async fn create_conversation(
 
     Ok(Json(ConversationResponse {
         id: info.id,
-        created_at: info.created_at,
+        created_at: parse_system_time_string(&info.created_at),
         message_count: 0,
     }))
 }
@@ -70,7 +82,7 @@ async fn list_conversations(
         let count = memory.load(&s.id).await.map(|m| m.len()).unwrap_or(0);
         conversations.push(ConversationResponse {
             id: s.id,
-            created_at: s.created_at,
+            created_at: parse_system_time_string(&s.created_at),
             message_count: count,
         });
     }
@@ -97,7 +109,7 @@ async fn get_conversation(
 
     Ok(Json(ConversationResponse {
         id: info.id,
-        created_at: info.created_at,
+        created_at: parse_system_time_string(&info.created_at),
         message_count: count,
     }))
 }

@@ -29,6 +29,11 @@ const NODE_ROLE_METHODS: &[&str] = &[
     "node.heartbeat",
     "node.register",
     "node.capabilities",
+    "node.pending.pull",
+    "node.pending.ack",
+    "node.event",
+    "node.pair.request",
+    "node.pair.verify",
 ];
 
 /// Methods available to any authenticated connection.
@@ -45,6 +50,12 @@ const CHAT_METHODS: &[&str] = &[
     "health",
     "status",
     "ping",
+    "system-presence",
+    "system-event",
+    "send",
+    "wake",
+    "exec.approval.request",
+    "exec.approval.waitDecision",
 ];
 
 /// Read-only operator methods.
@@ -85,6 +96,16 @@ const READ_METHODS: &[&str] = &[
     "debug.health",
     "agent.identity.get",
     "files.list",
+    "node.list",
+    "node.describe",
+    "node.pair.list",
+    "device.pair.list",
+    "exec.approvals.get",
+    "exec.approvals.node.get",
+    "tts.status",
+    "tts.providers",
+    "last-heartbeat",
+    "doctor.memory.status",
 ];
 
 /// Write operator methods.
@@ -125,10 +146,27 @@ const WRITE_METHODS: &[&str] = &[
     "debug.invoke",
     "files.upload",
     "files.delete",
+    "node.rename",
+    "node.invoke",
+    "tts.enable",
+    "tts.disable",
+    "tts.convert",
+    "tts.setProvider",
+    "set-heartbeats",
+    "secrets.reload",
+    "secrets.resolve",
+    "updates.run",
 ];
 
 /// Approval-related methods.
-const APPROVAL_METHODS: &[&str] = &["approval.list", "approval.approve", "approval.deny"];
+const APPROVAL_METHODS: &[&str] = &[
+    "approval.list",
+    "approval.approve",
+    "approval.deny",
+    "exec.approval.resolve",
+    "exec.approvals.set",
+    "exec.approvals.node.set",
+];
 
 /// Pairing-related methods.
 const PAIRING_METHODS: &[&str] = &[
@@ -136,6 +174,13 @@ const PAIRING_METHODS: &[&str] = &[
     "pairing.confirm",
     "pairing.cancel",
     "pairing.list",
+    "node.pair.approve",
+    "node.pair.reject",
+    "device.pair.approve",
+    "device.pair.reject",
+    "device.pair.remove",
+    "device.token.rotate",
+    "device.token.revoke",
 ];
 
 /// Check whether the given role and scopes permit calling `method`.

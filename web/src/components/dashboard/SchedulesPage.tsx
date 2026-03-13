@@ -486,7 +486,7 @@ export default function SchedulesPage() {
                   disabled={saving}
                   className={cn(
                     "flex items-center gap-1.5 px-4 py-2 text-[12px] font-medium rounded-[var(--radius-md)] transition-all cursor-pointer",
-                    "bg-[var(--accent)] text-white hover:brightness-110",
+                    "bg-[var(--accent)] text-white hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)]",
                     saving && "opacity-60 cursor-not-allowed"
                   )}
                 >

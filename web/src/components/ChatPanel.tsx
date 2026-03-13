@@ -31,13 +31,12 @@ interface Props {
   onApprovalRespond?: (approved: boolean, allowAll?: boolean) => void;
   onNewChat?: () => void;
   onReset?: () => void;
-  onClearCanvas?: () => void;
   queueSize?: number;
   chatError?: string | null;
   onDismissError?: () => void;
 }
 
-export default function ChatPanel({ messages, loading, streaming, approvalRequest, onSend, onCancel, onApprovalRespond, onNewChat, onReset, onClearCanvas, queueSize, chatError, onDismissError }: Props) {
+export default function ChatPanel({ messages, loading, streaming, approvalRequest, onSend, onCancel, onApprovalRespond, onNewChat, onReset, queueSize, chatError, onDismissError }: Props) {
   const { t, i18n } = useTranslation();
   const [input, setInput] = useState("");
   const [showCommands, setShowCommands] = useState(false);
@@ -72,13 +71,7 @@ export default function ChatPanel({ messages, loading, streaming, approvalReques
       descriptionZh: "重置当前对话",
       action: () => onReset?.(),
     },
-    {
-      name: "clear",
-      description: "Clear the canvas",
-      descriptionZh: "清空画布",
-      action: () => onClearCanvas?.(),
-    },
-  ], [onCancel, onNewChat, onReset, onClearCanvas]);
+  ], [onCancel, onNewChat, onReset]);
 
   const filteredCommands = useMemo(() => {
     if (!showCommands) return [];

@@ -277,7 +277,7 @@ export default function DebugPage() {
                 <button
                   onClick={handleExecute}
                   disabled={executing || !method.trim()}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[12px] font-medium hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)] transition-all cursor-pointer disabled:opacity-40"
                 >
                   <Play className="h-3.5 w-3.5" />
                   {executing ? t("debug.running") : t("debug.execute")}

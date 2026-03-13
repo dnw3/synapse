@@ -259,7 +259,7 @@ export default function WorkspacePage() {
           )}
           <button
             onClick={() => setCreating(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:opacity-90 transition-opacity"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)] transition-all"
           >
             <Plus className="h-3.5 w-3.5" />
             {t("workspace.newFile")}
@@ -320,7 +320,7 @@ export default function WorkspacePage() {
                             ? "bg-[var(--accent)]/10 text-[var(--accent-light)]"
                             : file.exists
                               ? "hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
-                              : "hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] opacity-50 hover:opacity-80",
+                              : "hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]",
                         )}
                       >
                         <div className="flex items-center gap-2">
@@ -330,7 +330,7 @@ export default function WorkspacePage() {
                               ? "text-[var(--accent)]"
                               : file.exists
                                 ? "text-[var(--text-tertiary)]"
-                                : "text-[var(--text-tertiary)]/50"
+                                : "text-[var(--text-tertiary)]"
                           )}>
                             {ICON_MAP[file.icon] || <FileText className="h-4 w-4" />}
                           </span>
@@ -440,7 +440,7 @@ export default function WorkspacePage() {
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] transition-all",
                     hasChanges
-                      ? "bg-[var(--accent)] text-white hover:opacity-90"
+                      ? "bg-[var(--accent)] text-white hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)]"
                       : "bg-[var(--bg-content)] text-[var(--text-tertiary)] cursor-not-allowed"
                   )}
                 >
@@ -457,7 +457,7 @@ export default function WorkspacePage() {
             <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-tertiary)]">
               <FileText className="h-10 w-10 mb-3 opacity-30" />
               <p className="text-sm">{t("workspace.selectFile") || "Select a file to edit"}</p>
-              <p className="text-[11px] mt-1 opacity-60">{t("workspace.subtitle")}</p>
+              <p className="text-[11px] mt-1">{t("workspace.subtitle")}</p>
             </div>
           )}
         </div>
@@ -491,7 +491,7 @@ export default function WorkspacePage() {
               <button
                 onClick={handleCreateNew}
                 disabled={!newFilename}
-                className="px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] bg-[var(--accent)] text-white hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)] transition-all disabled:opacity-50"
               >
                 {t("workspace.create")}
               </button>

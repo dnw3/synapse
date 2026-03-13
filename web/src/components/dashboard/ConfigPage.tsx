@@ -700,7 +700,7 @@ export default function ConfigPage() {
 
         <button onClick={handleSave} disabled={!hasChanges || saving || !isValid}
           className={cn("flex items-center gap-1.5 px-4 py-1.5 rounded-[var(--radius-lg)] text-[11px] font-medium transition-colors cursor-pointer",
-            hasChanges && isValid ? "bg-[var(--accent)] text-white hover:opacity-90" : "bg-[var(--bg-content)] text-[var(--text-tertiary)] cursor-not-allowed"
+            hasChanges && isValid ? "bg-[var(--accent)] text-white hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)]" : "bg-[var(--bg-content)] text-[var(--text-tertiary)] cursor-not-allowed"
           )}>
           {saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
           {saving ? t("config.saving") : t("config.save")}

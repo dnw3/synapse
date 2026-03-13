@@ -32,15 +32,6 @@
     "newChat": "新建会话",
     "attachFile": "附件"
   },
-  "files": {
-    "title": "文件",
-    "viewer": "查看器",
-    "emptyDir": "空目录",
-    "selectFile": "选择文件查看",
-    "navigateUp": "返回上级",
-    "collapse": "收起面板",
-    "expand": "展开面板"
-  },
   "tools": {
     "read_file": "读取",
     "write_file": "写入",
@@ -117,19 +108,6 @@
     "prev": "上一页",
     "next": "下一页",
     "ofTotal": "{{from}}–{{to}} / {{total}}"
-  },
-  "canvas": {
-    "title": "画布",
-    "copy": "复制",
-    "invalidChartData": "无效的图表数据",
-    "emptyHint": "Agent 生成的画布区块将在此展示。",
-    "emptyHint2": "使用 [canvas:type] 标记。",
-    "blocks": "{{count}} 个区块",
-    "export": "导出",
-    "clear": "清空",
-    "formInvalidSchema": "Canvas 区块中的表单 schema 无效。",
-    "formSelectPlaceholder": "-- 请选择 --",
-    "formSubmit": "提交"
   },
   "logs": {
     "entries": "{{count}} 条记录",
@@ -330,6 +308,8 @@
     "agents": "代理",
     "workspace": "工作区",
     "debug": "调试",
+    "instances": "实例",
+    "nodes": "节点",
     "allOperational": "系统运行正常",
     "gatewayDisconnected": "网关未连接",
     "lastRefresh": "上次刷新",
@@ -430,6 +410,27 @@
   },
   "reasoning": {
     "title": "思考过程"
+  },
+  "instances": {
+    "title": "已连接实例",
+    "empty": "暂无已连接实例",
+    "type": "类型",
+    "platform": "平台",
+    "version": "版本",
+    "mode": "模式",
+    "connected": "已连接"
+  },
+  "nodes": {
+    "title": "节点与执行审批",
+    "pairedNodes": "已配对节点",
+    "pendingRequests": "待处理请求",
+    "execApprovals": "执行审批",
+    "securityMode": "安全模式",
+    "askPolicy": "询问策略",
+    "allowlist": "白名单",
+    "empty": "暂无配对节点",
+    "approve": "批准",
+    "reject": "拒绝"
   },
   "logid": {
     "copied": "已复制",

@@ -32,15 +32,6 @@
     "newChat": "New Chat",
     "attachFile": "Attach file"
   },
-  "files": {
-    "title": "Files",
-    "viewer": "Viewer",
-    "emptyDir": "Empty directory",
-    "selectFile": "Select a file to view",
-    "navigateUp": "Navigate up",
-    "collapse": "Collapse panel",
-    "expand": "Expand panel"
-  },
   "tools": {
     "read_file": "Reading",
     "write_file": "Writing",
@@ -117,19 +108,6 @@
     "prev": "Prev",
     "next": "Next",
     "ofTotal": "{{from}}–{{to}} of {{total}}"
-  },
-  "canvas": {
-    "title": "Canvas",
-    "copy": "Copy",
-    "invalidChartData": "Invalid chart data",
-    "emptyHint": "Canvas blocks from the agent will appear here.",
-    "emptyHint2": "Use [canvas:type] markers.",
-    "blocks": "{{count}} blocks",
-    "export": "Export",
-    "clear": "Clear",
-    "formInvalidSchema": "Invalid form schema in canvas block.",
-    "formSelectPlaceholder": "-- select --",
-    "formSubmit": "Submit"
   },
   "logs": {
     "entries": "{{count}} entries",
@@ -330,6 +308,8 @@
     "agents": "Agents",
     "workspace": "Workspace",
     "debug": "Debug",
+    "instances": "Instances",
+    "nodes": "Nodes",
     "allOperational": "All Systems Operational",
     "gatewayDisconnected": "Gateway Disconnected",
     "lastRefresh": "Last refresh",
@@ -430,6 +410,27 @@
   },
   "reasoning": {
     "title": "Thinking"
+  },
+  "instances": {
+    "title": "Connected Instances",
+    "empty": "No instances connected",
+    "type": "Type",
+    "platform": "Platform",
+    "version": "Version",
+    "mode": "Mode",
+    "connected": "Connected"
+  },
+  "nodes": {
+    "title": "Nodes & Exec Approvals",
+    "pairedNodes": "Paired Nodes",
+    "pendingRequests": "Pending Requests",
+    "execApprovals": "Exec Approvals",
+    "securityMode": "Security Mode",
+    "askPolicy": "Ask Policy",
+    "allowlist": "Allowlist",
+    "empty": "No nodes paired",
+    "approve": "Approve",
+    "reject": "Reject"
   },
   "logid": {
     "copied": "Copied",

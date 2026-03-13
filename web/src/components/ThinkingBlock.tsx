@@ -28,7 +28,7 @@ export default function ThinkingBlock({ content }: Props) {
         <Brain className="h-3.5 w-3.5" />
         <span className="text-xs text-[var(--text-secondary)]" style={{ fontWeight: 500 }}>{t("reasoning.title")}</span>
         {!expanded && (
-          <span className="text-xs text-[var(--text-tertiary)]/60 truncate ml-1">
+          <span className="text-xs text-[var(--text-tertiary)] truncate ml-1">
             {preview}
           </span>
         )}

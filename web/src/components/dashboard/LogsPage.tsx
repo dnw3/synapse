@@ -327,7 +327,7 @@ function LogRow({
           {hasExpandable ? (
             expanded
               ? <ChevronDown className="h-3 w-3 text-[var(--text-tertiary)]" />
-              : <ChevronRight className="h-3 w-3 text-[var(--text-tertiary)] opacity-30 group-hover:opacity-80 transition-opacity" />
+              : <ChevronRight className="h-3 w-3 text-[var(--text-tertiary)] opacity-50 group-hover:opacity-80 transition-opacity" />
           ) : <span className="w-3" />}
         </div>
 
@@ -343,7 +343,7 @@ function LogRow({
                 {entry.request_id.slice(-8)}
               </button>
             ) : (
-              <span className="text-[10px] text-[var(--text-tertiary)] opacity-20">—</span>
+              <span className="text-[10px] text-[var(--text-tertiary)]">—</span>
             )}
           </div>
         )}
@@ -371,7 +371,7 @@ function LogRow({
 
         {/* Target */}
         <span
-          className="text-[11px] font-mono text-[var(--text-tertiary)]/60 shrink-0 pt-[2px] truncate"
+          className="text-[11px] font-mono text-[var(--text-tertiary)] shrink-0 pt-[2px] truncate"
           style={{ width: colWidths.target }}
           title={entry.target}
         >
@@ -421,7 +421,7 @@ function LogRow({
 
           {/* Content preview (first content field, single line) */}
           {!expanded && contentFields.length > 0 && (
-            <div className="mt-1 text-[11px] font-mono text-[var(--text-tertiary)] truncate leading-snug opacity-70">
+            <div className="mt-1 text-[11px] font-mono text-[var(--text-tertiary)] truncate leading-snug">
               {contentFields[0][0] === "error" ? (
                 <span className="text-[var(--error)]/80">{contentFields[0][1]}</span>
               ) : contentFields[0][0] === "tools" ? (
@@ -443,7 +443,7 @@ function LogRow({
               <div className="border-b border-[var(--border-subtle)]/30">
                 {contentFields.map(([k, v]) => (
                   <div key={k} className="px-3 py-2 border-b border-[var(--border-subtle)]/20 last:border-b-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] opacity-60">{k.replace(/_/g, " ")}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">{k.replace(/_/g, " ")}</span>
                     <pre className={cn(
                       "mt-1 text-[11px] font-mono leading-relaxed whitespace-pre-wrap break-all max-h-[200px] overflow-y-auto",
                       k === "error" ? "text-[var(--error)]" :
@@ -713,7 +713,7 @@ export default function LogsPage() {
                       "px-2.5 py-[5px] rounded-md text-[11px] font-bold tracking-wide transition-all cursor-pointer flex items-center gap-1.5",
                       active
                         ? lc ? cn(lc.bg, lc.color) : "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm"
-                        : "text-[var(--text-tertiary)]/70 hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]/50"
+                        : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                     )}
                   >
                     {level}
@@ -795,7 +795,7 @@ export default function LogsPage() {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Clock className="h-3 w-3 text-[var(--text-tertiary)]/60 shrink-0" />
+              <Clock className="h-3 w-3 text-[var(--text-tertiary)] shrink-0" />
               <div className="flex items-center gap-0.5">
                 {TIME_RANGES.map((tr) => (
                   <button
@@ -805,7 +805,7 @@ export default function LogsPage() {
                       "px-2 py-1 rounded text-[10px] font-semibold transition-all cursor-pointer",
                       timeRange === tr.value
                         ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm"
-                        : "text-[var(--text-tertiary)]/60 hover:text-[var(--text-secondary)]"
+                        : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                     )}
                   >
                     {tr.label}

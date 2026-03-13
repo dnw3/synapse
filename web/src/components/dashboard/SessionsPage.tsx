@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { MessageSquare, ChevronDown, ChevronRight, Trash2, Pencil, PackageMinus, Search, Filter, Clock, ExternalLink } from "lucide-react";
 import { cn } from "../../lib/cn";
@@ -417,9 +417,8 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                 </thead>
                 <tbody>
                   {filtered.map((session) => (
-                    <>
+                    <Fragment key={session.id}>
                       <tr
-                        key={session.id}
                         className={cn(
                           "hover:bg-[var(--bg-hover)] transition-colors",
                           expandedId === session.id && "bg-[var(--bg-hover)]"
@@ -465,7 +464,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                         </td>
 
                         {/* Title / Label — click to navigate to chat */}
-                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] max-w-[200px]">
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] max-w-[280px] overflow-hidden">
                           {editingLabelId === session.id ? (
                             <input
                               ref={labelEditRef}
@@ -484,7 +483,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                             <span
                               onClick={() => onNavigateToChat?.(session.id)}
                               className={cn(
-                                "text-[var(--text-secondary)] inline-flex items-center gap-1 group truncate",
+                                "text-[var(--text-secondary)] flex items-center gap-1 group truncate",
                                 onNavigateToChat
                                   ? "cursor-pointer hover:text-[var(--accent)] transition-colors"
                                   : "cursor-default"
@@ -609,7 +608,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                                 <div className="text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
                                   {t("sessions.cost")}
                                 </div>
-                                <div className="text-[var(--text-primary)] font-medium text-sm">
+                                <div className="text-[var(--text-primary)] font-medium text-[13px]">
                                   {formatCost(session.cost ?? 0)}
                                 </div>
                               </div>
@@ -648,7 +647,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

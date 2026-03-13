@@ -46,7 +46,7 @@ function LogIdBadge({ requestId }: { requestId: string }) {
         {copied ? t("logid.copied") : `${requestId.slice(0, 8)}...${requestId.slice(-4)}`}
       </span>
       {timeStr && !copied && (
-        <span className="text-[var(--text-tertiary)]/60 ml-0.5">{timeStr}</span>
+        <span className="text-[var(--text-tertiary)] ml-0.5">{timeStr}</span>
       )}
     </button>
   );

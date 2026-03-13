@@ -42,12 +42,22 @@ export interface UsageData {
   total_cost_usd: number;
 }
 
+export interface HealthConfigSummary {
+  model: string;
+  provider: string;
+  mcp_servers: number;
+  scheduled_jobs: number;
+  bot_channels: number;
+}
+
 export interface HealthData {
   status: string;
   uptime_secs: number;
   auth_enabled: boolean;
   memory_entries: number;
   active_sessions: number;
+  session_count?: number;
+  config_summary?: HealthConfigSummary;
 }
 
 export interface SessionEntry {
@@ -237,6 +247,8 @@ export type TabKey =
   | "channels"
   | "agents"
   | "workspace"
+  | "instances"
+  | "nodes"
   | "debug";
 
 export interface TabDef {

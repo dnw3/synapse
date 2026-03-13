@@ -969,7 +969,7 @@ function StoreSkillCard({
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[10px] font-medium transition-all shrink-0 cursor-pointer",
                 isInstalling
                   ? "bg-[var(--bg-content)] text-[var(--text-tertiary)] border border-[var(--border-subtle)]"
-                  : "bg-[var(--accent)] text-white hover:opacity-90 active:scale-[0.97]"
+                  : "bg-[var(--accent)] text-white hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)]"
               )}
             >
               {isInstalling ? (
@@ -1224,7 +1224,7 @@ function StoreSkillDetailModal({
                         "flex items-center gap-1.5 px-4 py-2 rounded-[var(--radius-md)] text-[12px] font-medium transition-all cursor-pointer",
                         isInstalling
                           ? "bg-[var(--bg-content)] text-[var(--text-tertiary)] border border-[var(--border-subtle)]"
-                          : "bg-[var(--accent)] text-white hover:opacity-90 active:scale-[0.97]"
+                          : "bg-[var(--accent)] text-white hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)]"
                       )}
                     >
                       {isInstalling ? (
@@ -1596,7 +1596,7 @@ function SkillCard({
             <div className="flex items-center gap-1.5">
               {skill.has_install_specs && (
                 <span
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--bg-content)] text-[10px] text-[var(--text-tertiary)] border border-[var(--border-subtle)] pointer-events-none select-none opacity-70"
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-[var(--radius-sm)] bg-[var(--bg-content)] text-[10px] text-[var(--text-tertiary)] border border-[var(--border-subtle)] pointer-events-none select-none"
                   title={t("dashboard.hasInstallLabel", "Has install instructions")}
                 >
                   <Package className="h-2.5 w-2.5" />

@@ -223,7 +223,7 @@ function ChannelDetailPanel({
           className={cn(
             "flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-sm)] text-[12px] font-medium transition-all cursor-pointer",
             hasChanges
-              ? "bg-[var(--accent)] text-white hover:bg-[var(--accent-light)]"
+              ? "bg-[var(--accent)] text-white hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)]"
               : "bg-[var(--bg-content)] text-[var(--text-tertiary)] cursor-not-allowed"
           )}
         >

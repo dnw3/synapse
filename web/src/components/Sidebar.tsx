@@ -40,8 +40,10 @@ interface SidebarProps {
 
 function formatRelativeTime(dateStr: string): string {
   const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diffMs = now - then;
+  // Handle millisecond-timestamp strings from the API (e.g. "1773246544000")
+  const parsed = /^\d+$/.test(dateStr) ? parseInt(dateStr, 10) : new Date(dateStr).getTime();
+  if (isNaN(parsed)) return "";
+  const diffMs = now - parsed;
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 1) return "now";
   if (diffMin < 60) return `${diffMin}m`;

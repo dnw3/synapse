@@ -11,6 +11,8 @@ import {
   Terminal,
   RefreshCw,
   FolderOpen,
+  Monitor,
+  Network,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,6 +33,8 @@ import ChannelsPage from "./dashboard/ChannelsPage";
 import AgentsPage from "./dashboard/AgentsPage";
 import WorkspacePage from "./dashboard/WorkspacePage";
 import DebugPage from "./dashboard/DebugPage";
+import InstancesPage from "./dashboard/InstancesPage";
+import NodesPage from "./dashboard/NodesPage";
 
 // Tabs that need full-height flex layout (editors, log viewers, scrollable tables)
 // Pages that manage their own scroll (have internal scroll areas, editors, etc.)
@@ -55,13 +59,15 @@ export const TABS: (TabDef & { i18nKey: string })[] = [
   { key: "channels", labelZh: "频道", labelEn: "Channels", i18nKey: "dashboard.channels", icon: <Radio className="h-4 w-4" /> },
   { key: "agents", labelZh: "代理", labelEn: "Agents", i18nKey: "dashboard.agents", icon: <Bot className="h-4 w-4" /> },
   { key: "workspace", labelZh: "工作区", labelEn: "Workspace", i18nKey: "dashboard.workspace", icon: <FolderOpen className="h-4 w-4" /> },
+  { key: "instances", labelZh: "实例", labelEn: "Instances", i18nKey: "dashboard.instances", icon: <Monitor className="h-4 w-4" /> },
+  { key: "nodes", labelZh: "节点", labelEn: "Nodes", i18nKey: "dashboard.nodes", icon: <Network className="h-4 w-4" /> },
   { key: "debug", labelZh: "调试", labelEn: "Debug", i18nKey: "dashboard.debug", icon: <Terminal className="h-4 w-4" /> },
 ];
 
 export const SIDEBAR_SECTIONS: (SidebarSection & { i18nKey: string })[] = [
   { labelZh: "监控", labelEn: "Monitor", i18nKey: "dashboard.monitor", keys: ["overview", "usage"] },
-  { labelZh: "控制", labelEn: "Control", i18nKey: "dashboard.control", keys: ["channels", "sessions", "schedules"] },
-  { labelZh: "代理", labelEn: "Agent", i18nKey: "dashboard.agent", keys: ["agents", "skills", "workspace"] },
+  { labelZh: "控制", labelEn: "Control", i18nKey: "dashboard.control", keys: ["channels", "sessions", "schedules", "instances"] },
+  { labelZh: "代理", labelEn: "Agent", i18nKey: "dashboard.agent", keys: ["agents", "skills", "workspace", "nodes"] },
   { labelZh: "设置", labelEn: "Settings", i18nKey: "dashboard.settings", keys: ["config", "logs", "debug"] },
 ];
 
@@ -143,6 +149,8 @@ export default function Dashboard({ connected: wsConnected, conversationCount, m
         {activeTab === "channels" && <ChannelsPage />}
         {activeTab === "agents" && <AgentsPage />}
         {activeTab === "workspace" && <WorkspacePage />}
+        {activeTab === "instances" && <InstancesPage />}
+        {activeTab === "nodes" && <NodesPage />}
         {activeTab === "debug" && <DebugPage />}
 
         {/* Footer — pinned at bottom of scroll for normal pages, hidden for self-scroll */}

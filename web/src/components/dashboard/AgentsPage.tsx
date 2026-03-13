@@ -238,7 +238,7 @@ export default function AgentsPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving || !editName.trim()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[12px] font-medium hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[12px] font-medium hover:brightness-110 active:scale-[0.97] [text-shadow:0_1px_1px_rgba(0,0,0,0.2)] transition-all cursor-pointer disabled:opacity-40"
                 >
                   <Save className="h-3.5 w-3.5" />
                   {saving ? t("agents.saving") : t("agents.save")}
@@ -353,7 +353,7 @@ export default function AgentsPage() {
                               <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">
                                 {group.label}
                               </span>
-                              <span className="text-[10px] text-[var(--text-tertiary)]/60">
+                              <span className="text-[10px] text-[var(--text-tertiary)]">
                                 {group.tools.length}
                               </span>
                             </div>
@@ -377,7 +377,7 @@ export default function AgentsPage() {
                             </div>
                           </div>
                         ))}
-                        <div className="text-[10px] text-[var(--text-tertiary)]/60 pt-2">
+                        <div className="text-[10px] text-[var(--text-tertiary)] pt-2">
                           {t("agents.toolsTotal", { count: toolsCatalog.reduce((s, g) => s + g.tools.length, 0) })}
                         </div>
                       </div>
@@ -421,13 +421,13 @@ export default function AgentsPage() {
                                   {skill.description}
                                 </p>
                               )}
-                              <span className="text-[10px] text-[var(--text-tertiary)]/60">
+                              <span className="text-[10px] text-[var(--text-tertiary)]">
                                 {skill.source}
                               </span>
                             </div>
                           </div>
                         ))}
-                        <div className="text-[10px] text-[var(--text-tertiary)]/60 pt-2">
+                        <div className="text-[10px] text-[var(--text-tertiary)] pt-2">
                           {t("agents.skillsTotal", { count: skills.length })}
                         </div>
                       </div>

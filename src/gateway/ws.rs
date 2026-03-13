@@ -1327,9 +1327,28 @@ async fn handle_v3_connection(
     // Event sequence counter for this connection
     let seq = AtomicU64::new(1);
 
+    // Tick timer for keepalive / heartbeat
+    let mut tick_interval = tokio::time::interval(std::time::Duration::from_secs(30));
+    tick_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
     // --- V3 main loop ---
     loop {
         tokio::select! {
+            // Periodic tick event
+            _ = tick_interval.tick() => {
+                let tick_seq = seq.fetch_add(1, Ordering::Relaxed);
+                let tick_frame = ServerFrame::event("tick", serde_json::json!({
+                    "ts": std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64,
+                }), tick_seq);
+                let _ = sender
+                    .send(WsMessage::Text(
+                        serde_json::to_string(&tick_frame).unwrap().into(),
+                    ))
+                    .await;
+            }
             // Client frames from WebSocket
             msg = receiver.next() => {
                 let text = match msg {

@@ -87,6 +87,9 @@ pub async fn run_server_with_log_buffer(
     // Request metrics tracking layer (wraps all routes)
     let metrics_state = app_state.request_metrics.clone();
 
+    // Clone broadcaster before app_state is consumed by ws_router
+    let shutdown_broadcaster = app_state.broadcaster.clone();
+
     let app = protected_api
         .merge(public_routes)
         .merge(health_route)
@@ -138,7 +141,21 @@ pub async fn run_server_with_log_buffer(
     );
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+
+    // Graceful shutdown: broadcast shutdown event, then stop accepting connections
+    let broadcaster = shutdown_broadcaster;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            let _ = tokio::signal::ctrl_c().await;
+            eprintln!("\n{}", "Shutting down gracefully...".yellow().bold());
+            // Broadcast shutdown event to all connected clients
+            broadcaster
+                .broadcast("shutdown", serde_json::json!({"reason": "server_shutdown"}))
+                .await;
+            // Give in-flight RPCs a moment to complete
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        })
+        .await?;
 
     Ok(())
 }

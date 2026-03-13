@@ -5,6 +5,7 @@
 
 mod agents;
 mod channels;
+mod chat;
 mod config_rpc;
 mod debug_rpc;
 mod events;
@@ -263,5 +264,27 @@ pub fn register_all(router: &mut RpcRouter) {
     router.register(
         "agent.identity.get",
         Box::new(|ctx, params| Box::pin(identity::handle_get(ctx, params))),
+    );
+
+    // Chat / Agent control
+    router.register(
+        "chat.history",
+        Box::new(|ctx, params| Box::pin(chat::handle_history(ctx, params))),
+    );
+    router.register(
+        "chat.abort",
+        Box::new(|ctx, params| Box::pin(chat::handle_abort(ctx, params))),
+    );
+    router.register(
+        "chat.inject",
+        Box::new(|ctx, params| Box::pin(chat::handle_inject(ctx, params))),
+    );
+    router.register(
+        "agent.wait",
+        Box::new(|ctx, params| Box::pin(chat::handle_agent_wait(ctx, params))),
+    );
+    router.register(
+        "poll",
+        Box::new(|ctx, params| Box::pin(chat::handle_poll(ctx, params))),
     );
 }

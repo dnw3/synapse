@@ -49,12 +49,36 @@ const READ_METHODS: &[&str] = &[
     "messages.list",
     "sessions.list",
     "sessions.get",
+    "sessions.usage",
+    "sessions.usage.timeseries",
+    "sessions.usage.logs",
     "logs.query",
+    "logs.tail",
     "config.get",
+    "config.schema",
+    "config.validate",
     "agents.list",
     "skills.list",
+    "skills.status",
+    "skills.bins",
     "schedules.list",
     "channels.list",
+    "channels.status",
+    "cron.list",
+    "cron.status",
+    "cron.runs",
+    "usage.status",
+    "usage.cost",
+    "models.list",
+    "tools.catalog",
+    "workspace.list",
+    "workspace.get",
+    "store.search",
+    "store.list",
+    "store.detail",
+    "store.status",
+    "debug.health",
+    "agent.identity.get",
     "files.list",
 ];
 
@@ -66,19 +90,34 @@ const WRITE_METHODS: &[&str] = &[
     "messages.send",
     "sessions.create",
     "sessions.delete",
+    "sessions.patch",
+    "sessions.compact",
     "config.set",
+    "config.reload",
     "agents.create",
     "agents.update",
     "agents.delete",
     "skills.create",
     "skills.update",
     "skills.delete",
+    "skills.install",
     "schedules.create",
     "schedules.update",
     "schedules.delete",
     "channels.create",
     "channels.update",
     "channels.delete",
+    "channels.logout",
+    "cron.add",
+    "cron.update",
+    "cron.remove",
+    "cron.run",
+    "workspace.set",
+    "workspace.create",
+    "workspace.delete",
+    "workspace.reset",
+    "store.install",
+    "debug.invoke",
     "files.upload",
     "files.delete",
 ];
@@ -195,5 +234,46 @@ mod tests {
 
         let admin = HashSet::from(["operator.admin".to_string()]);
         assert!(check_scope("some.unknown.method", Role::Operator, &admin).is_ok());
+    }
+
+    #[test]
+    fn new_rpc_methods_have_correct_scopes() {
+        let read = HashSet::from(["operator.read".to_string()]);
+        let write = HashSet::from(["operator.write".to_string()]);
+
+        // Read methods
+        assert!(check_scope("sessions.list", Role::Operator, &read).is_ok());
+        assert!(check_scope("sessions.get", Role::Operator, &read).is_ok());
+        assert!(check_scope("sessions.usage", Role::Operator, &read).is_ok());
+        assert!(check_scope("agents.list", Role::Operator, &read).is_ok());
+        assert!(check_scope("skills.status", Role::Operator, &read).is_ok());
+        assert!(check_scope("channels.status", Role::Operator, &read).is_ok());
+        assert!(check_scope("config.get", Role::Operator, &read).is_ok());
+        assert!(check_scope("cron.list", Role::Operator, &read).is_ok());
+        assert!(check_scope("usage.status", Role::Operator, &read).is_ok());
+        assert!(check_scope("logs.tail", Role::Operator, &read).is_ok());
+        assert!(check_scope("models.list", Role::Operator, &read).is_ok());
+        assert!(check_scope("tools.catalog", Role::Operator, &read).is_ok());
+        assert!(check_scope("workspace.list", Role::Operator, &read).is_ok());
+        assert!(check_scope("store.search", Role::Operator, &read).is_ok());
+        assert!(check_scope("debug.health", Role::Operator, &read).is_ok());
+        assert!(check_scope("agent.identity.get", Role::Operator, &read).is_ok());
+
+        // Write methods
+        assert!(check_scope("sessions.patch", Role::Operator, &write).is_ok());
+        assert!(check_scope("sessions.delete", Role::Operator, &write).is_ok());
+        assert!(check_scope("agents.create", Role::Operator, &write).is_ok());
+        assert!(check_scope("skills.install", Role::Operator, &write).is_ok());
+        assert!(check_scope("channels.logout", Role::Operator, &write).is_ok());
+        assert!(check_scope("config.set", Role::Operator, &write).is_ok());
+        assert!(check_scope("cron.add", Role::Operator, &write).is_ok());
+        assert!(check_scope("workspace.set", Role::Operator, &write).is_ok());
+        assert!(check_scope("store.install", Role::Operator, &write).is_ok());
+        assert!(check_scope("debug.invoke", Role::Operator, &write).is_ok());
+
+        // Write methods should NOT be accessible with read-only scope
+        let empty = HashSet::new();
+        assert!(check_scope("sessions.delete", Role::Operator, &empty).is_err());
+        assert!(check_scope("config.set", Role::Operator, &empty).is_err());
     }
 }

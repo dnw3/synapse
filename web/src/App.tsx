@@ -10,6 +10,7 @@ import ChatPanel, { FocusModeExitButton } from "./components/ChatPanel";
 import Dashboard, { TABS, SIDEBAR_SECTIONS, type TabKey } from "./components/Dashboard";
 import CommandPalette, { type PaletteEntry } from "./components/CommandPalette";
 import SetupWizard from "./components/SetupWizard";
+import ToolOutputSidebar from "./components/ToolOutputSidebar";
 import type { Message, FileAttachment } from "./types";
 import type { IdentityInfo } from "./types/dashboard";
 import {
@@ -43,6 +44,10 @@ export default function App() {
   const [focusMode, setFocusMode] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  const [toolSidebar, setToolSidebar] = useState<{ open: boolean; content: string; toolName?: string }>({
+    open: false,
+    content: "",
+  });
 
   // Fetch agent identity + model name from health
   useEffect(() => {
@@ -93,9 +98,25 @@ export default function App() {
       currentRequestIdRef.current = lastEvent.request_id;
     }
 
-    // Handle sessions.changed push event from v3 protocol
-    if (lastEvent.type === "event" && (lastEvent as { type: "event"; event: string; payload: unknown }).event === "sessions.changed") {
-      conv.refreshMessages();
+    // Handle Protocol v3 push events
+    if (lastEvent.type === "event") {
+      const evtFrame = lastEvent as { type: "event"; event: string; payload: unknown };
+      if (evtFrame.event === "sessions.changed") {
+        conv.refreshMessages();
+      } else if (evtFrame.event === "session.compacted") {
+        toast({
+          variant: "info",
+          title: t("toast.sessionCompacted"),
+          duration: 4000,
+        });
+      } else if (evtFrame.event === "update.available") {
+        const payload = evtFrame.payload as { version?: string } | null;
+        toast({
+          variant: "info",
+          title: t("toast.updateAvailable", { version: payload?.version ?? "" }),
+          duration: 8000,
+        });
+      }
     }
 
     if (lastEvent.type === "subagent_complete") {
@@ -292,27 +313,36 @@ export default function App() {
   const toolbarStatus = (!["idle", "pong"].includes(ws.status)) ? t(`status.${ws.status}`) : undefined;
 
   const chatPanel = (
-    <ChatPanel
-      messages={allMessages}
-      loading={sendLock || conv.loading || ws.status === "executing" || ws.status === "thinking"}
-      streaming={currentAssistantContent.length > 0}
-      approvalRequest={pendingApproval}
-      onSend={handleSendMessage}
-      onCancel={handleCancel}
-      onApprovalRespond={handleApprovalRespond}
-      onNewChat={() => conv.createConversation()}
-      onReset={() => {
-        if (conv.activeId) {
-          conv.deleteConversation(conv.activeId);
-          conv.createConversation();
-        }
-      }}
-      onToggleFocus={() => setFocusMode((f) => !f)}
-      onClearMessages={() => conv.setMessages([])}
-      queueSize={messageQueue.length}
-      chatError={chatError}
-      onDismissError={() => setChatError(null)}
-    />
+    <div className="flex flex-1 min-w-0 min-h-0 overflow-hidden">
+      <ChatPanel
+        messages={allMessages}
+        loading={sendLock || conv.loading || ws.status === "executing" || ws.status === "thinking"}
+        streaming={currentAssistantContent.length > 0}
+        approvalRequest={pendingApproval}
+        onSend={handleSendMessage}
+        onCancel={handleCancel}
+        onApprovalRespond={handleApprovalRespond}
+        onNewChat={() => conv.createConversation()}
+        onReset={() => {
+          if (conv.activeId) {
+            conv.deleteConversation(conv.activeId);
+            conv.createConversation();
+          }
+        }}
+        onToggleFocus={() => setFocusMode((f) => !f)}
+        onClearMessages={() => conv.setMessages([])}
+        queueSize={messageQueue.length}
+        chatError={chatError}
+        onDismissError={() => setChatError(null)}
+        onToolResultClick={(content, toolName) => setToolSidebar({ open: true, content, toolName })}
+      />
+      <ToolOutputSidebar
+        open={toolSidebar.open}
+        content={toolSidebar.content}
+        toolName={toolSidebar.toolName}
+        onClose={() => setToolSidebar((prev) => ({ ...prev, open: false }))}
+      />
+    </div>
   );
 
   // ── Command Palette entries ───────────────────────────────────────────
@@ -379,7 +409,7 @@ export default function App() {
       {/* Focus mode: show only chat with exit button */}
       {focusMode ? (
         <>
-          <main className="flex-1 flex flex-col min-w-0 min-h-0">
+          <main className="flex-1 flex min-w-0 min-h-0">
             {chatPanel}
           </main>
           <FocusModeExitButton onExit={() => setFocusMode(false)} />
@@ -428,9 +458,7 @@ export default function App() {
 
             <div className="flex-1 flex overflow-hidden">
               {isChatView ? (
-                <div className="flex-1 flex flex-col min-w-0 min-h-0">
-                  {chatPanel}
-                </div>
+                chatPanel
               ) : (
                 /* Dashboard content for the active tab */
                 <Dashboard

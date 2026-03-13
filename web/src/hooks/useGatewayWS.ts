@@ -148,6 +148,13 @@ export function useGatewayWS(conversationId: string | null): UseGatewayWSReturn 
           setStatus(data.state);
         }
 
+        // Protocol v3 push event frames — pass through to events array
+        // App.tsx handles: sessions.changed, session.compacted, update.available
+        if (data.type === "event") {
+          setEvents((prev) => [...prev, { type: "event", event: data.event, payload: data.payload }]);
+          return;
+        }
+
         setEvents((prev) => [...prev, data]);
       } catch {
         // ignore malformed messages

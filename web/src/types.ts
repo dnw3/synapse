@@ -49,7 +49,7 @@ export type WsEvent =
   | { type: "canvas_update"; block_type: string; content: string; language?: string; attributes?: Record<string, unknown> }
   | { type: "approval_request"; tool_name: string; args_preview: string; risk_level: string }
   | { type: "subagent_complete"; task_id: string; summary: string }
-  | { type: "done" }
+  | { type: "done"; usage?: { input_tokens?: number; output_tokens?: number; cost_usd?: number }; model?: string; stop_reason?: string }
   | { type: "error"; message: string; request_id?: string }
   | { type: "rpc_response"; id: string; result?: unknown; error?: string }
   | { type: "hello"; version: string; features: string[] }

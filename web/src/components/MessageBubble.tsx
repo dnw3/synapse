@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { User, Bot, Copy, Check, Trash2 } from "lucide-react";
+import { User, Bot, Copy, Check, Trash2, Volume2, VolumeX } from "lucide-react";
 import type { Message } from "../types";
 import ToolCallCard from "./ToolCallCard";
 import ThinkingBlock from "./ThinkingBlock";
@@ -16,6 +16,8 @@ interface Props {
   turn?: Message[];
   /** Called when user deletes this message group */
   onDelete?: () => void;
+  /** Called when a tool result is clicked — passes full content + tool name */
+  onToolResultClick?: (content: string, toolName?: string) => void;
 }
 
 function formatTokens(n: number): string {
@@ -114,7 +116,8 @@ function MarkdownContent({ content }: { content: string }) {
   );
 }
 
-function ToolResultSnippet({ content }: { content: string }) {
+function ToolResultSnippet({ content, onClick }: { content: string; onClick?: () => void }) {
+  const { t } = useTranslation();
   // Try to unescape JSON-encoded strings (e.g. "\"[agent]\\nmax_turns..." → real content)
   let display = content ?? "";
   if (display.startsWith('"') && display.endsWith('"')) {
@@ -128,16 +131,34 @@ function ToolResultSnippet({ content }: { content: string }) {
   const shown = truncated ? display.slice(0, 500) + "\n..." : display || "(empty)";
 
   return (
-    <pre className="text-xs text-[var(--text-tertiary)] font-mono bg-[var(--bg-content)]/80 rounded-[var(--radius-sm)] px-3 py-2 max-h-24 overflow-auto border border-[var(--border-subtle)] whitespace-pre-wrap break-words">
+    <pre
+      onClick={onClick}
+      title={onClick ? t("toolSidebar.title") : undefined}
+      className={`text-xs text-[var(--text-tertiary)] font-mono bg-[var(--bg-content)]/80 rounded-[var(--radius-sm)] px-3 py-2 max-h-24 overflow-auto border border-[var(--border-subtle)] whitespace-pre-wrap break-words ${onClick ? "cursor-pointer hover:border-[var(--accent)]/40 hover:bg-[var(--bg-hover)] transition-colors" : ""}`}
+    >
       {shown}
     </pre>
   );
 }
 
-export default function MessageBubble({ message, turn, onDelete }: Props) {
+export default function MessageBubble({ message, turn, onDelete, onToolResultClick }: Props) {
   const { t } = useTranslation();
   const identity = useIdentity();
   const [copyDone, setCopyDone] = useState(false);
+  const [ttsPlaying, setTtsPlaying] = useState(false);
+
+  const handleTtsPlay = (text: string) => {
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setTtsPlaying(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onend = () => setTtsPlaying(false);
+    utterance.onerror = () => setTtsPlaying(false);
+    setTtsPlaying(true);
+    window.speechSynthesis.speak(utterance);
+  };
 
   // Single human message
   if (message && message.role === "human") {
@@ -198,6 +219,19 @@ export default function MessageBubble({ message, turn, onDelete }: Props) {
           >
             {copyDone ? <Check className="w-3 h-3 text-[var(--success)]" /> : <Copy className="w-3 h-3" />}
           </button>
+          <button
+            onClick={() => {
+              const allContent = msgs
+                .filter((m) => m.role === "assistant" && m.content)
+                .map((m) => m.content)
+                .join("\n\n");
+              handleTtsPlay(allContent);
+            }}
+            title={ttsPlaying ? t("tts.stop") : t("tts.play")}
+            className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            {ttsPlaying ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+          </button>
           {onDelete && (
             <button
               onClick={onDelete}
@@ -211,7 +245,13 @@ export default function MessageBubble({ message, turn, onDelete }: Props) {
 
         {msgs.map((msg, i) => {
           if (msg.role === "tool") {
-            return <ToolResultSnippet key={i} content={msg.content} />;
+            return (
+              <ToolResultSnippet
+                key={i}
+                content={msg.content}
+                onClick={onToolResultClick ? () => onToolResultClick(msg.content) : undefined}
+              />
+            );
           }
           // assistant message
           const hasToolCalls = (msg.tool_calls ?? []).length > 0;

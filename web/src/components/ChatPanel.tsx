@@ -48,6 +48,17 @@ interface Props {
   chatError?: string | null;
   onDismissError?: () => void;
   contextUsage?: { tokens: number; limit: number };
+  onToolResultClick?: (content: string, toolName?: string) => void;
+}
+
+function MessageDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <div className="flex-1 h-px bg-[var(--separator)]" />
+      <span className="text-[10px] text-[var(--text-tertiary)] font-medium uppercase tracking-wider">{label}</span>
+      <div className="flex-1 h-px bg-[var(--separator)]" />
+    </div>
+  );
 }
 
 function formatTokens(n: number): string {
@@ -101,6 +112,7 @@ export default function ChatPanel({
   chatError,
   onDismissError,
   contextUsage,
+  onToolResultClick,
 }: Props) {
   const { t, i18n } = useTranslation();
   const [input, setInput] = useState("");
@@ -553,13 +565,22 @@ export default function ChatPanel({
             </div>
           )}
 
-          {turns.map((turn, i) =>
-            turn.type === "human" ? (
-              <MessageBubble key={i} message={turn.messages[0]} />
-            ) : (
-              <MessageBubble key={i} turn={turn.messages} />
-            )
-          )}
+          {turns.map((turn, i) => (
+            <div key={i}>
+              {/* Add a divider every 10 human-turn groups from the start */}
+              {turn.type === "human" && i > 0 && i % 10 === 0 && (
+                <MessageDivider label={t("divider.start")} />
+              )}
+              {turn.type === "human" ? (
+                <MessageBubble message={turn.messages[0]} />
+              ) : (
+                <MessageBubble
+                  turn={turn.messages}
+                  onToolResultClick={onToolResultClick}
+                />
+              )}
+            </div>
+          ))}
 
           {approvalRequest && onApprovalRespond && (
             <ApprovalDialog

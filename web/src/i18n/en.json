@@ -487,5 +487,22 @@
     "save": "Save",
     "saved": "Saved",
     "loading": "Loading..."
+  },
+  "tts": {
+    "play": "Read aloud",
+    "stop": "Stop reading"
+  },
+  "divider": {
+    "start": "Conversation start",
+    "compacted": "Context compacted"
+  },
+  "toolSidebar": {
+    "raw": "Raw",
+    "rendered": "Rendered",
+    "title": "Tool Output"
+  },
+  "toast": {
+    "sessionCompacted": "Context compacted",
+    "updateAvailable": "Update available: {{version}}"
   }
 }

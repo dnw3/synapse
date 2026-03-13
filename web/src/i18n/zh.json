@@ -487,5 +487,22 @@
     "save": "保存",
     "saved": "已保存",
     "loading": "加载中..."
+  },
+  "tts": {
+    "play": "朗读",
+    "stop": "停止朗读"
+  },
+  "divider": {
+    "start": "对话开始",
+    "compacted": "上下文已压缩"
+  },
+  "toolSidebar": {
+    "raw": "原始",
+    "rendered": "渲染",
+    "title": "工具输出"
+  },
+  "toast": {
+    "sessionCompacted": "上下文已压缩",
+    "updateAvailable": "有更新可用: {{version}}"
   }
 }

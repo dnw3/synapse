@@ -3,6 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use colored::Colorize;
 use futures::{SinkExt, StreamExt};
 use serde_json::json;
@@ -17,8 +18,67 @@ use crate::channels::handler::AgentSession;
 use crate::channels::reactions;
 use crate::config::bot::resolve_secret;
 use crate::config::SynapseConfig;
+use crate::gateway::messages::sender::{ChannelSender, SendResult};
 use crate::gateway::messages::{Attachment, MessageEnvelope};
+use crate::gateway::presence::now_ms;
 use crate::logging;
+
+// ---------------------------------------------------------------------------
+// ChannelSender implementation
+// ---------------------------------------------------------------------------
+
+/// Outbound sender for the Discord channel.
+pub struct DiscordSender {
+    /// HTTP client for making Discord API calls.
+    pub client: reqwest::Client,
+    /// Discord bot token (without the "Bot " prefix).
+    pub token: String,
+}
+
+#[async_trait]
+impl ChannelSender for DiscordSender {
+    fn channel_id(&self) -> &str {
+        "discord"
+    }
+
+    async fn send(
+        &self,
+        target: &DeliveryContext,
+        content: &str,
+        _meta: Option<&serde_json::Value>,
+    ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>> {
+        let channel_id = target
+            .to
+            .as_deref()
+            .and_then(|s| s.strip_prefix("channel:"))
+            .ok_or("missing or invalid channel_id in delivery target (expected 'channel:<id>')")?;
+
+        let chunks = formatter::chunk_discord(content);
+        let mut last_message_id: Option<String> = None;
+        for chunk in chunks {
+            let resp: serde_json::Value = self
+                .client
+                .post(format!(
+                    "https://discord.com/api/v10/channels/{}/messages",
+                    channel_id
+                ))
+                .header("Authorization", format!("Bot {}", self.token))
+                .json(&json!({"content": chunk}))
+                .send()
+                .await?
+                .json()
+                .await?;
+            if let Some(msg_id) = resp.get("id").and_then(|v| v.as_str()) {
+                last_message_id = Some(msg_id.to_string());
+            }
+        }
+
+        Ok(SendResult {
+            message_id: last_message_id,
+            delivered_at_ms: now_ms(),
+        })
+    }
+}
 
 /// Run the Discord bot.
 pub async fn run(

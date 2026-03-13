@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use tokio_tungstenite::tungstenite::Message as WsMsg;
 
@@ -14,7 +15,64 @@ use crate::channels::handler::AgentSession;
 use crate::channels::reactions;
 use crate::config::bot::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::sender::{ChannelSender, SendResult};
 use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::presence::now_ms;
+
+// ---------------------------------------------------------------------------
+// ChannelSender implementation
+// ---------------------------------------------------------------------------
+
+/// Outbound sender for the Slack channel.
+pub struct SlackSender {
+    /// Bot OAuth token used for `chat.postMessage`.
+    pub bot_token: String,
+}
+
+#[async_trait]
+impl ChannelSender for SlackSender {
+    fn channel_id(&self) -> &str {
+        "slack"
+    }
+
+    async fn send(
+        &self,
+        target: &DeliveryContext,
+        content: &str,
+        _meta: Option<&serde_json::Value>,
+    ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>> {
+        let channel = target
+            .to
+            .as_deref()
+            .and_then(|s| s.strip_prefix("channel:"))
+            .ok_or("missing or invalid channel in delivery target (expected 'channel:<id>')")?;
+
+        let client = reqwest::Client::new();
+        let chunks = formatter::chunk_slack(content);
+        let mut last_ts: Option<String> = None;
+        for chunk in chunks {
+            let resp: serde_json::Value = client
+                .post("https://slack.com/api/chat.postMessage")
+                .bearer_auth(&self.bot_token)
+                .json(&serde_json::json!({
+                    "channel": channel,
+                    "text": chunk,
+                }))
+                .send()
+                .await?
+                .json()
+                .await?;
+            if let Some(ts) = resp.get("ts").and_then(|v| v.as_str()) {
+                last_ts = Some(ts.to_string());
+            }
+        }
+
+        Ok(SendResult {
+            message_id: last_ts,
+            delivered_at_ms: now_ms(),
+        })
+    }
+}
 
 /// Run the Slack bot adapter using Socket Mode.
 pub async fn run(

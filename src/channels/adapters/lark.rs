@@ -19,7 +19,49 @@ use crate::config::bot::{
     resolve_secret, DmPolicy, GroupPolicy, GroupSessionScope, LarkRenderMode,
 };
 use crate::config::{BotAllowlist, SynapseConfig};
+use crate::gateway::messages::sender::{ChannelSender, SendResult};
 use crate::gateway::messages::{Attachment, MessageEnvelope};
+use crate::gateway::presence::now_ms;
+
+// ---------------------------------------------------------------------------
+// ChannelSender implementation
+// ---------------------------------------------------------------------------
+
+/// Outbound sender for the Lark channel.
+pub struct LarkSender {
+    /// Lark bot client for making API calls.
+    pub client: LarkBotClient,
+}
+
+#[async_trait]
+impl ChannelSender for LarkSender {
+    fn channel_id(&self) -> &str {
+        "lark"
+    }
+
+    async fn send(
+        &self,
+        target: &DeliveryContext,
+        content: &str,
+        _meta: Option<&serde_json::Value>,
+    ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>> {
+        let chat_id = target
+            .to
+            .as_deref()
+            .and_then(|s| s.strip_prefix("chat:"))
+            .ok_or("missing or invalid chat_id in delivery target (expected 'chat:<id>')")?;
+
+        self.client
+            .send_text("chat_id", chat_id, content)
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+
+        Ok(SendResult {
+            message_id: None,
+            delivered_at_ms: now_ms(),
+        })
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Streaming output adapter

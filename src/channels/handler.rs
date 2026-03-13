@@ -16,7 +16,14 @@ use tracing;
 use crate::agent;
 use crate::agent::registry::ModelRegistry;
 use crate::config::SynapseConfig;
-use crate::gateway::messages::{AgentReply, Attachment, MessageEnvelope};
+use crate::gateway::messages::routing::{
+    resolve_delivery_target, update_last_route, SessionDeliveryState, TurnSource,
+};
+use crate::gateway::messages::{
+    AgentReply, Attachment, ChannelRegistry, MessageEnvelope, MessageReceivedEvent,
+    MessageSentEvent,
+};
+use crate::gateway::rpc::Broadcaster;
 use crate::memory::LongTermMemory;
 
 /// Callback for streaming token output to bot adapters.
@@ -52,6 +59,10 @@ pub struct AgentSession {
     channel: String,
     /// Tracks which session key maps to which session ID.
     session_map: RwLock<std::collections::HashMap<String, String>>,
+    /// Optional channel registry for outbound dispatch (available in gateway mode).
+    channel_registry: Option<Arc<RwLock<ChannelRegistry>>>,
+    /// Optional broadcaster for message events (available in gateway mode).
+    broadcaster: Option<Arc<Broadcaster>>,
 }
 
 impl AgentSession {
@@ -68,6 +79,8 @@ impl AgentSession {
             deep_agent,
             channel: "unknown".to_string(),
             session_map: RwLock::new(std::collections::HashMap::new()),
+            channel_registry: None,
+            broadcaster: None,
         }
     }
 
@@ -105,6 +118,8 @@ impl AgentSession {
             deep_agent,
             channel: "unknown".to_string(),
             session_map: RwLock::new(std::collections::HashMap::new()),
+            channel_registry: None,
+            broadcaster: None,
         }
     }
 
@@ -112,6 +127,36 @@ impl AgentSession {
     pub fn with_channel(mut self, channel: &str) -> Self {
         self.channel = channel.to_string();
         self
+    }
+
+    /// Set channel registry and broadcaster for gateway mode.
+    pub fn with_gateway(
+        mut self,
+        channel_registry: Arc<RwLock<ChannelRegistry>>,
+        broadcaster: Arc<Broadcaster>,
+    ) -> Self {
+        self.channel_registry = Some(channel_registry);
+        self.broadcaster = Some(broadcaster);
+        self
+    }
+
+    /// Load delivery state from session metadata store.
+    async fn load_delivery_state(&self, session_key: &str) -> SessionDeliveryState {
+        let store = self.session_mgr.store();
+        let ns = &["delivery_state"];
+        match store.get(ns, session_key).await {
+            Ok(Some(item)) => serde_json::from_value(item.value).unwrap_or_default(),
+            _ => SessionDeliveryState::default(),
+        }
+    }
+
+    /// Save delivery state to session metadata store.
+    async fn save_delivery_state(&self, session_key: &str, state: &SessionDeliveryState) {
+        let store = self.session_mgr.store();
+        let ns = &["delivery_state"];
+        if let Ok(value) = serde_json::to_value(state) {
+            let _ = store.put(ns, session_key, value).await;
+        }
     }
 
     /// Resolve or create a persistent session ID for a given chat key.
@@ -184,6 +229,30 @@ impl AgentSession {
 
         tracing::info!("processing channel message");
 
+        // Load delivery state
+        let mut delivery_state = self.load_delivery_state(&session_key).await;
+
+        // Set active_turn_source (cross-channel race prevention)
+        delivery_state.active_turn_source = Some(TurnSource {
+            turn_id: request_id.clone(),
+            channel: envelope.delivery.channel.clone(),
+            to: envelope.delivery.to.clone(),
+            account_id: envelope.delivery.account_id.clone(),
+            thread_id: envelope.delivery.thread_id.clone(),
+        });
+
+        // Save delivery state for crash recovery
+        self.save_delivery_state(&session_key, &delivery_state)
+            .await;
+
+        // Broadcast message.received
+        if let Some(ref broadcaster) = self.broadcaster {
+            let event = MessageReceivedEvent::from_envelope(&envelope);
+            if let Ok(payload) = serde_json::to_value(&event) {
+                broadcaster.broadcast("message.received", payload).await;
+            }
+        }
+
         let sid = self.resolve_session(&session_key).await?;
 
         // Build content blocks from attachments
@@ -209,7 +278,59 @@ impl AgentSession {
         }
 
         let response = result?;
-        let delivery_target = envelope.delivery.clone();
+
+        // Resolve delivery target via priority chain
+        let delivery_target =
+            resolve_delivery_target(&delivery_state, delivery_state.active_turn_source.as_ref())
+                .unwrap_or_else(|_| envelope.delivery.clone());
+
+        // Dispatch outbound (for non-webchat channels only)
+        if delivery_target.channel != "webchat" {
+            if let Some(ref registry) = self.channel_registry {
+                let sender = {
+                    let reg = registry.read().await;
+                    reg.get(&delivery_target.channel).cloned()
+                };
+                if let Some(sender) = sender {
+                    match sender
+                        .send(&delivery_target, &response, delivery_target.meta.as_ref())
+                        .await
+                    {
+                        Ok(send_result) => {
+                            if let Some(ref broadcaster) = self.broadcaster {
+                                let sent_event = MessageSentEvent {
+                                    request_id: request_id.clone(),
+                                    channel: delivery_target.channel.clone(),
+                                    to: delivery_target.to.clone(),
+                                    timestamp_ms: send_result.delivered_at_ms,
+                                    message_id: send_result.message_id,
+                                };
+                                if let Ok(payload) = serde_json::to_value(&sent_event) {
+                                    broadcaster.broadcast("message.sent", payload).await;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(
+                                "failed to dispatch to {}: {}",
+                                delivery_target.channel,
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update last_* fields
+        update_last_route(&mut delivery_state, &delivery_target);
+
+        // Clear active_turn_source
+        delivery_state.active_turn_source = None;
+
+        // Save delivery state
+        self.save_delivery_state(&session_key, &delivery_state)
+            .await;
 
         Ok(AgentReply {
             content: response,
@@ -238,6 +359,30 @@ impl AgentSession {
         let _guard = span.enter();
 
         tracing::info!("processing streaming channel message");
+
+        // Load delivery state
+        let mut delivery_state = self.load_delivery_state(&session_key).await;
+
+        // Set active_turn_source (cross-channel race prevention)
+        delivery_state.active_turn_source = Some(TurnSource {
+            turn_id: request_id.clone(),
+            channel: envelope.delivery.channel.clone(),
+            to: envelope.delivery.to.clone(),
+            account_id: envelope.delivery.account_id.clone(),
+            thread_id: envelope.delivery.thread_id.clone(),
+        });
+
+        // Save delivery state for crash recovery
+        self.save_delivery_state(&session_key, &delivery_state)
+            .await;
+
+        // Broadcast message.received
+        if let Some(ref broadcaster) = self.broadcaster {
+            let event = MessageReceivedEvent::from_envelope(&envelope);
+            if let Ok(payload) = serde_json::to_value(&event) {
+                broadcaster.broadcast("message.received", payload).await;
+            }
+        }
 
         let sid = self.resolve_session(&session_key).await?;
 
@@ -279,7 +424,41 @@ impl AgentSession {
         }
 
         let response = result?;
-        let delivery_target = envelope.delivery.clone();
+
+        // Resolve delivery target via priority chain
+        let delivery_target =
+            resolve_delivery_target(&delivery_state, delivery_state.active_turn_source.as_ref())
+                .unwrap_or_else(|_| envelope.delivery.clone());
+
+        // For webchat streaming, actual delivery is via WebSocket (caller handles it).
+        // For other channels, streaming is not typically used for dispatch,
+        // but broadcast message.sent to keep event bus consistent.
+        if let Some(ref broadcaster) = self.broadcaster {
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            let sent_event = MessageSentEvent {
+                request_id: request_id.clone(),
+                channel: delivery_target.channel.clone(),
+                to: delivery_target.to.clone(),
+                timestamp_ms: now_ms,
+                message_id: None,
+            };
+            if let Ok(payload) = serde_json::to_value(&sent_event) {
+                broadcaster.broadcast("message.sent", payload).await;
+            }
+        }
+
+        // Update last_* fields
+        update_last_route(&mut delivery_state, &delivery_target);
+
+        // Clear active_turn_source
+        delivery_state.active_turn_source = None;
+
+        // Save delivery state
+        self.save_delivery_state(&session_key, &delivery_state)
+            .await;
 
         Ok(AgentReply {
             content: response,

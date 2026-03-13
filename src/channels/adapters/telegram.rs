@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use colored::Colorize;
 use tracing;
 
@@ -12,8 +13,70 @@ use crate::channels::handler::AgentSession;
 use crate::channels::reactions;
 use crate::config::bot::resolve_secret;
 use crate::config::SynapseConfig;
+use crate::gateway::messages::sender::{ChannelSender, SendResult};
 use crate::gateway::messages::{Attachment, MessageEnvelope};
+use crate::gateway::presence::now_ms;
 use crate::logging;
+
+// ---------------------------------------------------------------------------
+// ChannelSender implementation
+// ---------------------------------------------------------------------------
+
+/// Outbound sender for the Telegram channel.
+pub struct TelegramSender {
+    /// HTTP client for making API calls.
+    pub client: reqwest::Client,
+    /// Base URL: `https://api.telegram.org/bot{TOKEN}`.
+    pub base_url: String,
+}
+
+#[async_trait]
+impl ChannelSender for TelegramSender {
+    fn channel_id(&self) -> &str {
+        "telegram"
+    }
+
+    async fn send(
+        &self,
+        target: &DeliveryContext,
+        content: &str,
+        _meta: Option<&serde_json::Value>,
+    ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>> {
+        let chat_id = target
+            .to
+            .as_deref()
+            .and_then(|s| s.strip_prefix("chat:"))
+            .ok_or("missing or invalid chat_id in delivery target (expected 'chat:<id>')")?;
+
+        let chunks = formatter::chunk_telegram(content);
+        let mut last_message_id: Option<String> = None;
+        for chunk in chunks {
+            let resp: serde_json::Value = self
+                .client
+                .post(&format!("{}/sendMessage", self.base_url))
+                .json(&serde_json::json!({
+                    "chat_id": chat_id,
+                    "text": chunk,
+                }))
+                .send()
+                .await?
+                .json()
+                .await?;
+            if let Some(msg_id) = resp
+                .get("result")
+                .and_then(|r| r.get("message_id"))
+                .and_then(|v| v.as_i64())
+            {
+                last_message_id = Some(msg_id.to_string());
+            }
+        }
+
+        Ok(SendResult {
+            message_id: last_message_id,
+            delivered_at_ms: now_ms(),
+        })
+    }
+}
 
 /// Run the Telegram bot adapter using Long Polling.
 pub async fn run(

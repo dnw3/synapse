@@ -58,8 +58,11 @@ export default function Sidebar({
         isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}
     >
-      {/* Window controls / mobile close */}
-      <div className="h-[52px] flex-shrink-0 flex items-end px-3 pb-2 md:block">
+      {/* Window controls / mobile close — compact in dashboard mode */}
+      <div className={cn(
+        "flex-shrink-0 flex items-end px-3 md:block",
+        sidebarMode === "chat" ? "h-[52px] pb-2" : "h-[38px] pb-1"
+      )}>
         <button
           onClick={onClose}
           className="md:hidden p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors rounded-[var(--radius-sm)]"

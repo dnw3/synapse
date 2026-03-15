@@ -4,7 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
-  BarChart3, DollarSign, Zap, Activity, Download, RefreshCw,
+  BarChart3, DollarSign, Zap, Activity, Download, RefreshCw, Radio, Bot, Timer,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
@@ -18,6 +18,24 @@ import {
 
 type TimeRange = "today" | "7d" | "30d";
 type ViewMode = "tokens" | "cost";
+
+interface AggregateEntry {
+  key: string;
+  total_tokens: number;
+  total_cost: number;
+  requests: number;
+}
+
+interface LatencyStats {
+  avg_ms: number;
+  p95_ms: number;
+}
+
+interface UsageAggregates {
+  by_channel?: AggregateEntry[];
+  by_agent?: AggregateEntry[];
+  latency?: LatencyStats;
+}
 
 function rangeToParams(range: TimeRange): { from?: string; to?: string; granularity?: string } {
   const now = new Date();
@@ -71,8 +89,40 @@ function formatTsLabel(ts: string, range: TimeRange): string {
   }
 }
 
+const CHART_COLORS = [
+  "var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)",
+  "var(--chart-5)", "var(--chart-6)", "var(--chart-7)", "var(--chart-8)",
+];
+
+function DistributionBars({ entries }: { entries: AggregateEntry[] }) {
+  const maxTokens = Math.max(...entries.map((e) => e.total_tokens), 1);
+  return (
+    <div className="space-y-2">
+      {entries.map((entry, i) => (
+        <div key={entry.key} className="flex items-center gap-3">
+          <span className="text-[12px] font-mono text-[var(--text-secondary)] w-20 truncate" title={entry.key}>
+            {entry.key}
+          </span>
+          <div className="flex-1 h-5 bg-[var(--bg-content)] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${(entry.total_tokens / maxTokens) * 100}%`,
+                backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+              }}
+            />
+          </div>
+          <span className="text-[11px] font-mono text-[var(--text-tertiary)] w-16 text-right tabular-nums">
+            {formatTokens(entry.total_tokens)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function UsagePage() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isZh = i18n.language?.startsWith("zh");
   const api = useDashboardAPI();
 
@@ -84,10 +134,34 @@ export default function UsagePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("tokens");
   const [refreshing, setRefreshing] = useState(false);
 
+  // Aggregates: by channel, by agent, latency
+  const [channelUsage, setChannelUsage] = useState<AggregateEntry[]>([]);
+  const [agentUsage, setAgentUsage] = useState<AggregateEntry[]>([]);
+  const [latencyStats, setLatencyStats] = useState<LatencyStats | null>(null);
+
   // Session pagination & sort
   const [sessOffset, setSessOffset] = useState(0);
   const [sessSort, setSessSort] = useState<"cost" | "tokens">("cost");
   const sessLimit = 10;
+
+  const sinceDays = range === "today" ? 1 : range === "7d" ? 7 : 30;
+
+  const fetchAggregates = useCallback(async () => {
+    try {
+      const resp = await api.debugInvoke({ method: "usage.aggregates", params: { since_days: sinceDays } });
+      if (resp?.ok && resp.result) {
+        const data = resp.result as UsageAggregates;
+        setChannelUsage(data.by_channel ?? []);
+        setAgentUsage(data.by_agent ?? []);
+        setLatencyStats(data.latency ?? null);
+      }
+    } catch {
+      // RPC not available yet — gracefully show empty state
+      setChannelUsage([]);
+      setAgentUsage([]);
+      setLatencyStats(null);
+    }
+  }, [api, sinceDays]);
 
   const load = useCallback(async () => {
     const params = rangeToParams(range);
@@ -95,6 +169,7 @@ export default function UsagePage() {
       api.fetchUsage(),
       api.fetchUsageTimeseries(params.from, params.to, params.granularity),
       api.fetchUsageSessions(params.from, params.to, sessSort, sessLimit, sessOffset),
+      fetchAggregates(),
     ]);
     if (u) setUsage(u);
     if (ts && ts.length > 0) {
@@ -106,7 +181,7 @@ export default function UsagePage() {
     if (ss) setSessions(ss);
     setLoading(false);
     setRefreshing(false);
-  }, [api, range, sessSort, sessOffset]);
+  }, [api, range, sessSort, sessOffset, fetchAggregates]);
 
   useEffect(() => {
     setLoading(true);
@@ -332,6 +407,57 @@ export default function UsagePage() {
           </div>
         )}
       </SectionCard>
+
+      {/* Latency Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatsCard
+          icon={<Timer className="h-5 w-5" />}
+          label={t("usage.avgLatency")}
+          value={latencyStats ? `${latencyStats.avg_ms.toFixed(0)}` : "--"}
+          sub="ms"
+          accent="#38bdf8"
+        />
+        <StatsCard
+          icon={<Timer className="h-5 w-5" />}
+          label={t("usage.p95Latency")}
+          value={latencyStats ? `${latencyStats.p95_ms.toFixed(0)}` : "--"}
+          sub="ms"
+          accent="#fb923c"
+        />
+      </div>
+
+      {/* By Channel & By Agent */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+        <SectionCard>
+          <SectionHeader
+            icon={<Radio className="h-4 w-4" />}
+            title={t("usage.byChannel")}
+          />
+          {channelUsage.length === 0 ? (
+            <EmptyState
+              icon={<Radio className="h-8 w-8 opacity-40" />}
+              message={t("usage.noChannelData")}
+            />
+          ) : (
+            <DistributionBars entries={channelUsage} />
+          )}
+        </SectionCard>
+
+        <SectionCard>
+          <SectionHeader
+            icon={<Bot className="h-4 w-4" />}
+            title={t("usage.byAgent")}
+          />
+          {agentUsage.length === 0 ? (
+            <EmptyState
+              icon={<Bot className="h-8 w-8 opacity-40" />}
+              message={t("usage.noAgentData")}
+            />
+          ) : (
+            <DistributionBars entries={agentUsage} />
+          )}
+        </SectionCard>
+      </div>
 
       {/* Bottom two columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">

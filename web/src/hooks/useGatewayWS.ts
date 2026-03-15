@@ -6,8 +6,6 @@ const RPC_TIMEOUT_MS = 30_000;
 const MAX_BACKOFF_MS = 30_000;
 const BASE_BACKOFF_MS = 1_000;
 
-/** Poll interval to detect execution completion when reconnected mid-execution. */
-const EXECUTION_POLL_MS = 3_000;
 
 interface PendingRpc {
   resolve: (value: unknown) => void;

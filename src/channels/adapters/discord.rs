@@ -28,6 +28,7 @@ use crate::logging;
 // ---------------------------------------------------------------------------
 
 /// Outbound sender for the Discord channel.
+#[allow(dead_code)]
 pub struct DiscordSender {
     /// HTTP client for making Discord API calls.
     pub client: reqwest::Client,
@@ -53,7 +54,7 @@ impl ChannelSender for DiscordSender {
             .and_then(|s| s.strip_prefix("channel:"))
             .ok_or("missing or invalid channel_id in delivery target (expected 'channel:<id>')")?;
 
-        let chunks = formatter::chunk_discord(content);
+        let chunks = formatter::format_for_channel(content, "discord", 2000);
         let mut last_message_id: Option<String> = None;
         for chunk in chunks {
             let resp: serde_json::Value = self
@@ -87,7 +88,7 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let discord_config = config
         .discord
-        .as_ref()
+        .first()
         .ok_or("Discord bot configuration not found in config")?;
 
     let token = resolve_secret(
@@ -95,7 +96,7 @@ pub async fn run(
         discord_config.bot_token_env.as_deref(),
         "Discord bot token",
     )
-    .map_err(|e| format!("{}", e))?;
+    .map_err(|e| e.to_string())?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -274,20 +275,30 @@ pub async fn run(
                         .send()
                         .await;
 
+                    let is_dm = guild_id.is_none();
                     let delivery = DeliveryContext {
                         channel: "discord".into(),
                         to: Some(format!("channel:{}", channel_id)),
-                        account_id: guild_id,
+                        account_id: guild_id.clone(),
                         ..Default::default()
                     };
                     let mut envelope =
                         MessageEnvelope::channel(channel_id.clone(), content, delivery);
                     envelope.attachments = attachments;
+                    envelope.sender_id = Some(sender_id.clone());
+                    envelope.routing.peer_kind = Some(if is_dm {
+                        crate::config::PeerKind::Direct
+                    } else {
+                        crate::config::PeerKind::Group
+                    });
+                    envelope.routing.peer_id = Some(channel_id.clone());
+                    envelope.routing.guild_id = guild_id;
 
                     match session.handle_message(envelope).await {
                         Ok(reply) => {
                             // Split long replies into chunks (Discord 2000 char limit)
-                            let chunks = formatter::chunk_discord(&reply.content);
+                            let chunks =
+                                formatter::format_for_channel(&reply.content, "discord", 2000);
                             for chunk in chunks {
                                 let _ = http
                                     .post(format!(

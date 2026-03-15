@@ -1,5 +1,4 @@
 /// Default workspace template files for project context injection.
-
 pub struct WorkspaceTemplate {
     pub filename: &'static str,
     pub description: &'static str,

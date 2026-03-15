@@ -11,6 +11,7 @@ use synaptic::core::{Message, SynapticError, TokenUsage};
 use synaptic::graph::{CompiledGraph, MessageState, StreamMode};
 
 /// Result of running an agent to completion.
+#[allow(dead_code)]
 pub struct AgentResult {
     /// All messages including the agent's responses.
     pub messages: Vec<Message>,
@@ -21,6 +22,7 @@ pub struct AgentResult {
 }
 
 /// Agent execution runtime — unifies REPL, task, and bot execution modes.
+#[allow(dead_code)]
 #[async_trait]
 pub trait AgentRuntime: Send + Sync {
     /// Run the agent with the given messages, returning the final response.
@@ -31,23 +33,27 @@ pub trait AgentRuntime: Send + Sync {
     ) -> Result<AgentResult, SynapticError>;
 }
 
+/// Callback type for rendering messages during streaming.
+#[allow(dead_code)]
+type MessageRenderer = Arc<dyn Fn(&[Message], usize) -> usize + Send + Sync>;
+
 /// Streaming mode: prints tool calls and chunks to terminal.
 ///
 /// Used by REPL and task execution modes. Streams events and
 /// renders them in real-time.
+#[allow(dead_code)]
 pub struct StreamingRuntime {
     /// Callback invoked for each new message batch during streaming.
-    pub on_messages: Option<Arc<dyn Fn(&[Message], usize) -> usize + Send + Sync>>,
+    pub on_messages: Option<MessageRenderer>,
 }
 
+#[allow(dead_code)]
 impl StreamingRuntime {
     pub fn new() -> Self {
         Self { on_messages: None }
     }
 
-    pub fn with_renderer(
-        on_messages: Arc<dyn Fn(&[Message], usize) -> usize + Send + Sync>,
-    ) -> Self {
+    pub fn with_renderer(on_messages: MessageRenderer) -> Self {
         Self {
             on_messages: Some(on_messages),
         }
@@ -100,6 +106,7 @@ impl AgentRuntime for StreamingRuntime {
 ///
 /// Used by bot adapters. Runs the agent to completion and returns
 /// the final response text.
+#[allow(dead_code)]
 pub struct InvokeRuntime;
 
 #[async_trait]
@@ -124,6 +131,7 @@ impl AgentRuntime for InvokeRuntime {
 }
 
 /// Extract the final AI response text from the message list.
+#[allow(dead_code)]
 fn extract_final_response(messages: &[Message]) -> String {
     for msg in messages.iter().rev() {
         if msg.is_ai() {

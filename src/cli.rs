@@ -49,6 +49,44 @@ pub enum Command {
     /// List all sessions.
     Sessions,
 
+    /// Generate a device pairing QR code and setup code.
+    #[cfg(feature = "web")]
+    Qr {
+        /// Only output the setup code (no QR).
+        #[arg(long)]
+        setup_code_only: bool,
+        /// Override the gateway WebSocket URL.
+        #[arg(long)]
+        url: Option<String>,
+    },
+
+    /// Manage paired devices.
+    #[cfg(feature = "web")]
+    Devices {
+        /// Action: list, approve, reject, remove, rename, rotate, revoke.
+        action: String,
+        /// Request ID (for approve/reject).
+        #[arg(long)]
+        request_id: Option<String>,
+        /// Device ID (for remove/rename/rotate/revoke).
+        #[arg(long)]
+        device: Option<String>,
+        /// New name (for rename).
+        #[arg(long)]
+        name: Option<String>,
+    },
+
+    /// Manage DM pairing for bot channels.
+    #[cfg(feature = "web")]
+    Pairing {
+        /// Action: list, approve, allowlist, remove.
+        action: String,
+        /// Channel name (e.g., lark, telegram).
+        channel: String,
+        /// Pairing code (for approve) or sender ID (for remove).
+        value: Option<String>,
+    },
+
     /// Interactive setup wizard — creates synapse.toml config file.
     Init,
 

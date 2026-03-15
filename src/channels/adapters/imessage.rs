@@ -22,8 +22,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let imessage_config = config
         .imessage
-        .as_ref()
-        .ok_or("missing [imessage] section in config")?;
+        .first()
+        .ok_or("missing [[imessage]] section in config")?;
 
     let password = resolve_secret(
         imessage_config.password.as_deref(),
@@ -153,8 +153,11 @@ pub async fn run(
             let reply_chat_guid = chat_guid.clone();
             let session_key = sender.clone();
 
+            // iMessage group chats have GUIDs starting with "iMessage;+;" while DMs are "iMessage;-;"
+            let is_group = chat_guid.contains(";+;");
+
             tokio::spawn(async move {
-                let envelope = MessageEnvelope::channel(
+                let mut envelope = MessageEnvelope::channel(
                     session_key.clone(),
                     text.clone(),
                     DeliveryContext {
@@ -165,9 +168,17 @@ pub async fn run(
                         meta: None,
                     },
                 );
+                envelope.sender_id = Some(sender.clone());
+                envelope.routing.peer_kind = Some(if is_group {
+                    crate::config::PeerKind::Group
+                } else {
+                    crate::config::PeerKind::Direct
+                });
+                envelope.routing.peer_id = Some(reply_chat_guid.clone());
                 match session.handle_message(envelope).await {
                     Ok(reply) => {
-                        let chunks = formatter::chunk_imessage(&reply.content);
+                        let chunks =
+                            formatter::format_for_channel(&reply.content, "imessage", 10000);
                         for chunk in chunks {
                             let body = serde_json::json!({
                                 "chatGuid": reply_chat_guid,

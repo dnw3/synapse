@@ -19,8 +19,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mx_config = config
         .matrix
-        .as_ref()
-        .ok_or("missing [matrix] section in config")?;
+        .first()
+        .ok_or("missing [[matrix]] section in config")?;
 
     let password = resolve_secret(
         mx_config.password.as_deref(),
@@ -94,8 +94,9 @@ pub async fn run(
                     let hs = homeserver.clone();
                     let token = access_token.clone();
                     let rid = room_id.clone();
+                    let sender_clone = sender.clone();
                     tokio::spawn(async move {
-                        let envelope = MessageEnvelope::channel(
+                        let mut envelope = MessageEnvelope::channel(
                             rid.clone(),
                             text.clone(),
                             DeliveryContext {
@@ -106,9 +107,13 @@ pub async fn run(
                                 meta: None,
                             },
                         );
+                        envelope.sender_id = Some(sender_clone);
+                        envelope.routing.peer_kind = Some(crate::config::PeerKind::Group);
+                        envelope.routing.peer_id = Some(rid.clone());
                         match session.handle_message(envelope).await {
                             Ok(reply) => {
-                                let chunks = formatter::chunk_matrix(&reply.content);
+                                let chunks =
+                                    formatter::format_for_channel(&reply.content, "matrix", 60000);
                                 for chunk in chunks {
                                     send_message(&http, &hs, &token, &rid, &chunk).await;
                                 }

@@ -88,10 +88,13 @@ pub async fn resolve_skill_slash_command(
     None
 }
 
+/// Command dispatch info: (tool_name, arg_mode).
+type CommandDispatch = (String, String);
+
 /// Parse frontmatter and return (body, user_invocable, command_dispatch).
 ///
 /// `command_dispatch` is `Some((tool_name, arg_mode))` when `command-dispatch: tool` is set.
-fn parse_skill_for_slash(content: &str) -> Option<(String, bool, Option<(String, String)>)> {
+fn parse_skill_for_slash(content: &str) -> Option<(String, bool, Option<CommandDispatch>)> {
     let content = content.trim_start_matches('\u{feff}');
     let mut lines = content.lines();
     if lines.next()?.trim() != "---" {

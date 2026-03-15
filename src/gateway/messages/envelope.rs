@@ -22,8 +22,28 @@ pub struct MessageEnvelope {
     pub provenance: InputProvenance,
     pub idempotency_key: Option<String>,
     pub timestamp_ms: u64,
+    /// Sender identity (user ID) for routing and session isolation.
+    pub sender_id: Option<String>,
+    /// Routing metadata for multi-agent dispatch.
+    pub routing: RoutingMeta,
 }
 
+/// Routing metadata carried in the envelope for multi-agent dispatch.
+#[derive(Debug, Default, Clone)]
+pub struct RoutingMeta {
+    /// Discord guild ID.
+    pub guild_id: Option<String>,
+    /// Slack team/workspace ID.
+    pub team_id: Option<String>,
+    /// User roles (Discord).
+    pub roles: Vec<String>,
+    /// Whether this is a DM or group.
+    pub peer_kind: Option<crate::config::PeerKind>,
+    /// Primary peer ID (chat_id for groups, sender_id for DMs).
+    pub peer_id: Option<String>,
+}
+
+#[allow(dead_code)]
 impl MessageEnvelope {
     /// Create a new envelope with minimal fields. Sets provenance to ExternalUser.
     pub fn new(request_id: String, session_key: String, content: String) -> Self {
@@ -36,6 +56,8 @@ impl MessageEnvelope {
             provenance: InputProvenance::default(),
             idempotency_key: None,
             timestamp_ms: now_ms(),
+            sender_id: None,
+            routing: RoutingMeta::default(),
         }
     }
 
@@ -63,6 +85,8 @@ impl MessageEnvelope {
             },
             idempotency_key: None,
             timestamp_ms: now_ms(),
+            sender_id: None,
+            routing: RoutingMeta::default(),
         }
     }
 
@@ -82,6 +106,8 @@ impl MessageEnvelope {
             },
             idempotency_key: None,
             timestamp_ms: now_ms(),
+            sender_id: None,
+            routing: RoutingMeta::default(),
         }
     }
 }

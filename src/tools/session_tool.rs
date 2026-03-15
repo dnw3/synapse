@@ -17,6 +17,7 @@ pub struct SessionsListTool {
     mgr: Arc<SessionManager>,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl SessionsListTool {
     pub fn new(mgr: Arc<SessionManager>) -> Arc<dyn Tool> {
         Arc::new(Self { mgr })
@@ -66,6 +67,7 @@ pub struct SessionsHistoryTool {
     mgr: Arc<SessionManager>,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl SessionsHistoryTool {
     pub fn new(mgr: Arc<SessionManager>) -> Arc<dyn Tool> {
         Arc::new(Self { mgr })
@@ -150,6 +152,7 @@ pub struct SessionsSendTool {
     mgr: Arc<SessionManager>,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl SessionsSendTool {
     pub fn new(mgr: Arc<SessionManager>) -> Arc<dyn Tool> {
         Arc::new(Self { mgr })
@@ -216,6 +219,7 @@ pub struct SessionsSpawnTool {
     mgr: Arc<SessionManager>,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl SessionsSpawnTool {
     pub fn new(mgr: Arc<SessionManager>) -> Arc<dyn Tool> {
         Arc::new(Self { mgr })

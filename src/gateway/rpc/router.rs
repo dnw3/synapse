@@ -18,6 +18,7 @@ use crate::gateway::state::AppState;
 // ---------------------------------------------------------------------------
 
 /// Context available to every RPC handler invocation.
+#[allow(dead_code)]
 pub struct RpcContext {
     /// Shared application state.
     pub state: AppState,
@@ -157,6 +158,7 @@ impl Broadcaster {
     }
 
     /// Send a frame to a specific connection.
+    #[allow(dead_code)]
     pub async fn send_to(&self, conn_id: &str, frame: ServerFrame) -> bool {
         let conns = self.connections.read().await;
         if let Some(tx) = conns.get(conn_id) {

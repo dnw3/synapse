@@ -5,11 +5,14 @@
 
 mod agent_files;
 mod agents;
+mod bindings_rpc;
+mod broadcasts_rpc;
 mod channels;
 mod chat;
 mod config_rpc;
 mod debug_rpc;
 mod devices;
+mod dm_pairing;
 mod events;
 mod exec_approvals;
 mod health;
@@ -36,7 +39,9 @@ pub mod scopes;
 pub mod types;
 
 pub use events::GATEWAY_EVENTS;
-pub use router::{Broadcaster, RpcContext, RpcHandler, RpcRouter};
+#[allow(unused_imports)]
+pub use router::RpcHandler;
+pub use router::{Broadcaster, RpcContext, RpcRouter};
 pub use scopes::Role;
 pub use types::*;
 
@@ -229,6 +234,14 @@ pub fn register_all(router: &mut RpcRouter) {
         "usage.cost",
         Box::new(|ctx, params| Box::pin(usage::handle_cost(ctx, params))),
     );
+    router.register(
+        "usage.aggregates",
+        Box::new(|ctx, params| Box::pin(usage::handle_aggregates(ctx, params))),
+    );
+    router.register(
+        "usage.records",
+        Box::new(|ctx, params| Box::pin(usage::handle_records(ctx, params))),
+    );
 
     // Logs
     router.register(
@@ -378,6 +391,10 @@ pub fn register_all(router: &mut RpcRouter) {
     router.register(
         "system-presence",
         Box::new(|ctx, params| Box::pin(presence::handle_system_presence(ctx, params))),
+    );
+    router.register(
+        "presence.list",
+        Box::new(|ctx, params| Box::pin(presence::handle_presence_list(ctx, params))),
     );
     router.register(
         "system-event",
@@ -594,5 +611,39 @@ pub fn register_all(router: &mut RpcRouter) {
     router.register(
         "doctor.memory.status",
         Box::new(|ctx, params| Box::pin(misc::handle_doctor_memory_status(ctx, params))),
+    );
+
+    // Bindings
+    router.register(
+        "bindings.list",
+        Box::new(|ctx, params| Box::pin(bindings_rpc::handle_list(ctx, params))),
+    );
+
+    // Broadcasts
+    router.register(
+        "broadcasts.list",
+        Box::new(|ctx, params| Box::pin(broadcasts_rpc::handle_list(ctx, params))),
+    );
+
+    // DM Pairing
+    router.register(
+        "dm.pairing.list",
+        Box::new(|ctx, params| Box::pin(dm_pairing::handle_list(ctx, params))),
+    );
+    router.register(
+        "dm.pairing.approve",
+        Box::new(|ctx, params| Box::pin(dm_pairing::handle_approve(ctx, params))),
+    );
+    router.register(
+        "dm.pairing.allowlist",
+        Box::new(|ctx, params| Box::pin(dm_pairing::handle_allowlist(ctx, params))),
+    );
+    router.register(
+        "dm.pairing.remove",
+        Box::new(|ctx, params| Box::pin(dm_pairing::handle_remove(ctx, params))),
+    );
+    router.register(
+        "dm.pairing.channels",
+        Box::new(|ctx, params| Box::pin(dm_pairing::handle_channels(ctx, params))),
     );
 }

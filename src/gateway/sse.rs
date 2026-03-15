@@ -125,11 +125,7 @@ async fn run_sse_session(
                                 let content = msg.content();
                                 if !content.is_empty() {
                                     let _ = tx
-                                        .send(
-                                            Event::default()
-                                                .event("token")
-                                                .data(content.to_string()),
-                                        )
+                                        .send(Event::default().event("token").data(content))
                                         .await;
                                 }
                             }

@@ -1,23 +1,27 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
-  Bot, Plus, Trash2, Save, Sparkles, Wrench, Radio, Settings2,
+  Bot, Plus, Trash2, Save, Sparkles, Wrench, Settings2,
   FileText, Terminal, Brain, MessageSquare, Puzzle, FolderOpen, Files,
+  Link2, Megaphone, CalendarClock, Eye, Pencil,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import type { AgentEntry, ToolCatalogGroup, SkillEntry } from "../../types/dashboard";
+import type { AgentEntry, BindingEntry, BroadcastGroupEntry, ToolCatalogGroup, SkillEntry } from "../../types/dashboard";
 import {
   SectionCard, SectionHeader, EmptyState, LoadingSkeleton, useToast, ToastContainer,
 } from "./shared";
 
-type DetailTab = "overview" | "tools" | "skills" | "channels" | "files";
+type DetailTab = "overview" | "tools" | "bindings" | "skills" | "cron" | "files";
 
 const DETAIL_TABS: { key: DetailTab; i18nKey: string; icon: React.ReactNode }[] = [
   { key: "overview", i18nKey: "agents.tabOverview", icon: <Settings2 className="h-3.5 w-3.5" /> },
   { key: "tools", i18nKey: "agents.tabTools", icon: <Wrench className="h-3.5 w-3.5" /> },
+  { key: "bindings", i18nKey: "agents.tabBindings", icon: <Link2 className="h-3.5 w-3.5" /> },
   { key: "skills", i18nKey: "agents.tabSkills", icon: <Sparkles className="h-3.5 w-3.5" /> },
-  { key: "channels", i18nKey: "agents.tabChannels", icon: <Radio className="h-3.5 w-3.5" /> },
+  { key: "cron", i18nKey: "dashboard.schedules", icon: <CalendarClock className="h-3.5 w-3.5" /> },
   { key: "files", i18nKey: "agentFiles.title", icon: <Files className="h-3.5 w-3.5" /> },
 ];
 
@@ -35,6 +39,8 @@ export default function AgentsPage() {
   const { toasts, addToast } = useToast();
 
   const [agents, setAgents] = useState<AgentEntry[]>([]);
+  const [bindings, setBindings] = useState<BindingEntry[]>([]);
+  const [broadcasts, setBroadcasts] = useState<BroadcastGroupEntry[]>([]);
   const [toolsCatalog, setToolsCatalog] = useState<ToolCatalogGroup[]>([]);
   const [skills, setSkills] = useState<SkillEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,13 +54,30 @@ export default function AgentsPage() {
   const [editPrompt, setEditPrompt] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Agent files tab state
-  const AGENT_FILES = ["AGENTS.md", "SOUL.md", "MEMORY.md", "BOOTSTRAP.md"];
+  // Agent files tab state — uses workspace API with ?agent= param
+  const [workspaceFiles, setWorkspaceFiles] = useState<{ name: string; size?: number }[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
   const [fileLoading, setFileLoading] = useState(false);
   const [fileSaving, setFileSaving] = useState(false);
   const [fileSaved, setFileSaved] = useState(false);
+  const [filePreview, setFilePreview] = useState(false);
+
+  const agentParam = selected && selected !== "default" ? selected : undefined;
+
+  const loadWorkspaceFiles = useCallback(async () => {
+    const data = await api.fetchWorkspaceFiles(agentParam);
+    if (data) setWorkspaceFiles(data.map((f) => ({ name: f.filename, size: f.size_bytes ?? 0 })));
+  }, [api, agentParam]);
+
+  // Reload workspace files when selected agent changes
+  useEffect(() => {
+    if (selected) {
+      loadWorkspaceFiles();
+      setSelectedFile(null);
+      setFileContent("");
+    }
+  }, [selected, loadWorkspaceFiles]);
 
   const loadFile = useCallback(async (filename: string) => {
     setSelectedFile(filename);
@@ -62,40 +85,32 @@ export default function AgentsPage() {
     setFileSaved(false);
     setFileLoading(true);
     try {
-      const res = await fetch(`/api/dashboard/agents/files/${encodeURIComponent(filename)}`);
-      if (res.ok) {
-        const data = await res.json() as { content?: string };
-        setFileContent(data.content ?? "");
-      } else {
-        setFileContent("");
-      }
+      const data = await api.fetchWorkspaceFile(filename, agentParam);
+      setFileContent(data?.content ?? "");
     } catch {
       setFileContent("");
     } finally {
       setFileLoading(false);
     }
-  }, []);
+  }, [api, agentParam]);
 
   const saveFile = useCallback(async () => {
     if (!selectedFile) return;
     setFileSaving(true);
     try {
-      await fetch(`/api/dashboard/agents/files/${encodeURIComponent(selectedFile)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: fileContent }),
-      });
+      await api.saveWorkspaceFile(selectedFile, fileContent, agentParam);
       setFileSaved(true);
       setTimeout(() => setFileSaved(false), 2000);
     } catch { /* ignore */ }
     finally {
       setFileSaving(false);
     }
-  }, [selectedFile, fileContent]);
+  }, [api, selectedFile, fileContent, agentParam]);
 
   const loadAgents = useCallback(async () => {
-    const [data, tools, sk] = await Promise.all([
+    const [data, tools, sk, bd, bc] = await Promise.all([
       api.fetchAgents(), api.fetchToolsCatalog(), api.fetchSkills(),
+      api.fetchBindings(), api.fetchBroadcasts(),
     ]);
     if (data) {
       setAgents(data);
@@ -105,6 +120,8 @@ export default function AgentsPage() {
     }
     if (tools) setToolsCatalog(tools);
     if (sk) setSkills(sk);
+    setBindings(bd ?? []);
+    setBroadcasts(bc ?? []);
     setLoading(false);
   }, [api, selected]);
 
@@ -369,6 +386,35 @@ export default function AgentsPage() {
                       label={t("agents.default")}
                       value={selectedAgent.is_default ? t("agents.yes") : t("agents.no")}
                     />
+                    <InfoCell
+                      label={t("agents.dmScope")}
+                      value={
+                        selectedAgent.dm_scope === "perpeer" ? t("agents.dmScopePerPeer")
+                        : selectedAgent.dm_scope === "perchannelpeer" ? t("agents.dmScopePerChannelPeer")
+                        : selectedAgent.dm_scope === "peraccountchannelpeer" ? t("agents.dmScopePerAccountChannelPeer")
+                        : selectedAgent.dm_scope === "main" ? t("agents.dmScopeMain")
+                        : t("agents.dmScopePerChannelPeer")
+                      }
+                    />
+                    <InfoCell
+                      label={t("agents.workspacePath")}
+                      value={selectedAgent.workspace || "—"}
+                      mono
+                    />
+                    {(selectedAgent.tool_allow?.length ?? 0) > 0 && (
+                      <InfoCell
+                        label={t("agents.toolAllow")}
+                        value={selectedAgent.tool_allow?.join(", ") ?? "—"}
+                        mono
+                      />
+                    )}
+                    {(selectedAgent.tool_deny?.length ?? 0) > 0 && (
+                      <InfoCell
+                        label={t("agents.toolDeny")}
+                        value={selectedAgent.tool_deny?.join(", ") ?? "—"}
+                        mono
+                      />
+                    )}
                     <div className="sm:col-span-2">
                       <InfoCell
                         label={t("agents.systemPrompt")}
@@ -481,81 +527,173 @@ export default function AgentsPage() {
                   </div>
                 )}
 
-                {detailTab === "channels" && (
+                {detailTab === "bindings" && (() => {
+                  const agentBindings = bindings.filter((b) => b.agent === selectedAgent.name);
+                  return (
+                    <div>
+                      {agentBindings.length === 0 ? (
+                        <EmptyState
+                          icon={<Link2 className="h-8 w-8 opacity-40" />}
+                          message={t("agents.noBindings")}
+                        />
+                      ) : (
+                        <div className="space-y-1.5">
+                          {agentBindings.map((b, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-2 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 hover:bg-[var(--bg-content)] transition-colors flex-wrap"
+                            >
+                              {b.channel && (
+                                <span className="px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-medium border border-[var(--accent)]/20">
+                                  {b.channel}
+                                </span>
+                              )}
+                              {b.account_id && (
+                                <span className="text-[11px] text-[var(--text-tertiary)]">
+                                  {t("agents.bindingAccount")}: <span className="font-mono">{b.account_id}</span>
+                                </span>
+                              )}
+                              {b.peer && (
+                                <span className="text-[11px] text-[var(--text-tertiary)]">
+                                  {b.peer.kind}: <span className="font-mono">{b.peer.id}</span>
+                                </span>
+                              )}
+                              {b.guild_id && (
+                                <span className="text-[11px] text-[var(--text-tertiary)]">
+                                  {t("agents.bindingGuild")}: <span className="font-mono">{b.guild_id}</span>
+                                </span>
+                              )}
+                              {b.team_id && (
+                                <span className="text-[11px] text-[var(--text-tertiary)]">
+                                  {t("agents.bindingTeam")}: <span className="font-mono">{b.team_id}</span>
+                                </span>
+                              )}
+                              {(b.roles?.length ?? 0) > 0 && (
+                                <span className="text-[11px] text-[var(--text-tertiary)]">
+                                  {t("agents.bindingRoles")}: {b.roles?.join(", ")}
+                                </span>
+                              )}
+                              {b.comment && (
+                                <span className="text-[11px] text-[var(--text-quaternary)] italic ml-auto">
+                                  {b.comment}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {detailTab === "cron" && (
                   <div>
-                    {(selectedAgent.channels ?? []).length === 0 ? (
-                      <EmptyState
-                        icon={<Radio className="h-8 w-8 opacity-40" />}
-                        message={t("agents.noChannels")}
-                      />
-                    ) : (
-                      <div className="space-y-1.5">
-                        {(selectedAgent.channels ?? []).map((ch) => (
-                          <div
-                            key={ch}
-                            className="flex items-center gap-2.5 p-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 hover:bg-[var(--bg-content)] transition-colors"
-                          >
-                            <Radio className="h-3.5 w-3.5 text-[var(--success)]" />
-                            <span className="text-[12px] text-[var(--text-secondary)]">
-                              {ch}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <EmptyState
+                      icon={<CalendarClock className="h-8 w-8 opacity-40" />}
+                      message={t("schedules.noTasks")}
+                    />
+                    <div className="text-center mt-2">
+                      <span className="text-[11px] text-[var(--text-tertiary)]">
+                        {t("dashboard.schedules")}
+                      </span>
+                    </div>
                   </div>
                 )}
 
                 {detailTab === "files" && (
                   <div className="space-y-3">
-                    {/* File buttons */}
+                    {/* File buttons — dynamic from workspace API */}
                     <div className="flex flex-wrap gap-2">
-                      {AGENT_FILES.map((fname) => (
+                      {workspaceFiles.map((f) => (
                         <button
-                          key={fname}
-                          onClick={() => loadFile(fname)}
+                          key={f.name}
+                          onClick={() => loadFile(f.name)}
                           className={cn(
                             "flex items-center gap-1.5 px-2.5 py-1.5 rounded-[var(--radius-md)] text-[12px] font-mono border transition-colors cursor-pointer",
-                            selectedFile === fname
+                            selectedFile === f.name
                               ? "bg-[var(--accent)]/10 border-[var(--accent)]/40 text-[var(--accent)]"
                               : "bg-[var(--bg-content)]/50 border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--separator)]"
                           )}
                         >
                           <FileText className="h-3 w-3" />
-                          {fname}
+                          {f.name}
                         </button>
                       ))}
+                      {workspaceFiles.length === 0 && (
+                        <span className="text-[11px] text-[var(--text-tertiary)]">
+                          {t("agents.noChannels")}
+                        </span>
+                      )}
                     </div>
 
-                    {/* Editor */}
+                    {/* Editor / Preview */}
                     {fileLoading ? (
                       <div className="text-[12px] text-[var(--text-tertiary)] py-4">
                         {t("agentFiles.loading")}
                       </div>
                     ) : selectedFile ? (
                       <div className="space-y-2">
-                        <textarea
-                          value={fileContent}
-                          onChange={(e) => { setFileContent(e.target.value); setFileSaved(false); }}
-                          rows={14}
-                          className="w-full px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[12px] font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors resize-y"
-                          spellCheck={false}
-                        />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={saveFile}
-                            disabled={fileSaving}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[12px] font-medium hover:brightness-110 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-40"
-                          >
-                            <Save className="h-3.5 w-3.5" />
-                            {fileSaving ? t("agentFiles.loading") : t("agentFiles.save")}
-                          </button>
-                          {fileSaved && (
-                            <span className="text-[12px] text-[var(--success)]">
-                              {t("agentFiles.saved")}
-                            </span>
-                          )}
+                        {/* Toolbar: Edit/Preview toggle + Save */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] overflow-hidden">
+                            <button
+                              onClick={() => setFilePreview(false)}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer",
+                                !filePreview
+                                  ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-content)]"
+                              )}
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setFilePreview(true)}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer border-l border-[var(--border-subtle)]",
+                                filePreview
+                                  ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-content)]"
+                              )}
+                            >
+                              <Eye className="h-3 w-3" />
+                              Preview
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {fileSaved && (
+                              <span className="text-[11px] text-[var(--success)]">
+                                {t("agentFiles.saved")}
+                              </span>
+                            )}
+                            <button
+                              onClick={saveFile}
+                              disabled={fileSaving || filePreview}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] bg-[var(--accent)] text-white text-[11px] font-medium hover:brightness-110 active:scale-[0.97] transition-all cursor-pointer disabled:opacity-40"
+                            >
+                              <Save className="h-3 w-3" />
+                              {fileSaving ? t("agentFiles.loading") : t("agentFiles.save")}
+                            </button>
+                          </div>
                         </div>
+
+                        {/* Content area */}
+                        {filePreview ? (
+                          <div className="px-4 py-3 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] min-h-[300px] max-h-[500px] overflow-y-auto prose prose-sm max-w-none text-[13px]">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {fileContent || "*Empty file*"}
+                            </ReactMarkdown>
+                          </div>
+                        ) : (
+                          <textarea
+                            value={fileContent}
+                            onChange={(e) => { setFileContent(e.target.value); setFileSaved(false); }}
+                            rows={16}
+                            className="w-full px-4 py-3 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors resize-y leading-relaxed"
+                            spellCheck={false}
+                          />
+                        )}
                       </div>
                     ) : (
                       <div className="text-[12px] text-[var(--text-tertiary)] py-4">
@@ -574,6 +712,61 @@ export default function AgentsPage() {
           )}
         </SectionCard>
       </div>
+
+      {/* Broadcast Groups */}
+      {broadcasts.length > 0 && (
+        <SectionCard>
+          <SectionHeader
+            icon={<Megaphone className="h-4 w-4" />}
+            title={t("agents.broadcasts")}
+            right={
+              <span className="px-1.5 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] text-[10px] font-mono tabular-nums border border-[var(--accent)]/25">
+                {broadcasts.length}
+              </span>
+            }
+          />
+          <div className="space-y-2">
+            {broadcasts.map((bg) => (
+              <div
+                key={bg.name}
+                className="px-3 py-2.5 rounded-[var(--radius-md)] bg-[var(--bg-content)]/50 border border-[var(--border-subtle)] hover:border-[var(--separator)] transition-all"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[13px] font-semibold text-[var(--text-primary)]">{bg.name}</span>
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded text-[9px] font-medium border",
+                    bg.strategy === "parallel" ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20"
+                    : bg.strategy === "aggregated" ? "bg-[var(--warning)]/10 text-[var(--warning)] border-[var(--warning)]/20"
+                    : "bg-[var(--info)]/10 text-[var(--info)] border-[var(--info)]/20"
+                  )}>
+                    {bg.strategy === "parallel" ? t("agents.broadcastParallel")
+                    : bg.strategy === "aggregated" ? t("agents.broadcastAggregated")
+                    : t("agents.broadcastSequential")}
+                  </span>
+                  {bg.channel && (
+                    <span className="px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-medium border border-[var(--accent)]/20">
+                      {bg.channel}
+                    </span>
+                  )}
+                  {bg.peer_id && (
+                    <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
+                      {t("agents.broadcastPeer")}: {bg.peer_id}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="text-[10px] text-[var(--text-tertiary)]">{t("agents.broadcastAgents")}:</span>
+                  {bg.agents.map((a) => (
+                    <span key={a} className="px-1.5 py-0.5 rounded bg-[var(--bg-elevated)] text-[11px] font-mono text-[var(--text-secondary)] border border-[var(--border-subtle)]">
+                      {a}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
 
       <ToastContainer toasts={toasts} />
     </div>

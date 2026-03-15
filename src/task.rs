@@ -11,8 +11,6 @@ use crate::agent::{self, InteractiveApprovalCallback};
 use crate::config::SynapseConfig;
 use crate::display;
 use crate::memory::LongTermMemory;
-use crate::router::AgentRouter;
-
 /// Run a Deep Agent task with streaming output.
 pub async fn run_task(
     config: &SynapseConfig,
@@ -24,16 +22,10 @@ pub async fn run_task(
     let session_mgr = crate::build_session_manager(config);
     let memory = session_mgr.memory();
 
-    // Multi-agent routing: select model/prompt based on message pattern
-    let (routed_model, system_prompt_override) =
-        if config.agent_routes.as_ref().is_some_and(|r| !r.is_empty()) {
-            let router = AgentRouter::new(config, model.clone())?;
-            let (agent_name, routed, sys_prompt) = router.route(message, None);
-            tracing::info!(agent = %agent_name, "routed to agent");
-            (routed.clone(), sys_prompt.map(|s| s.to_string()))
-        } else {
-            (model, None)
-        };
+    // TODO(multi-agent): Wire BindingRouter for CLI task routing.
+    // For now, tasks always use the default model/prompt.
+    let routed_model = model;
+    let system_prompt_override: Option<String> = None;
 
     // Resolve or create session
     let sid = if let Some(id) = session_id {

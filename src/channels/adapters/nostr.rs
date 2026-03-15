@@ -17,8 +17,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let nostr_config = config
         .nostr
-        .as_ref()
-        .ok_or("missing [nostr] section in config")?;
+        .first()
+        .ok_or("missing [[nostr]] section in config")?;
 
     let private_key = resolve_secret(
         nostr_config.private_key.as_deref(),

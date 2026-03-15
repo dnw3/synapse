@@ -27,6 +27,7 @@ async fn read_config_file() -> Result<(String, String), RpcError> {
     Ok((path, content))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_agent_route_toml(
     name: &str,
     model: Option<&str>,
@@ -95,27 +96,40 @@ fn build_agent_route_toml(
 
 pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let mut agents = Vec::new();
+    let effective = ctx.state.config.effective_agents();
 
+    // Default agent entry
     agents.push(json!({
         "name": "default",
+        "id": "default",
         "model": ctx.state.config.base.model.model,
         "system_prompt": ctx.state.config.base.agent.system_prompt,
         "channels": [],
         "is_default": true,
         "workspace": ctx.state.config.workspace_dir().to_string_lossy(),
+        "dm_scope": format!("{:?}", crate::config::DmSessionScope::default()).to_lowercase(),
+        "tool_allow": [],
+        "tool_deny": [],
     }));
 
-    if let Some(routes) = &ctx.state.config.agent_routes {
-        for route in routes {
-            agents.push(json!({
-                "name": route.name,
-                "model": route.model.clone().unwrap_or_else(|| ctx.state.config.base.model.model.clone()),
-                "system_prompt": route.system_prompt,
-                "channels": route.channels,
-                "is_default": false,
-                "workspace": ctx.state.config.workspace_dir_for_agent(Some(&route.name)).to_string_lossy(),
-            }));
-        }
+    // Agents from new [agents] config (effective_agents migrates legacy routes)
+    for agent_def in &effective.list {
+        let is_default_agent = agent_def.id == effective.default;
+        let workspace = crate::config::agent_workspace_dir(agent_def);
+        agents.push(json!({
+            "name": agent_def.id,
+            "id": agent_def.id,
+            "description": agent_def.description,
+            "model": agent_def.model.clone().unwrap_or_else(|| ctx.state.config.base.model.model.clone()),
+            "system_prompt": agent_def.system_prompt,
+            "is_default": is_default_agent,
+            "workspace": workspace.to_string_lossy(),
+            "dm_scope": format!("{:?}", agent_def.dm_scope).to_lowercase(),
+            "group_session_scope": agent_def.group_session_scope.as_ref().map(|s| format!("{:?}", s).to_lowercase()),
+            "tool_allow": agent_def.tool_allow,
+            "tool_deny": agent_def.tool_deny,
+            "skills_dir": agent_def.skills_dir,
+        }));
     }
 
     Ok(json!(agents))

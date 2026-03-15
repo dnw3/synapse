@@ -121,6 +121,7 @@ pub async fn build_deep_agent(
 }
 
 /// Build a Deep Agent with an optional custom security callback and optional LTM.
+#[allow(clippy::too_many_arguments)]
 pub async fn build_deep_agent_with_callback(
     model: Arc<dyn ChatModel>,
     config: &SynapseConfig,
@@ -622,9 +623,11 @@ pub async fn build_deep_agent_with_callback(
         match reflection_model_name {
             Some(name) => match super::model::build_model_by_name(config, name) {
                 Ok(m) => {
-                    let mut rcfg = synaptic_deep::ReflectionConfig::default();
-                    rcfg.min_messages = config.reflection.min_messages;
-                    rcfg.memory_file = config.base.paths.memory_file.clone();
+                    let rcfg = synaptic_deep::ReflectionConfig {
+                        min_messages: config.reflection.min_messages,
+                        memory_file: config.base.paths.memory_file.clone(),
+                        ..Default::default()
+                    };
                     options.reflection_model = Some(m);
                     options.reflection_config = Some(rcfg);
                     tracing::info!(model = name, "Reflection middleware enabled");
@@ -633,9 +636,11 @@ pub async fn build_deep_agent_with_callback(
             },
             None => {
                 // Use main model (fallback)
-                let mut rcfg = synaptic_deep::ReflectionConfig::default();
-                rcfg.min_messages = config.reflection.min_messages;
-                rcfg.memory_file = config.base.paths.memory_file.clone();
+                let rcfg = synaptic_deep::ReflectionConfig {
+                    min_messages: config.reflection.min_messages,
+                    memory_file: config.base.paths.memory_file.clone(),
+                    ..Default::default()
+                };
                 options.reflection_model = Some(model.clone());
                 options.reflection_config = Some(rcfg);
                 tracing::info!("Reflection middleware enabled (using main model)");

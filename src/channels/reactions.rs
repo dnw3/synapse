@@ -21,7 +21,7 @@ pub async fn slack_react(bot_token: &str, channel: &str, timestamp: &str, emoji:
 pub async fn telegram_react(base_url: &str, chat_id: i64, message_id: i64, emoji: &str) {
     let client = reqwest::Client::new();
     let _ = client
-        .post(&format!("{}/setMessageReaction", base_url))
+        .post(format!("{}/setMessageReaction", base_url))
         .json(&serde_json::json!({
             "chat_id": chat_id,
             "message_id": message_id,

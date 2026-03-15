@@ -40,9 +40,9 @@ fn machine_id() -> u32 {
 /// Generate a LogID: {13-digit decimal ms}{6-hex machine}{4-hex random}
 ///
 /// Format (23 chars): `1773047905112a1b2c3d4e5f`
-///   - [0..13]:  Unix millisecond timestamp (decimal, directly human-readable)
-///   - [13..19]: machine identifier (hex, from HOSTNAME/POD_NAME FNV hash)
-///   - [19..23]: random (hex, for uniqueness within same ms on same machine)
+///   - \[0..13\]:  Unix millisecond timestamp (decimal, directly human-readable)
+///   - \[13..19\]: machine identifier (hex, from HOSTNAME/POD_NAME FNV hash)
+///   - \[19..23\]: random (hex, for uniqueness within same ms on same machine)
 ///
 /// Decode timestamp (frontend): `parseInt(logid.slice(0, 13))` → milliseconds
 /// Decode machine: `logid.slice(13, 19)` → hex machine hash

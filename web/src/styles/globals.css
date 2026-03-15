@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* ── macOS Sequoia Design Tokens ─────────────────────────── */
 
@@ -275,6 +276,37 @@ code, pre, .font-mono { font-family: var(--font-mono) !important; }
 }
 .animate-fade-in { animation: fade-in 0.3s ease-out both; }
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+
+/* ── Typography (prose) — dark theme adaptation ─────────── */
+.prose {
+  --tw-prose-body: var(--text-secondary);
+  --tw-prose-headings: var(--text-primary);
+  --tw-prose-links: var(--accent);
+  --tw-prose-bold: var(--text-primary);
+  --tw-prose-code: var(--accent);
+  --tw-prose-pre-bg: var(--bg-grouped);
+  --tw-prose-pre-code: var(--text-secondary);
+  --tw-prose-th-borders: var(--border-subtle);
+  --tw-prose-td-borders: var(--border-subtle);
+  --tw-prose-hr: var(--border-subtle);
+  --tw-prose-quotes: var(--text-tertiary);
+  --tw-prose-quote-borders: var(--accent);
+  --tw-prose-counters: var(--text-tertiary);
+  --tw-prose-bullets: var(--text-tertiary);
+}
+
+.prose code:not(pre code) {
+  background: var(--bg-grouped);
+  padding: 0.15em 0.4em;
+  border-radius: var(--radius-sm);
+  font-size: 0.875em;
+}
+
+.prose pre {
+  background: var(--bg-grouped);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
 
 /* ── Reduced Motion ──────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

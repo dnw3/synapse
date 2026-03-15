@@ -168,6 +168,7 @@ struct DoneUsage {
 /// WebSocket event types sent from server to client.
 #[derive(Serialize)]
 #[serde(tag = "type")]
+#[allow(dead_code)]
 enum WsEvent {
     #[serde(rename = "token")]
     Token { content: String },
@@ -842,8 +843,25 @@ async fn handle_legacy_connection(
                                         }
                                     };
                                     let model_name = state.model.profile().map(|p| p.name);
+                                    let model_provider = state.model.profile().map(|p| p.provider);
                                     let elapsed = execution_start.elapsed().as_millis();
                                     tracing::info!(duration_ms = %elapsed, "turn completed");
+
+                                    // Record in multi-dimensional usage tracker
+                                    state.usage_tracker.record(crate::usage::UsageRecord {
+                                        model: model_name.clone().unwrap_or_default(),
+                                        provider: model_provider.unwrap_or_default(),
+                                        channel: "web".to_string(),
+                                        agent_id: "default".to_string(),
+                                        session_key: conversation_id.clone(),
+                                        input_tokens: done_usage.input_tokens,
+                                        output_tokens: done_usage.output_tokens,
+                                        total_tokens: done_usage.input_tokens + done_usage.output_tokens,
+                                        cost_usd: done_usage.cost_usd,
+                                        latency_ms: elapsed as u64,
+                                        timestamp_ms: crate::gateway::presence::now_ms(),
+                                    }).await;
+
                                     let _ = sender.send(ws_json(&WsEvent::Done {
                                         usage: Some(done_usage),
                                         model: model_name,
@@ -1180,8 +1198,25 @@ async fn handle_legacy_connection(
                                         }
                                     };
                                     let model_name = state.model.profile().map(|p| p.name);
+                                    let model_provider = state.model.profile().map(|p| p.provider);
                                     let elapsed = execution_start.elapsed().as_millis();
                                     tracing::info!(duration_ms = %elapsed, "turn completed");
+
+                                    // Record in multi-dimensional usage tracker
+                                    state.usage_tracker.record(crate::usage::UsageRecord {
+                                        model: model_name.clone().unwrap_or_default(),
+                                        provider: model_provider.unwrap_or_default(),
+                                        channel: "web".to_string(),
+                                        agent_id: "default".to_string(),
+                                        session_key: conversation_id.clone(),
+                                        input_tokens: done_usage.input_tokens,
+                                        output_tokens: done_usage.output_tokens,
+                                        total_tokens: done_usage.input_tokens + done_usage.output_tokens,
+                                        cost_usd: done_usage.cost_usd,
+                                        latency_ms: elapsed as u64,
+                                        timestamp_ms: crate::gateway::presence::now_ms(),
+                                    }).await;
+
                                     let _ = sender.send(ws_json(&WsEvent::Done {
                                         usage: Some(done_usage),
                                         model: model_name,
@@ -1359,10 +1394,19 @@ async fn handle_v3_connection(
             methods: state.rpc_router.method_names(),
             events: GATEWAY_EVENTS.iter().map(|s| s.to_string()).collect(),
         },
-        snapshot: SnapshotInfo {
-            presence: serde_json::json!({}),
-            health: serde_json::json!({"status": "ok"}),
-            state_version: StateVersion::default(),
+        snapshot: {
+            let mut pstore = state.presence.write().await;
+            let pver = pstore.version();
+            let psnap = pstore.snapshot_json();
+            drop(pstore);
+            SnapshotInfo {
+                presence: psnap,
+                health: serde_json::json!({"status": "ok"}),
+                state_version: StateVersion {
+                    presence: pver,
+                    ..Default::default()
+                },
+            }
         },
         auth_result: Some(AuthResult {
             authenticated: true,
@@ -1506,6 +1550,7 @@ async fn handle_v3_connection(
 /// Reuses the existing `StreamingProxy` + agent builder logic. Streams
 /// tokens/reasoning/tool events as v3 `ServerFrame::Event`, then sends
 /// the final result as a `ServerFrame::Response`.
+#[allow(clippy::too_many_arguments)]
 async fn handle_v3_agent(
     sender: &mut SplitSink<WebSocket, WsMessage>,
     receiver: &mut SplitStream<WebSocket>,
@@ -1884,6 +1929,29 @@ async fn handle_v3_agent(
                         }
                         let elapsed = execution_start.elapsed().as_millis();
                         tracing::info!(duration_ms = %elapsed, "v3 turn completed");
+
+                        // Record in multi-dimensional usage tracker
+                        {
+                            let snap = state.cost_tracker.snapshot().await;
+                            let input_delta = snap.total_input_tokens.saturating_sub(pre_snap.total_input_tokens);
+                            let output_delta = snap.total_output_tokens.saturating_sub(pre_snap.total_output_tokens);
+                            let cost_delta = (snap.estimated_cost_usd - pre_snap.estimated_cost_usd).max(0.0);
+                            let model_name = state.model.profile().map(|p| p.name).unwrap_or_default();
+                            let model_provider = state.model.profile().map(|p| p.provider).unwrap_or_default();
+                            state.usage_tracker.record(crate::usage::UsageRecord {
+                                model: model_name,
+                                provider: model_provider,
+                                channel: "web".to_string(),
+                                agent_id: "default".to_string(),
+                                session_key: conversation_id.to_string(),
+                                input_tokens: input_delta,
+                                output_tokens: output_delta,
+                                total_tokens: input_delta + output_delta,
+                                cost_usd: cost_delta,
+                                latency_ms: elapsed as u64,
+                                timestamp_ms: crate::gateway::presence::now_ms(),
+                            }).await;
+                        }
 
                         send_event!("agent.turn.complete", serde_json::json!({
                             "request_id": request_id,

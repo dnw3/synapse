@@ -75,6 +75,12 @@ pub async fn handle_system_presence(
     Ok(json!({"ok": true}))
 }
 
+/// Read-only query: return the current presence list.
+pub async fn handle_presence_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
+    let snapshot = ctx.state.presence.write().await.snapshot_json();
+    Ok(snapshot)
+}
+
 pub async fn handle_system_event(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     let event_type = params
         .get("type")

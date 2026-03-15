@@ -23,6 +23,7 @@ use crate::logging;
 // ---------------------------------------------------------------------------
 
 /// Outbound sender for the Telegram channel.
+#[allow(dead_code)]
 pub struct TelegramSender {
     /// HTTP client for making API calls.
     pub client: reqwest::Client,
@@ -48,12 +49,12 @@ impl ChannelSender for TelegramSender {
             .and_then(|s| s.strip_prefix("chat:"))
             .ok_or("missing or invalid chat_id in delivery target (expected 'chat:<id>')")?;
 
-        let chunks = formatter::chunk_telegram(content);
+        let chunks = formatter::format_for_channel(content, "telegram", 4096);
         let mut last_message_id: Option<String> = None;
         for chunk in chunks {
             let resp: serde_json::Value = self
                 .client
-                .post(&format!("{}/sendMessage", self.base_url))
+                .post(format!("{}/sendMessage", self.base_url))
                 .json(&serde_json::json!({
                     "chat_id": chat_id,
                     "text": chunk,
@@ -85,15 +86,15 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let tg_config = config
         .telegram
-        .as_ref()
-        .ok_or("missing [telegram] section in config")?;
+        .first()
+        .ok_or("missing [[telegram]] section in config")?;
 
     let bot_token = resolve_secret(
         tg_config.bot_token.as_deref(),
         tg_config.bot_token_env.as_deref(),
         "Telegram bot token",
     )
-    .map_err(|e| format!("{}", e))?;
+    .map_err(|e| e.to_string())?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -190,6 +191,11 @@ pub async fn run(
                 .and_then(|f| f.get("id"))
                 .and_then(|v| v.as_i64())
                 .map(|id| id.to_string());
+            let is_private_chat = message
+                .get("chat")
+                .and_then(|c| c.get("type"))
+                .and_then(|v| v.as_str())
+                == Some("private");
 
             // Extract photo/document attachments
             let mut attachments = Vec::new();
@@ -268,7 +274,7 @@ pub async fn run(
 
                 // Send typing indicator
                 let _ = http
-                    .post(&format!("{}/sendChatAction", base))
+                    .post(format!("{}/sendChatAction", base))
                     .json(&serde_json::json!({
                         "chat_id": chat_id,
                         "action": "typing",
@@ -283,14 +289,22 @@ pub async fn run(
                 };
                 let mut envelope = MessageEnvelope::channel(chat_id.to_string(), text, delivery);
                 envelope.attachments = attachments;
+                envelope.sender_id = Some(sender_id.clone());
+                envelope.routing.peer_kind = Some(if is_private_chat {
+                    crate::config::PeerKind::Direct
+                } else {
+                    crate::config::PeerKind::Group
+                });
+                envelope.routing.peer_id = Some(chat_id.to_string());
 
                 match session.handle_message(envelope).await {
                     Ok(reply) => {
                         // Split long replies into chunks
-                        let chunks = formatter::chunk_telegram(&reply.content);
+                        let chunks =
+                            formatter::format_for_channel(&reply.content, "telegram", 4096);
                         for chunk in chunks {
                             let _ = http
-                                .post(&format!("{}/sendMessage", base))
+                                .post(format!("{}/sendMessage", base))
                                 .json(&serde_json::json!({
                                     "chat_id": chat_id,
                                     "text": chunk,

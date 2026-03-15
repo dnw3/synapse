@@ -39,8 +39,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let wa_config = config
         .whatsapp
-        .as_ref()
-        .ok_or("missing [whatsapp] section in config")?;
+        .first()
+        .ok_or("missing [[whatsapp]] section in config")?;
 
     // Optionally resolve an API key (used as Bearer token for bridge).
     let api_key: Option<String> = resolve_secret(
@@ -195,12 +195,15 @@ async fn run_ws_loop(
             continue;
         }
 
+        // WhatsApp group JIDs end with @g.us, DM JIDs with @s.whatsapp.net
+        let is_group = chat_id.contains("@g.us");
+
         // Process the message in a background task so we don't block the event loop.
         let session = agent_session.clone();
         let bridge = bridge_url.to_string();
         let api_key_owned = api_key.map(|k| k.to_string());
         tokio::spawn(async move {
-            let envelope = MessageEnvelope::channel(
+            let mut envelope = MessageEnvelope::channel(
                 chat_id.clone(),
                 body.clone(),
                 DeliveryContext {
@@ -211,9 +214,18 @@ async fn run_ws_loop(
                     meta: None,
                 },
             );
+            if !from.is_empty() {
+                envelope.sender_id = Some(from.clone());
+            }
+            envelope.routing.peer_kind = Some(if is_group {
+                crate::config::PeerKind::Group
+            } else {
+                crate::config::PeerKind::Direct
+            });
+            envelope.routing.peer_id = Some(chat_id.clone());
             match session.handle_message(envelope).await {
                 Ok(reply) => {
-                    let chunks = formatter::chunk_whatsapp(&reply.content);
+                    let chunks = formatter::format_for_channel(&reply.content, "whatsapp", 2000);
                     let http = reqwest::Client::new();
                     for chunk in chunks {
                         let send_url = format!("{}/send", bridge);

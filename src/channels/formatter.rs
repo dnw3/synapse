@@ -1,11 +1,61 @@
-/// Platform-aware message chunking and formatting.
+//! Platform-aware message chunking and formatting.
+//!
+//! Each messaging platform has different limits:
+//! - Discord: 2000 characters
+//! - Telegram: 4096 characters
+//! - Slack: 4000 characters (mrkdwn)
+//! - Lark: 4096 characters (approximate)
+//! - Mattermost: 16383 characters
+
+// ---------------------------------------------------------------------------
+// IR-based formatting (message-ir feature)
+// ---------------------------------------------------------------------------
+
+/// Format a message for a specific channel using the Message IR system.
 ///
-/// Each messaging platform has different limits:
-/// - Discord: 2000 characters
-/// - Telegram: 4096 characters
-/// - Slack: 4000 characters (mrkdwn)
-/// - Lark: 4096 characters (approximate)
-/// - Mattermost: 16383 characters
+/// Parses Markdown into a structured IR, renders for the target platform,
+/// and chunks to respect character limits.
+pub fn format_for_channel(text: &str, channel: &str, chunk_limit: usize) -> Vec<String> {
+    use synaptic::core::message_ir::{
+        format_for_channel as ir_format, RenderOptions, RenderTarget,
+    };
+
+    let target = match channel {
+        "lark" | "feishu" => RenderTarget::Markdown,
+        "slack" => RenderTarget::SlackMrkdwn,
+        "telegram" => RenderTarget::TelegramHtml,
+        "discord" => RenderTarget::Markdown,
+        "signal" => RenderTarget::PlainText,
+        "whatsapp" => RenderTarget::PlainText,
+        "imessage" => RenderTarget::PlainText,
+        "mattermost" => RenderTarget::Markdown,
+        "matrix" => RenderTarget::Markdown,
+        "teams" => RenderTarget::Markdown,
+        "dingtalk" => RenderTarget::Markdown,
+        "googlechat" => RenderTarget::PlainText,
+        "line" => RenderTarget::PlainText,
+        "wechat" => RenderTarget::PlainText,
+        "irc" => RenderTarget::PlainText,
+        "twitch" => RenderTarget::PlainText,
+        _ => RenderTarget::PlainText,
+    };
+
+    let options = RenderOptions::new(target).with_chunk_limit(chunk_limit);
+    ir_format(text, &options)
+}
+
+/// Format for Lark card rendering (returns rendered card content string).
+#[allow(dead_code)]
+pub fn format_for_lark_card(text: &str) -> String {
+    use synaptic::core::message_ir::{parse_markdown, RenderOptions, RenderTarget};
+
+    let ir = parse_markdown(text);
+    ir.render(&RenderOptions::new(RenderTarget::LarkCard))
+}
+
+// ---------------------------------------------------------------------------
+// Legacy chunking (plain text splitting, no format conversion)
+// ---------------------------------------------------------------------------
 
 /// Split a message into chunks that respect platform character limits.
 ///
@@ -40,11 +90,10 @@ pub fn chunk_message(text: &str, max_len: usize) -> Vec<String> {
             if let Some(close_offset) = after.find("\n```") {
                 let full_block_end = max_len + close_offset + 4; // include "\n```"
                                                                  // Skip trailing newline after the closing fence
-                let end = remaining[full_block_end..]
+                remaining[full_block_end..]
                     .find('\n')
                     .map(|i| full_block_end + i)
-                    .unwrap_or(full_block_end);
-                end
+                    .unwrap_or(full_block_end)
             } else {
                 // No closing fence found — split before the code fence
                 if code_fence_start > max_len / 4 {
@@ -104,77 +153,92 @@ fn find_open_code_fence(text: &str) -> Option<usize> {
 }
 
 /// Chunk for Discord (2000 char limit).
+#[allow(dead_code)]
 pub fn chunk_discord(text: &str) -> Vec<String> {
     chunk_message(text, 2000)
 }
 
 /// Chunk for Telegram (4096 char limit).
+#[allow(dead_code)]
 pub fn chunk_telegram(text: &str) -> Vec<String> {
     chunk_message(text, 4096)
 }
 
 /// Chunk for Slack (4000 char limit).
+#[allow(dead_code)]
 pub fn chunk_slack(text: &str) -> Vec<String> {
     chunk_message(text, 4000)
 }
 
 /// Chunk for Lark (4096 char limit).
+#[allow(dead_code)]
 pub fn chunk_lark(text: &str) -> Vec<String> {
     chunk_message(text, 4096)
 }
 
 /// Chunk for DingTalk (20000 char limit for text messages).
+#[allow(dead_code)]
 pub fn chunk_dingtalk(text: &str) -> Vec<String> {
     chunk_message(text, 20000)
 }
 
 /// Chunk for Mattermost (16383 char limit).
+#[allow(dead_code)]
 pub fn chunk_mattermost(text: &str) -> Vec<String> {
     chunk_message(text, 16383)
 }
 
 /// Chunk for Matrix (60000 char limit for m.room.message body).
+#[allow(dead_code)]
 pub fn chunk_matrix(text: &str) -> Vec<String> {
     chunk_message(text, 60000)
 }
 
 /// Chunk for WhatsApp (2000 char limit, matching WhatsApp Web display constraints).
+#[allow(dead_code)]
 pub fn chunk_whatsapp(text: &str) -> Vec<String> {
     chunk_message(text, 2000)
 }
 
 /// Chunk for Microsoft Teams (4000 char limit).
+#[allow(dead_code)]
 pub fn chunk_teams(text: &str) -> Vec<String> {
     chunk_message(text, 4000)
 }
 
 /// Chunk for Signal (4096 char limit, same as Telegram).
+#[allow(dead_code)]
 pub fn chunk_signal(text: &str) -> Vec<String> {
     chunk_message(text, 4096)
 }
 
 /// Chunk for iMessage via BlueBubbles (10000 char limit).
+#[allow(dead_code)]
 pub fn chunk_imessage(text: &str) -> Vec<String> {
     chunk_message(text, 10000)
 }
 
 /// Chunk for LINE Messaging API (5000 char limit per text message).
+#[allow(dead_code)]
 pub fn chunk_line(text: &str) -> Vec<String> {
     chunk_message(text, 5000)
 }
 
 /// Chunk for Google Chat (4096 char limit).
+#[allow(dead_code)]
 pub fn chunk_googlechat(text: &str) -> Vec<String> {
     chunk_message(text, 4096)
 }
 
 /// Chunk for WeCom (WeChat Work) Bot Webhook API (2048 char limit for text messages).
+#[allow(dead_code)]
 pub fn chunk_wechat(text: &str) -> Vec<String> {
     chunk_message(text, 2048)
 }
 
 /// Chunk for IRC (400 char limit — IRC lines are capped at 512 bytes including
 /// the ":nick!user@host PRIVMSG #channel :" prefix, leaving ~400 chars of usable space).
+#[allow(dead_code)]
 pub fn chunk_irc(text: &str) -> Vec<String> {
     chunk_message(text, 400)
 }

@@ -11,6 +11,7 @@ use tokio_tungstenite::tungstenite::Message as WsMsg;
 /// Events received from the gateway server.
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
+#[allow(dead_code)]
 pub enum WsEvent {
     #[serde(rename = "token")]
     Token { content: String },

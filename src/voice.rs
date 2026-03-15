@@ -38,6 +38,7 @@ pub struct WakeWordDetector {
     wake_word_lower: String,
 }
 
+#[allow(dead_code)]
 impl WakeWordDetector {
     /// Create a detector for the given keyword (comparison is case-insensitive).
     pub fn new(wake_word: &str) -> Self {
@@ -340,10 +341,10 @@ pub async fn run_voice_loop(
     let wake_word = voice_config
         .and_then(|vc| vc.wake_word.as_deref())
         .unwrap_or("synapse");
-    let silence_threshold = voice_config
+    let _silence_threshold = voice_config
         .and_then(|vc| vc.silence_threshold)
         .unwrap_or(0.02);
-    let silence_duration_ms = voice_config
+    let _silence_duration_ms = voice_config
         .and_then(|vc| vc.silence_duration_ms)
         .unwrap_or(1500);
 
@@ -375,7 +376,7 @@ pub async fn run_voice_loop(
         }
     };
     #[cfg(not(feature = "voice"))]
-    let voice_provider: Option<()> = {
+    let _voice_provider: Option<()> = {
         let _ = voice_config;
         None
     };
@@ -419,7 +420,7 @@ pub async fn run_voice_loop(
             #[cfg(feature = "voice")]
             {
                 eprint!("  {} listening... ", "voice:".dimmed());
-                match record_audio(silence_threshold, silence_duration_ms) {
+                match record_audio(_silence_threshold, _silence_duration_ms) {
                     Ok(pcm_bytes) => {
                         eprintln!("({} bytes recorded)", pcm_bytes.len());
                         // Step 2: Transcribe

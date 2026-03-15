@@ -1,8 +1,10 @@
 pub mod adapters;
 pub mod dedup;
+pub mod dm;
 pub mod formatter;
 pub mod handler;
 pub mod reactions;
+pub mod session_key;
 
 use crate::config::SynapseConfig;
 
@@ -14,7 +16,7 @@ pub async fn run_bot(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match platform {
         #[cfg(feature = "bot-lark")]
-        "lark" | "feishu" => adapters::lark::run(config, model_override).await,
+        "lark" | "feishu" => adapters::lark::run(config, model_override, None).await,
 
         #[cfg(feature = "bot-slack")]
         "slack" => adapters::slack::run(config, model_override).await,
@@ -95,6 +97,7 @@ pub async fn run_bot(
     }
 }
 
+#[allow(clippy::vec_init_then_push)]
 fn available_platforms() -> Vec<&'static str> {
     let mut platforms = Vec::new();
     #[cfg(feature = "bot-lark")]

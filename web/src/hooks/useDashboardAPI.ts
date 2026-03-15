@@ -11,11 +11,12 @@ import type {
   ChannelEntry,
   SkillEntry,
   McpEntry,
-  RequestEntry,
   RequestMetricsResponse,
   UsageTimeseriesEntry,
   UsageSessionEntry,
   AgentEntry,
+  BindingEntry,
+  BroadcastGroupEntry,
   ToolCatalogGroup,
   DebugInvokeRequest,
   DebugInvokeResponse,
@@ -196,6 +197,16 @@ export function useDashboardAPI() {
   const deleteAgent = useCallback((name: string) =>
     deleteJSON(`/agents/${encodeURIComponent(name)}`), [deleteJSON]);
 
+  // Bindings & Broadcasts (multi-agent)
+  const fetchBindings = useCallback(async () => {
+    const resp = await postJSON<DebugInvokeResponse>("/debug/invoke" as never, { method: "bindings.list", params: {} });
+    return (resp?.result as { bindings: BindingEntry[] } | undefined)?.bindings ?? [];
+  }, [postJSON]);
+  const fetchBroadcasts = useCallback(async () => {
+    const resp = await postJSON<DebugInvokeResponse>("/debug/invoke" as never, { method: "broadcasts.list", params: {} });
+    return (resp?.result as { broadcasts: BroadcastGroupEntry[] } | undefined)?.broadcasts ?? [];
+  }, [postJSON]);
+
   // Sessions advanced (Phase 5)
   const deleteSession = useCallback((id: string) =>
     deleteJSON(`/sessions/${encodeURIComponent(id)}`), [deleteJSON]);
@@ -285,8 +296,9 @@ export function useDashboardAPI() {
     createSchedule, updateSchedule, deleteSchedule, triggerSchedule, toggleSchedule, fetchScheduleRuns,
     // Config advanced
     fetchConfigSchema, patchConfig, validateConfig, reloadConfig,
-    // Agents + Tools
+    // Agents + Tools + Bindings + Broadcasts
     fetchAgents, createAgent, updateAgent, deleteAgent, fetchToolsCatalog,
+    fetchBindings, fetchBroadcasts,
     // Sessions advanced
     deleteSession, renameSession, patchSessionOverrides, compactSession,
     // Channels
@@ -311,6 +323,7 @@ export function useDashboardAPI() {
     createSchedule, updateSchedule, deleteSchedule, triggerSchedule, toggleSchedule, fetchScheduleRuns,
     fetchConfigSchema, patchConfig, validateConfig, reloadConfig,
     fetchAgents, createAgent, updateAgent, deleteAgent, fetchToolsCatalog,
+    fetchBindings, fetchBroadcasts,
     deleteSession, renameSession, patchSessionOverrides, compactSession,
     toggleChannel, updateChannelConfig,
     toggleSkill, fetchSkillFiles, fetchSkillFileContent,

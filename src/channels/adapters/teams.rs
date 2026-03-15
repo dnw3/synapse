@@ -252,10 +252,16 @@ async fn handle_message(
         text: Some(text.clone()),
     };
 
+    let is_group = activity
+        .conversation
+        .as_ref()
+        .map(|c| c.is_group)
+        .unwrap_or(false);
+
     tokio::spawn(async move {
         let client = reqwest::Client::new();
 
-        let envelope = MessageEnvelope::channel(
+        let mut envelope = MessageEnvelope::channel(
             session_key.clone(),
             text.clone(),
             DeliveryContext {
@@ -266,9 +272,18 @@ async fn handle_message(
                 meta: None,
             },
         );
+        if let Some(ref uid) = user_id {
+            envelope.sender_id = Some(uid.clone());
+        }
+        envelope.routing.peer_kind = Some(if is_group {
+            crate::config::PeerKind::Group
+        } else {
+            crate::config::PeerKind::Direct
+        });
+        envelope.routing.peer_id = Some(conversation_id.clone());
         match session.handle_message(envelope).await {
             Ok(reply) => {
-                let chunks = formatter::chunk_teams(&reply.content);
+                let chunks = formatter::format_for_channel(&reply.content, "teams", 4000);
                 for chunk in &chunks {
                     send_reply(
                         &client,
@@ -307,8 +322,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let teams_config = config
         .teams
-        .as_ref()
-        .ok_or("missing [teams] section in config")?;
+        .first()
+        .ok_or("missing [[teams]] section in config")?;
 
     let app_password = resolve_secret(
         teams_config.app_password.as_deref(),

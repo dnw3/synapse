@@ -1,6 +1,7 @@
 pub mod conversations;
 pub mod dashboard;
 pub mod files;
+pub mod lark_callback;
 pub mod logs;
 pub mod messages;
 pub mod upload;
@@ -22,4 +23,5 @@ fn api_routes() -> Router<AppState> {
         .merge(dashboard::routes())
         .merge(logs::routes())
         .merge(upload::routes())
+        .merge(lark_callback::routes())
 }

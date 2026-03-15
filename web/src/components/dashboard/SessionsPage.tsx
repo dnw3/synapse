@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { useTranslation } from "react-i18next";
-import { MessageSquare, ChevronDown, ChevronRight, Trash2, Pencil, PackageMinus, Search, Filter, Clock, ExternalLink } from "lucide-react";
+import { MessageSquare, ChevronDown, ChevronRight, Trash2, Pencil, PackageMinus, Search, Filter, Clock, ExternalLink, Bot } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
 import type { SessionEntry } from "../../types/dashboard";
@@ -23,6 +23,11 @@ type SortField = "id" | "created_at" | "message_count" | "token_count";
 type SortOrder = "asc" | "desc";
 
 const PAGE_LIMIT = 50;
+
+function extractAgentId(sessionKey: string): string {
+  const match = sessionKey.match(/^agent:([^:]+):/);
+  return match?.[1] ?? "default";
+}
 
 const THINKING_OPTIONS = ["off", "low", "medium", "high", "adaptive"] as const;
 
@@ -47,6 +52,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
   const [activeWithinMin, setActiveWithinMin] = useState<string>("");
   const [includeGlobal, setIncludeGlobal] = useState(false);
   const [limitInput, setLimitInput] = useState<string>("");
+  const [agentFilter, setAgentFilter] = useState<string>("");
 
   // Inline label editing
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
@@ -187,7 +193,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
     setEditValue(id);
   };
 
-  const startLabelEdit = (session: SessionEntry) => {
+  const _startLabelEdit = (session: SessionEntry) => {
     setEditingLabelId(session.id);
     setEditLabelValue(session.label ?? "");
   };
@@ -196,33 +202,48 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
-  // Filter by search and active-within
-  let filtered = search
-    ? sessions.filter(
-        (s) =>
-          s.id.toLowerCase().includes(search.toLowerCase()) ||
-          (s.label && s.label.toLowerCase().includes(search.toLowerCase()))
-      )
-    : sessions;
+  // Extract unique agent IDs from sessions
+  const uniqueAgentIds = useMemo(() => {
+    const ids = new Set(sessions.map((s) => extractAgentId(s.id)));
+    return Array.from(ids).sort();
+  }, [sessions]);
 
-  // Active within filter
-  if (activeWithinMin) {
-    const mins = parseInt(activeWithinMin, 10);
-    if (mins > 0) {
-      const cutoff = Date.now() - mins * 60 * 1000;
-      filtered = filtered.filter((s) => {
-        const ts = s.updated_at || s.created_at;
-        if (!ts) return true;
-        const d = /^\d+$/.test(ts) ? new Date(Number(ts)) : new Date(ts);
-        return d.getTime() >= cutoff;
-      });
+  // Filter by search, active-within, global, and agent
+  const filtered = useMemo(() => {
+    let result = search
+      ? sessions.filter(
+          (s) =>
+            s.id.toLowerCase().includes(search.toLowerCase()) ||
+            (s.label && s.label.toLowerCase().includes(search.toLowerCase()))
+        )
+      : sessions;
+
+    // Active within filter
+    if (activeWithinMin) {
+      const mins = parseInt(activeWithinMin, 10);
+      if (mins > 0) {
+        const cutoff = Date.now() - mins * 60 * 1000;
+        result = result.filter((s) => {
+          const ts = s.updated_at || s.created_at;
+          if (!ts) return true;
+          const d = /^\d+$/.test(ts) ? new Date(Number(ts)) : new Date(ts);
+          return d.getTime() >= cutoff;
+        });
+      }
     }
-  }
 
-  // Include global filter (currently a placeholder - filters sessions with "global" in id)
-  if (!includeGlobal) {
-    filtered = filtered.filter((s) => !s.id.startsWith("global:"));
-  }
+    // Include global filter (currently a placeholder - filters sessions with "global" in id)
+    if (!includeGlobal) {
+      result = result.filter((s) => !s.id.startsWith("global:"));
+    }
+
+    // Agent filter
+    if (agentFilter) {
+      result = result.filter((s) => extractAgentId(s.id) === agentFilter);
+    }
+
+    return result;
+  }, [sessions, search, activeWithinMin, includeGlobal, agentFilter]);
 
   // Stats
   const totalMessages = sessions.reduce((sum, s) => sum + (s.message_count ?? 0), 0);
@@ -366,6 +387,22 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
               {t("sessions.includeGlobal")}
             </label>
 
+            {/* Agent filter */}
+            <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+              <Bot className="h-3 w-3 text-[var(--text-tertiary)]" />
+              {t("sessions.agentFilter")}
+              <select
+                value={agentFilter}
+                onChange={(e) => setAgentFilter(e.target.value)}
+                className="px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-window)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+              >
+                <option value="">{t("sessions.allAgents")}</option>
+                {uniqueAgentIds.map((id) => (
+                  <option key={id} value={id}>{id}</option>
+                ))}
+              </select>
+            </label>
+
             {/* Limit */}
             <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
               {t("sessions.limit")}
@@ -465,45 +502,50 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
 
                         {/* Title / Label — click to navigate to chat */}
                         <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] max-w-[280px] overflow-hidden">
-                          {editingLabelId === session.id ? (
-                            <input
-                              ref={labelEditRef}
-                              type="text"
-                              value={editLabelValue}
-                              onChange={(e) => setEditLabelValue(e.target.value)}
-                              onBlur={() => handleLabelSave(session.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleLabelSave(session.id);
-                                if (e.key === "Escape") setEditingLabelId(null);
-                              }}
-                              placeholder={t("sessions.enterLabel")}
-                              className="px-1.5 py-0.5 text-[12px] bg-[var(--bg-grouped)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-40"
-                            />
-                          ) : (
-                            <span
-                              onClick={() => onNavigateToChat?.(session.id)}
-                              className={cn(
-                                "text-[var(--text-secondary)] flex items-center gap-1 group truncate",
-                                onNavigateToChat
-                                  ? "cursor-pointer hover:text-[var(--accent)] transition-colors"
-                                  : "cursor-default"
-                              )}
-                              title={session.label || session.title || session.id}
-                            >
-                              {session.label ? (
-                                <span className="font-medium">{session.label}</span>
-                              ) : session.title ? (
-                                <span className="truncate">{session.title}</span>
-                              ) : (
-                                <span className="text-[var(--text-tertiary)] italic text-[11px]">
-                                  {t("sessions.noLabel")}
-                                </span>
-                              )}
-                              {onNavigateToChat && (
-                                <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
-                              )}
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-medium border border-[var(--accent)]/20 flex-shrink-0">
+                              {extractAgentId(session.id)}
                             </span>
-                          )}
+                            {editingLabelId === session.id ? (
+                              <input
+                                ref={labelEditRef}
+                                type="text"
+                                value={editLabelValue}
+                                onChange={(e) => setEditLabelValue(e.target.value)}
+                                onBlur={() => handleLabelSave(session.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleLabelSave(session.id);
+                                  if (e.key === "Escape") setEditingLabelId(null);
+                                }}
+                                placeholder={t("sessions.enterLabel")}
+                                className="px-1.5 py-0.5 text-[12px] bg-[var(--bg-grouped)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-40"
+                              />
+                            ) : (
+                              <span
+                                onClick={() => onNavigateToChat?.(session.id)}
+                                className={cn(
+                                  "text-[var(--text-secondary)] flex items-center gap-1 group truncate",
+                                  onNavigateToChat
+                                    ? "cursor-pointer hover:text-[var(--accent)] transition-colors"
+                                    : "cursor-default"
+                                )}
+                                title={session.label || session.title || session.id}
+                              >
+                                {session.label ? (
+                                  <span className="font-medium">{session.label}</span>
+                                ) : session.title ? (
+                                  <span className="truncate">{session.title}</span>
+                                ) : (
+                                  <span className="text-[var(--text-tertiary)] italic text-[11px]">
+                                    {t("sessions.noLabel")}
+                                  </span>
+                                )}
+                                {onNavigateToChat && (
+                                  <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
+                                )}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Created */}

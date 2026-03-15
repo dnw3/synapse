@@ -31,7 +31,6 @@ const TOOL_CONFIG: Record<
 export default function ToolCallCard({ name, args }: Props) {
   const { t } = useTranslation();
   const config = TOOL_CONFIG[name] || { icon: Wrench, colorVar: "--text-secondary" };
-  const Icon = config.icon;
   const label = t(`tools.${name}`, { defaultValue: name });
   const summary = formatToolSummary(name, args);
   const colorVal = `var(${config.colorVar})`;

@@ -4,13 +4,13 @@ import {
   Sparkles, Search, FolderOpen, ChevronDown, ChevronRight,
   Eye, EyeOff, AlertTriangle, ExternalLink, Package,
   Zap, User, Box, Download, Star, ArrowDownWideNarrow,
-  Store, Loader2, CheckCircle2, GitBranch, Monitor,
+  Store, Loader2, CheckCircle2, GitBranch,
   X, Shield, Clock, FileText, Copy, Check,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useCodeTheme } from "../../hooks/useCodeTheme";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
 import type { SkillEntry, StoreSkillItem, StoreSkillDetail, StoreSearchResult } from "../../types/dashboard";
 import {
@@ -290,6 +290,7 @@ function LocalSkillDetailModal({
   onClose: () => void;
   onToggle: () => void;
 }) {
+  const codeTheme = useCodeTheme();
   const { t } = useTranslation();
   const api = useDashboardAPI();
   const [detailTab, setDetailTab] = useState<"info" | "files">("info");
@@ -609,7 +610,7 @@ function LocalSkillDetailModal({
                             ) : (
                               <SyntaxHighlighter
                                 language={extToLang(selectedFile)}
-                                style={oneDark}
+                                style={codeTheme}
                                 customStyle={{ margin: 0, borderRadius: "var(--radius-md)", fontSize: "12px", lineHeight: "1.8" }}
                                 wrapLongLines
                               >
@@ -1050,6 +1051,7 @@ function StoreSkillDetailModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const codeTheme = useCodeTheme();
   const api = useDashboardAPI();
   const [detail, setDetail] = useState<StoreSkillDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1412,7 +1414,7 @@ function StoreSkillDetailModal({
                               ) : (
                                 <SyntaxHighlighter
                                   language={extToLang(selectedFile)}
-                                  style={oneDark}
+                                  style={codeTheme}
                                   customStyle={{ margin: 0, borderRadius: "var(--radius-md)", fontSize: "12px", lineHeight: "1.8" }}
                                   wrapLongLines
                                 >

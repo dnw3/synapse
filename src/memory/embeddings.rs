@@ -12,7 +12,7 @@ use crate::config::MemoryConfig;
 ///
 /// Priority order depends on `embedding_provider` setting:
 /// - "auto": OPENAI_API_KEY → MISTRAL_API_KEY → VOYAGE_API_KEY → JINA_API_KEY
-///            → COHERE_API_KEY → NOMIC_API_KEY → Ollama → fake
+///   → COHERE_API_KEY → NOMIC_API_KEY → Ollama → fake
 /// - "openai" / "mistral" / "voyage" / "jina" / "cohere" / "nomic" / "ollama" / "fake"
 pub fn build_embeddings(config: &MemoryConfig) -> (Arc<dyn Embeddings>, bool) {
     let provider = config.embedding_provider.as_str();

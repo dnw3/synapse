@@ -15,6 +15,7 @@ pub struct ApplyPatchTool {
     work_dir: PathBuf,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl ApplyPatchTool {
     pub fn new(work_dir: &Path) -> Arc<dyn Tool> {
         Arc::new(Self {
@@ -92,13 +93,9 @@ fn apply_unified_diff(work_dir: &Path, patch: &str) -> Result<Vec<(String, usize
             continue;
         }
 
-        if line.starts_with("+++ ") {
+        if let Some(rest) = line.strip_prefix("+++ ") {
             // Parse target file: "+++ b/path/to/file" or "+++ path/to/file"
-            let path = line
-                .strip_prefix("+++ b/")
-                .or_else(|| line.strip_prefix("+++ "))
-                .unwrap_or(&line[4..])
-                .trim();
+            let path = rest.strip_prefix("b/").unwrap_or(rest).trim();
             current_file = Some(path.to_string());
             continue;
         }

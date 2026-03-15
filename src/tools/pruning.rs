@@ -62,7 +62,8 @@ impl PruningOptions {
 /// - `hard_clear_chars`: hard-clear threshold — entire content replaced with placeholder.
 ///
 /// Hard-clear is applied first (larger threshold), then soft-trim (smaller threshold).
-pub fn prune_tool_results(messages: &mut Vec<Message>, max_chars: usize, hard_clear_chars: usize) {
+#[allow(dead_code)]
+pub fn prune_tool_results(messages: &mut [Message], max_chars: usize, hard_clear_chars: usize) {
     prune_tool_results_with_options(
         messages,
         &PruningOptions {
@@ -74,7 +75,7 @@ pub fn prune_tool_results(messages: &mut Vec<Message>, max_chars: usize, hard_cl
 }
 
 /// Prune tool results with full configuration options.
-pub fn prune_tool_results_with_options(messages: &mut Vec<Message>, opts: &PruningOptions) {
+pub fn prune_tool_results_with_options(messages: &mut [Message], opts: &PruningOptions) {
     if opts.max_chars == 0 && opts.hard_clear_chars == 0 {
         return;
     }

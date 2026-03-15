@@ -22,8 +22,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mm_config = config
         .mattermost
-        .as_ref()
-        .ok_or("missing [mattermost] section in config")?;
+        .first()
+        .ok_or("missing [[mattermost]] section in config")?;
 
     let token = resolve_secret(
         mm_config.token.as_deref(),
@@ -179,8 +179,9 @@ async fn run_ws(
         let session = agent_session.clone();
         let api_url = url.to_string();
         let api_token = token.to_string();
+        let sender_id = user_id.to_string();
         tokio::spawn(async move {
-            let envelope = MessageEnvelope::channel(
+            let mut envelope = MessageEnvelope::channel(
                 channel_id.clone(),
                 message.clone(),
                 DeliveryContext {
@@ -191,9 +192,12 @@ async fn run_ws(
                     meta: None,
                 },
             );
+            envelope.sender_id = Some(sender_id);
+            envelope.routing.peer_kind = Some(crate::config::PeerKind::Channel);
+            envelope.routing.peer_id = Some(channel_id.clone());
             match session.handle_message(envelope).await {
                 Ok(reply) => {
-                    let chunks = formatter::chunk_mattermost(&reply.content);
+                    let chunks = formatter::format_for_channel(&reply.content, "mattermost", 16383);
                     let client = reqwest::Client::new();
                     for chunk in chunks {
                         let _ = client

@@ -345,13 +345,10 @@ fn persist_state(mgr: &PluginManager) {
     disabled.sort_unstable();
 
     let json = serde_json::json!({ "disabled": disabled });
-    match serde_json::to_string_pretty(&json) {
-        Ok(contents) => {
-            if let Err(err) = std::fs::write(&path, contents) {
-                tracing::warn!(path = %path.display(), error = %err, "failed to write plugin state");
-            }
+    if let Ok(contents) = serde_json::to_string_pretty(&json) {
+        if let Err(err) = std::fs::write(&path, contents) {
+            tracing::warn!(path = %path.display(), error = %err, "failed to write plugin state");
         }
-        Err(_) => {}
     }
 }
 

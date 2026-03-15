@@ -191,10 +191,12 @@ async fn handle_callback(
         format!("dingtalk:{}", sender_id)
     };
 
+    let is_dm = payload.conversation_type.as_deref() == Some("1");
+
     // Process in background so we respond to DingTalk quickly
     let session = state.agent_session.clone();
     tokio::spawn(async move {
-        let envelope = MessageEnvelope::channel(
+        let mut envelope = MessageEnvelope::channel(
             session_key.clone(),
             text.clone(),
             DeliveryContext {
@@ -205,10 +207,17 @@ async fn handle_callback(
                 meta: None,
             },
         );
+        envelope.sender_id = Some(sender_id.clone());
+        envelope.routing.peer_kind = Some(if is_dm {
+            crate::config::PeerKind::Direct
+        } else {
+            crate::config::PeerKind::Group
+        });
+        envelope.routing.peer_id = Some(conversation_id.clone());
         match session.handle_message(envelope).await {
             Ok(reply) => {
                 let client = reqwest::Client::new();
-                let chunks = formatter::chunk_dingtalk(&reply.content);
+                let chunks = formatter::format_for_channel(&reply.content, "dingtalk", 20000);
                 for chunk in chunks {
                     let body = serde_json::json!({
                         "msgtype": "text",
@@ -247,8 +256,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let dt_config = config
         .dingtalk
-        .as_ref()
-        .ok_or("missing [dingtalk] section in config")?;
+        .first()
+        .ok_or("missing [[dingtalk]] section in config")?;
 
     let app_secret = resolve_secret(
         dt_config.app_secret.as_deref(),

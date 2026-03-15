@@ -75,3 +75,42 @@ pub async fn handle_cost(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
         "per_model": per_model,
     }))
 }
+
+// ---------------------------------------------------------------------------
+// usage.aggregates — multi-dimensional aggregated snapshot
+// ---------------------------------------------------------------------------
+
+pub async fn handle_aggregates(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let since_days = params
+        .get("since_days")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(7);
+
+    let now_ms = crate::gateway::presence::now_ms();
+    let since_ms = now_ms.saturating_sub(since_days * 24 * 60 * 60 * 1000);
+
+    let snapshot = ctx.state.usage_tracker.snapshot_since(since_ms).await;
+    serde_json::to_value(&snapshot).map_err(|e| RpcError::internal(e.to_string()))
+}
+
+// ---------------------------------------------------------------------------
+// usage.records — raw records for a time range
+// ---------------------------------------------------------------------------
+
+pub async fn handle_records(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let since_days = params
+        .get("since_days")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1);
+    let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(100) as usize;
+
+    let now_ms = crate::gateway::presence::now_ms();
+    let since_ms = now_ms.saturating_sub(since_days * 24 * 60 * 60 * 1000);
+
+    let mut records = ctx.state.usage_tracker.records_since(since_ms).await;
+    // Most recent first
+    records.reverse();
+    records.truncate(limit);
+
+    serde_json::to_value(&records).map_err(|e| RpcError::internal(e.to_string()))
+}

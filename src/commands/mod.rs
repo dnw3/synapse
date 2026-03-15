@@ -1,5 +1,11 @@
+#[cfg(feature = "web")]
+pub mod devices;
 pub mod models_cmd;
+#[cfg(feature = "web")]
+pub mod pairing_cmd;
 pub mod plugin_cmd;
+#[cfg(feature = "web")]
+pub mod qr;
 pub mod skill_cmd;
 
 pub use self::models_cmd::run_models_command;

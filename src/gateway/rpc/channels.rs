@@ -2,105 +2,164 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::SystemTime;
 
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use super::router::RpcContext;
 use super::types::RpcError;
 
-fn config_file_path() -> String {
-    if std::path::Path::new("synapse.toml").exists() {
-        "synapse.toml".to_string()
-    } else {
-        "synapse.toml.example".to_string()
+fn system_time_to_secs(t: SystemTime) -> u64 {
+    t.duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+fn opt_time_to_value(t: Option<SystemTime>) -> Value {
+    match t {
+        Some(t) => json!(system_time_to_secs(t)),
+        None => Value::Null,
     }
 }
 
-fn extract_channel_config(toml_val: &toml::Value, channel_name: &str) -> HashMap<String, String> {
-    let table = toml_val
-        .as_table()
-        .and_then(|root| root.get(channel_name))
-        .and_then(|v| v.as_table());
-    let Some(table) = table else {
-        return HashMap::new();
-    };
-    table
-        .iter()
-        .filter_map(|(k, v)| {
-            let s = match v {
-                toml::Value::String(s) => s.clone(),
-                toml::Value::Boolean(b) => b.to_string(),
-                toml::Value::Integer(i) => i.to_string(),
-                toml::Value::Float(f) => f.to_string(),
-                _ => return None,
-            };
-            Some((k.clone(), s))
-        })
-        .collect()
+#[derive(Deserialize, Default)]
+struct StatusParams {
+    #[serde(default)]
+    probe: bool,
 }
 
 // ---------------------------------------------------------------------------
 // channels.status
 // ---------------------------------------------------------------------------
 
-pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
+pub async fn handle_status(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let params: StatusParams = serde_json::from_value(params).unwrap_or_default();
     let config = &ctx.state.config;
 
-    let toml_val: toml::Value = {
-        let path = config_file_path();
-        tokio::fs::read_to_string(&path)
-            .await
-            .ok()
-            .and_then(|content| toml::from_str(&content).ok())
-            .unwrap_or(toml::Value::Table(Default::default()))
-    };
+    // Collect live snapshots from the channel manager
+    let snapshots = ctx.state.channel_manager.snapshot_all().await;
 
-    let resolve_enabled = |name: &str, startup_exists: bool| -> bool {
-        toml_val
-            .get("channel_overrides")
-            .and_then(|o| o.get(name))
-            .and_then(|c| c.get("enabled"))
-            .and_then(|v| v.as_bool())
-            .unwrap_or(startup_exists)
-    };
+    // Group snapshots by channel name
+    let mut by_channel: HashMap<String, Vec<Value>> = HashMap::new();
+    for snap in &snapshots {
+        let disconnect_val = snap.last_disconnect.as_ref().map(|d| {
+            json!({
+                "at": system_time_to_secs(d.at),
+                "error": d.error,
+            })
+        });
 
-    let channels = vec![
-        ("lark", config.lark.is_some()),
-        ("slack", config.slack.is_some()),
-        ("telegram", config.telegram.is_some()),
-        ("discord", config.discord.is_some()),
-        ("dingtalk", config.dingtalk.is_some()),
-        ("mattermost", config.mattermost.is_some()),
-        ("matrix", config.matrix.is_some()),
-        ("whatsapp", config.whatsapp.is_some()),
-        ("teams", config.teams.is_some()),
-        ("signal", config.signal.is_some()),
-        ("wechat", config.wechat.is_some()),
-        ("imessage", config.imessage.is_some()),
-        ("line", config.line.is_some()),
-        ("googlechat", config.googlechat.is_some()),
-        ("irc", config.irc.is_some()),
-        ("webchat", config.webchat.is_some()),
-        ("twitch", config.twitch.is_some()),
-        ("nostr", config.nostr.is_some()),
-        ("nextcloud", config.nextcloud.is_some()),
-        ("synology", config.synology.is_some()),
-        ("tlon", config.tlon.is_some()),
-        ("zalo", config.zalo.is_some()),
+        let entry = json!({
+            "account_id": snap.account_id,
+            "state": snap.state.to_string(),
+            "running": snap.running,
+            "busy": snap.busy,
+            "active_runs": snap.active_runs,
+            "connected_at": opt_time_to_value(snap.connected_at),
+            "last_event_at": opt_time_to_value(snap.last_event_at),
+            "last_inbound_at": opt_time_to_value(snap.last_inbound_at),
+            "last_outbound_at": opt_time_to_value(snap.last_outbound_at),
+            "last_error": snap.last_error,
+            "reconnect_count": snap.reconnect_count,
+            "mode": snap.mode,
+            "last_disconnect": disconnect_val,
+        });
+
+        by_channel
+            .entry(snap.channel.clone())
+            .or_default()
+            .push(entry);
+    }
+
+    // All known channel names and their configured account counts
+    let configured_channels: Vec<(&str, usize)> = vec![
+        ("lark", config.lark.len()),
+        ("slack", config.slack.len()),
+        ("telegram", config.telegram.len()),
+        ("discord", config.discord.len()),
+        ("dingtalk", config.dingtalk.len()),
+        ("mattermost", config.mattermost.len()),
+        ("matrix", config.matrix.len()),
+        ("whatsapp", config.whatsapp.len()),
+        ("teams", config.teams.len()),
+        ("signal", config.signal.len()),
+        ("wechat", config.wechat.len()),
+        ("imessage", config.imessage.len()),
+        ("line", config.line.len()),
+        ("googlechat", config.googlechat.len()),
+        ("irc", config.irc.len()),
+        ("webchat", config.webchat.len()),
+        ("twitch", config.twitch.len()),
+        ("nostr", config.nostr.len()),
+        ("nextcloud", config.nextcloud.len()),
+        ("synology", config.synology.len()),
+        ("tlon", config.tlon.len()),
+        ("zalo", config.zalo.len()),
     ];
 
-    let result: Vec<Value> = channels
-        .into_iter()
-        .map(|(name, startup_exists)| {
+    // Build the channels map: include all channels that are either configured or running
+    let mut channels: HashMap<String, Value> = HashMap::new();
+    for (name, configured_count) in &configured_channels {
+        let accounts = by_channel.remove(*name).unwrap_or_default();
+        channels.insert(
+            name.to_string(),
             json!({
-                "name": name,
-                "enabled": resolve_enabled(name, startup_exists),
-                "config": extract_channel_config(&toml_val, name),
-            })
-        })
-        .collect();
+                "configured": *configured_count,
+                "accounts": accounts,
+            }),
+        );
+    }
 
-    Ok(json!(result))
+    // Include any channels that are running but not in the known list
+    for (name, accounts) in by_channel {
+        channels.insert(
+            name.clone(),
+            json!({
+                "configured": 0,
+                "accounts": accounts,
+            }),
+        );
+    }
+
+    let ts = system_time_to_secs(SystemTime::now());
+
+    // Optionally run probes
+    let probe_results = if params.probe {
+        let probes = ctx.state.channel_manager.run_probes().await;
+        let results: Vec<Value> = probes
+            .into_iter()
+            .map(|(channel, account_id, result)| {
+                let (ok, error) = match result {
+                    Ok(()) => (true, Value::Null),
+                    Err(e) => (false, json!(e)),
+                };
+                json!({
+                    "channel": channel,
+                    "account_id": account_id,
+                    "ok": ok,
+                    "error": error,
+                })
+            })
+            .collect();
+        Some(results)
+    } else {
+        None
+    };
+
+    let mut result = json!({
+        "ts": ts,
+        "channels": channels,
+    });
+
+    if let Some(probes) = probe_results {
+        result
+            .as_object_mut()
+            .unwrap()
+            .insert("probe_results".to_string(), json!(probes));
+    }
+
+    Ok(result)
 }
 
 // ---------------------------------------------------------------------------

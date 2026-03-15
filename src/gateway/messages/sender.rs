@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use synaptic::DeliveryContext;
 
 /// Result of sending a message to a channel.
+#[allow(dead_code)]
 pub struct SendResult {
     /// Platform-returned message ID (for future editing/threading).
     pub message_id: Option<String>,

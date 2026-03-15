@@ -576,7 +576,7 @@ function LogRow({
   index,
   onFilterRequestId,
   isTracing,
-  searchQuery,
+  searchQuery: _searchQuery,
   colWidths,
 }: {
   entry: LogEntry;

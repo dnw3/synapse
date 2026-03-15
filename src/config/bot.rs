@@ -6,6 +6,9 @@ fn default_true() -> bool {
 fn default_4000() -> usize {
     4000
 }
+fn default_account_id() -> String {
+    "default".to_string()
+}
 
 /// Resolve a secret value: try direct value first, then environment variable.
 /// This allows dashboard UI to set values directly, while power users can
@@ -43,6 +46,7 @@ pub struct BotAllowlist {
     pub allowed_channels: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl BotAllowlist {
     /// Returns true if the allowlist is empty (no restrictions).
     pub fn is_empty(&self) -> bool {
@@ -90,13 +94,7 @@ pub enum GroupSessionScope {
     GroupTopicSender,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum DmPolicy {
-    #[default]
-    Open,
-    Allowlist,
-}
+pub use synaptic::DmPolicy;
 
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -108,6 +106,7 @@ pub enum GroupPolicy {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
+#[allow(dead_code)]
 pub struct GroupToolPolicy {
     #[serde(default)]
     pub allow: Vec<String>,
@@ -116,6 +115,7 @@ pub struct GroupToolPolicy {
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
+#[allow(dead_code)]
 pub struct GroupConfig {
     #[serde(default)]
     pub tool_policy: GroupToolPolicy,
@@ -126,6 +126,10 @@ pub struct GroupConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct LarkBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     // Auth
     pub app_id: String,
     pub app_secret: Option<String>,
@@ -154,7 +158,17 @@ pub struct LarkBotConfig {
     #[serde(default)]
     pub allowlist: BotAllowlist,
 
+    /// Chat ID of the owner/admin for receiving pairing approval cards.
+    #[serde(default)]
+    pub owner_chat_id: Option<String>,
+    /// Pairing code TTL in seconds (default: 3600 = 1 hour).
+    #[serde(default)]
+    pub pairing_ttl_secs: Option<u64>,
+
     // Sessions
+    /// DM session isolation level.
+    #[serde(default)]
+    pub dm_session_scope: Option<crate::config::DmSessionScope>,
     #[serde(default)]
     pub group_session_scope: GroupSessionScope,
     #[serde(default)]
@@ -172,6 +186,10 @@ pub struct LarkBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct SlackBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub bot_token: Option<String>,
     #[serde(default)]
     pub bot_token_env: Option<String>,
@@ -186,6 +204,10 @@ pub struct SlackBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct TelegramBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub bot_token: Option<String>,
     #[serde(default)]
     pub bot_token_env: Option<String>,
@@ -197,6 +219,10 @@ pub struct TelegramBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct DiscordBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub bot_token: Option<String>,
     #[serde(default)]
     pub bot_token_env: Option<String>,
@@ -207,6 +233,10 @@ pub struct DiscordBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct DingTalkBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub app_key: String,
     pub app_secret: Option<String>,
     #[serde(default)]
@@ -221,6 +251,10 @@ pub struct DingTalkBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct MattermostBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub url: String,
     pub token: Option<String>,
     #[serde(default)]
@@ -233,6 +267,10 @@ pub struct MattermostBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct MatrixBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub homeserver_url: String,
     pub user_id: String,
     pub password: Option<String>,
@@ -246,6 +284,10 @@ pub struct MatrixBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct WhatsAppBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub phone_number_id: Option<String>,
     pub bridge_url: Option<String>,
     pub access_token: Option<String>,
@@ -259,6 +301,10 @@ pub struct WhatsAppBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct TeamsBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub app_id: String,
     pub app_password: Option<String>,
     #[serde(default)]
@@ -272,6 +318,10 @@ pub struct TeamsBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct SignalBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub api_url: String,
     pub phone_number: String,
     #[serde(default)]
@@ -282,6 +332,10 @@ pub struct SignalBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct WeChatBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub corp_id: Option<String>,
     pub webhook_key: Option<String>,
     #[serde(default)]
@@ -297,6 +351,10 @@ pub struct WeChatBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct IMessageBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub api_url: String,
     pub password: Option<String>,
     #[serde(default)]
@@ -309,6 +367,10 @@ pub struct IMessageBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct LineBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub channel_secret: Option<String>,
     #[serde(default)]
     pub channel_secret_env: Option<String>,
@@ -324,6 +386,10 @@ pub struct LineBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct GoogleChatBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub project_id: Option<String>,
     pub port: Option<u16>,
     #[serde(default)]
@@ -334,6 +400,10 @@ pub struct GoogleChatBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct WebChatBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     /// Port for the HTTP server (default: 8090).
     pub port: Option<u16>,
     /// Allowed CORS origins (empty = allow all).
@@ -350,6 +420,10 @@ pub struct WebChatBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct IrcBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub server: String,
     pub port: Option<u16>,
     pub nick: String,
@@ -365,6 +439,10 @@ pub struct IrcBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct TwitchBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub nick: String,
     pub oauth_token: Option<String>,
     #[serde(default)]
@@ -379,6 +457,10 @@ pub struct TwitchBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct NostrBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub private_key: Option<String>,
     #[serde(default)]
     pub private_key_env: Option<String>,
@@ -392,6 +474,10 @@ pub struct NostrBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct NextcloudBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub url: String,
     pub username: String,
     pub password: Option<String>,
@@ -408,6 +494,10 @@ pub struct NextcloudBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct SynologyBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     /// Port for the incoming webhook HTTP server (default: 8091).
     pub port: Option<u16>,
     /// Optional outgoing webhook URL for sending replies.
@@ -421,6 +511,10 @@ pub struct SynologyBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct TlonBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub url: String,
     pub api_key: Option<String>,
     #[serde(default)]
@@ -433,6 +527,10 @@ pub struct TlonBotConfig {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct ZaloBotConfig {
+    #[serde(default = "default_account_id")]
+    pub account_id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     pub access_token: Option<String>,
     #[serde(default)]
     pub access_token_env: Option<String>,

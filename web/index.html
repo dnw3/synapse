@@ -47,7 +47,14 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        // Dev mode (Vite): unregister any existing SW to prevent fetch interception
+        if (window.location.port && window.location.port !== '80' && window.location.port !== '443' && window.location.port !== '3000') {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) { r.unregister(); });
+          });
+        } else {
+          navigator.serviceWorker.register('/sw.js').catch(function() {});
+        }
       }
     </script>
   </body>

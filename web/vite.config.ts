@@ -10,6 +10,9 @@ export default defineConfig({
       "/ws": {
         target: "ws://localhost:3000",
         ws: true,
+        configure: (proxy) => {
+          proxy.on("error", () => {}); // Suppress EPIPE on backend restart
+        },
       },
     },
   },

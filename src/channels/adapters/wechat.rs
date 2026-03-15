@@ -197,7 +197,7 @@ async fn handle_callback(
     // Process in background so we respond to WeCom quickly (5s timeout requirement)
     let session = state.agent_session.clone();
     tokio::spawn(async move {
-        let envelope = MessageEnvelope::channel(
+        let mut envelope = MessageEnvelope::channel(
             session_key.clone(),
             text.clone(),
             DeliveryContext {
@@ -208,11 +208,14 @@ async fn handle_callback(
                 meta: None,
             },
         );
+        envelope.sender_id = Some(sender_id.clone());
+        envelope.routing.peer_kind = Some(crate::config::PeerKind::Direct);
+        envelope.routing.peer_id = Some(sender_id.clone());
         match session.handle_message(envelope).await {
             Ok(reply) => {
                 let client = reqwest::Client::new();
                 let webhook_url = format!("{}?key={}", WECOM_WEBHOOK_BASE, webhook_key);
-                let chunks = formatter::chunk_wechat(&reply.content);
+                let chunks = formatter::format_for_channel(&reply.content, "wechat", 2048);
                 for chunk in chunks {
                     let body = serde_json::json!({
                         "msgtype": "text",
@@ -252,8 +255,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let wc_config = config
         .wechat
-        .as_ref()
-        .ok_or("missing [wechat] section in config")?;
+        .first()
+        .ok_or("missing [[wechat]] section in config")?;
 
     let webhook_key = resolve_secret(
         wc_config.webhook_key.as_deref(),

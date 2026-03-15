@@ -7,7 +7,7 @@ import {
 import {
   MessageSquare, Zap, Wifi, Clock, Server,
   Globe, Activity, Cpu, Database, Shield,
-  Link2, Key, Copy, Check, RefreshCw,
+  Link2, Copy, Check, RefreshCw,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
@@ -426,7 +426,7 @@ export default function OverviewPage({ connected, conversationCount, messageCoun
           ) : (
             <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
               {requests.map((r) => {
-                const successCount = r.status_counts["2xx"] ?? 0;
+                const _successCount = r.status_counts["2xx"] ?? 0;
                 const errorCount = Object.entries(r.status_counts)
                   .filter(([k]) => k.startsWith("4") || k.startsWith("5"))
                   .reduce((sum, [, v]) => sum + v, 0);

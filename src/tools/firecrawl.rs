@@ -14,6 +14,7 @@ pub struct FirecrawlTool {
     client: reqwest::Client,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl FirecrawlTool {
     pub fn new() -> Arc<dyn Tool> {
         Arc::new(Self {

@@ -15,6 +15,7 @@ use tracing;
 
 use crate::agent;
 use crate::agent::registry::ModelRegistry;
+use crate::config::AgentDef;
 use crate::config::SynapseConfig;
 use crate::gateway::messages::routing::{
     resolve_delivery_target, update_last_route, SessionDeliveryState, TurnSource,
@@ -25,6 +26,34 @@ use crate::gateway::messages::{
 };
 use crate::gateway::rpc::Broadcaster;
 use crate::memory::LongTermMemory;
+use crate::router::{BindingRouter, RoutingContext};
+
+/// Resolved agent info passed through the message handling pipeline.
+struct ResolvedAgentInfo {
+    /// Agent ID.
+    id: String,
+    /// Model override (if any).
+    #[allow(dead_code)]
+    model_override: Option<String>,
+    /// System prompt override (if any).
+    prompt_override: Option<String>,
+    /// Full agent definition (if routed to a defined agent).
+    #[allow(dead_code)]
+    def: Option<AgentDef>,
+}
+
+/// Result of routing: single agent or broadcast to multiple.
+#[allow(clippy::large_enum_variant)]
+enum ResolvedRoute {
+    Single(ResolvedAgentInfo),
+    Broadcast {
+        group_name: String,
+        strategy: crate::config::BroadcastStrategy,
+        agents: Vec<ResolvedAgentInfo>,
+        #[allow(dead_code)]
+        timeout_secs: u64,
+    },
+}
 
 /// Callback for streaming token output to bot adapters.
 ///
@@ -63,6 +92,12 @@ pub struct AgentSession {
     channel_registry: Option<Arc<RwLock<ChannelRegistry>>>,
     /// Optional broadcaster for message events (available in gateway mode).
     broadcaster: Option<Arc<Broadcaster>>,
+    /// Optional binding router for multi-agent dispatch.
+    router: Option<Arc<BindingRouter>>,
+    /// Optional cost tracker for usage statistics.
+    cost_tracker: Option<Arc<synaptic::callbacks::CostTrackingCallback>>,
+    /// Optional multi-dimensional usage tracker.
+    usage_tracker: Option<Arc<crate::usage::UsageTracker>>,
 }
 
 impl AgentSession {
@@ -81,6 +116,9 @@ impl AgentSession {
             session_map: RwLock::new(std::collections::HashMap::new()),
             channel_registry: None,
             broadcaster: None,
+            router: None,
+            cost_tracker: None,
+            usage_tracker: None,
         }
     }
 
@@ -88,6 +126,7 @@ impl AgentSession {
     ///
     /// If a `[[channel_models]]` entry matches the `channel_id`, the bound model is used.
     /// Otherwise falls back to the provided default model.
+    #[allow(dead_code)]
     pub fn new_for_channel(
         default_model: Arc<dyn ChatModel>,
         config: Arc<SynapseConfig>,
@@ -120,7 +159,34 @@ impl AgentSession {
             session_map: RwLock::new(std::collections::HashMap::new()),
             channel_registry: None,
             broadcaster: None,
+            router: None,
+            cost_tracker: None,
+            usage_tracker: None,
         }
+    }
+
+    /// Set the cost tracker for usage statistics.
+    #[allow(dead_code)]
+    pub fn with_cost_tracker(
+        mut self,
+        tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
+    ) -> Self {
+        self.cost_tracker = Some(tracker);
+        self
+    }
+
+    /// Set the multi-dimensional usage tracker.
+    #[allow(dead_code)]
+    pub fn with_usage_tracker(mut self, tracker: Arc<crate::usage::UsageTracker>) -> Self {
+        self.usage_tracker = Some(tracker);
+        self
+    }
+
+    /// Set the binding router for multi-agent dispatch.
+    #[allow(dead_code)]
+    pub fn with_router(mut self, router: Arc<BindingRouter>) -> Self {
+        self.router = Some(router);
+        self
     }
 
     /// Set the channel name for self-awareness context (e.g. "lark", "slack", "web").
@@ -130,6 +196,7 @@ impl AgentSession {
     }
 
     /// Set channel registry and broadcaster for gateway mode.
+    #[allow(dead_code)]
     pub fn with_gateway(
         mut self,
         channel_registry: Arc<RwLock<ChannelRegistry>>,
@@ -138,6 +205,74 @@ impl AgentSession {
         self.channel_registry = Some(channel_registry);
         self.broadcaster = Some(broadcaster);
         self
+    }
+
+    /// Build a routing context from a message envelope.
+    fn routing_context(envelope: &MessageEnvelope) -> RoutingContext {
+        RoutingContext {
+            channel: Some(envelope.delivery.channel.clone()),
+            account_id: envelope.delivery.account_id.clone(),
+            peer_kind: envelope.routing.peer_kind.clone(),
+            peer_id: envelope.routing.peer_id.clone(),
+            sender_id: envelope.sender_id.clone(),
+            guild_id: envelope.routing.guild_id.clone(),
+            team_id: envelope.routing.team_id.clone(),
+            roles: envelope.routing.roles.clone(),
+            message: Some(envelope.content.clone()),
+        }
+    }
+
+    /// Resolve the routing for this envelope via the binding router.
+    fn resolve_route(&self, envelope: &MessageEnvelope) -> ResolvedRoute {
+        if let Some(ref router) = self.router {
+            let ctx = Self::routing_context(envelope);
+            match router.resolve(&ctx) {
+                crate::router::RouteResult::Single(resolved) => {
+                    let agent_id = resolved.def.id.clone();
+                    tracing::info!(
+                        agent = %agent_id,
+                        binding = ?resolved.binding.map(|b| &b.agent),
+                        "routed to agent"
+                    );
+                    ResolvedRoute::Single(ResolvedAgentInfo {
+                        id: agent_id,
+                        model_override: resolved.def.model.clone(),
+                        prompt_override: resolved.def.system_prompt.clone(),
+                        def: Some(resolved.def.clone()),
+                    })
+                }
+                crate::router::RouteResult::Broadcast { group, agents } => {
+                    tracing::info!(
+                        broadcast_group = %group.name,
+                        strategy = ?group.strategy,
+                        agent_count = agents.len(),
+                        "broadcast match"
+                    );
+                    let infos: Vec<_> = agents
+                        .iter()
+                        .map(|r| ResolvedAgentInfo {
+                            id: r.def.id.clone(),
+                            model_override: r.def.model.clone(),
+                            prompt_override: r.def.system_prompt.clone(),
+                            def: Some(r.def.clone()),
+                        })
+                        .collect();
+                    ResolvedRoute::Broadcast {
+                        group_name: group.name.clone(),
+                        strategy: group.strategy.clone(),
+                        agents: infos,
+                        timeout_secs: group.timeout_secs,
+                    }
+                }
+            }
+        } else {
+            ResolvedRoute::Single(ResolvedAgentInfo {
+                id: "default".into(),
+                model_override: None,
+                prompt_override: None,
+                def: None,
+            })
+        }
     }
 
     /// Load delivery state from session metadata store.
@@ -191,6 +326,32 @@ impl AgentSession {
             }
         }
 
+        // Legacy key fallback: try stripping the "agent:default:" prefix
+        // Old keys look like "lark:dm:xxx", new keys like "agent:default:lark:dm:xxx"
+        if let Some(legacy_key) = session_key.strip_prefix("agent:default:") {
+            if let Ok(Some(item)) = store.get(ns, legacy_key).await {
+                if let Some(sid) = item.value.as_str() {
+                    if self
+                        .session_mgr
+                        .get_session(sid)
+                        .await
+                        .ok()
+                        .flatten()
+                        .is_some()
+                    {
+                        // Migrate: save under new key, cache
+                        let _ = store
+                            .put(ns, session_key, serde_json::Value::String(sid.to_string()))
+                            .await;
+                        let mut map = self.session_map.write().await;
+                        map.insert(session_key.to_string(), sid.to_string());
+                        tracing::info!(old_key = %legacy_key, new_key = %session_key, "migrated legacy session key");
+                        return Ok(sid.to_string());
+                    }
+                }
+            }
+        }
+
         // Create a new session
         let sid = self
             .session_mgr
@@ -227,7 +388,29 @@ impl AgentSession {
         );
         let _guard = span.enter();
 
-        tracing::info!("processing channel message");
+        // Resolve routing (single agent or broadcast)
+        let route = self.resolve_route(&envelope);
+
+        // Handle broadcast: fan out to multiple agents
+        if let ResolvedRoute::Broadcast {
+            ref group_name,
+            ref strategy,
+            ref agents,
+            ..
+        } = route
+        {
+            tracing::info!(broadcast = %group_name, "dispatching broadcast");
+            return self
+                .handle_broadcast_message(&envelope, agents, strategy)
+                .await;
+        }
+
+        // Single agent path
+        let agent_info = match route {
+            ResolvedRoute::Single(info) => info,
+            _ => unreachable!(),
+        };
+        tracing::info!(agent = %agent_info.id, "processing channel message");
 
         // Load delivery state
         let mut delivery_state = self.load_delivery_state(&session_key).await;
@@ -258,8 +441,15 @@ impl AgentSession {
         // Build content blocks from attachments
         let content_blocks = self.download_attachments(&envelope.attachments).await;
 
+        // Snapshot cost tracker before agent call for usage diff
+        let pre_snap = if let Some(ref tracker) = self.usage_tracker {
+            Some(tracker.framework_tracker.snapshot().await)
+        } else {
+            None
+        };
+
         let result = if self.deep_agent {
-            self.handle_deep_agent(&sid, &envelope.content, &content_blocks)
+            self.handle_deep_agent(&sid, &envelope.content, &content_blocks, &agent_info)
                 .await
         } else {
             self.handle_simple_chat(&sid, &envelope.content, &content_blocks)
@@ -269,12 +459,40 @@ impl AgentSession {
         let duration_ms = start.elapsed().as_millis();
         match &result {
             Ok(_) => tracing::info!(
+                agent = %agent_info.id,
                 duration_ms = duration_ms as u64,
                 "channel message processed"
             ),
             Err(e) => {
-                tracing::error!(duration_ms = duration_ms as u64, error = %e, "channel message failed")
+                tracing::error!(agent = %agent_info.id, duration_ms = duration_ms as u64, error = %e, "channel message failed")
             }
+        }
+
+        // Record usage with dimensional metadata (even on error — we still used tokens)
+        if let (Some(ref tracker), Some(pre)) = (&self.usage_tracker, pre_snap) {
+            let post = tracker.framework_tracker.snapshot().await;
+            let model_name = self.model.profile().map(|p| p.name).unwrap_or_default();
+            let provider = self.model.profile().map(|p| p.provider).unwrap_or_default();
+            tracker
+                .record(crate::usage::UsageRecord {
+                    model: model_name,
+                    provider,
+                    channel: channel.clone(),
+                    agent_id: agent_info.id.clone(),
+                    session_key: session_key.clone(),
+                    input_tokens: post
+                        .total_input_tokens
+                        .saturating_sub(pre.total_input_tokens),
+                    output_tokens: post
+                        .total_output_tokens
+                        .saturating_sub(pre.total_output_tokens),
+                    total_tokens: (post.total_input_tokens + post.total_output_tokens)
+                        .saturating_sub(pre.total_input_tokens + pre.total_output_tokens),
+                    cost_usd: (post.estimated_cost_usd - pre.estimated_cost_usd).max(0.0),
+                    latency_ms: duration_ms as u64,
+                    timestamp_ms: crate::gateway::presence::now_ms(),
+                })
+                .await;
         }
 
         let response = result?;
@@ -358,7 +576,28 @@ impl AgentSession {
         );
         let _guard = span.enter();
 
-        tracing::info!("processing streaming channel message");
+        // Resolve routing (single agent or broadcast)
+        let route = self.resolve_route(&envelope);
+
+        // Broadcast in streaming mode: fall back to non-streaming broadcast
+        if let ResolvedRoute::Broadcast {
+            ref group_name,
+            ref strategy,
+            ref agents,
+            ..
+        } = route
+        {
+            tracing::info!(broadcast = %group_name, "dispatching broadcast (streaming fallback)");
+            return self
+                .handle_broadcast_message(&envelope, agents, strategy)
+                .await;
+        }
+
+        let agent_info = match route {
+            ResolvedRoute::Single(info) => info,
+            _ => unreachable!(),
+        };
+        tracing::info!(agent = %agent_info.id, "processing streaming channel message");
 
         // Load delivery state
         let mut delivery_state = self.load_delivery_state(&session_key).await;
@@ -389,12 +628,20 @@ impl AgentSession {
         // Build content blocks from attachments
         let content_blocks = self.download_attachments(&envelope.attachments).await;
 
+        // Snapshot cost tracker before agent call for usage diff
+        let pre_snap = if let Some(ref tracker) = self.usage_tracker {
+            Some(tracker.framework_tracker.snapshot().await)
+        } else {
+            None
+        };
+
         let result = if self.deep_agent {
             self.handle_deep_agent_streaming(
                 &sid,
                 &envelope.content,
                 &content_blocks,
                 output.clone(),
+                &agent_info,
             )
             .await
         } else {
@@ -421,6 +668,33 @@ impl AgentSession {
                 output.on_error(&e.to_string()).await;
                 tracing::error!(duration_ms = duration_ms as u64, error = %e, "streaming message failed");
             }
+        }
+
+        // Record usage with dimensional metadata (even on error — we still used tokens)
+        if let (Some(ref tracker), Some(pre)) = (&self.usage_tracker, pre_snap) {
+            let post = tracker.framework_tracker.snapshot().await;
+            let model_name = self.model.profile().map(|p| p.name).unwrap_or_default();
+            let provider = self.model.profile().map(|p| p.provider).unwrap_or_default();
+            tracker
+                .record(crate::usage::UsageRecord {
+                    model: model_name,
+                    provider,
+                    channel: channel.clone(),
+                    agent_id: agent_info.id.clone(),
+                    session_key: session_key.clone(),
+                    input_tokens: post
+                        .total_input_tokens
+                        .saturating_sub(pre.total_input_tokens),
+                    output_tokens: post
+                        .total_output_tokens
+                        .saturating_sub(pre.total_output_tokens),
+                    total_tokens: (post.total_input_tokens + post.total_output_tokens)
+                        .saturating_sub(pre.total_input_tokens + pre.total_output_tokens),
+                    cost_usd: (post.estimated_cost_usd - pre.estimated_cost_usd).max(0.0),
+                    latency_ms: duration_ms as u64,
+                    timestamp_ms: crate::gateway::presence::now_ms(),
+                })
+                .await;
         }
 
         let response = result?;
@@ -543,6 +817,7 @@ impl AgentSession {
         session_id: &str,
         text: &str,
         content_blocks: &[ContentBlock],
+        agent_info: &ResolvedAgentInfo,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let memory = self.session_mgr.memory();
 
@@ -550,13 +825,12 @@ impl AgentSession {
         let mut messages = memory.load(session_id).await.unwrap_or_default();
 
         // Add system prompt if this is a new conversation
+        // Priority: agent route override > global config > default
         if messages.is_empty() {
-            let system_prompt = self
-                .config
-                .base
-                .agent
-                .system_prompt
+            let system_prompt = agent_info
+                .prompt_override
                 .clone()
+                .or_else(|| self.config.base.agent.system_prompt.clone())
                 .unwrap_or_else(|| {
                     "You are Synapse, a helpful AI assistant. You can read and write files, \
                      execute commands, and help with complex tasks. Keep responses concise \
@@ -594,7 +868,7 @@ impl AgentSession {
             None, // no LTM tools in bot mode
             None, // no session tools in bot mode
             None, // no session overrides in bot mode
-            None, // no cost tracking in bot mode
+            self.cost_tracker.clone(),
             &self.channel,
             None, // agent routing resolved at higher level
         )
@@ -625,11 +899,13 @@ impl AgentSession {
         let threshold = self.config.memory.auto_compact_threshold;
         if token_count > threshold {
             // Pre-compaction flush: extract important memories before trimming
-            let sessions_dir = PathBuf::from(&self.config.base.paths.sessions_dir);
-            let ltm = LongTermMemory::new(
-                sessions_dir.join("long_term_memory"),
-                self.config.memory.clone(),
-            );
+            // Use per-agent memory dir if routed to a named agent
+            let ltm_dir = if agent_info.id != "default" {
+                crate::config::agent_memory_dir(&agent_info.id)
+            } else {
+                PathBuf::from(&self.config.base.paths.sessions_dir).join("long_term_memory")
+            };
+            let ltm = LongTermMemory::new(ltm_dir, self.config.memory.clone());
             ltm.load().await.ok();
 
             let keep_recent = self.config.memory.keep_recent;
@@ -658,6 +934,179 @@ impl AgentSession {
         }
 
         Ok(response)
+    }
+
+    /// Handle broadcast: fan out to multiple agents in parallel.
+    ///
+    /// Each agent processes the message independently with its own session/prompt/memory.
+    /// Replies are collected and merged into a single response.
+    async fn handle_broadcast_message(
+        &self,
+        envelope: &MessageEnvelope,
+        agents: &[ResolvedAgentInfo],
+        strategy: &crate::config::BroadcastStrategy,
+    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
+        use crate::config::BroadcastStrategy;
+
+        let request_id = envelope.request_id.clone();
+        let session_key = envelope.session_key.clone();
+        let content_blocks = self.download_attachments(&envelope.attachments).await;
+
+        match strategy {
+            BroadcastStrategy::Parallel | BroadcastStrategy::Aggregated => {
+                // Spawn all agents concurrently
+                let mut set = tokio::task::JoinSet::new();
+                for agent_info in agents {
+                    let _sid_key = format!(
+                        "agent:{}:{}",
+                        agent_info.id,
+                        session_key.trim_start_matches("agent:default:")
+                    );
+                    let text = envelope.content.clone();
+                    let blocks = content_blocks.clone();
+                    let agent_id = agent_info.id.clone();
+                    let prompt = agent_info.prompt_override.clone();
+
+                    // Create agent info for the spawned task
+                    let info = ResolvedAgentInfo {
+                        id: agent_id.clone(),
+                        model_override: agent_info.model_override.clone(),
+                        prompt_override: prompt,
+                        def: agent_info.def.clone(),
+                    };
+
+                    let memory_store = self.session_mgr.memory();
+                    let model = self.model.clone();
+                    let config = self.config.clone();
+                    let deep = self.deep_agent;
+
+                    let checkpointer = Arc::new(self.session_mgr.checkpointer());
+
+                    set.spawn(async move {
+                        // Use a unique session for each broadcast agent
+                        let memory = memory_store;
+                        let sid = uuid::Uuid::new_v4().to_string();
+
+                        // Build messages
+                        let mut messages = memory.load(&sid).await.unwrap_or_default();
+                        if messages.is_empty() {
+                            let sys_prompt = info
+                                .prompt_override
+                                .clone()
+                                .or_else(|| config.base.agent.system_prompt.clone())
+                                .unwrap_or_else(|| "You are a helpful AI assistant.".into());
+                            messages.push(Message::system(&sys_prompt));
+                        }
+                        let human_msg = if blocks.is_empty() {
+                            Message::human(&text)
+                        } else {
+                            Message::human(&text).with_content_blocks(blocks)
+                        };
+                        memory.append(&sid, human_msg.clone()).await.ok();
+                        messages.push(human_msg);
+
+                        if deep {
+                            let cwd =
+                                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                            let mcp_tools = agent::load_mcp_tools(&config).await;
+
+                            let agent = agent::build_deep_agent_with_callback(
+                                model,
+                                &config,
+                                &cwd,
+                                checkpointer,
+                                mcp_tools,
+                                None,
+                                Some(Arc::new(agent::BotSafetyCallback)),
+                                None,
+                                None,
+                                None,
+                                None,
+                                "broadcast",
+                                None,
+                            )
+                            .await
+                            .map_err(|e| AgentError(format!("agent build: {}", e)))?;
+
+                            let initial_state = MessageState::with_messages(messages);
+                            let result = agent
+                                .invoke(initial_state)
+                                .await
+                                .map_err(|e| AgentError(format!("agent error: {}", e)))?;
+                            let response = extract_final_response(&result.into_state().messages);
+                            Ok::<(String, String), Box<dyn std::error::Error + Send + Sync>>((
+                                agent_id, response,
+                            ))
+                        } else {
+                            let req = ChatRequest::new(messages);
+                            let resp = model
+                                .chat(req)
+                                .await
+                                .map_err(|e| AgentError(format!("chat error: {}", e)))?;
+                            let text = resp.message.content().to_string();
+                            Ok((agent_id, text))
+                        }
+                    });
+                }
+
+                // Collect results
+                let mut replies: Vec<(String, String)> = Vec::new();
+                while let Some(result) = set.join_next().await {
+                    match result {
+                        Ok(Ok((agent_id, response))) => {
+                            tracing::info!(agent = %agent_id, "broadcast agent completed");
+                            replies.push((agent_id, response));
+                        }
+                        Ok(Err(e)) => {
+                            tracing::warn!(error = %e, "broadcast agent failed");
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "broadcast task panicked");
+                        }
+                    }
+                }
+
+                // Merge responses
+                let merged = if replies.len() == 1 {
+                    replies.into_iter().next().unwrap().1
+                } else {
+                    replies
+                        .iter()
+                        .map(|(agent_id, response)| format!("**[{}]**\n\n{}", agent_id, response))
+                        .collect::<Vec<_>>()
+                        .join("\n\n---\n\n")
+                };
+
+                Ok(AgentReply {
+                    content: merged,
+                    delivery_target: envelope.delivery.clone(),
+                    turn_id: request_id,
+                })
+            }
+            BroadcastStrategy::Sequential => {
+                // Process agents one by one, return last response
+                let mut last_response = String::new();
+                for agent_info in agents {
+                    let sid = self.resolve_session(&session_key).await?;
+                    match self
+                        .handle_deep_agent(&sid, &envelope.content, &content_blocks, agent_info)
+                        .await
+                    {
+                        Ok(response) => {
+                            last_response = response;
+                        }
+                        Err(e) => {
+                            tracing::warn!(agent = %agent_info.id, error = %e, "sequential broadcast agent failed");
+                        }
+                    }
+                }
+                Ok(AgentReply {
+                    content: last_response,
+                    delivery_target: envelope.delivery.clone(),
+                    turn_id: request_id,
+                })
+            }
+        }
     }
 
     /// Simple chat mode: direct model.chat() call without tools.
@@ -731,6 +1180,7 @@ impl AgentSession {
         text: &str,
         content_blocks: &[ContentBlock],
         output: Arc<dyn StreamingOutput>,
+        agent_info: &ResolvedAgentInfo,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let memory = self.session_mgr.memory();
 
@@ -738,13 +1188,12 @@ impl AgentSession {
         let mut messages = memory.load(session_id).await.unwrap_or_default();
 
         // Add system prompt if this is a new conversation
+        // Priority: agent route override > global config > default
         if messages.is_empty() {
-            let system_prompt = self
-                .config
-                .base
-                .agent
-                .system_prompt
+            let system_prompt = agent_info
+                .prompt_override
                 .clone()
+                .or_else(|| self.config.base.agent.system_prompt.clone())
                 .unwrap_or_else(|| {
                     "You are Synapse, a helpful AI assistant. You can read and write files, \
                      execute commands, and help with complex tasks. Keep responses concise \
@@ -836,11 +1285,13 @@ impl AgentSession {
         let threshold = self.config.memory.auto_compact_threshold;
         if token_count > threshold {
             // Pre-compaction flush: extract important memories before trimming
-            let sessions_dir = PathBuf::from(&self.config.base.paths.sessions_dir);
-            let ltm = LongTermMemory::new(
-                sessions_dir.join("long_term_memory"),
-                self.config.memory.clone(),
-            );
+            // Use per-agent memory dir if routed to a named agent
+            let ltm_dir = if agent_info.id != "default" {
+                crate::config::agent_memory_dir(&agent_info.id)
+            } else {
+                PathBuf::from(&self.config.base.paths.sessions_dir).join("long_term_memory")
+            };
+            let ltm = LongTermMemory::new(ltm_dir, self.config.memory.clone());
             ltm.load().await.ok();
 
             let keep_recent = self.config.memory.keep_recent;

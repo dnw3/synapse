@@ -17,6 +17,7 @@ pub struct NodeSession {
 }
 
 /// A pending invoke waiting for a result from a node.
+#[allow(dead_code)]
 pub struct PendingInvoke {
     pub invoke_id: String,
     pub node_id: String,

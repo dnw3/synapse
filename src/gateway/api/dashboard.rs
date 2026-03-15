@@ -7,6 +7,7 @@ use axum::response::Json;
 use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
 use serde::{Deserialize, Serialize};
+use sha2::Digest;
 use synaptic::core::MemoryStore;
 
 use tracing;
@@ -152,6 +153,9 @@ pub fn routes() -> Router<AppState> {
         .route("/dashboard/nodes/approve", post(approve_node))
         .route("/dashboard/nodes/reject", post(reject_node))
         .route("/dashboard/nodes/remove", post(remove_node))
+        .route("/dashboard/nodes/rename", post(rename_node))
+        .route("/dashboard/nodes/rotate", post(rotate_node_token))
+        .route("/dashboard/nodes/revoke", post(revoke_node_token))
         .route("/dashboard/nodes/qr", post(generate_qr))
         .route("/dashboard/exec-approvals", get(get_exec_approvals))
 }
@@ -1793,8 +1797,8 @@ fn build_config_schema() -> Vec<ConfigSectionSchema> {
         // Bot channel sections
         ConfigSectionSchema {
             key: "lark".into(),
-            label: "Lark / Feishu".into(),
-            description: Some("Lark (Feishu) bot platform credentials".into()),
+            label: "Lark".into(),
+            description: Some("Lark bot platform credentials".into()),
             order: 200,
             icon: "bot".into(),
             fields: vec![
@@ -1883,20 +1887,6 @@ fn build_config_schema() -> Vec<ConfigSectionSchema> {
                 },
             ],
         },
-        // Channel overrides
-        ConfigSectionSchema {
-            key: "channel_overrides.lark".into(),
-            label: "Lark Overrides".into(),
-            description: Some("Per-channel behavior overrides for Lark".into()),
-            order: 300,
-            icon: "settings".into(),
-            fields: vec![{
-                let mut f = field("enabled", "Enabled", "boolean");
-                f.description = Some("Enable/disable Lark channel".into());
-                f.default_value = Some("false".into());
-                f
-            }],
-        },
     ]
 }
 
@@ -1929,10 +1919,13 @@ struct ChannelResponse {
 
 /// Extract config fields for a channel from the raw TOML value.
 fn extract_channel_config(toml_val: &toml::Value, channel_name: &str) -> HashMap<String, String> {
-    let table = toml_val
-        .as_table()
-        .and_then(|root| root.get(channel_name))
-        .and_then(|v| v.as_table());
+    let entry = toml_val.as_table().and_then(|root| root.get(channel_name));
+    // Support both [channel] (table) and [[channel]] (array of tables — take first)
+    let table = entry.and_then(|v| match v {
+        toml::Value::Table(t) => Some(t),
+        toml::Value::Array(arr) => arr.first().and_then(|item| item.as_table()),
+        _ => None,
+    });
     let Some(table) = table else {
         return HashMap::new();
     };
@@ -1973,28 +1966,28 @@ async fn get_channels(State(state): State<AppState>) -> Json<Vec<ChannelResponse
     };
 
     let channels = vec![
-        ("lark", config.lark.is_some()),
-        ("slack", config.slack.is_some()),
-        ("telegram", config.telegram.is_some()),
-        ("discord", config.discord.is_some()),
-        ("dingtalk", config.dingtalk.is_some()),
-        ("mattermost", config.mattermost.is_some()),
-        ("matrix", config.matrix.is_some()),
-        ("whatsapp", config.whatsapp.is_some()),
-        ("teams", config.teams.is_some()),
-        ("signal", config.signal.is_some()),
-        ("wechat", config.wechat.is_some()),
-        ("imessage", config.imessage.is_some()),
-        ("line", config.line.is_some()),
-        ("googlechat", config.googlechat.is_some()),
-        ("irc", config.irc.is_some()),
-        ("webchat", config.webchat.is_some()),
-        ("twitch", config.twitch.is_some()),
-        ("nostr", config.nostr.is_some()),
-        ("nextcloud", config.nextcloud.is_some()),
-        ("synology", config.synology.is_some()),
-        ("tlon", config.tlon.is_some()),
-        ("zalo", config.zalo.is_some()),
+        ("lark", !config.lark.is_empty()),
+        ("slack", !config.slack.is_empty()),
+        ("telegram", !config.telegram.is_empty()),
+        ("discord", !config.discord.is_empty()),
+        ("dingtalk", !config.dingtalk.is_empty()),
+        ("mattermost", !config.mattermost.is_empty()),
+        ("matrix", !config.matrix.is_empty()),
+        ("whatsapp", !config.whatsapp.is_empty()),
+        ("teams", !config.teams.is_empty()),
+        ("signal", !config.signal.is_empty()),
+        ("wechat", !config.wechat.is_empty()),
+        ("imessage", !config.imessage.is_empty()),
+        ("line", !config.line.is_empty()),
+        ("googlechat", !config.googlechat.is_empty()),
+        ("irc", !config.irc.is_empty()),
+        ("webchat", !config.webchat.is_empty()),
+        ("twitch", !config.twitch.is_empty()),
+        ("nostr", !config.nostr.is_empty()),
+        ("nextcloud", !config.nextcloud.is_empty()),
+        ("synology", !config.synology.is_empty()),
+        ("tlon", !config.tlon.is_empty()),
+        ("zalo", !config.zalo.is_empty()),
     ];
 
     Json(
@@ -3160,6 +3153,7 @@ async fn get_tools_catalog(State(state): State<AppState>) -> Json<Vec<ToolCatalo
     });
 
     // 2. Core tools (built-in synapse tools)
+    #[allow(unused_mut)]
     let mut core_tools = vec![
         ToolCatalogEntry {
             name: "apply_patch".to_string(),
@@ -3365,7 +3359,12 @@ async fn debug_invoke(
         }
         "stats" => {
             let snapshot = state.cost_tracker.snapshot().await;
-            let sessions = state.sessions.list_sessions().await.map(|s| s.len()).unwrap_or(0);
+            let sessions = state
+                .sessions
+                .list_sessions()
+                .await
+                .map(|s| s.len())
+                .unwrap_or(0);
             let active = state.cancel_tokens.read().await.len();
             Json(DebugInvokeResponse {
                 ok: true,
@@ -3381,16 +3380,14 @@ async fn debug_invoke(
                 error: None,
             })
         }
-        "version" => {
-            Json(DebugInvokeResponse {
-                ok: true,
-                result: Some(serde_json::json!({
-                    "version": env!("CARGO_PKG_VERSION"),
-                    "name": env!("CARGO_PKG_NAME"),
-                })),
-                error: None,
-            })
-        }
+        "version" => Json(DebugInvokeResponse {
+            ok: true,
+            result: Some(serde_json::json!({
+                "version": env!("CARGO_PKG_VERSION"),
+                "name": env!("CARGO_PKG_NAME"),
+            })),
+            error: None,
+        }),
         "providers" => {
             let mut providers = Vec::new();
             if let Some(catalog) = &state.config.provider_catalog {
@@ -3425,9 +3422,14 @@ async fn debug_invoke(
         }
         "sessions" => {
             let sessions = state.sessions.list_sessions().await.unwrap_or_default();
-            let list: Vec<_> = sessions.iter().map(|s| serde_json::json!({
-                "id": s.id,
-            })).collect();
+            let list: Vec<_> = sessions
+                .iter()
+                .map(|s| {
+                    serde_json::json!({
+                        "id": s.id,
+                    })
+                })
+                .collect();
             Json(DebugInvokeResponse {
                 ok: true,
                 result: Some(serde_json::json!(list)),
@@ -3435,26 +3437,71 @@ async fn debug_invoke(
             })
         }
         "schedules" => {
-            let schedules: Vec<_> = state.config.schedules.as_ref().map(|entries| {
-                entries.iter().map(|s| serde_json::json!({
-                    "name": s.name,
-                    "prompt": s.prompt,
-                    "cron": s.cron,
-                    "interval_secs": s.interval_secs,
-                    "enabled": s.enabled,
-                })).collect()
-            }).unwrap_or_default();
+            let schedules: Vec<_> = state
+                .config
+                .schedules
+                .as_ref()
+                .map(|entries| {
+                    entries
+                        .iter()
+                        .map(|s| {
+                            serde_json::json!({
+                                "name": s.name,
+                                "prompt": s.prompt,
+                                "cron": s.cron,
+                                "interval_secs": s.interval_secs,
+                                "enabled": s.enabled,
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
             Json(DebugInvokeResponse {
                 ok: true,
                 result: Some(serde_json::json!(schedules)),
                 error: None,
             })
         }
-        _ => Json(DebugInvokeResponse {
-            ok: false,
-            result: None,
-            error: Some(format!("unknown method: {}. Available: health, cost_snapshot, stats, version, providers, models.list, sessions, schedules", body.method)),
-        }),
+        _ => {
+            // Delegate unknown methods to the RPC router
+            let rpc_ctx = std::sync::Arc::new(crate::gateway::rpc::router::RpcContext {
+                state: state.clone(),
+                conn_id: "dashboard-rest".to_string(),
+                client: crate::gateway::rpc::types::ClientInfo::default(),
+                role: crate::gateway::rpc::scopes::Role::Operator,
+                scopes: std::collections::HashSet::from([
+                    "operator.read".to_string(),
+                    "operator.write".to_string(),
+                    "operator.pairing".to_string(),
+                    "operator.approvals".to_string(),
+                ]),
+                broadcaster: state.broadcaster.clone(),
+            });
+            let frame = state
+                .rpc_router
+                .dispatch(
+                    rpc_ctx,
+                    "dashboard-rest-0".to_string(),
+                    &body.method,
+                    body.params.clone(),
+                )
+                .await;
+            // Extract ok/payload/error from ServerFrame::Response
+            match frame {
+                crate::gateway::rpc::types::ServerFrame::Response {
+                    ok, payload, error, ..
+                } => Json(DebugInvokeResponse {
+                    ok,
+                    result: payload,
+                    error: error.map(|e| e.message),
+                }),
+                _ => Json(DebugInvokeResponse {
+                    ok: false,
+                    result: None,
+                    error: Some("unexpected RPC response".to_string()),
+                }),
+            }
+        }
     }
 }
 
@@ -3551,28 +3598,28 @@ async fn read_config_file() -> Result<(String, String), (StatusCode, String)> {
 
 fn count_bot_channels(config: &crate::config::SynapseConfig) -> usize {
     let checks: &[bool] = &[
-        config.lark.is_some(),
-        config.slack.is_some(),
-        config.telegram.is_some(),
-        config.discord.is_some(),
-        config.dingtalk.is_some(),
-        config.mattermost.is_some(),
-        config.matrix.is_some(),
-        config.whatsapp.is_some(),
-        config.teams.is_some(),
-        config.signal.is_some(),
-        config.wechat.is_some(),
-        config.imessage.is_some(),
-        config.line.is_some(),
-        config.googlechat.is_some(),
-        config.irc.is_some(),
-        config.webchat.is_some(),
-        config.twitch.is_some(),
-        config.nostr.is_some(),
-        config.nextcloud.is_some(),
-        config.synology.is_some(),
-        config.tlon.is_some(),
-        config.zalo.is_some(),
+        !config.lark.is_empty(),
+        !config.slack.is_empty(),
+        !config.telegram.is_empty(),
+        !config.discord.is_empty(),
+        !config.dingtalk.is_empty(),
+        !config.mattermost.is_empty(),
+        !config.matrix.is_empty(),
+        !config.whatsapp.is_empty(),
+        !config.teams.is_empty(),
+        !config.signal.is_empty(),
+        !config.wechat.is_empty(),
+        !config.imessage.is_empty(),
+        !config.line.is_empty(),
+        !config.googlechat.is_empty(),
+        !config.irc.is_empty(),
+        !config.webchat.is_empty(),
+        !config.twitch.is_empty(),
+        !config.nostr.is_empty(),
+        !config.nextcloud.is_empty(),
+        !config.synology.is_empty(),
+        !config.tlon.is_empty(),
+        !config.zalo.is_empty(),
     ];
     checks.iter().filter(|&&v| v).count()
 }
@@ -3854,6 +3901,7 @@ async fn parse_skill_full_info(
     )
 }
 
+#[allow(dead_code)]
 async fn parse_skill_frontmatter(path: &Path) -> (String, bool) {
     let content = match tokio::fs::read_to_string(path).await {
         Ok(c) => c,
@@ -3864,9 +3912,9 @@ async fn parse_skill_frontmatter(path: &Path) -> (String, bool) {
     let mut user_invocable = false;
 
     // Simple YAML frontmatter parser (between --- delimiters)
-    if content.starts_with("---") {
-        if let Some(end) = content[3..].find("---") {
-            let frontmatter = &content[3..3 + end];
+    if let Some(rest) = content.strip_prefix("---") {
+        if let Some(end) = rest.find("---") {
+            let frontmatter = &rest[..end];
             for line in frontmatter.lines() {
                 let line = line.trim();
                 if let Some(val) = line.strip_prefix("description:") {
@@ -4302,14 +4350,24 @@ struct NodesResponse {
 }
 
 async fn get_nodes(State(state): State<AppState>) -> Json<NodesResponse> {
-    let pairing = state.pairing_store.read().await;
-    let paired = pairing.list_paired();
-    let registry = state.node_registry.read().await;
+    // Collect paired nodes under a single read lock, then drop it before
+    // acquiring the write lock to avoid deadlock.
+    let paired = {
+        let pairing = state.pairing_store.read().await;
+        pairing.list_paired()
+    };
 
+    let registry = state.node_registry.read().await;
     let nodes: Vec<serde_json::Value> = paired
         .iter()
         .map(|n| {
-            let online = registry.get(&n.node_id).is_some();
+            let session = registry.get(&n.node_id);
+            let online = session.is_some();
+            let token_status = match &n.token_hash {
+                Some(h) if h.is_empty() => "revoked",
+                Some(_) => "active",
+                None => "none",
+            };
             serde_json::json!({
                 "id": n.node_id,
                 "name": n.name,
@@ -4317,10 +4375,12 @@ async fn get_nodes(State(state): State<AppState>) -> Json<NodesResponse> {
                 "status": if online { "online" } else { "offline" },
                 "paired_at": n.paired_at.to_string(),
                 "device_id": n.device_id,
+                "token_status": token_status,
+                "connected_at": session.map(|s| s.connected_at),
+                "capabilities": session.map(|s| &s.capabilities),
             })
         })
         .collect();
-
     drop(registry);
 
     let mut pairing_w = state.pairing_store.write().await;
@@ -4332,6 +4392,7 @@ async fn get_nodes(State(state): State<AppState>) -> Json<NodesResponse> {
                 "id": r.request_id,
                 "node_name": r.node_name,
                 "platform": r.platform,
+                "ip": r.ip,
                 "requested_at": r.created_at.to_string(),
             })
         })
@@ -4401,6 +4462,84 @@ async fn remove_node(
         Ok(Json(serde_json::json!({"ok": true})))
     } else {
         Err((StatusCode::NOT_FOUND, "paired device not found".to_string()))
+    }
+}
+
+#[derive(Deserialize)]
+struct RenameRequest {
+    node_id: String,
+    name: String,
+}
+
+async fn rename_node(
+    State(state): State<AppState>,
+    Json(body): Json<RenameRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let renamed = state
+        .pairing_store
+        .write()
+        .await
+        .rename(&body.node_id, &body.name);
+    if renamed {
+        // Also update live registry if online
+        state
+            .node_registry
+            .write()
+            .await
+            .rename(&body.node_id, &body.name);
+        Ok(Json(serde_json::json!({"ok": true})))
+    } else {
+        Err((StatusCode::NOT_FOUND, "device not found".to_string()))
+    }
+}
+
+async fn rotate_node_token(
+    State(state): State<AppState>,
+    Json(body): Json<NodeActionRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    use crate::gateway::nodes::bootstrap;
+
+    let node_id = body
+        .node_id
+        .as_deref()
+        .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing node_id".to_string()))?;
+
+    let new_token = bootstrap::generate_pairing_token();
+    let token_hash = format!("{:x}", sha2::Sha256::digest(new_token.as_bytes()));
+
+    let updated = state
+        .pairing_store
+        .write()
+        .await
+        .update_token_hash(node_id, &token_hash);
+    if updated {
+        Ok(Json(serde_json::json!({
+            "ok": true,
+            "token": new_token,
+        })))
+    } else {
+        Err((StatusCode::NOT_FOUND, "device not found".to_string()))
+    }
+}
+
+async fn revoke_node_token(
+    State(state): State<AppState>,
+    Json(body): Json<NodeActionRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let node_id = body
+        .node_id
+        .as_deref()
+        .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing node_id".to_string()))?;
+
+    let updated = state
+        .pairing_store
+        .write()
+        .await
+        .update_token_hash(node_id, "");
+    if updated {
+        Ok(Json(serde_json::json!({"ok": true})))
+    } else {
+        Err((StatusCode::NOT_FOUND, "device not found".to_string()))
     }
 }
 

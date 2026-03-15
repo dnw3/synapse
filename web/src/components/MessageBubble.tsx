@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useCodeTheme } from "../hooks/useCodeTheme";
 import { User, Bot, Copy, Check, Trash2, Volume2, VolumeX } from "lucide-react";
 import type { Message } from "../types";
 import ToolCallCard from "./ToolCallCard";
@@ -81,6 +81,8 @@ function LogIdBadge({ requestId }: { requestId: string }) {
 }
 
 function MarkdownContent({ content }: { content: string }) {
+  const codeTheme = useCodeTheme();
+
   return (
     <div className="synapse-prose prose max-w-none prose-p:leading-[1.75] prose-li:leading-[1.75] prose-headings:mt-6 prose-headings:mb-3 prose-headings:tracking-tight prose-h2:text-lg prose-h2:border-b prose-h2:border-[var(--border-subtle)] prose-h2:pb-2 prose-pre:bg-[var(--bg-window)] prose-pre:border prose-pre:border-[var(--border-subtle)] prose-headings:text-[var(--text-primary)] prose-a:text-[var(--accent-light)] prose-strong:text-[var(--text-primary)]">
       <ReactMarkdown
@@ -99,10 +101,15 @@ function MarkdownContent({ content }: { content: string }) {
               </code>
             ) : (
               <SyntaxHighlighter
-                style={oneDark}
+                style={codeTheme}
                 language={match?.[1] || "text"}
                 PreTag="div"
-                className="!rounded-[var(--radius-md)] !text-[13px] !leading-relaxed !border !border-[var(--border-subtle)] !my-3 !bg-[var(--bg-window)]"
+                className="!rounded-[var(--radius-md)] !text-[13px] !leading-relaxed !border !border-[var(--border-subtle)] !my-3"
+                customStyle={{
+                  padding: "1em",
+                  margin: 0,
+                  overflow: "auto",
+                }}
               >
                 {String(children).replace(/\n$/, "")}
               </SyntaxHighlighter>

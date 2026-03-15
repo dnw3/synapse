@@ -381,6 +381,7 @@ impl ClawHubClient {
     }
 
     /// Resolve a skill fingerprint to a known version.
+    #[allow(dead_code)]
     pub async fn resolve_fingerprint(
         &self,
         slug: &str,

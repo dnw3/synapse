@@ -6,7 +6,7 @@ pub mod state;
 
 // Re-exports for backward compatibility
 pub use self::run::repl;
-pub use self::session::{list_sessions, prune_sessions, save_session_title};
+pub use self::session::list_sessions;
 
 use std::sync::Arc;
 

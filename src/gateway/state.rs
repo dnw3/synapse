@@ -14,6 +14,7 @@ use crate::gateway::messages::ChannelRegistry;
 use crate::gateway::rpc::wizard::WizardSession;
 use crate::logging::LogBuffer;
 use crate::session::SessionWriteLock;
+use crate::usage::UsageTracker;
 
 /// Request counter key: (method, path, status).
 type RequestKey = (String, String, u16);
@@ -45,6 +46,8 @@ pub struct AppState {
     pub started_at: std::time::Instant,
     /// Cost and token usage tracking across all requests.
     pub cost_tracker: Arc<CostTrackingCallback>,
+    /// Multi-dimensional usage tracker with persistence.
+    pub usage_tracker: Arc<UsageTracker>,
     /// HTTP request metrics (counters, durations).
     pub request_metrics: RequestMetrics,
     /// Per-session write locks to prevent concurrent modifications.
@@ -74,7 +77,14 @@ pub struct AppState {
     /// Bootstrap token store for device pairing QR codes.
     pub bootstrap_store: Arc<RwLock<crate::gateway::nodes::BootstrapStore>>,
     /// Registry of active channel senders for outbound delivery.
+    #[allow(dead_code)]
     pub channel_registry: Arc<RwLock<ChannelRegistry>>,
+    /// Channel adapter lifecycle manager.
+    pub channel_manager: Arc<super::channel_manager::ChannelAdapterManager>,
+    /// DM pairing policy enforcer (shared with channel adapters).
+    pub dm_enforcer: Arc<crate::channels::dm::FileDmPolicyEnforcer>,
+    /// Registry of per-channel approval notifiers.
+    pub approve_notifiers: Arc<crate::channels::dm::ApproveNotifierRegistry>,
 }
 
 impl AppState {
@@ -98,6 +108,19 @@ impl AppState {
             .map(|auth_config| Arc::new(AuthState::new(auth_config.clone())));
 
         let cost_tracker = Arc::new(CostTrackingCallback::new(default_pricing()));
+
+        // Multi-dimensional usage tracker with JSONL persistence
+        let usage_path = crate::usage::default_usage_path();
+        let usage_tracker = Arc::new(UsageTracker::with_persistence(
+            Arc::clone(&cost_tracker),
+            usage_path,
+        ));
+        // Load historical records from disk
+        if let Err(e) = usage_tracker.load().await {
+            tracing::warn!(error = %e, "failed to load usage records from disk");
+        }
+        // Periodic flush every 60 seconds
+        usage_tracker.spawn_periodic_flush(std::time::Duration::from_secs(60));
 
         // Default write-lock timeout: 5 minutes
         let write_lock = Arc::new(SessionWriteLock::new(std::time::Duration::from_secs(300)));
@@ -133,6 +156,7 @@ impl AppState {
             auth,
             started_at: std::time::Instant::now(),
             cost_tracker,
+            usage_tracker,
             request_metrics: RequestMetrics::default(),
             write_lock,
             log_buffer,
@@ -148,6 +172,19 @@ impl AppState {
             wizard_sessions: Arc::new(RwLock::new(HashMap::new())),
             bootstrap_store: Arc::new(RwLock::new(crate::gateway::nodes::BootstrapStore::new())),
             channel_registry: Arc::new(RwLock::new(ChannelRegistry::new())),
+            channel_manager: Arc::new(super::channel_manager::ChannelAdapterManager::new()),
+            dm_enforcer: {
+                let pairing_dir = dirs::home_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("."))
+                    .join(".synapse")
+                    .join("pairing");
+                Arc::new(crate::channels::dm::FileDmPolicyEnforcer::new(
+                    pairing_dir,
+                    synaptic::DmPolicy::Pairing,
+                    None,
+                ))
+            },
+            approve_notifiers: Arc::new(crate::channels::dm::ApproveNotifierRegistry::default()),
         })
     }
 }

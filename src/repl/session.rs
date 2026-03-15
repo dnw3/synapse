@@ -59,10 +59,8 @@ pub async fn prune_sessions(
     let mut removed = 0;
     for s in &sessions {
         if let Some(timestamp) = parse_iso_timestamp(&s.created_at) {
-            if timestamp < cutoff {
-                if mgr.delete_session(&s.id).await.is_ok() {
-                    removed += 1;
-                }
+            if timestamp < cutoff && mgr.delete_session(&s.id).await.is_ok() {
+                removed += 1;
             }
         }
     }

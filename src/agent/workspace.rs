@@ -44,6 +44,7 @@ pub fn initialize_workspace(cwd: &Path) -> Vec<String> {
 }
 
 /// Delete BOOTSTRAP.md after the first session completes.
+#[allow(dead_code)]
 pub fn delete_bootstrap(cwd: &Path) {
     let path = cwd.join("BOOTSTRAP.md");
     if path.exists() {

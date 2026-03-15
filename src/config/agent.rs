@@ -1,8 +1,213 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
+use super::bot::GroupSessionScope;
 use super::memory::default_true;
+
+// ---------------------------------------------------------------------------
+// Multi-Agent: Agent definitions, Bindings, Broadcasts
+// ---------------------------------------------------------------------------
+
+/// Top-level multi-agent configuration.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AgentsConfig {
+    /// Default agent ID (fallback when no binding matches).
+    #[serde(default = "default_agent_id")]
+    pub default: String,
+    /// Agent definition list.
+    #[serde(default)]
+    pub list: Vec<AgentDef>,
+}
+
+fn default_agent_id() -> String {
+    "default".into()
+}
+
+impl Default for AgentsConfig {
+    fn default() -> Self {
+        Self {
+            default: default_agent_id(),
+            list: Vec::new(),
+        }
+    }
+}
+
+/// Definition of an independent agent with its own workspace, model, tools, and session isolation.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AgentDef {
+    /// Unique agent identifier (lowercase, [a-z0-9_-], max 64 chars).
+    pub id: String,
+    /// Human-readable description.
+    pub description: Option<String>,
+    /// Model override (resolved via ModelResolver).
+    pub model: Option<String>,
+    /// System prompt override.
+    pub system_prompt: Option<String>,
+    /// Workspace directory (default: `~/.synapse/agents/{id}/workspace`).
+    pub workspace: Option<String>,
+    /// DM session isolation level.
+    #[serde(default)]
+    pub dm_scope: DmSessionScope,
+    /// Group session isolation level (overrides channel-level setting).
+    pub group_session_scope: Option<GroupSessionScope>,
+    /// Tool allowlist (empty = all tools allowed). Supports glob patterns.
+    #[serde(default)]
+    pub tool_allow: Vec<String>,
+    /// Tool denylist. Supports glob patterns.
+    #[serde(default)]
+    pub tool_deny: Vec<String>,
+    /// Per-agent skills directory.
+    pub skills_dir: Option<String>,
+}
+
+/// DM session isolation level — controls how sessions are keyed for direct messages.
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DmSessionScope {
+    /// All DMs share a single session (unsafe for multi-user).
+    Main,
+    /// Each sender gets an independent session.
+    PerPeer,
+    /// Each channel + sender gets an independent session (recommended).
+    #[default]
+    PerChannelPeer,
+    /// Each account + channel + sender gets an independent session.
+    PerAccountChannelPeer,
+}
+
+/// Route binding — maps incoming messages to an agent based on channel/account/peer/guild/team.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Binding {
+    /// Target agent ID.
+    pub agent: String,
+    /// Channel name constraint (e.g. "lark", "discord", "slack").
+    pub channel: Option<String>,
+    /// Account ID constraint (for multi-account channels).
+    pub account_id: Option<String>,
+    /// Peer match — bind to a specific DM or group.
+    pub peer: Option<PeerMatch>,
+    /// Discord guild ID constraint.
+    pub guild_id: Option<String>,
+    /// Slack team/workspace ID constraint.
+    pub team_id: Option<String>,
+    /// Discord role IDs (AND logic — user must have all listed roles).
+    #[serde(default)]
+    pub roles: Vec<String>,
+    /// Human-readable comment for this binding.
+    pub comment: Option<String>,
+}
+
+/// Peer match — identifies a specific DM or group conversation.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PeerMatch {
+    /// Peer type.
+    pub kind: PeerKind,
+    /// Platform-specific peer ID.
+    pub id: String,
+}
+
+/// Peer type for binding matches.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PeerKind {
+    /// Direct message (1:1 DM).
+    Direct,
+    /// Group conversation.
+    Group,
+    /// Channel (e.g. Discord channel, Slack channel).
+    Channel,
+}
+
+/// Agent broadcast group — fans out a single message to multiple agents.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AgentBroadcastGroup {
+    /// Broadcast group name.
+    pub name: String,
+    /// Human-readable description.
+    pub description: Option<String>,
+    /// Channel constraint.
+    pub channel: Option<String>,
+    /// Peer ID constraint (exact match).
+    pub peer_id: Option<String>,
+    /// Agent IDs to fan out to.
+    pub agents: Vec<String>,
+    /// Execution strategy.
+    #[serde(default)]
+    pub strategy: BroadcastStrategy,
+    /// Timeout in seconds for aggregated strategy (default: 60).
+    #[serde(default = "default_broadcast_timeout")]
+    pub timeout_secs: u64,
+}
+
+/// Broadcast execution strategy.
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum BroadcastStrategy {
+    /// All agents process in parallel, each replies independently.
+    #[default]
+    Parallel,
+    /// Agents process one after another.
+    Sequential,
+    /// All agents process in parallel, replies are merged into one message.
+    Aggregated,
+}
+
+fn default_broadcast_timeout() -> u64 {
+    60
+}
+
+// ---------------------------------------------------------------------------
+// Agent directory helpers
+// ---------------------------------------------------------------------------
+
+/// Resolve the base directory for an agent: `~/.synapse/agents/{agent_id}/`.
+#[allow(dead_code)]
+pub fn agent_base_dir(agent_id: &str) -> PathBuf {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    home.join(".synapse").join("agents").join(agent_id)
+}
+
+/// Resolve the workspace directory for an agent definition.
+/// Priority: explicit `workspace` field → `~/.synapse/agents/{id}/workspace/`.
+pub fn agent_workspace_dir(agent_def: &AgentDef) -> PathBuf {
+    if let Some(ref ws) = agent_def.workspace {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+        if let Some(suffix) = ws.strip_prefix("~/") {
+            home.join(suffix)
+        } else {
+            PathBuf::from(ws)
+        }
+    } else {
+        agent_base_dir(&agent_def.id).join("workspace")
+    }
+}
+
+/// Sessions directory for an agent: `~/.synapse/agents/{agent_id}/sessions/`.
+#[allow(dead_code)]
+pub fn agent_sessions_dir(agent_id: &str) -> PathBuf {
+    agent_base_dir(agent_id).join("sessions")
+}
+
+/// Memory (LTM) directory for an agent: `~/.synapse/agents/{agent_id}/memory/`.
+#[allow(dead_code)]
+pub fn agent_memory_dir(agent_id: &str) -> PathBuf {
+    agent_base_dir(agent_id).join("memory")
+}
+
+/// Ensure all standard agent directories exist.
+#[allow(dead_code)]
+pub fn ensure_agent_dirs(agent_id: &str) {
+    let base = agent_base_dir(agent_id);
+    std::fs::create_dir_all(base.join("workspace")).ok();
+    std::fs::create_dir_all(base.join("sessions")).ok();
+    std::fs::create_dir_all(base.join("memory")).ok();
+}
+
+// ---------------------------------------------------------------------------
+// Sub-agent delegation configuration
+// ---------------------------------------------------------------------------
 
 /// Sub-agent delegation configuration.
 #[derive(Debug, Clone, Deserialize)]
@@ -157,6 +362,7 @@ pub struct SkillOverrideConfig {
 
 /// Skills system configuration.
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct SkillsConfig {
     /// Bundled skills allowlist (empty = all allowed).
     #[serde(default)]

@@ -20,8 +20,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let irc_config = config
         .irc
-        .as_ref()
-        .ok_or("missing [irc] section in config")?;
+        .first()
+        .ok_or("missing [[irc]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -169,6 +169,9 @@ async fn run_tcp(
             continue;
         }
 
+        // Private messages (target == own nick) are DMs; channel messages are channels.
+        let is_dm = parsed.target.eq_ignore_ascii_case(&own_nick);
+
         // Spawn agent processing in the background.
         let session = agent_session.clone();
         let tx_clone = tx.clone();
@@ -176,7 +179,7 @@ async fn run_tcp(
         let session_key = reply_target.clone();
 
         tokio::spawn(async move {
-            let envelope = MessageEnvelope::channel(
+            let mut envelope = MessageEnvelope::channel(
                 session_key.clone(),
                 message.clone(),
                 DeliveryContext {
@@ -187,9 +190,16 @@ async fn run_tcp(
                     meta: None,
                 },
             );
+            envelope.sender_id = Some(sender_nick);
+            envelope.routing.peer_kind = Some(if is_dm {
+                crate::config::PeerKind::Direct
+            } else {
+                crate::config::PeerKind::Channel
+            });
+            envelope.routing.peer_id = Some(session_key.clone());
             match session.handle_message(envelope).await {
                 Ok(reply) => {
-                    let chunks = formatter::chunk_irc(&reply.content);
+                    let chunks = formatter::format_for_channel(&reply.content, "irc", 400);
                     for chunk in chunks {
                         // Each chunk is already ≤400 chars; send line-by-line
                         // in case the agent included embedded newlines.

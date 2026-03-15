@@ -4,11 +4,11 @@ import {
   Settings2, Save, Check, X, RefreshCw, Code, FormInput, Search,
   Brain, Bot, Wrench, Database, FileText, History, Globe, Shield,
   FolderOpen, Users, Gauge, Lock, HeartPulse, Sparkles, ScrollText,
-  Folder, Eye, EyeOff, AlertTriangle, ChevronRight,
+  Folder, Eye, EyeOff, AlertTriangle,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import { SectionCard, SectionHeader, EmptyState, LoadingSpinner, useToast, ToastContainer } from "./shared";
+import { SectionCard, EmptyState, LoadingSpinner, useToast, ToastContainer } from "./shared";
 
 type EditorMode = "form" | "raw";
 
@@ -50,6 +50,7 @@ interface TomlField {
 interface TomlSection {
   key: string;
   fields: TomlField[];
+  isArrayTable?: boolean;
 }
 
 // --- TOML helpers ---
@@ -102,8 +103,16 @@ function parseTomlSections(content: string): TomlSection[] {
       continue;
     }
 
-    // Section header: [name] or [name.sub] (but not [[array]])
-    const sectionMatch = line.match(/^\[([^\[\]]+)\]$/);
+    // Section header: [[array_table]] (TOML array tables)
+    const arrayTableMatch = line.match(/^\[\[([^[\]]+)\]\]$/);
+    if (arrayTableMatch) {
+      current = { key: arrayTableMatch[1], fields: [], isArrayTable: true };
+      sections.push(current);
+      continue;
+    }
+
+    // Section header: [name] or [name.sub]
+    const sectionMatch = line.match(/^\[([^[\]]+)\]$/);
     if (sectionMatch) {
       current = { key: sectionMatch[1], fields: [] };
       sections.push(current);
@@ -142,7 +151,7 @@ function parseTomlSections(content: string): TomlSection[] {
           const section = ensureSection();
           pushField(section, key, value, i, i);
         } else {
-          multiLineKey = key;
+          void key; // multiLineKey will be used when multi-line string support is completed
           multiLineValue = value;
           multiLineStart = i;
           // We'll look for closing """ later
@@ -329,7 +338,22 @@ function ReadOnlyField({ value, label }: { value: string; label?: string }) {
 
 // --- Main component ---
 
-export default function ConfigPage() {
+// Section filter mappings for split settings pages
+const SECTION_FILTERS: Record<string, string[]> = {
+  // Communications: channels, messages, broadcast, voice/audio
+  communications: ["lark", "slack", "telegram", "discord", "dingtalk", "mattermost", "matrix",
+    "whatsapp", "teams", "signal", "wechat", "imessage", "line", "googlechat", "irc", "webchat",
+    "twitch", "nostr", "nextcloud", "synology", "tlon", "zalo", "voice", "broadcast_group"],
+  // Automation: commands, hooks, bindings, approvals, heartbeat, tool_policy
+  automation: ["command", "bindings", "heartbeat", "tool_policy", "subagent", "reflection"],
+  // Infrastructure: serve, auth, security, docker, gateway, rate_limit, hub
+  infrastructure: ["serve", "auth", "security", "docker", "gateway", "rate_limit", "hub", "logging"],
+  // AI & Agents: agents, models, providers, skills, memory, session, context
+  "ai-agents": ["model", "agent", "agents", "models", "providers", "channel_models",
+    "skills", "skill_overrides", "memory", "session", "context", "fallback_models"],
+};
+
+export default function ConfigPage({ filterSection }: { filterSection?: string } = {}) {
   const { t } = useTranslation();
   const api = useDashboardAPI();
   const { toasts, addToast } = useToast();
@@ -387,8 +411,71 @@ export default function ConfigPage() {
     const tomlMap = new Map<string, TomlSection>();
     for (const s of parsedSections) tomlMap.set(s.key, s);
 
+    type MergedEntry = { schema: ConfigSectionSchema; toml: TomlSection | null; hasData: boolean };
+
+    // Helper: merge dotted child sections into parents
+    // e.g. "agent.tools" fields merge into "agent", "logging.file" into "logging"
+    const mergeChildren = (entries: MergedEntry[]): MergedEntry[] => {
+      const parentMap = new Map<string, MergedEntry>();
+
+      // First pass: collect all entries into map
+      for (const entry of entries) parentMap.set(entry.schema.key, entry);
+
+      // Second pass: merge dotted children into parents (create virtual parents for orphans)
+      const merged = new Set<string>();
+      for (const entry of entries) {
+        const key = entry.schema.key;
+        if (!key.includes(".")) continue;
+
+        const parentKey = key.split(".")[0];
+        let parent = parentMap.get(parentKey);
+
+        // Create virtual parent if it doesn't exist
+        if (!parent) {
+          const label = parentKey.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+          parent = {
+            schema: { key: parentKey, label, description: "", order: 998, icon: "settings", fields: [] },
+            toml: null,
+            hasData: false,
+          };
+          parentMap.set(parentKey, parent);
+        }
+
+        // Merge child's schema fields into parent
+        if (entry.schema.fields.length > 0) {
+          parent.schema = { ...parent.schema, fields: [...parent.schema.fields, ...entry.schema.fields] };
+        }
+        // Merge child's toml fields into parent
+        if (entry.toml && entry.toml.fields.length > 0) {
+          if (parent.toml) {
+            parent.toml = { ...parent.toml, fields: [...parent.toml.fields, ...entry.toml.fields] };
+          } else {
+            parent.toml = entry.toml;
+          }
+          parent.hasData = true;
+        }
+        merged.add(key);
+      }
+
+      // Third pass: collect non-merged entries (including newly created virtual parents)
+      const result: MergedEntry[] = [];
+      const seen = new Set<string>();
+      for (const entry of entries) {
+        if (merged.has(entry.schema.key)) continue;
+        result.push(entry);
+        seen.add(entry.schema.key);
+      }
+      // Add virtual parents that weren't in original entries
+      for (const [key, entry] of parentMap) {
+        if (!seen.has(key) && !merged.has(key) && entry.hasData) {
+          result.push(entry);
+        }
+      }
+      return result;
+    };
+
     if (schema) {
-      const result = schema.sections.map((ss) => {
+      const result: MergedEntry[] = schema.sections.map((ss) => {
         const tomlSection = tomlMap.get(ss.key);
         return { schema: ss, toml: tomlSection ?? null, hasData: !!tomlSection && tomlSection.fields.length > 0 };
       });
@@ -403,24 +490,38 @@ export default function ConfigPage() {
           });
         }
       }
-      return result.sort((a, b) => a.schema.order - b.schema.order);
+      return mergeChildren(result).sort((a, b) => a.schema.order - b.schema.order);
     }
 
     // Fallback: no schema — show TOML sections directly
-    return parsedSections.map((ts, idx) => ({
+    const fallback: MergedEntry[] = parsedSections.map((ts, idx) => ({
       schema: { key: ts.key, label: ts.key, order: idx * 10, icon: "settings", fields: [] } as ConfigSectionSchema,
       toml: ts,
       hasData: ts.fields.length > 0,
     }));
+    return mergeChildren(fallback);
   }, [schema, parsedSections]);
+
+  // Apply section filter for split settings pages
+  const filteredSections = useMemo(() => {
+    if (!filterSection) return mergedSections;
+    const allowedKeys = SECTION_FILTERS[filterSection];
+    if (!allowedKeys) return mergedSections;
+    return mergedSections.filter((s) => allowedKeys.includes(s.schema.key));
+  }, [mergedSections, filterSection]);
+
+  // Reset active section when filter changes
+  useEffect(() => {
+    setActiveSection(null);
+  }, [filterSection]);
 
   // Auto-select first section with data
   useEffect(() => {
-    if (mergedSections.length > 0 && !activeSection) {
-      const withData = mergedSections.find((s) => s.hasData);
-      setActiveSection((withData ?? mergedSections[0]).schema.key);
+    if (filteredSections.length > 0 && !activeSection) {
+      const withData = filteredSections.find((s) => s.hasData);
+      setActiveSection((withData ?? filteredSections[0]).schema.key);
     }
-  }, [mergedSections, activeSection]);
+  }, [filteredSections, activeSection]);
 
   // Debounced server-side validation
   useEffect(() => {
@@ -512,16 +613,16 @@ export default function ConfigPage() {
 
   // Search filter
   const displaySections = useMemo(() => {
-    if (!searchQuery) return mergedSections;
+    if (!searchQuery) return filteredSections;
     const q = searchQuery.toLowerCase();
-    return mergedSections.filter((s) => {
+    return filteredSections.filter((s) => {
       return s.schema.label.toLowerCase().includes(q)
         || s.schema.key.toLowerCase().includes(q)
         || s.schema.description?.toLowerCase().includes(q)
         || s.schema.fields.some((f) => f.label.toLowerCase().includes(q) || f.key.toLowerCase().includes(q))
         || s.toml?.fields.some((f) => f.key.toLowerCase().includes(q) || f.value.toLowerCase().includes(q));
     });
-  }, [mergedSections, searchQuery]);
+  }, [filteredSections, searchQuery]);
 
   const activeMerged = useMemo(() => {
     return displaySections.find((s) => s.schema.key === activeSection) ?? null;
@@ -788,7 +889,7 @@ export default function ConfigPage() {
                         )}
                       </div>
                       <span className="ml-auto text-[10px] font-mono text-[var(--text-tertiary)] bg-[var(--bg-content)] px-2 py-0.5 rounded-md">
-                        [{activeMerged.schema.key}]
+                        {activeMerged.toml?.isArrayTable ? `[[${activeMerged.schema.key}]]` : `[${activeMerged.schema.key}]`}
                       </span>
                     </div>
 

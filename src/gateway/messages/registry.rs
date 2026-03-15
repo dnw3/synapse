@@ -8,6 +8,7 @@ pub struct ChannelRegistry {
     senders: HashMap<String, Arc<dyn ChannelSender>>,
 }
 
+#[allow(dead_code)]
 impl ChannelRegistry {
     pub fn new() -> Self {
         Self {

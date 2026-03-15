@@ -36,8 +36,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let syn_config = config
         .synology
-        .as_ref()
-        .ok_or("missing [synology] section in config")?;
+        .first()
+        .ok_or("missing [[synology]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -82,11 +82,13 @@ async fn handle_webhook(
         );
     }
 
-    let session_key = payload
-        .channel_id
-        .unwrap_or_else(|| payload.user_id.unwrap_or_else(|| "default".to_string()));
+    let syn_user_id = payload.user_id.clone();
+    let syn_channel_id = payload.channel_id.clone();
+    let session_key = syn_channel_id
+        .clone()
+        .unwrap_or_else(|| syn_user_id.clone().unwrap_or_else(|| "default".to_string()));
 
-    let envelope = MessageEnvelope::channel(
+    let mut envelope = MessageEnvelope::channel(
         session_key.clone(),
         text.clone(),
         DeliveryContext {
@@ -97,6 +99,15 @@ async fn handle_webhook(
             meta: None,
         },
     );
+    if let Some(ref uid) = syn_user_id {
+        envelope.sender_id = Some(uid.clone());
+    }
+    envelope.routing.peer_kind = Some(if syn_channel_id.is_some() {
+        crate::config::PeerKind::Group
+    } else {
+        crate::config::PeerKind::Direct
+    });
+    envelope.routing.peer_id = Some(session_key.clone());
     match state.agent_session.handle_message(envelope).await {
         Ok(reply) => {
             // If outgoing webhook URL is configured, send there

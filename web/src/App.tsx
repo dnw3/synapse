@@ -7,7 +7,7 @@ import { Toaster, useToast } from "./components/ui/toast";
 import Sidebar from "./components/Sidebar";
 import Toolbar from "./components/Toolbar";
 import ChatPanel, { FocusModeExitButton } from "./components/ChatPanel";
-import Dashboard, { TABS, SIDEBAR_SECTIONS, type TabKey } from "./components/Dashboard";
+import Dashboard, { TABS, type TabKey } from "./components/Dashboard";
 import CommandPalette, { type PaletteEntry } from "./components/CommandPalette";
 
 // All dashboard tab keys for mode derivation
@@ -41,7 +41,7 @@ export default function App() {
   const theme = useTheme();
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeView, setActiveView] = useState<ViewKey>("chat");
+  const [activeView, setActiveView] = useState<ViewKey>("overview");
   const [identity, setIdentity] = useState<IdentityInfo | null>(null);
   const [modelName, setModelName] = useState<string | null>(null);
   const [focusMode, setFocusMode] = useState(false);
@@ -51,6 +51,20 @@ export default function App() {
     open: false,
     content: "",
   });
+
+  // Chat agent selector
+  const [chatAgent, setChatAgent] = useState("default");
+  const [agentList, setAgentList] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    fetch("/api/dashboard/agents")
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: { name: string; id?: string }[]) => {
+        if (Array.isArray(data)) {
+          setAgentList(data.map((a) => ({ id: a.id ?? a.name, name: a.name })));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Derived sidebar mode: "chat" or "dashboard"
   const sidebarMode = DASHBOARD_TABS.has(activeView) ? "dashboard" : "chat";
@@ -472,6 +486,17 @@ export default function App() {
               status={toolbarStatus}
               onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               showMenu={true}
+              agentSelector={isChatView && agentList.length > 0 ? (
+                <select
+                  value={chatAgent}
+                  onChange={(e) => setChatAgent(e.target.value)}
+                  className="px-2 py-0.5 text-[11px] font-mono bg-[var(--bg-grouped)] text-[var(--text-secondary)] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] outline-none cursor-pointer"
+                >
+                  {agentList.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              ) : undefined}
             />
 
             <div className="flex-1 flex overflow-hidden">

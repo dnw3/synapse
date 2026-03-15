@@ -225,7 +225,7 @@ impl Default for ContextConfig {
 }
 
 /// Session management configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct SessionConfig {
     /// Whether to auto-reset the session when it spans a new day. Default: false.
     #[serde(default)]
@@ -233,15 +233,6 @@ pub struct SessionConfig {
     /// Minutes of idle time before auto-resetting the session. 0 = disabled.
     #[serde(default)]
     pub idle_reset_minutes: u64,
-}
-
-impl Default for SessionConfig {
-    fn default() -> Self {
-        Self {
-            daily_reset: false,
-            idle_reset_minutes: 0,
-        }
-    }
 }
 
 /// Post-session reflection configuration for agent self-evolution.

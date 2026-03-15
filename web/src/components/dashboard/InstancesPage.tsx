@@ -11,6 +11,20 @@ import {
 } from "./shared";
 import { cn } from "../../lib/cn";
 
+interface RawPresenceEntry {
+  instance_id?: string;
+  device_id?: string;
+  key?: string;
+  reason?: string;
+  roles?: string[];
+  platform?: string;
+  version?: string;
+  mode?: string;
+  ts?: number;
+  text?: string;
+  host?: string;
+}
+
 interface PresenceEntry {
   instance_id: string;
   type: string;
@@ -61,24 +75,33 @@ export default function InstancesPage() {
   const [instances, setInstances] = useState<PresenceEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const mapPresence = (raw: RawPresenceEntry[]): PresenceEntry[] =>
+    raw.map((e) => ({
+      instance_id: e.instance_id || e.device_id || e.key || "unknown",
+      type: e.reason || (e.roles?.includes("gateway") ? "gateway" : "webchat"),
+      platform: e.platform,
+      version: e.version,
+      roles: e.roles,
+      mode: e.mode,
+      connected_at: e.ts ? new Date(e.ts).toISOString() : undefined,
+      display_name: e.text || e.host || undefined,
+    }));
+
   const loadInstances = useCallback(() => {
     // Try snapshot first
     if (helloOk?.snapshot?.presence) {
       const presence = helloOk.snapshot.presence;
-      if (Array.isArray(presence)) {
-        setInstances(presence);
-      } else if (typeof presence === "object") {
-        // presence might be a map of id -> entry
-        setInstances(Object.values(presence));
-      }
+      const arr = (Array.isArray(presence) ? presence : typeof presence === "object" ? Object.values(presence) : []) as RawPresenceEntry[];
+      setInstances(mapPresence(arr));
       setLoading(false);
       return;
     }
 
-    // Try RPC
+    // Fallback: query via presence.list RPC
     if (client?.isConnected) {
-      client.request<PresenceEntry[]>("system-presence").then((data) => {
-        setInstances(Array.isArray(data) ? data : []);
+      client.request<RawPresenceEntry[]>("presence.list").then((data) => {
+        const arr = Array.isArray(data) ? data : [];
+        setInstances(mapPresence(arr));
         setLoading(false);
       }).catch(() => {
         setLoading(false);
@@ -95,12 +118,10 @@ export default function InstancesPage() {
   // Subscribe to presence events for real-time updates
   useEffect(() => {
     if (!client?.isConnected) return;
-    const unsub = client.onEvent("presence", (payload: any) => {
-      if (Array.isArray(payload)) {
-        setInstances(payload);
-      } else if (payload?.instances) {
-        setInstances(payload.instances);
-      }
+    const unsub = client.onEvent("presence", (payload: unknown) => {
+      const p = payload as { instances?: RawPresenceEntry[] } | RawPresenceEntry[] | null;
+      const arr = Array.isArray(p) ? p : (p && typeof p === "object" && "instances" in p && Array.isArray(p.instances)) ? p.instances : [];
+      setInstances(mapPresence(arr));
     });
     return unsub;
   }, [client, connected]);

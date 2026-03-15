@@ -24,6 +24,7 @@ use crate::gateway::presence::now_ms;
 // ---------------------------------------------------------------------------
 
 /// Outbound sender for the Slack channel.
+#[allow(dead_code)]
 pub struct SlackSender {
     /// Bot OAuth token used for `chat.postMessage`.
     pub bot_token: String,
@@ -48,7 +49,7 @@ impl ChannelSender for SlackSender {
             .ok_or("missing or invalid channel in delivery target (expected 'channel:<id>')")?;
 
         let client = reqwest::Client::new();
-        let chunks = formatter::chunk_slack(content);
+        let chunks = formatter::format_for_channel(content, "slack", 4000);
         let mut last_ts: Option<String> = None;
         for chunk in chunks {
             let resp: serde_json::Value = client
@@ -81,21 +82,21 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let slack_config = config
         .slack
-        .as_ref()
-        .ok_or("missing [slack] section in config")?;
+        .first()
+        .ok_or("missing [[slack]] section in config")?;
 
     let app_token = resolve_secret(
         slack_config.app_token.as_deref(),
         slack_config.app_token_env.as_deref(),
         "Slack app token",
     )
-    .map_err(|e| format!("{}", e))?;
+    .map_err(|e| e.to_string())?;
     let bot_token = resolve_secret(
         slack_config.bot_token.as_deref(),
         slack_config.bot_token_env.as_deref(),
         "Slack bot token",
     )
-    .map_err(|e| format!("{}", e))?;
+    .map_err(|e| e.to_string())?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -114,13 +115,19 @@ pub async fn run(
     tracing::info!(channel = "slack", "adapter started");
 
     loop {
-        match run_socket_mode(&app_token, &bot_token, agent_session.clone(), &allowlist).await {
+        let err_msg = match run_socket_mode(
+            &app_token,
+            &bot_token,
+            agent_session.clone(),
+            &allowlist,
+        )
+        .await
+        {
             Ok(()) => break,
-            Err(e) => {
-                tracing::warn!(channel = "slack", error = %e, "connection error, reconnecting");
-                tokio::time::sleep(Duration::from_secs(5)).await;
-            }
-        }
+            Err(e) => e.to_string(),
+        };
+        tracing::warn!(channel = "slack", error = %err_msg, "connection error, reconnecting");
+        tokio::time::sleep(Duration::from_secs(5)).await;
     }
 
     Ok(())
@@ -217,6 +224,10 @@ async fn run_socket_mode(
             .unwrap_or("")
             .to_string();
         let user_id = event.get("user").and_then(|v| v.as_str()).unwrap_or("");
+        let channel_type = event
+            .get("channel_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
         let ts = event
             .get("ts")
@@ -232,6 +243,14 @@ async fn run_socket_mode(
         if !allowlist.is_allowed(Some(user_id), Some(&channel)) {
             continue;
         }
+
+        let is_dm = channel_type == "im";
+        let team_id = payload
+            .get("payload")
+            .and_then(|p| p.get("team_id"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let sender_id = user_id.to_string();
 
         // Process in background
         let session = agent_session.clone();
@@ -249,12 +268,20 @@ async fn run_socket_mode(
                 thread_id: Some(ts.clone()),
                 ..Default::default()
             };
-            let envelope = MessageEnvelope::channel(channel.clone(), text, delivery);
+            let mut envelope = MessageEnvelope::channel(channel.clone(), text, delivery);
+            envelope.sender_id = Some(sender_id.clone());
+            envelope.routing.peer_kind = Some(if is_dm {
+                crate::config::PeerKind::Direct
+            } else {
+                crate::config::PeerKind::Channel
+            });
+            envelope.routing.peer_id = Some(channel.clone());
+            envelope.routing.team_id = team_id.clone();
 
             match session.handle_message(envelope).await {
                 Ok(reply) => {
                     // Split long replies into chunks
-                    let chunks = formatter::chunk_slack(&reply.content);
+                    let chunks = formatter::format_for_channel(&reply.content, "slack", 4000);
                     let client = reqwest::Client::new();
                     for chunk in chunks {
                         let _ = client

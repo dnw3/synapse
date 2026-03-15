@@ -246,9 +246,12 @@ export type TabKey =
   | "skills"
   | "channels"
   | "agents"
-  | "workspace"
   | "instances"
   | "nodes"
+  | "communications"
+  | "automation"
+  | "infrastructure"
+  | "ai-agents"
   | "debug";
 
 export interface TabDef {
@@ -284,12 +287,40 @@ export interface UsageSessionEntry {
 // Agent types
 export interface AgentEntry {
   name: string;
+  id?: string;
   model: string;
+  description?: string;
   system_prompt?: string;
   channels?: string[] | null;
   skills?: string[] | null;
   is_default: boolean;
   workspace?: string;
+  dm_scope?: string;
+  group_session_scope?: string;
+  tool_allow?: string[];
+  tool_deny?: string[];
+  skills_dir?: string;
+}
+
+export interface BindingEntry {
+  agent: string;
+  channel?: string;
+  account_id?: string;
+  peer?: { kind: string; id: string } | null;
+  guild_id?: string;
+  team_id?: string;
+  roles?: string[];
+  comment?: string;
+}
+
+export interface BroadcastGroupEntry {
+  name: string;
+  description?: string;
+  channel?: string;
+  peer_id?: string;
+  agents: string[];
+  strategy: string;
+  timeout_secs: number;
 }
 
 // Tool catalog types

@@ -7,7 +7,7 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)).catch(() => {})
   );
   self.skipWaiting();
 });
@@ -22,14 +22,31 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network-first for API calls, cache-first for static assets
-  if (event.request.url.includes('/api/') || event.request.url.includes('/ws/')) {
-    event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request))
-    );
+  // Don't intercept navigation requests — let the browser handle them directly
+  if (event.request.mode === 'navigate') {
+    return;
   }
+
+  // Don't intercept WebSocket upgrade or non-GET requests
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Skip API and WS requests entirely — no caching for dynamic data
+  if (event.request.url.includes('/api/') || event.request.url.includes('/ws/')) {
+    return;
+  }
+
+  // Cache-first for static assets, with network fallback
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).catch(() => {
+        // Return empty response instead of throwing
+        return new Response('', { status: 503, statusText: 'Offline' });
+      });
+    })
+  );
 });
 
 // Push notification handler

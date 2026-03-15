@@ -150,12 +150,12 @@ fn base64_encode(data: &[u8]) -> String {
 /// beyond the first when the token allows multiple messages in one reply.
 async fn send_reply(channel_token: &str, reply_token: &str, text: &str) {
     let client = reqwest::Client::new();
-    let chunks = formatter::chunk_line(text);
+    let chunks = formatter::format_for_channel(text, "line", 5000);
 
     // LINE Reply API supports up to 5 messages per reply call.
     // We bundle all chunks into a single request (LINE allows up to 5 messages
     // in one reply), and if there are more than 5 chunks we send subsequent
-    // groups — though in practice chunk_line keeps messages small enough that
+    // groups — though in practice format_for_channel keeps messages small enough that
     // more than 5 chunks is rare.
     let messages: Vec<serde_json::Value> = chunks
         .iter()
@@ -274,11 +274,13 @@ async fn handle_webhook(
             format!("line:{}", user_id)
         };
 
+        let is_dm = event.source.source_type == "user";
+
         // Respond to LINE quickly (< 1 second) and process in the background.
         let session = state.agent_session.clone();
         let channel_token = state.channel_token.clone();
         tokio::spawn(async move {
-            let envelope = MessageEnvelope::channel(
+            let mut envelope = MessageEnvelope::channel(
                 session_key.clone(),
                 text.clone(),
                 DeliveryContext {
@@ -289,6 +291,19 @@ async fn handle_webhook(
                     meta: None,
                 },
             );
+            if !user_id.is_empty() {
+                envelope.sender_id = Some(user_id.clone());
+            }
+            envelope.routing.peer_kind = Some(if is_dm {
+                crate::config::PeerKind::Direct
+            } else {
+                crate::config::PeerKind::Group
+            });
+            envelope.routing.peer_id = Some(if !channel_id.is_empty() {
+                channel_id.clone()
+            } else {
+                user_id.clone()
+            });
             match session.handle_message(envelope).await {
                 Ok(reply) => {
                     send_reply(&channel_token, &reply_token, &reply.content).await;
@@ -311,8 +326,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let line_config = config
         .line
-        .as_ref()
-        .ok_or("missing [line] section in config")?;
+        .first()
+        .ok_or("missing [[line]] section in config")?;
 
     let channel_secret = resolve_secret(
         line_config.channel_secret.as_deref(),

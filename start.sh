@@ -22,6 +22,8 @@ FEATURES="web,plugins,bot-telegram,bot-discord,bot-slack,bot-lark"
 # ── Helpers ─────────────────────────────────────────────────────────────
 build_backend() {
   local profile="${1:-debug}"
+  echo "Running clippy..."
+  cargo clippy --features "$FEATURES" -- -D warnings
   if [ "$profile" = "release" ]; then
     echo "Building synapse (release, features: $FEATURES)..."
     cargo build --release --features "$FEATURES"

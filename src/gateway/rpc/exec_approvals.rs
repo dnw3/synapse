@@ -184,7 +184,7 @@ pub async fn handle_approvals_set(ctx: Arc<RpcContext>, params: Value) -> Result
     let mut config = ctx.state.exec_approvals_config.write().await;
     config
         .cas_update(expected_hash, new_mode, new_ask, new_allowlist)
-        .map_err(|e| RpcError::invalid_request(e))?;
+        .map_err(RpcError::invalid_request)?;
 
     Ok(json!({
         "ok": true,
@@ -202,7 +202,7 @@ pub async fn handle_node_approvals_get(
         .ok_or_else(|| RpcError::invalid_request("missing node_id"))?;
     let config = ctx.state.exec_approvals_config.read().await;
     let node_config = config.node_overrides.get(node_id);
-    Ok(serde_json::to_value(&node_config).unwrap_or(Value::Null))
+    Ok(serde_json::to_value(node_config).unwrap_or(Value::Null))
 }
 
 pub async fn handle_node_approvals_set(

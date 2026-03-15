@@ -18,8 +18,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let nc_config = config
         .nextcloud
-        .as_ref()
-        .ok_or("missing [nextcloud] section in config")?;
+        .first()
+        .ok_or("missing [[nextcloud]] section in config")?;
 
     let password = resolve_secret(
         nc_config.password.as_deref(),
@@ -107,9 +107,10 @@ pub async fn run(
                                 let username = nc_config.username.clone();
                                 let pw = password.clone();
                                 let msg_text = content.to_string();
+                                let sender_id = actor.to_string();
 
                                 tokio::spawn(async move {
-                                    let envelope = MessageEnvelope::channel(
+                                    let mut envelope = MessageEnvelope::channel(
                                         session_key.clone(),
                                         msg_text.clone(),
                                         DeliveryContext {
@@ -120,6 +121,10 @@ pub async fn run(
                                             meta: None,
                                         },
                                     );
+                                    envelope.sender_id = Some(sender_id);
+                                    envelope.routing.peer_kind =
+                                        Some(crate::config::PeerKind::Group);
+                                    envelope.routing.peer_id = Some(session_key.clone());
                                     match session.handle_message(envelope).await {
                                         Ok(reply) => {
                                             let _ = client

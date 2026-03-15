@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { useCodeTheme } from "../hooks/useCodeTheme";
 import { X } from "lucide-react";
 
 interface ToolOutputSidebarProps {
@@ -18,6 +18,7 @@ const DEFAULT_WIDTH = 350;
 
 export default function ToolOutputSidebar({ open, content, toolName, onClose }: ToolOutputSidebarProps) {
   const { t } = useTranslation();
+  const codeTheme = useCodeTheme();
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [raw, setRaw] = useState(false);
   const isDragging = useRef(false);
@@ -58,6 +59,18 @@ export default function ToolOutputSidebar({ open, content, toolName, onClose }: 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
+
+  // Try to parse content as JSON for rendered mode
+  const parsedJson = useMemo(() => {
+    if (!content) return null;
+    const trimmed = content.trim();
+    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+    try {
+      return JSON.parse(trimmed) as unknown;
+    } catch {
+      return null;
+    }
+  }, [content]);
 
   if (!open) return null;
 
@@ -119,6 +132,8 @@ export default function ToolOutputSidebar({ open, content, toolName, onClose }: 
           <pre className="text-xs font-mono text-[var(--text-secondary)] whitespace-pre-wrap break-words leading-relaxed">
             {content || "(empty)"}
           </pre>
+        ) : parsedJson !== null ? (
+          <RenderedJson data={parsedJson} />
         ) : (
           <div className="synapse-prose prose max-w-none prose-p:leading-[1.75] prose-headings:text-[var(--text-primary)] prose-a:text-[var(--accent-light)] prose-strong:text-[var(--text-primary)] text-sm">
             <ReactMarkdown
@@ -137,7 +152,7 @@ export default function ToolOutputSidebar({ open, content, toolName, onClose }: 
                     </code>
                   ) : (
                     <SyntaxHighlighter
-                      style={oneDark}
+                      style={codeTheme}
                       language={match?.[1] || "text"}
                       PreTag="div"
                       className="!rounded-[var(--radius-md)] !text-[12px] !leading-relaxed !border !border-[var(--border-subtle)] !my-2"
@@ -154,5 +169,80 @@ export default function ToolOutputSidebar({ open, content, toolName, onClose }: 
         )}
       </div>
     </div>
+  );
+}
+
+/* ---------- JSON rendered views ---------- */
+
+/** Check if an array looks like a file listing (objects with name + is_dir) */
+function isFileListing(data: unknown): data is Array<{ name: string; is_dir: boolean; size?: number }> {
+  if (!Array.isArray(data) || data.length === 0) return false;
+  return data.every(
+    (item) =>
+      typeof item === "object" &&
+      item !== null &&
+      "name" in item &&
+      "is_dir" in item,
+  );
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function FileListingView({ items }: { items: Array<{ name: string; is_dir: boolean; size?: number }> }) {
+  // Sort: directories first, then alphabetical
+  const sorted = [...items].sort((a, b) => {
+    if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="space-y-0.5">
+      {sorted.map((item) => (
+        <div
+          key={item.name}
+          className="flex items-center gap-2 px-2 py-1 rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] transition-colors text-xs font-mono"
+        >
+          <span className="flex-shrink-0 w-4 text-center">
+            {item.is_dir ? "\u{1F4C1}" : "\u{1F4C4}"}
+          </span>
+          <span className="text-[var(--text-primary)] truncate flex-1">
+            {item.name}{item.is_dir ? "/" : ""}
+          </span>
+          {item.size != null && (
+            <span className="text-[var(--text-tertiary)] flex-shrink-0 text-right" style={{ minWidth: "5em" }}>
+              {formatSize(item.size)}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RenderedJson({ data }: { data: unknown }) {
+  const codeTheme = useCodeTheme();
+
+  // File listing: array of {name, is_dir, size?}
+  if (isFileListing(data)) {
+    return <FileListingView items={data} />;
+  }
+
+  // Generic JSON: pretty-printed with syntax highlighting
+  const formatted = JSON.stringify(data, null, 2);
+  return (
+    <SyntaxHighlighter
+      style={codeTheme}
+      language="json"
+      PreTag="div"
+      className="!rounded-[var(--radius-md)] !text-[12px] !leading-relaxed !border !border-[var(--border-subtle)]"
+      customStyle={{ margin: 0 }}
+    >
+      {formatted}
+    </SyntaxHighlighter>
   );
 }

@@ -31,6 +31,7 @@ pub struct PresenceStore {
     version: u64,
 }
 
+#[allow(dead_code)]
 impl PresenceStore {
     pub fn new() -> Self {
         Self {

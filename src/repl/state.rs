@@ -6,6 +6,7 @@ use synaptic::core::{ChatModel, Message, ThinkingConfig};
 use crate::memory::LongTermMemory;
 
 /// Mutable state for the REPL session.
+#[allow(dead_code)]
 pub struct ReplState {
     pub model: Arc<dyn ChatModel>,
     pub current_model_name: String,

@@ -134,8 +134,11 @@ async fn handle_webhook(
         "googlechat:unknown".to_string()
     };
 
+    // Determine peer kind: if no space, it's a DM.
+    let is_dm = space_name.is_none();
+
     // Process the message through the agent session.
-    let envelope = MessageEnvelope::channel(
+    let mut envelope = MessageEnvelope::channel(
         session_key.clone(),
         text.clone(),
         DeliveryContext {
@@ -146,9 +149,20 @@ async fn handle_webhook(
             meta: None,
         },
     );
+    if let Some(ref sn) = sender_name {
+        envelope.sender_id = Some(sn.clone());
+    }
+    envelope.routing.peer_kind = Some(if is_dm {
+        crate::config::PeerKind::Direct
+    } else {
+        crate::config::PeerKind::Group
+    });
+    if let Some(ref sn) = space_name {
+        envelope.routing.peer_id = Some(sn.clone());
+    }
     let reply_text = match state.agent_session.handle_message(envelope).await {
         Ok(reply) => {
-            let chunks = formatter::chunk_googlechat(&reply.content);
+            let chunks = formatter::format_for_channel(&reply.content, "googlechat", 4096);
             // Google Chat synchronous replies support only a single text body.
             // If the response is chunked, join all chunks separated by a blank line.
             if chunks.is_empty() {
@@ -173,8 +187,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let gchat_config = config
         .googlechat
-        .as_ref()
-        .ok_or("missing [googlechat] section in config")?;
+        .first()
+        .ok_or("missing [[googlechat]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

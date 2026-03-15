@@ -241,6 +241,7 @@ impl LongTermMemory {
         self.remember_inner(content, false).await
     }
 
+    #[allow(dead_code)]
     pub async fn remember_evergreen(&self, content: &str) -> Result<(), SynapticError> {
         self.remember_inner(content, true).await
     }
@@ -462,6 +463,7 @@ impl LongTermMemory {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn prune(&self) -> Result<usize, SynapticError> {
         let mut entries = self.entries.write().await;
         if entries.len() <= self.config.ltm_max_entries {

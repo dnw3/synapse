@@ -9,10 +9,11 @@ use synaptic::lark::{
     StreamingCardWriter,
 };
 
-use synaptic::DeliveryContext;
+use synaptic::{DeliveryContext, DmPolicyEnforcer};
 
 use crate::agent;
 use crate::channels::dedup::MessageDedup;
+use crate::channels::dm::FileDmPolicyEnforcer;
 use crate::channels::formatter;
 use crate::channels::handler::{AgentSession, StreamingOutput};
 use crate::config::bot::{
@@ -28,9 +29,37 @@ use crate::gateway::presence::now_ms;
 // ---------------------------------------------------------------------------
 
 /// Outbound sender for the Lark channel.
+#[allow(dead_code)]
 pub struct LarkSender {
     /// Lark bot client for making API calls.
     pub client: LarkBotClient,
+}
+
+// ---------------------------------------------------------------------------
+// ApproveNotifier implementation
+// ---------------------------------------------------------------------------
+
+/// Sends a notification to a Lark user when their DM pairing is approved.
+pub struct LarkApproveNotifier {
+    pub client: LarkBotClient,
+}
+
+#[async_trait]
+impl crate::channels::dm::ApproveNotifier for LarkApproveNotifier {
+    async fn notify_approved(
+        &self,
+        sender_id: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.client
+            .send_text(
+                "open_id",
+                sender_id,
+                "您的配对请求已通过，现在可以开始对话了。",
+            )
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -102,33 +131,35 @@ impl StreamingOutput for LarkStreamingOutput {
 // ---------------------------------------------------------------------------
 
 /// Compute session key based on chat type and configured scope.
-fn compute_session_key(event: &LarkMessageEvent, scope: &GroupSessionScope) -> String {
-    let chat_id = event.chat_id();
-    if event.is_dm() {
-        return format!("lark:dm:{}", chat_id);
-    }
-    match scope {
-        GroupSessionScope::Group => format!("lark:grp:{}", chat_id),
-        GroupSessionScope::GroupSender => {
-            format!("lark:grp:{}:{}", chat_id, event.sender_open_id())
-        }
-        GroupSessionScope::GroupTopic => {
-            if let Some(ref root) = event.root_id {
-                format!("lark:grp:{}:t:{}", chat_id, root)
-            } else {
-                format!("lark:grp:{}", chat_id)
-            }
-        }
-        GroupSessionScope::GroupTopicSender => {
-            let topic = event.root_id.as_deref().unwrap_or("_");
-            format!(
-                "lark:grp:{}:t:{}:{}",
-                chat_id,
-                topic,
-                event.sender_open_id()
-            )
-        }
-    }
+fn compute_session_key(
+    event: &LarkMessageEvent,
+    scope: &GroupSessionScope,
+    dm_scope: &crate::config::DmSessionScope,
+    account_id: &str,
+) -> String {
+    use crate::channels::session_key::{self, ChatType, SessionKeyParams};
+
+    let chat_type = if event.is_dm() {
+        ChatType::Dm
+    } else {
+        ChatType::Group
+    };
+    let peer_id = if event.is_dm() {
+        event.sender_open_id()
+    } else {
+        event.chat_id()
+    };
+    session_key::compute(&SessionKeyParams {
+        agent_id: "default", // Will be overridden by router in handler
+        channel: "lark",
+        account_id: Some(account_id),
+        chat_type,
+        peer_id,
+        sender_id: Some(event.sender_open_id()),
+        thread_id: event.root_id.as_deref(),
+        dm_scope,
+        group_scope: scope,
+    })
 }
 
 /// Strip bot @mention placeholders from message text.
@@ -149,6 +180,70 @@ fn has_rich_content(text: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Card builders for device pairing
+// ---------------------------------------------------------------------------
+
+/// Build a Lark interactive card for displaying a setup code.
+fn build_pair_card(setup_code: &str, gateway_url: &str) -> serde_json::Value {
+    serde_json::json!({
+        "config": { "wide_screen_mode": true },
+        "header": {
+            "title": { "tag": "plain_text", "content": "Device Pairing" },
+            "template": "blue"
+        },
+        "elements": [
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": format!(
+                        "**Setup Code:**\n```\n{setup_code}\n```\n\n**Gateway:** {gateway_url}\n\n_Expires in 10 minutes_"
+                    )
+                }
+            }
+        ]
+    })
+}
+
+/// Build a Lark interactive card for pairing approval.
+#[allow(dead_code)]
+fn build_approval_card(request_id: &str, device_name: &str, platform: &str) -> serde_json::Value {
+    serde_json::json!({
+        "config": { "wide_screen_mode": true },
+        "header": {
+            "title": { "tag": "plain_text", "content": "New Device Pairing Request" },
+            "template": "orange"
+        },
+        "elements": [
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": format!("**Device:** {device_name}\n**Platform:** {platform}")
+                }
+            },
+            {
+                "tag": "action",
+                "actions": [
+                    {
+                        "tag": "button",
+                        "text": { "tag": "plain_text", "content": "Approve" },
+                        "type": "primary",
+                        "value": format!("pair_approve:{request_id}")
+                    },
+                    {
+                        "tag": "button",
+                        "text": { "tag": "plain_text", "content": "Reject" },
+                        "type": "danger",
+                        "value": format!("pair_reject:{request_id}")
+                    }
+                ]
+            }
+        ]
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Message handler
 // ---------------------------------------------------------------------------
 
@@ -157,9 +252,15 @@ struct LarkHandler {
     config: Arc<LarkHandlerConfig>,
     dedup: Arc<MessageDedup>,
     bot_open_id: String,
+    account_id: String,
+    enforcer: Arc<FileDmPolicyEnforcer>,
+    gateway_port: u16,
+    #[allow(dead_code)]
+    owner_chat_id: Option<String>,
 }
 
 /// Extracted config subset for the handler.
+#[allow(dead_code)]
 struct LarkHandlerConfig {
     render_mode: LarkRenderMode,
     streaming: bool,
@@ -167,6 +268,7 @@ struct LarkHandlerConfig {
     typing_indicator: bool,
     reply_in_thread: bool,
     group_session_scope: GroupSessionScope,
+    dm_scope: crate::config::DmSessionScope,
     dm_policy: DmPolicy,
     group_policy: GroupPolicy,
     allowlist: BotAllowlist,
@@ -174,22 +276,34 @@ struct LarkHandlerConfig {
 }
 
 impl LarkHandler {
-    /// Check DM/group access policy. Returns `true` if the message is allowed.
-    fn check_policy(&self, event: &LarkMessageEvent) -> bool {
-        if event.is_dm() {
-            match self.config.dm_policy {
-                DmPolicy::Open => true,
-                DmPolicy::Allowlist => self
-                    .config
-                    .allowlist
-                    .is_user_allowed(event.sender_open_id()),
+    /// Check group access policy. Returns `true` if the message is allowed.
+    fn check_group_policy(&self, event: &LarkMessageEvent) -> bool {
+        match self.config.group_policy {
+            GroupPolicy::Open => true,
+            GroupPolicy::Disabled => false,
+            GroupPolicy::Allowlist => self.config.allowlist.is_channel_allowed(event.chat_id()),
+        }
+    }
+
+    /// Check DM access using the enforcer. Returns Some(reply_text) if blocked.
+    async fn check_dm_access(&self, sender_id: &str) -> Option<String> {
+        use synaptic::DmAccessDenied;
+        match self.enforcer.check_access(sender_id, "lark").await {
+            Ok(()) => None,
+            Err(DmAccessDenied::NeedsPairing(challenge)) => {
+                let ttl_mins = challenge.ttl_ms / 60_000;
+                let ttl_desc = if ttl_mins >= 60 {
+                    format!("{} 小时", ttl_mins / 60)
+                } else {
+                    format!("{} 分钟", ttl_mins)
+                };
+                Some(format!(
+                    "请将以下配对码发送给管理员以完成验证：\n\n🔑 {}\n\n配对码有效期 {}。",
+                    challenge.code, ttl_desc
+                ))
             }
-        } else {
-            match self.config.group_policy {
-                GroupPolicy::Open => true,
-                GroupPolicy::Disabled => false,
-                GroupPolicy::Allowlist => self.config.allowlist.is_channel_allowed(event.chat_id()),
-            }
+            Err(DmAccessDenied::NotAllowed) => Some("抱歉，您未获得授权使用此机器人。".to_string()),
+            Err(DmAccessDenied::DmDisabled) => None, // silently ignore
         }
     }
 
@@ -200,7 +314,7 @@ impl LarkHandler {
         client: &LarkBotClient,
         text: &str,
     ) -> Result<(), SynapticError> {
-        let chunks = formatter::chunk_message(text, self.config.text_chunk_limit);
+        let chunks = formatter::format_for_channel(text, "lark", self.config.text_chunk_limit);
         for chunk in chunks {
             if self.config.reply_in_thread && event.has_thread() {
                 client
@@ -230,7 +344,21 @@ impl LarkHandler {
         let delivery = DeliveryContext {
             channel: "lark".into(),
             to: Some(format!("chat:{}", event.chat_id())),
+            account_id: Some(self.account_id.clone()),
             ..Default::default()
+        };
+
+        let build_envelope = |delivery: DeliveryContext| {
+            let mut env =
+                MessageEnvelope::channel(session_key.to_string(), text.to_string(), delivery);
+            env.sender_id = Some(event.sender_open_id().to_string());
+            env.routing.peer_kind = Some(if event.is_dm() {
+                crate::config::PeerKind::Direct
+            } else {
+                crate::config::PeerKind::Group
+            });
+            env.routing.peer_id = Some(event.chat_id().to_string());
+            env
         };
 
         if use_streaming {
@@ -243,15 +371,13 @@ impl LarkHandler {
 
             let output: Arc<dyn StreamingOutput> = Arc::new(LarkStreamingOutput { writer });
 
-            let envelope =
-                MessageEnvelope::channel(session_key.to_string(), text.to_string(), delivery);
+            let envelope = build_envelope(delivery);
             self.agent_session
                 .handle_message_streaming(envelope, output)
                 .await
                 .map_err(|e| SynapticError::Tool(e.to_string()))?;
         } else {
-            let envelope =
-                MessageEnvelope::channel(session_key.to_string(), text.to_string(), delivery);
+            let envelope = build_envelope(delivery);
             match self.agent_session.handle_message(envelope).await {
                 Ok(reply) => {
                     // Auto mode: use card for rich content even without streaming
@@ -396,11 +522,22 @@ impl MessageHandler for LarkHandler {
         }
 
         // 2. Policy
-        if !self.check_policy(&event) {
+        if event.is_dm() {
+            // DM policy: use enforcer
+            if let Some(reply) = self.check_dm_access(event.sender_open_id()).await {
+                if !reply.is_empty() {
+                    client
+                        .send_text("chat_id", event.chat_id(), &reply)
+                        .await
+                        .ok();
+                }
+                return Ok(());
+            }
+        } else if !self.check_group_policy(&event) {
             tracing::debug!(
                 sender = %event.sender_open_id(),
                 chat = %event.chat_id(),
-                "message rejected by policy"
+                "message rejected by group policy"
             );
             return Ok(());
         }
@@ -419,8 +556,29 @@ impl MessageHandler for LarkHandler {
             return Ok(());
         }
 
-        // 4. Session key
-        let session_key = compute_session_key(&event, &self.config.group_session_scope);
+        // 3.5 Command interception: /pair or 配对
+        let text_trimmed = text.trim();
+        if text_trimmed == "/pair" || text_trimmed == "配对" {
+            let mut bootstrap = crate::gateway::nodes::BootstrapStore::new();
+            let token = bootstrap.issue();
+            let gateway_url = format!("ws://localhost:{}/ws", self.gateway_port);
+            let setup_code =
+                crate::gateway::nodes::bootstrap::encode_setup_code(&gateway_url, &token);
+            let card = build_pair_card(&setup_code, &gateway_url);
+            client
+                .send_card("chat_id", event.chat_id(), &card)
+                .await
+                .ok();
+            return Ok(());
+        }
+
+        // 4. Session key (using centralized computation)
+        let session_key = compute_session_key(
+            &event,
+            &self.config.group_session_scope,
+            &self.config.dm_scope,
+            &self.account_id,
+        );
 
         // 5. Typing indicator (reaction)
         let typing_reaction = if self.config.typing_indicator {
@@ -520,22 +678,40 @@ impl CardActionHandler for LarkCardHandler {
 pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
+    status_handle: Option<Arc<dyn synaptic::ChannelStatusHandle>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let lark_config = config
         .lark
-        .as_ref()
-        .ok_or("missing [lark] section in config")?;
+        .first()
+        .ok_or("missing [[lark]] section in config")?;
 
     let app_secret = resolve_secret(
         lark_config.app_secret.as_deref(),
         lark_config.app_secret_env.as_deref(),
         "Lark app secret",
     )
-    .map_err(|e| format!("{}", e))?;
+    .map_err(|e| e.to_string())?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
-    let agent_session = Arc::new(AgentSession::new(model, config_arc, true).with_channel("lark"));
+    let cost_tracker = Arc::new(synaptic::callbacks::CostTrackingCallback::new(
+        synaptic::callbacks::default_pricing(),
+    ));
+    let usage_tracker = Arc::new(crate::usage::UsageTracker::with_persistence(
+        Arc::clone(&cost_tracker),
+        crate::usage::default_usage_path(),
+    ));
+    if let Err(e) = usage_tracker.load().await {
+        tracing::warn!(error = %e, "failed to load usage records for lark adapter");
+    }
+    usage_tracker.spawn_periodic_flush(std::time::Duration::from_secs(60));
+
+    let agent_session = Arc::new(
+        AgentSession::new(model, config_arc, true)
+            .with_channel("lark")
+            .with_cost_tracker(cost_tracker)
+            .with_usage_tracker(usage_tracker),
+    );
 
     let lark = LarkConfig::new(&lark_config.app_id, &app_secret);
     let client = LarkBotClient::new(lark.clone());
@@ -561,24 +737,50 @@ pub async fn run(
         typing_indicator: lark_config.typing_indicator,
         reply_in_thread: lark_config.reply_in_thread,
         group_session_scope: lark_config.group_session_scope.clone(),
+        dm_scope: lark_config.dm_session_scope.clone().unwrap_or_default(),
         dm_policy: lark_config.dm_policy.clone(),
         group_policy: lark_config.group_policy.clone(),
         allowlist: lark_config.allowlist.clone(),
         text_chunk_limit: lark_config.text_chunk_limit,
     });
 
+    let pairing_dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".synapse")
+        .join("pairing");
+    let config_allowlist = if lark_config.dm_policy == DmPolicy::Allowlist {
+        Some(lark_config.allowlist.allowed_users.clone())
+    } else {
+        None
+    };
+    let pairing_ttl_ms = lark_config.pairing_ttl_secs.unwrap_or(3600) * 1000;
+    let enforcer = Arc::new(FileDmPolicyEnforcer::with_ttl(
+        pairing_dir,
+        lark_config.dm_policy.clone(),
+        config_allowlist,
+        pairing_ttl_ms,
+    ));
+
     let msg_handler = LarkHandler {
         agent_session: agent_session.clone(),
         config: handler_config,
         dedup: Arc::new(MessageDedup::new(2048)),
         bot_open_id: bot_info.open_id,
+        account_id: lark_config.account_id.clone(),
+        enforcer,
+        gateway_port: config.serve.as_ref().and_then(|s| s.port).unwrap_or(3000),
+        owner_chat_id: lark_config.owner_chat_id.clone(),
     };
 
     let card_handler = LarkCardHandler { agent_session };
 
-    let listener = LarkLongConnListener::new(lark)
+    let mut listener = LarkLongConnListener::new(lark)
         .with_message_handler(msg_handler)
         .with_card_action_handler(card_handler);
+
+    if let Some(handle) = status_handle {
+        listener = listener.with_status_handle(handle);
+    }
 
     listener.run().await?;
     Ok(())

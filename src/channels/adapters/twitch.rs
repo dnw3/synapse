@@ -20,8 +20,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let twitch_config = config
         .twitch
-        .as_ref()
-        .ok_or("missing [twitch] section in config")?;
+        .first()
+        .ok_or("missing [[twitch]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -138,9 +138,10 @@ async fn run_twitch_irc(
         let tx_clone = tx.clone();
         let reply_target = parsed.target.clone();
         let message = parsed.message.clone();
+        let sender_nick = parsed.sender_nick.clone();
 
         tokio::spawn(async move {
-            let envelope = MessageEnvelope::channel(
+            let mut envelope = MessageEnvelope::channel(
                 session_key.clone(),
                 message.clone(),
                 DeliveryContext {
@@ -151,9 +152,12 @@ async fn run_twitch_irc(
                     meta: None,
                 },
             );
+            envelope.sender_id = Some(sender_nick);
+            envelope.routing.peer_kind = Some(crate::config::PeerKind::Channel);
+            envelope.routing.peer_id = Some(session_key.clone());
             match session.handle_message(envelope).await {
                 Ok(reply) => {
-                    let chunks = formatter::chunk_irc(&reply.content);
+                    let chunks = formatter::format_for_channel(&reply.content, "twitch", 400);
                     for chunk in chunks {
                         for irc_line in chunk.lines() {
                             let _ =

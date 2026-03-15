@@ -198,7 +198,7 @@ impl AgentMiddleware for ToolPolicyMiddleware {
 
         if !violations.is_empty() {
             use synaptic::core::Message;
-            response.message = Message::ai(&format!(
+            response.message = Message::ai(format!(
                 "I cannot execute the following owner-only tool(s): {}. \
                  This operation requires owner privileges.",
                 violations.join(", ")
@@ -217,6 +217,7 @@ impl AgentMiddleware for ToolPolicyMiddleware {
 ///
 /// Returns `true` if no owners are configured (open access) or if the
 /// sender is in the owners list.
+#[allow(dead_code)]
 pub fn is_owner_sender(sender_id: &str, config: &crate::config::SynapseConfig) -> bool {
     let owners = &config.tool_policy.owners;
     owners.is_empty() || owners.iter().any(|o| o == sender_id)

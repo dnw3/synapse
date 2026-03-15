@@ -9,10 +9,12 @@ import {
   TrendingUp,
   Bot,
   Terminal,
-  RefreshCw,
-  FolderOpen,
   Monitor,
   Network,
+  Send,
+  Workflow,
+  Server,
+  Brain,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,7 +33,6 @@ import ConfigPage from "./dashboard/ConfigPage";
 import SkillsPage from "./dashboard/SkillsPage";
 import ChannelsPage from "./dashboard/ChannelsPage";
 import AgentsPage from "./dashboard/AgentsPage";
-import WorkspacePage from "./dashboard/WorkspacePage";
 import DebugPage from "./dashboard/DebugPage";
 import InstancesPage from "./dashboard/InstancesPage";
 import NodesPage from "./dashboard/NodesPage";
@@ -39,7 +40,7 @@ import NodesPage from "./dashboard/NodesPage";
 // Tabs that need full-height flex layout (editors, log viewers, scrollable tables)
 // Pages that manage their own scroll (have internal scroll areas, editors, etc.)
 // These get overflow-hidden on the content wrapper so they don't double-scroll.
-const SELF_SCROLL_TABS = new Set<TabKey>(["workspace", "config", "logs", "sessions"]);
+const SELF_SCROLL_TABS = new Set<TabKey>(["config", "logs", "sessions", "communications", "automation", "infrastructure", "ai-agents"]);
 
 // ---------------------------------------------------------------------------
 // Tab & Sidebar Definitions (exported for App.tsx)
@@ -49,26 +50,31 @@ export type { TabKey };
 
 // labelZh/labelEn kept for backward compat; i18nKey used when t() is available
 export const TABS: (TabDef & { i18nKey: string })[] = [
+  // Control
   { key: "overview", labelZh: "概览", labelEn: "Overview", i18nKey: "dashboard.overview", icon: <BarChart3 className="h-4 w-4" /> },
-  { key: "usage", labelZh: "用量", labelEn: "Usage", i18nKey: "dashboard.usage", icon: <TrendingUp className="h-4 w-4" /> },
-  { key: "sessions", labelZh: "会话", labelEn: "Sessions", i18nKey: "dashboard.sessions", icon: <MessageSquare className="h-4 w-4" /> },
-  { key: "logs", labelZh: "日志", labelEn: "Logs", i18nKey: "dashboard.logs", icon: <ScrollText className="h-4 w-4" /> },
-  { key: "schedules", labelZh: "定时任务", labelEn: "Schedules", i18nKey: "dashboard.schedules", icon: <CalendarClock className="h-4 w-4" /> },
-  { key: "config", labelZh: "配置", labelEn: "Config", i18nKey: "dashboard.config", icon: <Settings2 className="h-4 w-4" /> },
-  { key: "skills", labelZh: "Skills", labelEn: "Skills", i18nKey: "dashboard.skills", icon: <Sparkles className="h-4 w-4" /> },
   { key: "channels", labelZh: "频道", labelEn: "Channels", i18nKey: "dashboard.channels", icon: <Radio className="h-4 w-4" /> },
-  { key: "agents", labelZh: "代理", labelEn: "Agents", i18nKey: "dashboard.agents", icon: <Bot className="h-4 w-4" /> },
-  { key: "workspace", labelZh: "工作区", labelEn: "Workspace", i18nKey: "dashboard.workspace", icon: <FolderOpen className="h-4 w-4" /> },
   { key: "instances", labelZh: "实例", labelEn: "Instances", i18nKey: "dashboard.instances", icon: <Monitor className="h-4 w-4" /> },
+  { key: "sessions", labelZh: "会话", labelEn: "Sessions", i18nKey: "dashboard.sessions", icon: <MessageSquare className="h-4 w-4" /> },
+  { key: "usage", labelZh: "用量", labelEn: "Usage", i18nKey: "dashboard.usage", icon: <TrendingUp className="h-4 w-4" /> },
+  { key: "schedules", labelZh: "定时任务", labelEn: "Schedules", i18nKey: "dashboard.schedules", icon: <CalendarClock className="h-4 w-4" /> },
   { key: "nodes", labelZh: "节点", labelEn: "Nodes", i18nKey: "dashboard.nodes", icon: <Network className="h-4 w-4" /> },
+  // Agent
+  { key: "agents", labelZh: "代理", labelEn: "Agents", i18nKey: "dashboard.agents", icon: <Bot className="h-4 w-4" /> },
+  { key: "skills", labelZh: "Skills", labelEn: "Skills", i18nKey: "dashboard.skills", icon: <Sparkles className="h-4 w-4" /> },
+  // Settings
+  { key: "config", labelZh: "通用配置", labelEn: "General", i18nKey: "dashboard.generalConfig", icon: <Settings2 className="h-4 w-4" /> },
+  { key: "communications", labelZh: "通信", labelEn: "Communications", i18nKey: "dashboard.communications", icon: <Send className="h-4 w-4" /> },
+  { key: "automation", labelZh: "自动化", labelEn: "Automation", i18nKey: "dashboard.automation", icon: <Workflow className="h-4 w-4" /> },
+  { key: "infrastructure", labelZh: "基础设施", labelEn: "Infrastructure", i18nKey: "dashboard.infrastructure", icon: <Server className="h-4 w-4" /> },
+  { key: "ai-agents", labelZh: "AI 与代理", labelEn: "AI & Agents", i18nKey: "dashboard.aiAgents", icon: <Brain className="h-4 w-4" /> },
+  { key: "logs", labelZh: "日志", labelEn: "Logs", i18nKey: "dashboard.logs", icon: <ScrollText className="h-4 w-4" /> },
   { key: "debug", labelZh: "调试", labelEn: "Debug", i18nKey: "dashboard.debug", icon: <Terminal className="h-4 w-4" /> },
 ];
 
 export const SIDEBAR_SECTIONS: (SidebarSection & { i18nKey: string })[] = [
-  { labelZh: "监控", labelEn: "Monitor", i18nKey: "dashboard.monitor", keys: ["overview", "usage"] },
-  { labelZh: "控制", labelEn: "Control", i18nKey: "dashboard.control", keys: ["channels", "sessions", "schedules", "instances"] },
-  { labelZh: "代理", labelEn: "Agent", i18nKey: "dashboard.agent", keys: ["agents", "skills", "workspace", "nodes"] },
-  { labelZh: "设置", labelEn: "Settings", i18nKey: "dashboard.settings", keys: ["config", "logs", "debug"] },
+  { labelZh: "控制", labelEn: "Control", i18nKey: "dashboard.control", keys: ["overview", "channels", "instances", "sessions", "usage", "schedules", "nodes"] },
+  { labelZh: "代理", labelEn: "Agent", i18nKey: "dashboard.agent", keys: ["agents", "skills"] },
+  { labelZh: "设置", labelEn: "Settings", i18nKey: "dashboard.settings", keys: ["config", "communications", "automation", "infrastructure", "ai-agents", "logs", "debug"] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -148,9 +154,12 @@ export default function Dashboard({ connected: wsConnected, conversationCount, m
         {activeTab === "skills" && <SkillsPage />}
         {activeTab === "channels" && <ChannelsPage />}
         {activeTab === "agents" && <AgentsPage />}
-        {activeTab === "workspace" && <WorkspacePage />}
         {activeTab === "instances" && <InstancesPage />}
         {activeTab === "nodes" && <NodesPage />}
+        {activeTab === "communications" && <ConfigPage filterSection="communications" />}
+        {activeTab === "automation" && <ConfigPage filterSection="automation" />}
+        {activeTab === "infrastructure" && <ConfigPage filterSection="infrastructure" />}
+        {activeTab === "ai-agents" && <ConfigPage filterSection="ai-agents" />}
         {activeTab === "debug" && <DebugPage />}
 
         {/* Footer — pinned at bottom of scroll for normal pages, hidden for self-scroll */}

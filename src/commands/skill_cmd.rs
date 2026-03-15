@@ -394,7 +394,7 @@ fn skill_info(name: &str) -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(info) = parse_skill_md_info(&content) {
                     println!("{} {}", "Name:".bold(), info.name);
                     println!("{} {}", "Description:".bold(), info.description);
-                    println!("{} {}", "Format:".bold(), "SKILL.md (OpenClaw)");
+                    println!("{} SKILL.md (OpenClaw)", "Format:".bold());
                     println!("{} {}", "Scope:".bold(), scope);
                     println!(
                         "{} {}",
@@ -419,7 +419,7 @@ fn skill_info(name: &str) -> Result<(), Box<dyn std::error::Error>> {
             println!("{} {}", "Name:".bold(), manifest.name);
             println!("{} {}", "Version:".bold(), manifest.version);
             println!("{} {}", "Description:".bold(), manifest.description);
-            println!("{} {}", "Format:".bold(), "manifest.toml (legacy)");
+            println!("{} manifest.toml (legacy)", "Format:".bold());
             println!("{} {}", "Scope:".bold(), scope);
             println!(
                 "{} {}",

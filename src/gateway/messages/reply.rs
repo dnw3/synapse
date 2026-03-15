@@ -1,6 +1,7 @@
 use synaptic::DeliveryContext;
 
 /// Response from AgentSession after processing a message.
+#[allow(dead_code)]
 pub struct AgentReply {
     /// Final accumulated response text.
     pub content: String,

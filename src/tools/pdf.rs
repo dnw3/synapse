@@ -15,6 +15,7 @@ pub struct ReadPdfTool {
     work_dir: PathBuf,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl ReadPdfTool {
     pub fn new(work_dir: &Path) -> Arc<dyn Tool> {
         Arc::new(Self {

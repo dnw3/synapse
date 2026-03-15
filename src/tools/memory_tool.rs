@@ -16,6 +16,7 @@ pub struct MemorySearchTool {
     ltm: Arc<LongTermMemory>,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl MemorySearchTool {
     pub fn new(ltm: Arc<LongTermMemory>) -> Arc<dyn Tool> {
         Arc::new(Self { ltm })
@@ -83,6 +84,7 @@ pub struct MemoryGetTool {
     ltm: Arc<LongTermMemory>,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl MemoryGetTool {
     pub fn new(ltm: Arc<LongTermMemory>) -> Arc<dyn Tool> {
         Arc::new(Self { ltm })

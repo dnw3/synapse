@@ -85,6 +85,8 @@ const READ_METHODS: &[&str] = &[
     "cron.runs",
     "usage.status",
     "usage.cost",
+    "usage.aggregates",
+    "usage.records",
     "models.list",
     "tools.catalog",
     "workspace.list",
@@ -95,6 +97,8 @@ const READ_METHODS: &[&str] = &[
     "store.status",
     "debug.health",
     "agent.identity.get",
+    "bindings.list",
+    "broadcasts.list",
     "files.list",
     "node.list",
     "node.describe",
@@ -181,6 +185,11 @@ const PAIRING_METHODS: &[&str] = &[
     "device.pair.remove",
     "device.token.rotate",
     "device.token.revoke",
+    "dm.pairing.list",
+    "dm.pairing.approve",
+    "dm.pairing.allowlist",
+    "dm.pairing.remove",
+    "dm.pairing.channels",
 ];
 
 /// Check whether the given role and scopes permit calling `method`.

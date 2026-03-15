@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use synaptic::DeliveryContext;
 
 #[derive(Debug, thiserror::Error)]
+#[allow(dead_code)]
 pub enum RouteError {
     #[error("no delivery route available for session")]
     NoRoute,

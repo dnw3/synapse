@@ -5,12 +5,12 @@ export interface HelloOk {
   protocol: number;
   server: { version: string; conn_id: string };
   features: { methods: string[]; events: string[] };
-  snapshot: { presence: any; health: any; state_version: { presence: number; health: number } };
+  snapshot: { presence: Record<string, unknown> | unknown[]; health: Record<string, unknown>; state_version: { presence: number; health: number } };
   auth_result?: { authenticated: boolean; role?: string; scopes: string[] };
 }
 
 interface PendingRequest {
-  resolve: (v: any) => void;
+  resolve: (v: unknown) => void;
   reject: (e: Error) => void;
   timer: ReturnType<typeof setTimeout>;
 }
@@ -18,7 +18,7 @@ interface PendingRequest {
 export class GatewayClient {
   private ws: WebSocket | null = null;
   private pending = new Map<string, PendingRequest>();
-  private eventHandlers = new Map<string, Set<(payload: any) => void>>();
+  private eventHandlers = new Map<string, Set<(payload: unknown) => void>>();
   private _connected = false;
   private _helloOk: HelloOk | null = null;
   private reqId = 0;
@@ -108,7 +108,7 @@ export class GatewayClient {
     });
   }
 
-  async request<T = any>(method: string, params: any = {}, timeoutMs = 30000): Promise<T> {
+  async request<T = unknown>(method: string, params: Record<string, unknown> = {}, timeoutMs = 30000): Promise<T> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error("Not connected");
     }
@@ -118,12 +118,12 @@ export class GatewayClient {
         this.pending.delete(id);
         reject(new Error(`RPC timeout: ${method}`));
       }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
+      this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject, timer });
       this.ws!.send(JSON.stringify({ type: "request", id, method, params }));
     });
   }
 
-  onEvent(event: string, handler: (payload: any) => void): () => void {
+  onEvent(event: string, handler: (payload: unknown) => void): () => void {
     if (!this.eventHandlers.has(event)) {
       this.eventHandlers.set(event, new Set());
     }

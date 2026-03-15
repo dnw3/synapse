@@ -15,8 +15,10 @@ mod init;
 mod logging;
 mod memory;
 mod notify;
+#[allow(dead_code)]
 mod plugin;
 mod repl;
+#[allow(dead_code)]
 mod router;
 mod scheduler;
 mod service;
@@ -153,6 +155,40 @@ async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Some(Command::Init) => unreachable!(), // handled above
+        #[cfg(feature = "web")]
+        Some(Command::Qr {
+            setup_code_only,
+            url,
+        }) => {
+            commands::qr::run(&config, setup_code_only, url);
+            Ok(())
+        }
+        #[cfg(feature = "web")]
+        Some(Command::Devices {
+            action,
+            request_id,
+            device,
+            name,
+        }) => {
+            commands::devices::run(
+                &action,
+                &commands::devices::DevicesArgs {
+                    request_id,
+                    device_id: device,
+                    name,
+                },
+            );
+            Ok(())
+        }
+        #[cfg(feature = "web")]
+        Some(Command::Pairing {
+            action,
+            channel,
+            value,
+        }) => {
+            commands::pairing_cmd::run(&action, &channel, value.as_deref()).await;
+            Ok(())
+        }
         Some(Command::Doctor) => doctor::run_doctor(&config).await,
         Some(Command::Chat { message }) => {
             run_chat(
@@ -392,7 +428,7 @@ async fn run_chat(
     let tracker = usage::create_tracker();
 
     if let Some(user_message) = message {
-        repl::single_shot(model, &memory, &sid, &mut messages, user_message, &*ltm).await
+        repl::single_shot(model, &memory, &sid, &mut messages, user_message, &ltm).await
     } else {
         repl::repl(
             model,

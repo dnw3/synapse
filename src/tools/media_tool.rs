@@ -22,6 +22,7 @@ pub struct AnalyzeImageTool {
     work_dir: PathBuf,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl AnalyzeImageTool {
     pub fn new(work_dir: &Path) -> Arc<dyn Tool> {
         Arc::new(Self {
@@ -138,6 +139,7 @@ fn detect_mime(path: &Path) -> &'static str {
 ///
 /// When built without the `voice` feature the tool still exists but returns an
 /// informational error asking the user to enable the feature.
+#[allow(dead_code)]
 pub struct TranscribeAudioTool {
     work_dir: PathBuf,
     #[cfg(feature = "voice")]
@@ -155,6 +157,7 @@ impl TranscribeAudioTool {
     }
 
     /// Stub constructor when the voice feature is disabled.
+    #[allow(dead_code)]
     #[cfg(not(feature = "voice"))]
     pub fn new_stub(work_dir: &Path) -> Arc<dyn Tool> {
         Arc::new(Self {

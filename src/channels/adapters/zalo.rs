@@ -49,8 +49,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let zalo_config = config
         .zalo
-        .as_ref()
-        .ok_or("missing [zalo] section in config")?;
+        .first()
+        .ok_or("missing [[zalo]] section in config")?;
 
     let access_token = resolve_secret(
         zalo_config.access_token.as_deref(),
@@ -110,7 +110,7 @@ async fn handle_webhook(
     let access_token = state.access_token.clone();
 
     tokio::spawn(async move {
-        let envelope = MessageEnvelope::channel(
+        let mut envelope = MessageEnvelope::channel(
             sender_id.clone(),
             text.clone(),
             DeliveryContext {
@@ -121,6 +121,9 @@ async fn handle_webhook(
                 meta: None,
             },
         );
+        envelope.sender_id = Some(sender_id.clone());
+        envelope.routing.peer_kind = Some(crate::config::PeerKind::Direct);
+        envelope.routing.peer_id = Some(sender_id.clone());
         match session.handle_message(envelope).await {
             Ok(reply) => {
                 // Send reply via Zalo OA API

@@ -1,6 +1,5 @@
 //! Node pairing with JSON file persistence.
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -17,6 +16,7 @@ pub struct PendingNodeRequest {
     pub public_key: Option<String>,
     pub device_id: Option<String>,
     pub platform: Option<String>,
+    pub ip: Option<String>,
     pub created_at: u64,
 }
 

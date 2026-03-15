@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Terminal, Play, Heart, Cpu, Activity, Clock, Trash2,
-  Database, RefreshCw, ChevronDown, ChevronRight,
+  Database, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
@@ -21,11 +21,6 @@ interface HistoryItem {
 
 /** Simple JSON syntax highlighting using spans */
 function highlightJSON(json: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  // Regex to match strings, numbers, booleans, null, keys
-  const regex = /("(?:[^"\\]|\\.)*")\s*:/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
   const lines = json.split("\n");
 
   return lines.map((line, i) => {
@@ -36,7 +31,7 @@ function highlightJSON(json: string): React.ReactNode[] {
       .replace(/\b(null)\b/g, (m) => `\x01NULL${m}\x01END`)
       .replace(/\b(\d+\.?\d*)\b/g, (m) => `\x01NUM${m}\x01END`);
 
-    const segments = highlighted.split(/\x01/);
+    const segments = highlighted.split("\x01");
 
     return (
       <div key={i} className="leading-5">
@@ -137,7 +132,7 @@ export default function DebugPage() {
 
   // Execute method
   const handleExecute = async () => {
-    let params: Record<string, unknown> = {};
+    let params: Record<string, unknown>;
     try {
       params = JSON.parse(paramsText);
     } catch {

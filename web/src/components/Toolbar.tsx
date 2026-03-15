@@ -10,6 +10,8 @@ interface ToolbarProps {
   connected?: boolean;
   status?: string;
   actions?: ReactNode;
+  /** Optional agent selector rendered before model badge */
+  agentSelector?: ReactNode;
   onMenuClick?: () => void;
   showMenu?: boolean;
 }
@@ -21,6 +23,7 @@ export default function Toolbar({
   connected,
   status,
   actions,
+  agentSelector,
   onMenuClick,
   showMenu,
 }: ToolbarProps) {
@@ -46,8 +49,9 @@ export default function Toolbar({
         )}
       </div>
 
-      {/* Right: model badge + connection dot + status badge + actions */}
+      {/* Right: agent selector + model badge + connection dot + status badge + actions */}
       <div className="flex items-center gap-2 flex-shrink-0">
+        {agentSelector}
         {modelBadge && (
           <span className="hidden sm:inline-flex items-center px-2 py-0.5 text-[11px] font-mono bg-[var(--bg-grouped)] text-[var(--text-secondary)] rounded-[var(--radius-sm)]">
             {modelBadge}

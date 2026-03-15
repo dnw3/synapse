@@ -77,6 +77,7 @@ impl SessionWriteLock {
     ///
     /// Call this periodically (e.g. from a background task) to reclaim
     /// locks abandoned by disconnected clients.
+    #[allow(dead_code)]
     pub async fn cleanup_expired(&self) {
         let mut locks = self.locks.lock().await;
         locks.retain(|_, entry| entry.acquired_at.elapsed() < self.timeout);

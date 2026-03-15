@@ -50,8 +50,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let wc_config = config
         .webchat
-        .as_ref()
-        .ok_or("missing [webchat] section in config")?;
+        .first()
+        .ok_or("missing [[webchat]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -124,7 +124,7 @@ async fn handle_chat(
     }
 
     let session_id = req.session_id.clone();
-    let envelope = MessageEnvelope::channel(
+    let mut envelope = MessageEnvelope::channel(
         session_id.clone(),
         req.message.clone(),
         DeliveryContext {
@@ -135,6 +135,11 @@ async fn handle_chat(
             meta: None,
         },
     );
+    if let Some(ref uid) = req.user_id {
+        envelope.sender_id = Some(uid.clone());
+    }
+    envelope.routing.peer_kind = Some(crate::config::PeerKind::Direct);
+    envelope.routing.peer_id = Some(session_id.clone());
     match state.agent_session.handle_message(envelope).await {
         Ok(reply) => (
             StatusCode::OK,

@@ -187,7 +187,7 @@ pub async fn handle_patch(_ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         entry.verbose = Some(verbose.to_string());
     }
 
-    save_overrides(&overrides).map_err(|e| RpcError::internal(e))?;
+    save_overrides(&overrides).map_err(RpcError::internal)?;
 
     Ok(json!({ "ok": true }))
 }
@@ -217,7 +217,7 @@ pub async fn handle_create(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         if let Some(t) = thinking_level {
             entry.thinking = Some(t.to_string());
         }
-        save_overrides(&overrides).map_err(|e| RpcError::internal(e))?;
+        save_overrides(&overrides).map_err(RpcError::internal)?;
     }
 
     // Broadcast sessions.changed event

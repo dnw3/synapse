@@ -44,50 +44,72 @@ pub struct SynapseConfig {
     #[serde(rename = "channel_models")]
     pub channel_model_bindings: Option<Vec<ChannelModelBinding>>,
 
-    /// Lark bot configuration.
-    pub lark: Option<LarkBotConfig>,
-    /// Slack bot configuration.
-    pub slack: Option<SlackBotConfig>,
-    /// Telegram bot configuration.
-    pub telegram: Option<TelegramBotConfig>,
-    /// Discord bot configuration.
-    pub discord: Option<DiscordBotConfig>,
-    /// DingTalk bot configuration.
-    pub dingtalk: Option<DingTalkBotConfig>,
-    /// Mattermost bot configuration.
-    pub mattermost: Option<MattermostBotConfig>,
-    /// Matrix bot configuration.
-    pub matrix: Option<MatrixBotConfig>,
-    /// WhatsApp bot configuration.
-    pub whatsapp: Option<WhatsAppBotConfig>,
-    /// Microsoft Teams bot configuration.
-    pub teams: Option<TeamsBotConfig>,
-    /// Signal bot configuration.
-    pub signal: Option<SignalBotConfig>,
-    /// WeCom (WeChat Work) bot configuration.
-    pub wechat: Option<WeChatBotConfig>,
-    /// iMessage bot configuration.
-    pub imessage: Option<IMessageBotConfig>,
-    /// LINE bot configuration.
-    pub line: Option<LineBotConfig>,
-    /// Google Chat bot configuration.
-    pub googlechat: Option<GoogleChatBotConfig>,
-    /// IRC bot configuration.
-    pub irc: Option<IrcBotConfig>,
-    /// WebChat bot configuration.
-    pub webchat: Option<WebChatBotConfig>,
-    /// Twitch bot configuration.
-    pub twitch: Option<TwitchBotConfig>,
-    /// Nostr bot configuration.
-    pub nostr: Option<NostrBotConfig>,
-    /// Nextcloud Talk bot configuration.
-    pub nextcloud: Option<NextcloudBotConfig>,
-    /// Synology Chat bot configuration.
-    pub synology: Option<SynologyBotConfig>,
-    /// Tlon (Urbit) bot configuration.
-    pub tlon: Option<TlonBotConfig>,
-    /// Zalo bot configuration.
-    pub zalo: Option<ZaloBotConfig>,
+    /// Lark bot configuration (multi-account).
+    #[serde(default)]
+    pub lark: Vec<LarkBotConfig>,
+    /// Slack bot configuration (multi-account).
+    #[serde(default)]
+    pub slack: Vec<SlackBotConfig>,
+    /// Telegram bot configuration (multi-account).
+    #[serde(default)]
+    pub telegram: Vec<TelegramBotConfig>,
+    /// Discord bot configuration (multi-account).
+    #[serde(default)]
+    pub discord: Vec<DiscordBotConfig>,
+    /// DingTalk bot configuration (multi-account).
+    #[serde(default)]
+    pub dingtalk: Vec<DingTalkBotConfig>,
+    /// Mattermost bot configuration (multi-account).
+    #[serde(default)]
+    pub mattermost: Vec<MattermostBotConfig>,
+    /// Matrix bot configuration (multi-account).
+    #[serde(default)]
+    pub matrix: Vec<MatrixBotConfig>,
+    /// WhatsApp bot configuration (multi-account).
+    #[serde(default)]
+    pub whatsapp: Vec<WhatsAppBotConfig>,
+    /// Microsoft Teams bot configuration (multi-account).
+    #[serde(default)]
+    pub teams: Vec<TeamsBotConfig>,
+    /// Signal bot configuration (multi-account).
+    #[serde(default)]
+    pub signal: Vec<SignalBotConfig>,
+    /// WeCom (WeChat Work) bot configuration (multi-account).
+    #[serde(default)]
+    pub wechat: Vec<WeChatBotConfig>,
+    /// iMessage bot configuration (multi-account).
+    #[serde(default)]
+    pub imessage: Vec<IMessageBotConfig>,
+    /// LINE bot configuration (multi-account).
+    #[serde(default)]
+    pub line: Vec<LineBotConfig>,
+    /// Google Chat bot configuration (multi-account).
+    #[serde(default)]
+    pub googlechat: Vec<GoogleChatBotConfig>,
+    /// IRC bot configuration (multi-account).
+    #[serde(default)]
+    pub irc: Vec<IrcBotConfig>,
+    /// WebChat bot configuration (multi-account).
+    #[serde(default)]
+    pub webchat: Vec<WebChatBotConfig>,
+    /// Twitch bot configuration (multi-account).
+    #[serde(default)]
+    pub twitch: Vec<TwitchBotConfig>,
+    /// Nostr bot configuration (multi-account).
+    #[serde(default)]
+    pub nostr: Vec<NostrBotConfig>,
+    /// Nextcloud Talk bot configuration (multi-account).
+    #[serde(default)]
+    pub nextcloud: Vec<NextcloudBotConfig>,
+    /// Synology Chat bot configuration (multi-account).
+    #[serde(default)]
+    pub synology: Vec<SynologyBotConfig>,
+    /// Tlon (Urbit) bot configuration (multi-account).
+    #[serde(default)]
+    pub tlon: Vec<TlonBotConfig>,
+    /// Zalo bot configuration (multi-account).
+    #[serde(default)]
+    pub zalo: Vec<ZaloBotConfig>,
 
     /// Web server configuration.
     pub serve: Option<ServeConfig>,
@@ -102,7 +124,16 @@ pub struct SynapseConfig {
     /// Voice configuration.
     pub voice: Option<VoiceConfig>,
 
-    /// Multi-agent routing.
+    /// Multi-agent definitions (new format).
+    pub agents: Option<AgentsConfig>,
+    /// Route bindings: map incoming messages to agents.
+    #[serde(default)]
+    pub bindings: Vec<Binding>,
+    /// Agent broadcast groups: fan out messages to multiple agents.
+    #[serde(default)]
+    pub broadcasts: Vec<AgentBroadcastGroup>,
+
+    /// Legacy multi-agent routing (deprecated — use `agents` + `bindings` instead).
     #[serde(rename = "agent_routes")]
     pub agent_routes: Option<Vec<AgentRouteConfig>>,
 
@@ -174,6 +205,72 @@ impl SynapseConfig {
     /// 3. `~/.synapse/config.{toml,json,yaml,yml}`
     pub fn load(path: Option<&Path>) -> Result<Self, SynapticError> {
         synaptic::config::discover_and_load_named(path, "synapse")
+    }
+
+    /// Get the effective agents config, migrating legacy `[[agent_routes]]` if needed.
+    ///
+    /// Returns `AgentsConfig` with at least a default agent.
+    pub fn effective_agents(&self) -> AgentsConfig {
+        // New format takes priority
+        if let Some(ref agents) = self.agents {
+            return agents.clone();
+        }
+
+        // Migrate legacy [[agent_routes]]
+        if let Some(ref routes) = self.agent_routes {
+            if !routes.is_empty() {
+                let mut agents_config = AgentsConfig {
+                    default: "default".into(),
+                    list: Vec::new(),
+                };
+                for route in routes {
+                    agents_config.list.push(AgentDef {
+                        id: route.name.clone(),
+                        description: route.description.clone(),
+                        model: route.model.clone(),
+                        system_prompt: route.system_prompt.clone(),
+                        workspace: route.workspace.clone(),
+                        dm_scope: DmSessionScope::default(),
+                        group_session_scope: None,
+                        tool_allow: Vec::new(),
+                        tool_deny: Vec::new(),
+                        skills_dir: None,
+                    });
+                }
+                return agents_config;
+            }
+        }
+
+        // No agents configured — return empty with defaults
+        AgentsConfig::default()
+    }
+
+    /// Get the effective bindings, migrating legacy `[[agent_routes]]` if needed.
+    pub fn effective_bindings(&self) -> Vec<Binding> {
+        if self.agents.is_some() || !self.bindings.is_empty() {
+            return self.bindings.clone();
+        }
+
+        // Migrate legacy [[agent_routes]] channel constraints to bindings
+        if let Some(ref routes) = self.agent_routes {
+            let mut bindings = Vec::new();
+            for route in routes {
+                if route.channels.is_empty() {
+                    // Catch-all route — no binding needed, handled by default
+                    continue;
+                }
+                for ch in &route.channels {
+                    bindings.push(Binding {
+                        agent: route.name.clone(),
+                        channel: Some(ch.clone()),
+                        ..Default::default()
+                    });
+                }
+            }
+            return bindings;
+        }
+
+        Vec::new()
     }
 
     /// Resolve the workspace directory path for the default agent.

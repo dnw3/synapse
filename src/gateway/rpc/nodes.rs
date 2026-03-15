@@ -21,9 +21,13 @@ pub async fn handle_pair_request(ctx: Arc<RpcContext>, params: Value) -> Result<
         .unwrap_or("unnamed")
         .to_string();
     let request_id = uuid::Uuid::new_v4().to_string();
+    let platform = params
+        .get("platform")
+        .and_then(|v| v.as_str())
+        .map(String::from);
     let req = PendingNodeRequest {
         request_id: request_id.clone(),
-        node_name: name,
+        node_name: name.clone(),
         public_key: params
             .get("public_key")
             .and_then(|v| v.as_str())
@@ -32,17 +36,22 @@ pub async fn handle_pair_request(ctx: Arc<RpcContext>, params: Value) -> Result<
             .get("device_id")
             .and_then(|v| v.as_str())
             .map(String::from),
-        platform: params
-            .get("platform")
-            .and_then(|v| v.as_str())
-            .map(String::from),
+        platform: platform.clone(),
+        ip: params.get("ip").and_then(|v| v.as_str()).map(String::from),
         created_at: now_ms(),
     };
     ctx.state.pairing_store.write().await.request(req);
 
     // Notify operators of the new pairing request
     ctx.broadcaster
-        .broadcast("node.pair.pending", json!({"request_id": request_id}))
+        .broadcast(
+            "node.pair.pending",
+            json!({
+                "request_id": request_id,
+                "node_name": name,
+                "platform": platform,
+            }),
+        )
         .await;
 
     Ok(json!({"request_id": request_id}))

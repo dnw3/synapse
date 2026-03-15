@@ -21,8 +21,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let signal_config = config
         .signal
-        .as_ref()
-        .ok_or("missing [signal] section in config")?;
+        .first()
+        .ok_or("missing [[signal]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());
@@ -126,7 +126,7 @@ pub async fn run(
             let recipient = sender.clone();
 
             tokio::spawn(async move {
-                let envelope = MessageEnvelope::channel(
+                let mut envelope = MessageEnvelope::channel(
                     recipient.clone(),
                     text.clone(),
                     DeliveryContext {
@@ -137,9 +137,12 @@ pub async fn run(
                         meta: None,
                     },
                 );
+                envelope.sender_id = Some(recipient.clone());
+                envelope.routing.peer_kind = Some(crate::config::PeerKind::Direct);
+                envelope.routing.peer_id = Some(recipient.clone());
                 match session.handle_message(envelope).await {
                     Ok(reply) => {
-                        let chunks = formatter::chunk_signal(&reply.content);
+                        let chunks = formatter::format_for_channel(&reply.content, "signal", 4096);
                         for chunk in chunks {
                             let body = serde_json::json!({
                                 "message": chunk,

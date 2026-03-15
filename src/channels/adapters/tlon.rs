@@ -15,8 +15,8 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let tlon_config = config
         .tlon
-        .as_ref()
-        .ok_or("missing [tlon] section in config")?;
+        .first()
+        .ok_or("missing [[tlon]] section in config")?;
 
     let api_key = resolve_secret(
         tlon_config.api_key.as_deref(),

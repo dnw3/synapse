@@ -5,6 +5,7 @@ pub mod formatter;
 pub mod handler;
 pub mod reactions;
 pub mod session_key;
+pub mod thread_ownership;
 
 use crate::config::SynapseConfig;
 

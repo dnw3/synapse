@@ -1,10 +1,17 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::post;
 use axum::Router;
 use tracing;
+
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 
 use synaptic::DeliveryContext;
 
@@ -374,4 +381,100 @@ pub async fn run(
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the Microsoft Teams bot.
+#[allow(dead_code)]
+pub struct TeamsAdapter {
+    client: reqwest::Client,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(dead_code)]
+impl TeamsAdapter {
+    pub fn new() -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelAdapter for TeamsAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "teams".to_string(),
+            name: "Microsoft Teams".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Groups,
+                ChannelCap::Threads,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(28000),
+            supports_streaming: false,
+            supports_threads: true,
+            supports_reactions: false,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "teams", "TeamsAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "teams", "TeamsAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl Outbound for TeamsAdapter {
+    async fn send(
+        &self,
+        envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        tracing::info!(
+            channel = "teams",
+            content_len = envelope.content.len(),
+            "TeamsAdapter::send (placeholder)"
+        );
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelHealth for TeamsAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => HealthStatus::Healthy,
+            STATUS_ERROR => HealthStatus::Unhealthy("adapter error".to_string()),
+            _ => HealthStatus::Unhealthy("disconnected".to_string()),
+        }
+    }
 }

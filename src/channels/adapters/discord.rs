@@ -1,5 +1,6 @@
 //! Discord bot adapter.
 
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -10,6 +11,10 @@ use serde_json::json;
 use tokio_tungstenite::tungstenite::Message as WsMsg;
 use tracing;
 
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 use synaptic::DeliveryContext;
 
 use crate::agent;
@@ -329,4 +334,139 @@ pub async fn run(
 
     heartbeat_handle.abort();
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// Status constants used by [`DiscordAdapter`].
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the Discord bot.
+///
+/// Wraps an HTTP client and bot token so the generic channel infrastructure
+/// can call `start`, `stop`, `send`, and `health_check` without knowing
+/// anything about the Discord-specific WebSocket gateway loop.
+#[allow(dead_code)]
+pub struct DiscordAdapter {
+    client: reqwest::Client,
+    token: String,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(dead_code)]
+impl DiscordAdapter {
+    pub fn new(bot_token: &str) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            token: bot_token.to_string(),
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelAdapter for DiscordAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "discord".to_string(),
+            name: "Discord".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Groups,
+                ChannelCap::Reactions,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(2000),
+            supports_streaming: false,
+            supports_threads: true,
+            supports_reactions: true,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "discord", "DiscordAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "discord", "DiscordAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl Outbound for DiscordAdapter {
+    async fn send(
+        &self,
+        envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        // Route to the channel encoded in thread_id ("channel:<id>") or channel_id.
+        let raw_channel = envelope
+            .thread_id
+            .as_deref()
+            .unwrap_or(envelope.channel_id.as_str());
+        let channel_id = raw_channel.strip_prefix("channel:").unwrap_or(raw_channel);
+
+        let chunks = formatter::format_for_channel(&envelope.content, "discord", 2000);
+        for chunk in chunks {
+            self.client
+                .post(format!(
+                    "https://discord.com/api/v10/channels/{}/messages",
+                    channel_id
+                ))
+                .header("Authorization", format!("Bot {}", self.token))
+                .json(&json!({"content": chunk}))
+                .send()
+                .await
+                .map_err(|e| synaptic::core::SynapticError::Tool(e.to_string()))?;
+        }
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelHealth for DiscordAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        let url = "https://discord.com/api/v10/users/@me";
+        match self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bot {}", self.token))
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => {
+                self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+                HealthStatus::Healthy
+            }
+            Ok(resp) => {
+                let msg = format!("GET /users/@me returned HTTP {}", resp.status());
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(msg)
+            }
+            Err(e) => {
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(e.to_string())
+            }
+        }
+    }
 }

@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -7,6 +8,10 @@ use tokio_tungstenite::tungstenite::Message as WsMsg;
 
 use tracing;
 
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 use synaptic::DeliveryContext;
 
 use crate::agent;
@@ -142,6 +147,160 @@ pub async fn run(
 /// since it requires tracking the temporary message ts.
 async fn send_typing(_bot_token: &str, _channel: &str) {
     // Slack Socket Mode has no typing API for bots — intentional no-op.
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// Status constants used by [`SlackAdapter`].
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the Slack bot.
+///
+/// Wraps an HTTP client and bot token so the generic channel infrastructure
+/// can call `start`, `stop`, `send`, and `health_check` without knowing
+/// anything about the Slack-specific Socket Mode loop.
+#[allow(dead_code)]
+pub struct SlackAdapter {
+    client: reqwest::Client,
+    bot_token: String,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(dead_code)]
+impl SlackAdapter {
+    pub fn new(bot_token: &str) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            bot_token: bot_token.to_string(),
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(unused)]
+#[async_trait]
+impl ChannelAdapter for SlackAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "slack".to_string(),
+            name: "Slack".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Groups,
+                ChannelCap::Reactions,
+                ChannelCap::Threading,
+                ChannelCap::Mentions,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(40000),
+            supports_streaming: false,
+            supports_threads: true,
+            supports_reactions: true,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "slack", "SlackAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "slack", "SlackAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(unused)]
+#[async_trait]
+impl Outbound for SlackAdapter {
+    async fn send(
+        &self,
+        envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        // Route to the channel encoded in thread_id ("channel:<id>") or channel_id.
+        let raw_channel = envelope
+            .thread_id
+            .as_deref()
+            .unwrap_or(envelope.channel_id.as_str());
+        let channel = raw_channel.strip_prefix("channel:").unwrap_or(raw_channel);
+
+        let chunks = formatter::format_for_channel(&envelope.content, "slack", 4000);
+        for chunk in chunks {
+            self.client
+                .post("https://slack.com/api/chat.postMessage")
+                .bearer_auth(&self.bot_token)
+                .json(&serde_json::json!({
+                    "channel": channel,
+                    "text": chunk,
+                }))
+                .send()
+                .await
+                .map_err(|e| synaptic::core::SynapticError::Tool(e.to_string()))?;
+        }
+        Ok(())
+    }
+}
+
+#[allow(unused)]
+#[async_trait]
+impl ChannelHealth for SlackAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        // Use auth.test as a lightweight liveness probe.
+        match self
+            .client
+            .post("https://slack.com/api/auth.test")
+            .bearer_auth(&self.bot_token)
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => {
+                match resp.json::<serde_json::Value>().await {
+                    Ok(body) if body.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) => {
+                        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+                        HealthStatus::Healthy
+                    }
+                    Ok(body) => {
+                        let msg = body
+                            .get("error")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown error")
+                            .to_string();
+                        self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                        HealthStatus::Unhealthy(msg)
+                    }
+                    Err(e) => {
+                        self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                        HealthStatus::Unhealthy(e.to_string())
+                    }
+                }
+            }
+            Ok(resp) => {
+                let msg = format!("auth.test returned HTTP {}", resp.status());
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(msg)
+            }
+            Err(e) => {
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(e.to_string())
+            }
+        }
+    }
 }
 
 async fn run_socket_mode(

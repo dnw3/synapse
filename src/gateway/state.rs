@@ -244,7 +244,11 @@ impl AppState {
         // Register builtin plugins so their event subscribers are wired into the
         // event bus and their manifests are visible via the plugin registry.
         let mut plugin_registry = synaptic::plugin::PluginRegistry::new(event_bus.clone());
-        if let Err(e) = crate::plugin::register_builtin_plugins(&mut plugin_registry) {
+        if let Err(e) = crate::plugin::register_builtin_plugins(
+            &mut plugin_registry,
+            Arc::clone(&cost_tracker),
+            Arc::clone(&usage_tracker),
+        ) {
             tracing::warn!(error = %e, "failed to register builtin plugins");
         }
         let plugin_registry = Arc::new(StdRwLock::new(plugin_registry));

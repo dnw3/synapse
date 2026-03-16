@@ -459,12 +459,7 @@ impl AgentSession {
         // Build content blocks from attachments
         let content_blocks = self.download_attachments(&envelope.attachments).await;
 
-        // Snapshot cost tracker before agent call for usage diff
-        let pre_snap = if let Some(ref tracker) = self.usage_tracker {
-            Some(tracker.framework_tracker.snapshot().await)
-        } else {
-            None
-        };
+        // Usage tracking is handled by CostTrackingSubscriber via EventBus.
 
         let result = if self.deep_agent {
             self.handle_deep_agent(&sid, &envelope.content, &content_blocks, &agent_info)
@@ -484,33 +479,6 @@ impl AgentSession {
             Err(e) => {
                 tracing::error!(agent = %agent_info.id, duration_ms = duration_ms as u64, error = %e, "channel message failed")
             }
-        }
-
-        // Record usage with dimensional metadata (even on error — we still used tokens)
-        if let (Some(ref tracker), Some(pre)) = (&self.usage_tracker, pre_snap) {
-            let post = tracker.framework_tracker.snapshot().await;
-            let model_name = self.model.profile().map(|p| p.name).unwrap_or_default();
-            let provider = self.model.profile().map(|p| p.provider).unwrap_or_default();
-            tracker
-                .record(crate::usage::UsageRecord {
-                    model: model_name,
-                    provider,
-                    channel: channel.clone(),
-                    agent_id: agent_info.id.clone(),
-                    session_key: session_key.clone(),
-                    input_tokens: post
-                        .total_input_tokens
-                        .saturating_sub(pre.total_input_tokens),
-                    output_tokens: post
-                        .total_output_tokens
-                        .saturating_sub(pre.total_output_tokens),
-                    total_tokens: (post.total_input_tokens + post.total_output_tokens)
-                        .saturating_sub(pre.total_input_tokens + pre.total_output_tokens),
-                    cost_usd: (post.estimated_cost_usd - pre.estimated_cost_usd).max(0.0),
-                    latency_ms: duration_ms as u64,
-                    timestamp_ms: crate::gateway::presence::now_ms(),
-                })
-                .await;
         }
 
         let response = result?;
@@ -727,12 +695,7 @@ impl AgentSession {
         // Build content blocks from attachments
         let content_blocks = self.download_attachments(&envelope.attachments).await;
 
-        // Snapshot cost tracker before agent call for usage diff
-        let pre_snap = if let Some(ref tracker) = self.usage_tracker {
-            Some(tracker.framework_tracker.snapshot().await)
-        } else {
-            None
-        };
+        // Usage tracking is handled by CostTrackingSubscriber via EventBus.
 
         let result = if self.deep_agent {
             self.handle_deep_agent_streaming(
@@ -767,33 +730,6 @@ impl AgentSession {
                 output.on_error(&e.to_string()).await;
                 tracing::error!(duration_ms = duration_ms as u64, error = %e, "streaming message failed");
             }
-        }
-
-        // Record usage with dimensional metadata (even on error — we still used tokens)
-        if let (Some(ref tracker), Some(pre)) = (&self.usage_tracker, pre_snap) {
-            let post = tracker.framework_tracker.snapshot().await;
-            let model_name = self.model.profile().map(|p| p.name).unwrap_or_default();
-            let provider = self.model.profile().map(|p| p.provider).unwrap_or_default();
-            tracker
-                .record(crate::usage::UsageRecord {
-                    model: model_name,
-                    provider,
-                    channel: channel.clone(),
-                    agent_id: agent_info.id.clone(),
-                    session_key: session_key.clone(),
-                    input_tokens: post
-                        .total_input_tokens
-                        .saturating_sub(pre.total_input_tokens),
-                    output_tokens: post
-                        .total_output_tokens
-                        .saturating_sub(pre.total_output_tokens),
-                    total_tokens: (post.total_input_tokens + post.total_output_tokens)
-                        .saturating_sub(pre.total_input_tokens + pre.total_output_tokens),
-                    cost_usd: (post.estimated_cost_usd - pre.estimated_cost_usd).max(0.0),
-                    latency_ms: duration_ms as u64,
-                    timestamp_ms: crate::gateway::presence::now_ms(),
-                })
-                .await;
         }
 
         let response = result?;

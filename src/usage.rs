@@ -152,7 +152,10 @@ pub struct AggregatedSnapshot {
 /// Wraps the framework's `CostTrackingCallback` (used by deep-agent middleware)
 /// and adds dimensional record tracking with persistence.
 pub struct UsageTracker {
-    /// The underlying framework tracker (passed to deep agent as callback).
+    /// The underlying framework tracker — kept alive so the deep agent's
+    /// CostTrackingCallback middleware can record aggregate snapshots.
+    /// Direct reads happen via CostTrackingSubscriber, not through this field.
+    #[allow(dead_code)]
     pub framework_tracker: Arc<CostTrackingCallback>,
     /// All dimensional records (in-memory).
     records: RwLock<Vec<UsageRecord>>,

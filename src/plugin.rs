@@ -439,11 +439,13 @@ pub fn load_state() -> HashSet<String> {
 
 /// Register all builtin plugins into a [`PluginRegistry`].
 ///
-/// This wires the three core event subscribers — tracing, thinking, and loop
-/// detection — into the framework's event bus and records their manifests so
-/// the dashboard and `/api/plugins` endpoints can surface them.
+/// This wires the core event subscribers — tracing, thinking, loop detection,
+/// and cost tracking — into the framework's event bus and records their
+/// manifests so the dashboard and `/api/plugins` endpoints can surface them.
 pub fn register_builtin_plugins(
     registry: &mut PluginRegistry,
+    cost_tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
+    usage_tracker: Arc<crate::usage::UsageTracker>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // --- 1. Tracing subscriber ---
     registry.register_event_subscriber(
@@ -486,6 +488,24 @@ pub fn register_builtin_plugins(
         name: "builtin-loop-detection".into(),
         version: env!("CARGO_PKG_VERSION").into(),
         description: "Detect and break agent execution loops".into(),
+        author: Some("synapse".into()),
+        license: None,
+        capabilities: vec![PluginCapability::Hooks],
+    });
+
+    // --- 4. Cost tracking subscriber (records usage to UsageTracker via EventBus) ---
+    registry.register_event_subscriber(
+        Arc::new(crate::agent::subscribers::CostTrackingSubscriber::new(
+            cost_tracker,
+            usage_tracker,
+        )),
+        -60,
+        "builtin:cost-tracking",
+    );
+    registry.record_plugin(PluginManifest {
+        name: "builtin-cost-tracking".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        description: "Token usage and cost tracking via EventBus".into(),
         author: Some("synapse".into()),
         license: None,
         capabilities: vec![PluginCapability::Hooks],

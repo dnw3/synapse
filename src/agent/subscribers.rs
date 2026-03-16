@@ -4,7 +4,6 @@
 //! the old middleware so we can switch over gradually.  Each subscriber is marked
 //! `#[allow(dead_code)]` until the integration step.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -615,19 +614,24 @@ impl EventSubscriber for ToolPolicySubscriber {
 /// Records token usage from every LLM response for cost accounting.
 ///
 /// Maps to: `LlmOutput` (Parallel — read-only observation of usage data).
-#[allow(dead_code)]
+///
+/// Dual recording:
+/// - Framework `CostTrackingCallback` for aggregate snapshots used by the UI.
+/// - Business `UsageTracker` for multi-dimensional per-record persistence.
 pub struct CostTrackingSubscriber {
     tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
-    /// Per-model pricing table keyed by model name.
-    pricing: HashMap<String, (f64, f64)>, // (input_per_m, output_per_m)
+    /// Multi-dimensional usage tracker with JSONL persistence.
+    usage_tracker: Arc<crate::usage::UsageTracker>,
 }
 
 impl CostTrackingSubscriber {
-    #[allow(dead_code)]
-    pub fn new(tracker: Arc<synaptic::callbacks::CostTrackingCallback>) -> Self {
+    pub fn new(
+        tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
+        usage_tracker: Arc<crate::usage::UsageTracker>,
+    ) -> Self {
         Self {
             tracker,
-            pricing: HashMap::new(),
+            usage_tracker,
         }
     }
 }
@@ -651,6 +655,7 @@ impl EventSubscriber for CostTrackingSubscriber {
                 "Token usage"
             );
 
+            // 1. Record into the framework's aggregate tracker (feeds UsageSnapshot).
             let usage = synaptic::core::TokenUsage {
                 input_tokens,
                 output_tokens,
@@ -659,6 +664,32 @@ impl EventSubscriber for CostTrackingSubscriber {
                 output_details: None,
             };
             self.tracker.record_usage(&usage).await;
+
+            // 2. Record into the multi-dimensional usage tracker (feeds dashboard & persistence).
+            let model = event.payload["model"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string();
+            let provider = event.payload["provider"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string();
+
+            self.usage_tracker
+                .record(crate::usage::UsageRecord {
+                    model,
+                    provider,
+                    channel: "eventbus".to_string(),
+                    agent_id: "default".to_string(),
+                    session_key: event.metadata.request_id.clone().unwrap_or_default(),
+                    input_tokens: input_tokens as u64,
+                    output_tokens: output_tokens as u64,
+                    total_tokens: total_tokens as u64,
+                    cost_usd: 0.0, // cost is computed by the framework tracker
+                    latency_ms: 0, // per-call latency not available here
+                    timestamp_ms: event.metadata.timestamp,
+                })
+                .await;
         } else {
             tracing::debug!("Provider returned no usage data for this response");
         }

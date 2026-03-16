@@ -4487,6 +4487,7 @@ dependencies = [
  "synaptic-ollama",
  "synaptic-openai",
  "synaptic-parsers",
+ "synaptic-plugin",
  "synaptic-postgres",
  "synaptic-prompts",
  "synaptic-redis",
@@ -4789,6 +4790,19 @@ dependencies = [
  "serde_json",
  "synaptic-core",
  "synaptic-runnables",
+]
+
+[[package]]
+name = "synaptic-plugin"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "serde_json",
+ "synaptic-core",
+ "synaptic-events",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]

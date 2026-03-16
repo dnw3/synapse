@@ -155,7 +155,7 @@ impl AppState {
             crate::gateway::exec_approvals::ExecApprovalsConfig::load(),
         ));
 
-        Ok(Self {
+        let state = Self {
             config: config.clone(),
             model,
             sessions: Arc::new(session_mgr),
@@ -194,6 +194,15 @@ impl AppState {
             approve_notifiers: Arc::new(crate::channels::dm::ApproveNotifierRegistry::default()),
             run_queue: Arc::new(AgentRunQueue::new()),
             event_bus: Arc::new(EventBus::new()),
-        })
+        };
+
+        // Register builtin plugins so their event subscribers are wired into the
+        // event bus and their manifests are visible via the plugin registry.
+        let mut plugin_registry = synaptic::plugin::PluginRegistry::new(state.event_bus.clone());
+        if let Err(e) = crate::plugin::register_builtin_plugins(&mut plugin_registry) {
+            tracing::warn!(error = %e, "failed to register builtin plugins");
+        }
+
+        Ok(state)
     }
 }

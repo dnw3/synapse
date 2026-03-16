@@ -10,9 +10,11 @@
 
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::Arc;
 
 use serde::Deserialize;
 use synaptic::core::ToolDefinition;
+use synaptic::plugin::{PluginCapability, PluginManifest, PluginRegistry};
 
 // ---------------------------------------------------------------------------
 // PluginCommand
@@ -100,7 +102,7 @@ pub struct PluginInfo {
 ///
 /// Stored as `.synapse/plugins/<plugin-name>/plugin.toml`.
 #[derive(Debug, Deserialize)]
-struct PluginManifest {
+struct FilePluginManifest {
     name: String,
     version: String,
     description: String,
@@ -189,7 +191,7 @@ impl PluginManager {
                 Err(err) => {
                     tracing::warn!(path = %manifest_path.display(), error = %err, "failed to read plugin manifest");
                 }
-                Ok(contents) => match toml::from_str::<PluginManifest>(&contents) {
+                Ok(contents) => match toml::from_str::<FilePluginManifest>(&contents) {
                     Err(err) => {
                         tracing::warn!(path = %manifest_path.display(), error = %err, "invalid plugin manifest");
                     }
@@ -429,4 +431,70 @@ pub fn load_state() -> HashSet<String> {
         Ok(state) => state.disabled.into_iter().collect(),
         Err(_) => HashSet::new(),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Builtin plugin registration
+// ---------------------------------------------------------------------------
+
+/// Register all builtin plugins into a [`PluginRegistry`].
+///
+/// This wires the three core event subscribers — tracing, thinking, and loop
+/// detection — into the framework's event bus and records their manifests so
+/// the dashboard and `/api/plugins` endpoints can surface them.
+pub fn register_builtin_plugins(
+    registry: &mut PluginRegistry,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // --- 1. Tracing subscriber ---
+    registry.register_event_subscriber(
+        Arc::new(crate::agent::subscribers::TracingSubscriber::new()),
+        -80,
+        "builtin:tracing",
+    );
+    registry.record_plugin(PluginManifest {
+        name: "builtin-tracing".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        description: "Agent tracing and latency measurement".into(),
+        author: Some("synapse".into()),
+        license: None,
+        capabilities: vec![PluginCapability::Hooks],
+    });
+
+    // --- 2. Thinking subscriber (no fixed config — adaptive is set separately
+    //        via ThinkingSubscriber::adaptive(); use None for default pass-through) ---
+    registry.register_event_subscriber(
+        Arc::new(crate::agent::subscribers::ThinkingSubscriber::new(None)),
+        -70,
+        "builtin:thinking",
+    );
+    registry.record_plugin(PluginManifest {
+        name: "builtin-thinking".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        description: "Extended thinking configuration".into(),
+        author: Some("synapse".into()),
+        license: None,
+        capabilities: vec![PluginCapability::Hooks],
+    });
+
+    // --- 3. Loop detection subscriber (max 3 consecutive identical tool-call hashes) ---
+    registry.register_event_subscriber(
+        Arc::new(crate::agent::subscribers::LoopDetectionSubscriber::new(3)),
+        -85,
+        "builtin:loop-detection",
+    );
+    registry.record_plugin(PluginManifest {
+        name: "builtin-loop-detection".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        description: "Detect and break agent execution loops".into(),
+        author: Some("synapse".into()),
+        license: None,
+        capabilities: vec![PluginCapability::Hooks],
+    });
+
+    tracing::info!(
+        count = registry.plugins().len(),
+        "registered builtin plugins"
+    );
+
+    Ok(())
 }

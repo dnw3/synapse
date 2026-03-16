@@ -3,6 +3,7 @@ pub(crate) mod bot;
 pub(crate) mod memory;
 mod misc;
 mod models;
+pub mod secrets_vault;
 mod security;
 mod server;
 pub mod watcher;

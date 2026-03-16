@@ -18,6 +18,8 @@ mod memory;
 mod notify;
 #[allow(dead_code)]
 mod plugin;
+#[allow(dead_code)]
+mod plugin_loader;
 mod repl;
 #[allow(dead_code)]
 mod router;

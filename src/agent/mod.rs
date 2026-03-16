@@ -8,6 +8,7 @@ pub mod discovery;
 pub mod link_understanding;
 mod mcp;
 pub mod media_understanding;
+pub mod message_ir;
 pub(crate) mod middleware;
 mod model;
 pub mod prose_vm;

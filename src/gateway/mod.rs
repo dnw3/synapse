@@ -11,6 +11,7 @@ pub mod messages;
 mod metrics;
 pub mod nodes;
 mod openai_compat;
+pub mod pairing;
 pub mod presence;
 mod request_id;
 pub mod rpc;

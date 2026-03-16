@@ -1,8 +1,14 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use tracing;
 
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 use synaptic::DeliveryContext;
 
 use crate::agent;
@@ -159,6 +165,114 @@ pub async fn run(
                     }
                 }
             });
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// Status constants used by [`SignalAdapter`].
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the Signal CLI REST bridge.
+#[allow(dead_code)]
+pub struct SignalAdapter {
+    api_url: String,
+    client: reqwest::Client,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(dead_code)]
+impl SignalAdapter {
+    pub fn new(api_url: &str) -> Self {
+        Self {
+            api_url: api_url.trim_end_matches('/').to_string(),
+            client: reqwest::Client::new(),
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelAdapter for SignalAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "signal".to_string(),
+            name: "Signal".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(40000),
+            supports_streaming: false,
+            supports_threads: false,
+            supports_reactions: false,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "signal", "SignalAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "signal", "SignalAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl Outbound for SignalAdapter {
+    async fn send(
+        &self,
+        envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        tracing::info!(
+            channel = "signal",
+            to = %envelope.channel_id,
+            "SignalAdapter::send (placeholder)",
+        );
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelHealth for SignalAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        let url = format!("{}/v1/health", self.api_url);
+        match self.client.get(&url).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+                HealthStatus::Healthy
+            }
+            Ok(resp) => {
+                let msg = format!("signal-cli health returned HTTP {}", resp.status());
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(msg)
+            }
+            Err(e) => {
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(e.to_string())
+            }
         }
     }
 }

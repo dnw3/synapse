@@ -1,5 +1,7 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -10,6 +12,10 @@ use sha2::Sha256;
 
 use tracing;
 
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 use synaptic::DeliveryContext;
 
 use crate::agent;
@@ -377,6 +383,123 @@ pub async fn run(
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// Status constants used by [`LineAdapter`].
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the LINE Messaging API.
+#[allow(dead_code)]
+pub struct LineAdapter {
+    channel_token: String,
+    client: reqwest::Client,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(dead_code)]
+impl LineAdapter {
+    pub fn new(channel_token: &str) -> Self {
+        Self {
+            channel_token: channel_token.to_string(),
+            client: reqwest::Client::new(),
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelAdapter for LineAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "line".to_string(),
+            name: "LINE".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Groups,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(5000),
+            supports_streaming: false,
+            supports_threads: false,
+            supports_reactions: false,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "line", "LineAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "line", "LineAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl Outbound for LineAdapter {
+    async fn send(
+        &self,
+        envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        tracing::info!(
+            channel = "line",
+            to = %envelope.channel_id,
+            "LineAdapter::send (placeholder)",
+        );
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelHealth for LineAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        // LINE does not provide a dedicated health endpoint; verify the token
+        // by calling the bot info endpoint.
+        let url = "https://api.line.me/v2/bot/info";
+        match self
+            .client
+            .get(url)
+            .bearer_auth(&self.channel_token)
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => {
+                self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+                HealthStatus::Healthy
+            }
+            Ok(resp) => {
+                let msg = format!("LINE bot info returned HTTP {}", resp.status());
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(msg)
+            }
+            Err(e) => {
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(e.to_string())
+            }
+        }
+    }
 }
 
 #[cfg(test)]

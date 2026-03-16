@@ -1,5 +1,7 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::routing::get;
@@ -7,6 +9,10 @@ use axum::Router;
 
 use tracing;
 
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 use synaptic::DeliveryContext;
 
 use crate::agent;
@@ -304,6 +310,116 @@ pub async fn run(
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// Status constants used by [`WeChatAdapter`].
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the WeChat Work (WeCom) webhook.
+#[allow(dead_code)]
+pub struct WeChatAdapter {
+    webhook_key: String,
+    client: reqwest::Client,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(dead_code)]
+impl WeChatAdapter {
+    pub fn new(webhook_key: &str) -> Self {
+        Self {
+            webhook_key: webhook_key.to_string(),
+            client: reqwest::Client::new(),
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelAdapter for WeChatAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "wechat".to_string(),
+            name: "WeChat".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(20000),
+            supports_streaming: false,
+            supports_threads: false,
+            supports_reactions: false,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "wechat", "WeChatAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "wechat", "WeChatAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl Outbound for WeChatAdapter {
+    async fn send(
+        &self,
+        envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        tracing::info!(
+            channel = "wechat",
+            to = %envelope.channel_id,
+            "WeChatAdapter::send (placeholder)",
+        );
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelHealth for WeChatAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        // Probe the WeCom webhook endpoint with an empty POST; a non-5xx response
+        // indicates the key is valid and the service is reachable.
+        let url = format!("{}?key={}", WECOM_WEBHOOK_BASE, self.webhook_key);
+        match self.client.get(&url).send().await {
+            Ok(resp) if !resp.status().is_server_error() => {
+                self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+                HealthStatus::Healthy
+            }
+            Ok(resp) => {
+                let msg = format!("WeCom probe returned HTTP {}", resp.status());
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(msg)
+            }
+            Err(e) => {
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(e.to_string())
+            }
+        }
+    }
 }
 
 #[cfg(test)]

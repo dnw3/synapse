@@ -1,6 +1,11 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
+use synaptic::core::channel::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as ChannelMessageEnvelope, Outbound,
+};
 use synaptic::core::SynapticError;
 use synaptic::lark::bot::session::MentionInfo;
 use synaptic::lark::bot::{CardActionEvent, CardActionHandler, MessageHandler};
@@ -667,6 +672,110 @@ impl CardActionHandler for LarkCardHandler {
             }
         }
         Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// A thin adapter struct that wraps a [`LarkBotClient`] to expose the
+/// synaptic channel traits without disturbing the existing event-loop code.
+#[allow(dead_code)]
+pub struct LarkChannelAdapter {
+    client: LarkBotClient,
+    status: RwLock<ChannelStatus>,
+}
+
+#[allow(dead_code)]
+impl LarkChannelAdapter {
+    pub fn new(client: LarkBotClient) -> Self {
+        Self {
+            client,
+            status: RwLock::new(ChannelStatus::Disconnected),
+        }
+    }
+}
+
+#[async_trait]
+impl ChannelAdapter for LarkChannelAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "lark".to_string(),
+            name: "Lark / Feishu".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Threading,
+                ChannelCap::Reactions,
+                ChannelCap::Mentions,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(4096),
+            supports_streaming: true,
+            supports_threads: true,
+            supports_reactions: true,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), SynapticError> {
+        *self.status.write().unwrap() = ChannelStatus::Connecting;
+        // The actual long-poll loop is managed externally via `run()`.
+        // Mark as connected optimistically; the loop will surface errors.
+        *self.status.write().unwrap() = ChannelStatus::Connected;
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), SynapticError> {
+        *self.status.write().unwrap() = ChannelStatus::Disconnected;
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        self.status.read().unwrap().clone()
+    }
+}
+
+#[async_trait]
+impl Outbound for LarkChannelAdapter {
+    /// Send a text message to `envelope.channel_id` (interpreted as a Lark
+    /// chat_id) with the textual content from `envelope.content`.
+    async fn send(&self, envelope: &ChannelMessageEnvelope) -> Result<(), SynapticError> {
+        self.client
+            .send_text("chat_id", &envelope.channel_id, &envelope.content)
+            .await?;
+        Ok(())
+    }
+
+    /// Edit a previously sent interactive card.  `msg_id` must be the Lark
+    /// card token; `content` is used as the new markdown body.
+    /// Sequence is set to 0 (initial update); callers needing strict ordering
+    /// should use the Lark client API directly.
+    async fn edit(&self, msg_id: &str, content: &str) -> Result<(), SynapticError> {
+        let card = serde_json::json!({
+            "config": { "wide_screen_mode": true },
+            "elements": [
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": content
+                    }
+                }
+            ]
+        });
+        self.client.update_card(msg_id, 0, &card).await?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl ChannelHealth for LarkChannelAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        match self.client.get_bot_info().await {
+            Ok(_) => HealthStatus::Healthy,
+            Err(e) => HealthStatus::Unhealthy(format!("Lark API unreachable: {}", e)),
+        }
     }
 }
 

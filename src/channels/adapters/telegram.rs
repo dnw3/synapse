@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -5,6 +6,10 @@ use async_trait::async_trait;
 use colored::Colorize;
 use tracing;
 
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 use synaptic::DeliveryContext;
 
 use crate::agent;
@@ -320,6 +325,134 @@ pub async fn run(
                     }
                 }
             });
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// Status constants used by [`TelegramAdapter`].
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the Telegram bot.
+///
+/// Wraps an HTTP client and bot token so the generic channel infrastructure
+/// can call `start`, `stop`, `send`, and `health_check` without knowing
+/// anything about the Telegram-specific long-polling loop.
+#[allow(unused)]
+pub struct TelegramAdapter {
+    client: reqwest::Client,
+    base_url: String,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(unused)]
+impl TelegramAdapter {
+    pub fn new(bot_token: &str) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            base_url: format!("https://api.telegram.org/bot{}", bot_token),
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(unused)]
+#[async_trait]
+impl ChannelAdapter for TelegramAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "telegram".to_string(),
+            name: "Telegram".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Groups,
+                ChannelCap::Reactions,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(4096),
+            supports_streaming: false,
+            supports_threads: false,
+            supports_reactions: true,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "telegram", "TelegramAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "telegram", "TelegramAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(unused)]
+#[async_trait]
+impl Outbound for TelegramAdapter {
+    async fn send(
+        &self,
+        envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        // Route to the chat encoded in thread_id ("chat:<id>") or channel_id.
+        let raw_chat = envelope
+            .thread_id
+            .as_deref()
+            .unwrap_or(envelope.channel_id.as_str());
+        let chat_id = raw_chat.strip_prefix("chat:").unwrap_or(raw_chat);
+
+        let chunks = formatter::format_for_channel(&envelope.content, "telegram", 4096);
+        for chunk in chunks {
+            self.client
+                .post(format!("{}/sendMessage", self.base_url))
+                .json(&serde_json::json!({
+                    "chat_id": chat_id,
+                    "text": chunk,
+                }))
+                .send()
+                .await
+                .map_err(|e| synaptic::core::SynapticError::Tool(e.to_string()))?;
+        }
+        Ok(())
+    }
+}
+
+#[allow(unused)]
+#[async_trait]
+impl ChannelHealth for TelegramAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        let url = format!("{}/getMe", self.base_url);
+        match self.client.get(&url).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+                HealthStatus::Healthy
+            }
+            Ok(resp) => {
+                let msg = format!("getMe returned HTTP {}", resp.status());
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(msg)
+            }
+            Err(e) => {
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(e.to_string())
+            }
         }
     }
 }

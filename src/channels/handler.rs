@@ -102,6 +102,10 @@ pub struct AgentSession {
     run_queue: Arc<crate::gateway::run_queue::AgentRunQueue>,
     /// Optional Outbound trait impl for the new channel trait interface.
     outbound: Option<Arc<dyn synaptic::core::Outbound>>,
+    /// Optional EventBus for event-driven usage tracking and subscriber notifications.
+    event_bus: Option<Arc<synaptic::events::EventBus>>,
+    /// Optional PluginRegistry for plugin-registered tools.
+    plugin_registry: Option<Arc<std::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
 }
 
 impl AgentSession {
@@ -125,6 +129,8 @@ impl AgentSession {
             usage_tracker: None,
             run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
             outbound: None,
+            event_bus: None,
+            plugin_registry: None,
         }
     }
 
@@ -170,7 +176,24 @@ impl AgentSession {
             usage_tracker: None,
             run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
             outbound: None,
+            event_bus: None,
+            plugin_registry: None,
         }
+    }
+
+    /// Set the EventBus for event-driven tracking in bot mode.
+    pub fn with_event_bus(mut self, event_bus: Arc<synaptic::events::EventBus>) -> Self {
+        self.event_bus = Some(event_bus);
+        self
+    }
+
+    /// Set the PluginRegistry for plugin tools in bot mode.
+    pub fn with_plugin_registry(
+        mut self,
+        registry: Arc<std::sync::RwLock<synaptic::plugin::PluginRegistry>>,
+    ) -> Self {
+        self.plugin_registry = Some(registry);
+        self
     }
 
     /// Set the cost tracker for usage statistics.
@@ -906,8 +929,8 @@ impl AgentSession {
             self.cost_tracker.clone(),
             &self.channel,
             None, // agent routing resolved at higher level
-            None, // no event bus in bot mode
-            None, // no plugin registry in bot mode
+            self.event_bus.clone(),
+            self.plugin_registry.clone(),
             None, // no channel registry in bot mode
         )
         .await
@@ -1275,8 +1298,8 @@ impl AgentSession {
             None,
             &self.channel,
             None, // agent routing resolved at higher level
-            None, // no event bus in bot mode
-            None, // no plugin registry in bot mode
+            self.event_bus.clone(),
+            self.plugin_registry.clone(),
             None, // no channel registry in bot mode
         )
         .await

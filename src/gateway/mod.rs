@@ -388,6 +388,8 @@ fn spawn_channel_adapters(
         let cfg = config.clone();
         let account_id = account.account_id.clone();
         let mgr = manager.clone();
+        let event_bus = app_state.event_bus.clone();
+        let plugin_registry = app_state.plugin_registry.clone();
         let handle = Arc::new(channel_manager::ChannelStatusHandleImpl::new(
             "lark",
             &account_id,
@@ -396,8 +398,14 @@ fn spawn_channel_adapters(
         let task = tokio::spawn(async move {
             tracing::info!(channel = "lark", account_id = %account_id, "starting channel adapter");
             loop {
-                match crate::channels::adapters::lark::run(&cfg, None, Some(status_handle.clone()))
-                    .await
+                match crate::channels::adapters::lark::run(
+                    &cfg,
+                    None,
+                    Some(status_handle.clone()),
+                    Some(event_bus.clone()),
+                    Some(plugin_registry.clone()),
+                )
+                .await
                 {
                     Ok(()) => {
                         tracing::info!(channel = "lark", account_id = %account_id, "adapter exited, restarting in 5s");

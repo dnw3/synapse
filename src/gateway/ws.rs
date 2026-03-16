@@ -29,8 +29,9 @@ use crate::agent::callbacks::{ApprovalResponse, WebSocketApprovalCallback};
 use crate::agent::{build_deep_agent_with_callback, SessionOverrides};
 use crate::gateway::messages::{Attachment as EnvelopeAttachment, MessageEnvelope};
 use crate::gateway::rpc::{
-    AuthResult, ClientFrame, ConnectParams, FeatureInfo, HelloOk, Role, RpcContext, RpcError,
-    ServerFrame, ServerInfo, SnapshotInfo, StateVersion, GATEWAY_EVENTS, PROTOCOL_VERSION,
+    AuthResult, ClientFrame, ClientInfo, ConnectParams, FeatureInfo, HelloOk, Role, RpcContext,
+    RpcError, ServerFrame, ServerInfo, SnapshotInfo, StateVersion, GATEWAY_EVENTS,
+    PROTOCOL_VERSION,
 };
 use crate::gateway::state::AppState;
 use crate::gateway::voice_ws::VoiceSession;
@@ -348,6 +349,7 @@ enum WsCommand {
 pub fn ws_router(state: AppState) -> Router {
     Router::new()
         .route("/ws/{conversation_id}", get(ws_handler))
+        .route("/ws", get(ws_multiplexed_handler))
         .with_state(state)
 }
 
@@ -2318,4 +2320,255 @@ fn load_session_overrides(conversation_id: &str) -> Option<SessionOverrides> {
         return None;
     }
     Some(SessionOverrides { thinking, verbose })
+}
+
+// ---------------------------------------------------------------------------
+// Multiplexed WebSocket handler — single connection, all sessions via RPC
+// ---------------------------------------------------------------------------
+
+/// Multiplexed WebSocket handler — single connection, all sessions via RPC.
+///
+/// Unlike the per-conversation `/ws/{conversation_id}` route, this handler
+/// accepts a bare `/ws` connection and dispatches frames based on the `method`
+/// and optional `session_key` embedded in each frame. This mirrors the
+/// OpenClaw single-WS design where one connection serves all conversations.
+async fn ws_multiplexed_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_multiplexed_socket(socket, state))
+}
+
+async fn handle_multiplexed_socket(socket: WebSocket, state: AppState) {
+    let (mut ws_sender, mut ws_receiver) = socket.split();
+    let conn_id = Uuid::new_v4().to_string();
+
+    tracing::info!(%conn_id, "multiplexed websocket connected");
+
+    // Register with broadcaster so we receive server-push events
+    let mut event_rx = state.broadcaster.register(conn_id.clone()).await;
+
+    // Build an RpcContext with anonymous/default client info.
+    // The multiplexed endpoint skips the connect handshake — clients that
+    // need auth should use the per-conversation route or pass a token via
+    // query params in a future iteration.
+    let rpc_ctx = Arc::new(RpcContext {
+        state: state.clone(),
+        conn_id: conn_id.clone(),
+        client: ClientInfo::default(),
+        role: Role::Operator,
+        scopes: std::collections::HashSet::new(),
+        broadcaster: state.broadcaster.clone(),
+    });
+
+    // Event sequence counter for this connection
+    let seq = std::sync::atomic::AtomicU64::new(1);
+
+    // Send connect.challenge so the client knows the connection is live
+    let nonce = Uuid::new_v4().to_string();
+    let challenge_seq = seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let challenge = ServerFrame::event(
+        "connect.challenge",
+        serde_json::json!({
+            "nonce": nonce,
+            "conn_id": conn_id,
+            "ts": std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64,
+            "methods": state.rpc_router.method_names(),
+        }),
+        challenge_seq,
+    );
+    if ws_sender
+        .send(WsMessage::Text(
+            serde_json::to_string(&challenge).unwrap().into(),
+        ))
+        .await
+        .is_err()
+    {
+        tracing::warn!(%conn_id, "failed to send challenge, closing");
+        state.broadcaster.unregister(&conn_id).await;
+        return;
+    }
+
+    // Tick timer for keepalive
+    let mut tick_interval = tokio::time::interval(std::time::Duration::from_secs(30));
+    tick_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    // Channel for outbound messages from spawned tasks (e.g. chat.send agent)
+    let (out_tx, mut out_rx) = mpsc::channel::<String>(256);
+
+    loop {
+        tokio::select! {
+            // Periodic tick keepalive
+            _ = tick_interval.tick() => {
+                let tick_seq = seq.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                let tick_frame = ServerFrame::event("tick", serde_json::json!({
+                    "ts": std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64,
+                }), tick_seq);
+                if ws_sender
+                    .send(WsMessage::Text(serde_json::to_string(&tick_frame).unwrap().into()))
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
+            }
+
+            // Outbound messages from spawned agent tasks
+            Some(msg) = out_rx.recv() => {
+                if ws_sender.send(WsMessage::Text(msg.into())).await.is_err() {
+                    break;
+                }
+            }
+
+            // Events from Broadcaster (server-push to all connections)
+            Some(frame) = event_rx.recv() => {
+                if ws_sender
+                    .send(WsMessage::Text(serde_json::to_string(&frame).unwrap().into()))
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
+            }
+
+            // Client frames from WebSocket
+            msg = ws_receiver.next() => {
+                let text = match msg {
+                    Some(Ok(WsMessage::Text(t))) => t.to_string(),
+                    Some(Ok(WsMessage::Close(_))) | None => {
+                        tracing::info!(%conn_id, "multiplexed client disconnected");
+                        break;
+                    }
+                    Some(Ok(WsMessage::Ping(_))) => {
+                        // Respond with pong (axum handles this automatically, but be safe)
+                        continue;
+                    }
+                    Some(Ok(_)) => continue,
+                    Some(Err(e)) => {
+                        tracing::warn!(%conn_id, error = %e, "multiplexed websocket error");
+                        break;
+                    }
+                };
+
+                // Parse as ClientFrame (reuse existing v3 frame format)
+                let frame = match serde_json::from_str::<ClientFrame>(&text) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        let err_frame = ServerFrame::err(
+                            "unknown",
+                            RpcError::invalid_request(format!("Invalid frame: {e}")),
+                        );
+                        if ws_sender
+                            .send(WsMessage::Text(serde_json::to_string(&err_frame).unwrap().into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                        continue;
+                    }
+                };
+
+                match frame {
+                    ClientFrame::Request { id, method, params } => {
+                        if method == "chat.send" {
+                            // Handle chat.send — extract session_key, echo back for now.
+                            // Full agent integration will be wired in a follow-up.
+                            let session_key = params
+                                .get("session_key")
+                                .or_else(|| params.get("sessionKey"))
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("default")
+                                .to_string();
+                            let content = params
+                                .get("content")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+
+                            // Ack immediately
+                            let ack = ServerFrame::ok(
+                                &id,
+                                serde_json::json!({
+                                    "status": "accepted",
+                                    "session_key": session_key,
+                                }),
+                            );
+                            if ws_sender
+                                .send(WsMessage::Text(serde_json::to_string(&ack).unwrap().into()))
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+
+                            // Spawn async task to stream agent events back
+                            let out = out_tx.clone();
+                            let sk = session_key.clone();
+                            tokio::spawn(async move {
+                                // Emit thinking status
+                                let _ = out.send(serde_json::json!({
+                                    "type": "event",
+                                    "event": "agent.turn.status",
+                                    "payload": { "session_key": sk, "state": "thinking" },
+                                    "seq": 0
+                                }).to_string()).await;
+
+                                // TODO: Wire to actual agent execution via handle_v3_agent logic
+                                // For now, echo back to prove the multiplexed path works
+                                let _ = out.send(serde_json::json!({
+                                    "type": "event",
+                                    "event": "agent.turn.chunk",
+                                    "payload": {
+                                        "session_key": sk,
+                                        "content": format!("[multiplexed] echo: {}", content),
+                                    },
+                                    "seq": 0
+                                }).to_string()).await;
+
+                                let _ = out.send(serde_json::json!({
+                                    "type": "event",
+                                    "event": "agent.turn.complete",
+                                    "payload": { "session_key": sk },
+                                    "seq": 0
+                                }).to_string()).await;
+                            });
+                        } else if method == "ping" {
+                            let pong = ServerFrame::ok(&id, serde_json::json!({"pong": true}));
+                            if ws_sender
+                                .send(WsMessage::Text(serde_json::to_string(&pong).unwrap().into()))
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                        } else {
+                            // Standard RPC dispatch via rpc_router
+                            let response = state
+                                .rpc_router
+                                .dispatch(rpc_ctx.clone(), id, &method, params)
+                                .await;
+                            if ws_sender
+                                .send(WsMessage::Text(serde_json::to_string(&response).unwrap().into()))
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Cleanup
+    state.broadcaster.unregister(&conn_id).await;
+    tracing::info!(%conn_id, "multiplexed websocket closed");
 }

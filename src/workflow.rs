@@ -6,10 +6,12 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use colored::Colorize;
 use serde::Deserialize;
 use serde_json::Value;
+use synaptic::core::{ChatModel, ChatRequest, ChatResponse, Message, SynapticError};
 use synaptic::graph::workflow::{
     Workflow, WorkflowContext, WorkflowError, WorkflowHandler, WorkflowResult, WorkflowStatus,
     WorkflowStep,
@@ -46,6 +48,55 @@ struct WorkflowStepDef {
     command: Option<String>,
     /// Static message to emit (for steps that are just checkpoints).
     message: Option<String>,
+
+    // --- LlmCall step fields ---
+    /// Prompt to send to the LLM (enables LlmCall step kind).
+    /// Supports `{key}` placeholder substitution from workflow state.
+    prompt: Option<String>,
+    /// Model to use for LlmCall (optional; defaults to config's default model).
+    model: Option<String>,
+
+    // --- Condition step fields ---
+    /// State field to read for comparison (enables Condition step kind).
+    field: Option<String>,
+    /// Comparison operator: "eq", "ne", "gt", "lt", "contains".
+    operator: Option<String>,
+    /// Value to compare against.
+    value: Option<Value>,
+    /// Step name to branch to when condition is true (optional).
+    branch_true: Option<String>,
+    /// Step name to branch to when condition is false (optional).
+    branch_false: Option<String>,
+
+    // --- Delay step fields ---
+    /// Duration in seconds to pause execution (enables Delay step kind).
+    delay_secs: Option<u64>,
+}
+
+// ---------------------------------------------------------------------------
+// StepKind — discriminates which handler to build for a step
+// ---------------------------------------------------------------------------
+
+/// The resolved kind of a workflow step.
+#[derive(Debug, Clone)]
+pub enum StepKind {
+    /// Run a shell command or emit a static message (default).
+    Shell,
+    /// Call an LLM with a prompt and store the result in workflow state.
+    LlmCall {
+        model: Option<String>,
+        prompt: String,
+    },
+    /// Evaluate a simple comparison against workflow state for branching.
+    Condition {
+        field: String,
+        operator: String,
+        value: Value,
+        branch_true: Option<String>,
+        branch_false: Option<String>,
+    },
+    /// Pause workflow execution for a fixed duration.
+    Delay { duration_secs: u64 },
 }
 
 // ---------------------------------------------------------------------------
@@ -161,23 +212,271 @@ impl WorkflowHandler for ShellStepHandler {
 }
 
 // ---------------------------------------------------------------------------
+// LlmCallHandler — calls a language model within a workflow step
+// ---------------------------------------------------------------------------
+
+struct LlmCallHandler {
+    model: Arc<dyn ChatModel>,
+    model_name: Option<String>,
+    prompt: String,
+}
+
+#[async_trait::async_trait]
+impl WorkflowHandler for LlmCallHandler {
+    async fn execute(&self, ctx: &mut WorkflowContext) -> Result<WorkflowResult, WorkflowError> {
+        // Interpolate {key} placeholders from workflow state into prompt
+        let prompt = interpolate_prompt(&self.prompt, &ctx.state);
+
+        tracing::info!(
+            model = ?self.model_name,
+            prompt_len = prompt.len(),
+            "workflow LlmCall step executing"
+        );
+
+        let request = ChatRequest::new(vec![Message::human(prompt)]);
+        let response = self
+            .model
+            .chat(request)
+            .await
+            .map_err(|e| WorkflowError::Other(format!("LLM call failed: {}", e)))?;
+
+        let result_text = response.message.content().to_string();
+
+        eprintln!("{}", result_text);
+
+        // Store result in state under "llm_result"
+        let mut state = ctx.state.clone();
+        if let Value::Object(ref mut map) = state {
+            map.insert("llm_result".to_string(), Value::String(result_text));
+        }
+        Ok(WorkflowResult::Continue(state))
+    }
+}
+
+/// Interpolate `{key}` placeholders in `template` from JSON state object.
+fn interpolate_prompt(template: &str, state: &Value) -> String {
+    let mut result = template.to_string();
+    if let Value::Object(map) = state {
+        for (key, val) in map {
+            let placeholder = format!("{{{}}}", key);
+            let replacement = match val {
+                Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            result = result.replace(&placeholder, &replacement);
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// ConditionHandler — evaluates a comparison and optionally branches
+// ---------------------------------------------------------------------------
+
+struct ConditionHandler {
+    field: String,
+    operator: String,
+    value: Value,
+    branch_true: Option<String>,
+    branch_false: Option<String>,
+}
+
+#[async_trait::async_trait]
+impl WorkflowHandler for ConditionHandler {
+    async fn execute(&self, ctx: &mut WorkflowContext) -> Result<WorkflowResult, WorkflowError> {
+        let field_val = match &ctx.state {
+            Value::Object(map) => map.get(&self.field).cloned().unwrap_or(Value::Null),
+            _ => Value::Null,
+        };
+
+        let result = evaluate_condition(&field_val, &self.operator, &self.value);
+
+        tracing::info!(
+            field = %self.field,
+            operator = %self.operator,
+            result = result,
+            "workflow Condition step evaluated"
+        );
+
+        // Store condition result in state
+        let mut state = ctx.state.clone();
+        if let Value::Object(ref mut map) = state {
+            map.insert("condition_result".to_string(), Value::Bool(result));
+        }
+
+        match result {
+            true => match &self.branch_true {
+                Some(target) => Ok(WorkflowResult::Branch(target.clone())),
+                None => Ok(WorkflowResult::Continue(state)),
+            },
+            false => match &self.branch_false {
+                Some(target) => Ok(WorkflowResult::Branch(target.clone())),
+                None => Ok(WorkflowResult::Continue(state)),
+            },
+        }
+    }
+}
+
+/// Evaluate a condition: `field_val <operator> cmp_val`.
+///
+/// Supported operators: `eq`, `ne`, `gt`, `lt`, `contains`.
+fn evaluate_condition(field_val: &Value, operator: &str, cmp_val: &Value) -> bool {
+    match operator {
+        "eq" => field_val == cmp_val,
+        "ne" => field_val != cmp_val,
+        "gt" => match (field_val, cmp_val) {
+            (Value::Number(a), Value::Number(b)) => {
+                a.as_f64().unwrap_or(0.0) > b.as_f64().unwrap_or(0.0)
+            }
+            (Value::String(a), Value::String(b)) => a > b,
+            _ => false,
+        },
+        "lt" => match (field_val, cmp_val) {
+            (Value::Number(a), Value::Number(b)) => {
+                a.as_f64().unwrap_or(0.0) < b.as_f64().unwrap_or(0.0)
+            }
+            (Value::String(a), Value::String(b)) => a < b,
+            _ => false,
+        },
+        "contains" => match (field_val, cmp_val) {
+            (Value::String(haystack), Value::String(needle)) => haystack.contains(needle.as_str()),
+            (Value::Array(arr), needle) => arr.contains(needle),
+            _ => false,
+        },
+        _ => {
+            tracing::warn!(operator = %operator, "unknown condition operator — treating as false");
+            false
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DelayHandler — pauses workflow execution for a fixed duration
+// ---------------------------------------------------------------------------
+
+struct DelayHandler {
+    duration_secs: u64,
+}
+
+#[async_trait::async_trait]
+impl WorkflowHandler for DelayHandler {
+    async fn execute(&self, ctx: &mut WorkflowContext) -> Result<WorkflowResult, WorkflowError> {
+        tracing::info!(
+            duration_secs = self.duration_secs,
+            "workflow Delay step sleeping"
+        );
+        tokio::time::sleep(Duration::from_secs(self.duration_secs)).await;
+        Ok(WorkflowResult::Continue(ctx.state.clone()))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NoOpModel — fallback ChatModel when LLM config is unavailable at build time
+// ---------------------------------------------------------------------------
+
+struct NoOpModel;
+
+#[async_trait::async_trait]
+impl ChatModel for NoOpModel {
+    async fn chat(&self, _request: ChatRequest) -> Result<ChatResponse, SynapticError> {
+        Ok(ChatResponse {
+            message: Message::ai("(LLM unavailable — no model configured for this workflow step)"),
+            usage: None,
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// resolve_step_kind — determines which StepKind applies to a step definition
+// ---------------------------------------------------------------------------
+
+fn resolve_step_kind(s: &WorkflowStepDef) -> StepKind {
+    // Delay: delay_secs is set
+    if let Some(duration_secs) = s.delay_secs {
+        return StepKind::Delay { duration_secs };
+    }
+
+    // Condition: field + operator + value are all set
+    if let (Some(field), Some(operator), Some(value)) =
+        (s.field.clone(), s.operator.clone(), s.value.clone())
+    {
+        return StepKind::Condition {
+            field,
+            operator,
+            value,
+            branch_true: s.branch_true.clone(),
+            branch_false: s.branch_false.clone(),
+        };
+    }
+
+    // LlmCall: prompt is set
+    if let Some(prompt) = s.prompt.clone() {
+        return StepKind::LlmCall {
+            model: s.model.clone(),
+            prompt,
+        };
+    }
+
+    // Default: shell / message / no-op
+    StepKind::Shell
+}
+
+// ---------------------------------------------------------------------------
 // Build a Workflow from a WorkflowDef
 // ---------------------------------------------------------------------------
 
-fn build_workflow(def: &WorkflowDef) -> Workflow {
+fn build_workflow(def: &WorkflowDef, config: &SynapseConfig) -> Workflow {
     let work_dir = std::env::current_dir().unwrap_or_default();
     let steps = def
         .steps
         .iter()
-        .map(|s| WorkflowStep {
-            name: s.name.clone(),
-            handler: Box::new(ShellStepHandler {
-                command: s.command.clone(),
-                message: s.message.clone(),
-                work_dir: work_dir.clone(),
-            }),
-            requires_approval: s.requires_approval,
-            timeout: None,
+        .map(|s| {
+            let kind = resolve_step_kind(s);
+            let handler: Box<dyn WorkflowHandler> = match kind {
+                StepKind::LlmCall {
+                    ref model,
+                    ref prompt,
+                } => {
+                    let model_arc = crate::agent::build_model(config, model.as_deref())
+                        .unwrap_or_else(|e| {
+                            tracing::warn!(
+                                error = %e,
+                                "failed to build LLM for workflow step — falling back to no-op"
+                            );
+                            Arc::new(NoOpModel)
+                        });
+                    Box::new(LlmCallHandler {
+                        model: model_arc,
+                        model_name: model.clone(),
+                        prompt: prompt.clone(),
+                    })
+                }
+                StepKind::Condition {
+                    ref field,
+                    ref operator,
+                    ref value,
+                    ref branch_true,
+                    ref branch_false,
+                } => Box::new(ConditionHandler {
+                    field: field.clone(),
+                    operator: operator.clone(),
+                    value: value.clone(),
+                    branch_true: branch_true.clone(),
+                    branch_false: branch_false.clone(),
+                }),
+                StepKind::Delay { duration_secs } => Box::new(DelayHandler { duration_secs }),
+                StepKind::Shell => Box::new(ShellStepHandler {
+                    command: s.command.clone(),
+                    message: s.message.clone(),
+                    work_dir: work_dir.clone(),
+                }),
+            };
+            WorkflowStep {
+                name: s.name.clone(),
+                handler,
+                requires_approval: s.requires_approval,
+                timeout: None,
+            }
         })
         .collect();
 
@@ -207,7 +506,7 @@ fn workflow_checkpointer() -> Arc<dyn Checkpointer> {
 
 /// Run a workflow CLI command.
 pub async fn run_workflow_command(
-    _config: &SynapseConfig,
+    config: &SynapseConfig,
     action: &str,
     name: Option<&str>,
     input: Option<&str>,
@@ -248,7 +547,7 @@ pub async fn run_workflow_command(
                 Value::Object(serde_json::Map::new())
             };
 
-            let workflow = build_workflow(def);
+            let workflow = build_workflow(def, config);
             let runner = WorkflowRunner::new(workflow_checkpointer());
 
             eprintln!(
@@ -320,7 +619,7 @@ pub async fn run_workflow_command(
                         format!("workflow '{}' not found (needed for resume)", wf_name)
                     })?;
 
-                    let workflow = build_workflow(def);
+                    let workflow = build_workflow(def, config);
                     let execution = runner
                         .resume(&workflow, token, approval_data)
                         .await
@@ -478,4 +777,24 @@ const EXAMPLE_WORKFLOW: &str = r#"
   [[steps]]
   name = "deploy"
   command = "echo 'Deploying...'"
+
+  # Example: LlmCall step
+  # [[steps]]
+  # name = "summarize"
+  # prompt = "Summarize the test results: {last_output}"
+  # model = "gpt-4o-mini"   # optional; omit to use default model
+
+  # Example: Condition step
+  # [[steps]]
+  # name = "check-env"
+  # field = "env"
+  # operator = "eq"
+  # value = "production"
+  # branch_true = "deploy-prod"
+  # branch_false = "deploy-staging"
+
+  # Example: Delay step
+  # [[steps]]
+  # name = "cooldown"
+  # delay_secs = 30
 "#;

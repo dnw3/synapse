@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Auto-Reply Command System.
 //!
 //! Intercepts incoming messages that start with `/` and routes them to built-in

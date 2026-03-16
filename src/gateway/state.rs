@@ -101,6 +101,7 @@ pub struct AppState {
     pub plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
     /// Per-request context scopes (TTL: 30 min).  Used for variable passing
     /// across multi-step agent pipelines and sub-agent spawning.
+    #[allow(dead_code)]
     pub context_engine: SharedContextEngine,
 }
 
@@ -110,6 +111,7 @@ impl AppState {
     /// Each section is checked and the relevant in-process state is updated where
     /// safe to do so without restarting. Changes that require a restart (e.g.
     /// serve port) are logged but not applied.
+    #[allow(dead_code)]
     pub fn reload_config(&mut self, new_config: SynapseConfig, diff: &crate::config::ConfigDiff) {
         if diff.agents_changed {
             tracing::info!("hot-reload: agents configuration changed — updating agent definitions");

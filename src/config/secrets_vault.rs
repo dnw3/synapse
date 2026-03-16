@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;

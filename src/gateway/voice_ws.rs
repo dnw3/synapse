@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,7 @@ impl Default for TtsConfig {
 // ---------------------------------------------------------------------------
 
 /// Client → Server voice messages
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 pub enum VoiceClientMessage {
@@ -43,6 +45,7 @@ pub enum VoiceClientMessage {
 }
 
 /// Server → Client voice messages
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 pub enum VoiceServerMessage {

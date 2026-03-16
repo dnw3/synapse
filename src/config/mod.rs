@@ -359,6 +359,7 @@ impl SynapseConfig {
 ///
 /// Used by [`crate::gateway::state::AppState::reload_config`] to apply only
 /// the fields that actually changed without a full restart.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
 pub struct ConfigDiff {
     pub agents_changed: bool,
@@ -371,6 +372,7 @@ pub struct ConfigDiff {
     pub channels_changed: bool,
 }
 
+#[allow(dead_code)]
 impl ConfigDiff {
     /// Returns `true` if any field indicates a change.
     pub fn any_changed(&self) -> bool {

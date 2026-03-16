@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use std::sync::Arc;
 use std::time::Duration;

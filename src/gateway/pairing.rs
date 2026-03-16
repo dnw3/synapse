@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Device pairing service using short-lived 6-digit challenge codes.
 //!
 //! Workflow:

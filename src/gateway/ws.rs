@@ -650,6 +650,16 @@ async fn handle_legacy_connection(
                 {
                     match state.sessions.create_session().await {
                         Ok(session_id) => {
+                            // Tag the new session as the main web session.
+                            if let Ok(Some(mut info)) =
+                                state.sessions.get_session(&session_id).await
+                            {
+                                info.session_key = Some("agent:default:main".to_string());
+                                info.channel = Some("web".to_string());
+                                info.chat_type = Some("direct".to_string());
+                                info.display_name = Some("main".to_string());
+                                let _ = state.sessions.update_session(&info).await;
+                            }
                             // Emit SessionStart (fire-and-forget)
                             let event_bus = state.event_bus.clone();
                             let conv_id = conversation_id.clone();
@@ -939,7 +949,7 @@ async fn handle_legacy_connection(
                                         let delta = post_tokens.saturating_sub(pre_tokens);
                                         if delta > 0 {
                                             if let Ok(Some(mut info)) = state.sessions.get_session(&conversation_id).await {
-                                                info.token_count += delta;
+                                                info.total_tokens += delta;
                                                 let _ = state.sessions.update_session(&info).await;
                                             }
                                         }
@@ -1325,7 +1335,7 @@ async fn handle_legacy_connection(
                                         let delta = post_tokens.saturating_sub(pre_tokens);
                                         if delta > 0 {
                                             if let Ok(Some(mut info)) = state.sessions.get_session(&conversation_id).await {
-                                                info.token_count += delta;
+                                                info.total_tokens += delta;
                                                 let _ = state.sessions.update_session(&info).await;
                                             }
                                         }
@@ -1831,6 +1841,14 @@ async fn handle_v3_agent(
     {
         match state.sessions.create_session().await {
             Ok(session_id) => {
+                // Tag the new session as the main web session.
+                if let Ok(Some(mut info)) = state.sessions.get_session(&session_id).await {
+                    info.session_key = Some("agent:default:main".to_string());
+                    info.channel = Some("web".to_string());
+                    info.chat_type = Some("direct".to_string());
+                    info.display_name = Some("main".to_string());
+                    let _ = state.sessions.update_session(&info).await;
+                }
                 // Emit SessionStart (fire-and-forget)
                 let event_bus = state.event_bus.clone();
                 let conv_id = conversation_id.to_string();
@@ -2134,7 +2152,7 @@ async fn handle_v3_agent(
                             let delta = post_tokens.saturating_sub(pre_tokens);
                             if delta > 0 {
                                 if let Ok(Some(mut info)) = state.sessions.get_session(conversation_id).await {
-                                    info.token_count += delta;
+                                    info.total_tokens += delta;
                                     let _ = state.sessions.update_session(&info).await;
                                 }
                             }

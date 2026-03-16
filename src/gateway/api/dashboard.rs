@@ -187,7 +187,11 @@ async fn get_stats(
     let memory = state.sessions.memory();
     let mut total_messages = 0usize;
     for s in &sessions {
-        total_messages += memory.load(&s.id).await.map(|m| m.len()).unwrap_or(0);
+        total_messages += memory
+            .load(&s.session_id)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0);
     }
 
     // Read from persisted usage tracker (survives restarts) instead of
@@ -342,17 +346,17 @@ async fn get_usage_sessions(
     for s in sessions {
         // Count messages in this session
         let msg_count = memory
-            .load(&s.id)
+            .load(&s.session_id)
             .await
             .map(|msgs| msgs.len() as u64)
             .unwrap_or(0);
 
         // Approximate input/output split (60/40 is typical for chat)
-        let input_tokens = (s.token_count as f64 * 0.6) as u64;
-        let output_tokens = s.token_count.saturating_sub(input_tokens);
+        let input_tokens = (s.total_tokens as f64 * 0.6) as u64;
+        let output_tokens = s.total_tokens.saturating_sub(input_tokens);
 
         result.push(UsageSessionEntry {
-            session_id: s.id,
+            session_id: s.session_id,
             input_tokens,
             output_tokens,
             cost: 0.0,                    // per-session cost tracking not yet available
@@ -452,7 +456,11 @@ async fn get_health(
     let memory = state.sessions.memory();
     let mut memory_entries = 0usize;
     for s in &sessions {
-        memory_entries += memory.load(&s.id).await.map(|m| m.len()).unwrap_or(0);
+        memory_entries += memory
+            .load(&s.session_id)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0);
     }
 
     let active = state.cancel_tokens.read().await.len();
@@ -492,19 +500,31 @@ async fn get_health(
 
 #[derive(Serialize)]
 struct SessionResponse {
-    id: String,
+    /// Session key (= id for web sessions, structured key for channel sessions)
+    key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    channel: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
     created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    updated_at: Option<String>,
     message_count: usize,
     token_count: u64,
-    compaction_count: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    title: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     thinking_level: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     verbose_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fast_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning_level: Option<String>,
 }
 
 async fn get_sessions(
@@ -518,30 +538,49 @@ async fn get_sessions(
 
     let overrides = load_overrides();
     let memory = state.sessions.memory();
+    let model_name = state.config.base.model.model.clone();
     let mut result = Vec::with_capacity(sessions.len());
     for s in sessions {
-        let messages = memory.load(&s.id).await.unwrap_or_default();
+        let messages = memory.load(&s.session_id).await.unwrap_or_default();
         let count = messages.len();
-        // Derive title from first human message (truncated to 60 chars)
-        let title = messages.iter().find(|m| m.is_human()).map(|m| {
-            let content = m.content();
-            if content.chars().count() > 60 {
-                format!("{}...", content.chars().take(60).collect::<String>())
-            } else {
-                content.to_string()
-            }
-        });
-        let ovr = overrides.get(&s.id);
+        // Use SessionInfo fields directly; fall back to parse_session_channel for legacy sessions.
+        let (channel, kind, display_name) = if s.channel.is_some() || s.chat_type.is_some() {
+            (
+                s.channel.clone(),
+                s.chat_type.clone(),
+                s.display_name.clone(),
+            )
+        } else {
+            let (ch, k, dn) =
+                crate::gateway::api::conversations::parse_session_channel(&s.session_id);
+            (
+                if ch.is_empty() { None } else { Some(ch) },
+                if k.is_empty() { None } else { Some(k) },
+                if dn.is_empty() { None } else { Some(dn) },
+            )
+        };
+        let ovr = overrides.get(&s.session_id);
+        // Use session_key as the key if available, otherwise fall back to session_id.
+        let key = s.session_key.clone().unwrap_or(s.session_id);
         result.push(SessionResponse {
-            id: s.id,
+            key,
+            channel,
+            kind,
+            display_name,
             created_at: parse_system_time_string(&s.created_at),
+            updated_at: if s.updated_at > 0 {
+                Some(s.updated_at.to_string())
+            } else {
+                None
+            },
             message_count: count,
-            token_count: s.token_count,
-            compaction_count: s.compaction_count,
-            title,
+            token_count: s.total_tokens,
             label: ovr.and_then(|o| o.label.clone()),
+            model: Some(model_name.clone()),
             thinking_level: ovr.and_then(|o| o.thinking.clone()),
             verbose_level: ovr.and_then(|o| o.verbose.clone()),
+            fast_mode: None,
+            reasoning_level: None,
         });
     }
 
@@ -3426,7 +3465,7 @@ async fn debug_invoke(
                 .iter()
                 .map(|s| {
                     serde_json::json!({
-                        "id": s.id,
+                        "id": s.session_id,
                     })
                 })
                 .collect();

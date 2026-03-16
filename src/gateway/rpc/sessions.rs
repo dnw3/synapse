@@ -165,7 +165,7 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
     let mut result = Vec::new();
 
     for s in sessions {
-        let messages = memory.load(&s.id).await.unwrap_or_default();
+        let messages = memory.load(&s.session_id).await.unwrap_or_default();
         let count = messages.len();
         let title = messages.iter().find(|m| m.is_human()).map(|m| {
             let content = m.content();
@@ -175,21 +175,37 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
                 content.to_string()
             }
         });
-        let ovr = overrides.get(&s.id);
-        let meta = parse_session_key(&s.id);
+        let ovr = overrides.get(&s.session_id);
+        // Use SessionInfo fields directly; fall back to parse_session_key for legacy sessions.
+        let (channel, kind, display_name) = if s.channel.is_some() || s.chat_type.is_some() {
+            (
+                s.channel.clone().unwrap_or_default(),
+                s.chat_type.clone().unwrap_or_default(),
+                s.display_name.clone().unwrap_or_default(),
+            )
+        } else {
+            let meta = parse_session_key(&s.session_id);
+            (meta.channel, meta.kind, meta.display_name)
+        };
+        // Use session_key as the key if available, otherwise fall back to session_id.
+        let key = s
+            .session_key
+            .clone()
+            .unwrap_or_else(|| s.session_id.clone());
         result.push(json!({
-            "id": s.id,
+            "id": s.session_id,
+            "key": key,
             "created_at": parse_system_time_string(&s.created_at),
             "message_count": count,
-            "token_count": s.token_count,
+            "token_count": s.total_tokens,
             "compaction_count": s.compaction_count,
             "title": title,
             "label": ovr.and_then(|o| o.label.clone()),
             "thinking_level": ovr.and_then(|o| o.thinking.clone()),
             "verbose_level": ovr.and_then(|o| o.verbose.clone()),
-            "channel": meta.channel,
-            "kind": meta.kind,
-            "display_name": meta.display_name,
+            "channel": channel,
+            "kind": kind,
+            "display_name": display_name,
         }));
     }
 
@@ -215,11 +231,11 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
 
     let session = sessions
         .iter()
-        .find(|s| s.id == id)
+        .find(|s| s.session_id == id)
         .ok_or_else(|| RpcError::not_found(format!("session '{}' not found", id)))?;
 
     let memory = ctx.state.sessions.memory();
-    let messages = memory.load(&session.id).await.unwrap_or_default();
+    let messages = memory.load(&session.session_id).await.unwrap_or_default();
     let count = messages.len();
     let title = messages.iter().find(|m| m.is_human()).map(|m| {
         let content = m.content();
@@ -232,21 +248,37 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
 
     let overrides = load_overrides();
     let ovr = overrides.get(id);
-    let meta = parse_session_key(&session.session_id);
+    // Use SessionInfo fields directly; fall back to parse_session_key for legacy sessions.
+    let (channel, kind, display_name) = if session.channel.is_some() || session.chat_type.is_some()
+    {
+        (
+            session.channel.clone().unwrap_or_default(),
+            session.chat_type.clone().unwrap_or_default(),
+            session.display_name.clone().unwrap_or_default(),
+        )
+    } else {
+        let meta = parse_session_key(&session.session_id);
+        (meta.channel, meta.kind, meta.display_name)
+    };
+    let key = session
+        .session_key
+        .clone()
+        .unwrap_or_else(|| session.session_id.clone());
 
     Ok(json!({
-        "id": session.id,
+        "id": session.session_id,
+        "key": key,
         "created_at": parse_system_time_string(&session.created_at),
         "message_count": count,
-        "token_count": session.token_count,
+        "token_count": session.total_tokens,
         "compaction_count": session.compaction_count,
         "title": title,
         "label": ovr.and_then(|o| o.label.clone()),
         "thinking_level": ovr.and_then(|o| o.thinking.clone()),
         "verbose_level": ovr.and_then(|o| o.verbose.clone()),
-        "channel": meta.channel,
-        "kind": meta.kind,
-        "display_name": meta.display_name,
+        "channel": channel,
+        "kind": kind,
+        "display_name": display_name,
     }))
 }
 
@@ -427,16 +459,16 @@ pub async fn handle_usage(ctx: Arc<RpcContext>, _params: Value) -> Result<Value,
 
     for s in sessions {
         let msg_count = memory
-            .load(&s.id)
+            .load(&s.session_id)
             .await
             .map(|msgs| msgs.len() as u64)
             .unwrap_or(0);
 
-        let input_tokens = (s.token_count as f64 * 0.6) as u64;
-        let output_tokens = s.token_count.saturating_sub(input_tokens);
+        let input_tokens = (s.total_tokens as f64 * 0.6) as u64;
+        let output_tokens = s.total_tokens.saturating_sub(input_tokens);
 
         result.push(json!({
-            "session_id": s.id,
+            "session_id": s.session_id,
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
             "cost": 0.0,
@@ -563,11 +595,54 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
         .or_else(|| params.get("id").and_then(|v| v.as_str()))
         .ok_or_else(|| RpcError::invalid_request("missing 'session_id' or 'id'"))?;
 
-    let memory = ctx.state.sessions.memory();
-    memory
-        .clear(session_id)
+    // Check if this is the main web session (has session_key = "agent:default:main").
+    // If so: delete the old session entirely, create a fresh one with the same key.
+    let existing_info = ctx
+        .state
+        .sessions
+        .get_session(session_id)
         .await
-        .map_err(|e| RpcError::internal(e.to_string()))?;
+        .ok()
+        .flatten();
+
+    let new_session_id = if existing_info
+        .as_ref()
+        .and_then(|s| s.session_key.as_deref())
+        == Some("agent:default:main")
+    {
+        // Delete the old session (messages + metadata + checkpoints)
+        ctx.state
+            .sessions
+            .delete_session(session_id)
+            .await
+            .map_err(|e| RpcError::internal(e.to_string()))?;
+
+        // Create a new session and tag it with the main session key
+        let new_id = ctx
+            .state
+            .sessions
+            .create_session()
+            .await
+            .map_err(|e| RpcError::internal(e.to_string()))?;
+
+        if let Ok(Some(mut info)) = ctx.state.sessions.get_session(&new_id).await {
+            info.session_key = Some("agent:default:main".to_string());
+            info.channel = Some("web".to_string());
+            info.chat_type = Some("direct".to_string());
+            info.display_name = Some("main".to_string());
+            let _ = ctx.state.sessions.update_session(&info).await;
+        }
+
+        Some(new_id)
+    } else {
+        // Non-main session: just clear messages
+        let memory = ctx.state.sessions.memory();
+        memory
+            .clear(session_id)
+            .await
+            .map_err(|e| RpcError::internal(e.to_string()))?;
+        None
+    };
 
     // Broadcast sessions.changed event
     ctx.broadcaster
@@ -576,11 +651,15 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
             json!({
                 "action": "reset",
                 "session_id": session_id,
+                "new_session_id": new_session_id,
             }),
         )
         .await;
 
-    Ok(json!({ "ok": true }))
+    Ok(json!({
+        "ok": true,
+        "new_session_id": new_session_id,
+    }))
 }
 
 // ---------------------------------------------------------------------------

@@ -1,10 +1,13 @@
+pub mod auto_reply;
 mod builder;
 pub mod callbacks;
 mod context;
+pub mod context_engine;
 pub mod copilot_proxy;
 pub mod discovery;
 pub mod link_understanding;
 mod mcp;
+pub mod media_understanding;
 pub(crate) mod middleware;
 mod model;
 pub mod prose_vm;

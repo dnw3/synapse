@@ -711,6 +711,7 @@ async fn handle_legacy_connection(
                     None, // web UI uses default agent workspace
                     Some(state.event_bus.clone()),
                     Some(state.plugin_registry.clone()),
+                    Some(state.channel_registry.clone()),
                 )
                 .await
                 {
@@ -1136,6 +1137,7 @@ async fn handle_legacy_connection(
                     None, // web UI uses default agent workspace
                     Some(state.event_bus.clone()),
                     Some(state.plugin_registry.clone()),
+                    Some(state.channel_registry.clone()),
                 )
                 .await
                 {
@@ -1920,6 +1922,7 @@ async fn handle_v3_agent(
         None,
         Some(state.event_bus.clone()),
         Some(state.plugin_registry.clone()),
+        Some(state.channel_registry.clone()),
     )
     .await
     {

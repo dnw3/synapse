@@ -120,6 +120,7 @@ pub async fn build_deep_agent(
         None,
         None,
         None,
+        None,
     )
     .await
 }
@@ -142,6 +143,7 @@ pub async fn build_deep_agent_with_callback(
     agent_name: Option<&str>,
     event_bus: Option<Arc<EventBus>>,
     plugin_registry: Option<Arc<RwLock<synaptic::plugin::PluginRegistry>>>,
+    channel_registry: Option<Arc<tokio::sync::RwLock<crate::gateway::messages::ChannelRegistry>>>,
 ) -> Result<CompiledGraph<MessageState>, SynapticError> {
     // Use docker backend if configured, otherwise filesystem
     #[cfg(feature = "docker")]
@@ -383,6 +385,20 @@ pub async fn build_deep_agent_with_callback(
         options
             .tools
             .push(crate::tools::SessionsSpawnTool::new(mgr.clone()));
+    }
+
+    // Add platform action tool (channel registry wired when running as gateway)
+    {
+        let tool = if let Some(ref reg) = channel_registry {
+            crate::tools::PlatformActionTool::with_registry(reg.clone())
+        } else {
+            crate::tools::PlatformActionTool::new()
+        };
+        options.tools.push(Arc::new(tool));
+        tracing::debug!(
+            has_registry = channel_registry.is_some(),
+            "PlatformActionTool registered"
+        );
     }
 
     // Add browser tools if enabled

@@ -6,6 +6,7 @@ mod broadcast;
 mod cli;
 mod commands;
 mod config;
+pub mod cron;
 mod display;
 mod doctor;
 mod heartbeat;

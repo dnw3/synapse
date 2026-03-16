@@ -5,6 +5,7 @@ mod misc;
 mod models;
 mod security;
 mod server;
+pub mod watcher;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

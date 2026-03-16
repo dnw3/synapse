@@ -90,6 +90,7 @@ pub struct AppState {
     /// Per-session run queue to serialize concurrent agent executions.
     pub run_queue: Arc<AgentRunQueue>,
     /// Central event bus for agent lifecycle and gateway events.
+    #[allow(dead_code)]
     pub event_bus: Arc<EventBus>,
 }
 

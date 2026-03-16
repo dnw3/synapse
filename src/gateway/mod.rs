@@ -185,6 +185,22 @@ pub async fn run_server_with_log_buffer(
     );
     tokio::spawn(health_monitor.run());
 
+    // Spawn config file watcher for hot reload.
+    if let Some(config_path) = crate::config::watcher::find_config_path() {
+        let watcher = crate::config::watcher::ConfigWatcher::new(config_path);
+        tokio::spawn(async move {
+            if let Err(e) = watcher
+                .watch(move |_new_config| {
+                    tracing::info!("config reloaded (hot reload handler placeholder)");
+                    // TODO: apply diff-based reload to running state
+                })
+                .await
+            {
+                tracing::warn!(error = %e, "config watcher stopped");
+            }
+        });
+    }
+
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 
     // Graceful shutdown: broadcast shutdown event, then stop accepting connections

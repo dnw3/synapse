@@ -177,8 +177,11 @@ mod tests {
 
         // Updated at yesterday's 05:00 UTC — after yesterday's boundary → fresh
         let updated_after_yesterday_boundary = yesterday_boundary + 3600 * 1000;
-        let result =
-            evaluate_freshness(updated_after_yesterday_boundary, &daily_policy(4), now_before_reset);
+        let result = evaluate_freshness(
+            updated_after_yesterday_boundary,
+            &daily_policy(4),
+            now_before_reset,
+        );
         assert!(result.fresh);
         assert_eq!(result.daily_reset_at, Some(yesterday_boundary));
 

@@ -190,15 +190,17 @@ async fn get_stats(
         total_messages += memory.load(&s.id).await.map(|m| m.len()).unwrap_or(0);
     }
 
-    let snapshot = state.cost_tracker.snapshot().await;
+    // Read from persisted usage tracker (survives restarts) instead of
+    // the in-memory-only cost_tracker which resets on every restart.
+    let usage_snap = state.usage_tracker.snapshot().await;
     let active_ws = state.cancel_tokens.read().await.len();
 
     Ok(Json(StatsResponse {
         session_count: sessions.len(),
         total_messages,
-        total_input_tokens: snapshot.total_input_tokens,
-        total_output_tokens: snapshot.total_output_tokens,
-        total_cost_usd: snapshot.estimated_cost_usd,
+        total_input_tokens: usage_snap.totals.input_tokens,
+        total_output_tokens: usage_snap.totals.output_tokens,
+        total_cost_usd: usage_snap.totals.total_cost,
         uptime_secs: state.started_at.elapsed().as_secs(),
         active_ws_sessions: active_ws,
     }))
@@ -227,26 +229,27 @@ struct ModelUsageEntry {
 }
 
 async fn get_usage(State(state): State<AppState>) -> Json<UsageResponse> {
-    let snapshot = state.cost_tracker.snapshot().await;
+    // Read from the persisted multi-dimensional usage tracker instead of
+    // the in-memory-only cost_tracker which resets on every server restart.
+    let snap = state.usage_tracker.snapshot().await;
 
-    let mut per_model: Vec<ModelUsageEntry> = snapshot
-        .per_model
+    let per_model: Vec<ModelUsageEntry> = snap
+        .by_model
         .into_iter()
-        .map(|(model, usage)| ModelUsageEntry {
-            model,
-            input_tokens: usage.input_tokens,
-            output_tokens: usage.output_tokens,
-            requests: usage.requests,
-            cost_usd: usage.cost_usd,
+        .map(|d| ModelUsageEntry {
+            model: d.key,
+            input_tokens: d.input_tokens,
+            output_tokens: d.output_tokens,
+            requests: d.count,
+            cost_usd: d.cost,
         })
         .collect();
-    per_model.sort_by(|a, b| a.model.cmp(&b.model));
 
     Json(UsageResponse {
-        total_input_tokens: snapshot.total_input_tokens,
-        total_output_tokens: snapshot.total_output_tokens,
-        total_requests: snapshot.total_requests,
-        total_cost_usd: snapshot.estimated_cost_usd,
+        total_input_tokens: snap.totals.input_tokens,
+        total_output_tokens: snap.totals.output_tokens,
+        total_requests: snap.totals.request_count,
+        total_cost_usd: snap.totals.total_cost,
         per_model,
     })
 }
@@ -278,23 +281,20 @@ async fn get_usage_timeseries(
     State(state): State<AppState>,
     Query(_query): Query<TimeseriesQuery>,
 ) -> Json<Vec<TimeseriesEntry>> {
-    // Build synthetic timeseries from per-model aggregates
-    // In a full implementation, this would read from a persistent usage store
-    let snapshot = state.cost_tracker.snapshot().await;
-    let now = chrono::Utc::now();
+    // Read real daily buckets from the persisted usage tracker.
+    let snap = state.usage_tracker.snapshot().await;
 
-    // Generate a single "today" bucket from current totals
-    let entries = if snapshot.total_requests > 0 {
-        vec![TimeseriesEntry {
-            timestamp: now.format("%Y-%m-%dT%H:00:00Z").to_string(),
-            input_tokens: snapshot.total_input_tokens,
-            output_tokens: snapshot.total_output_tokens,
-            cost: snapshot.estimated_cost_usd,
-            count: snapshot.total_requests,
-        }]
-    } else {
-        vec![]
-    };
+    let entries: Vec<TimeseriesEntry> = snap
+        .daily
+        .into_iter()
+        .map(|d| TimeseriesEntry {
+            timestamp: format!("{}T00:00:00Z", d.date),
+            input_tokens: d.input_tokens,
+            output_tokens: d.output_tokens,
+            cost: d.cost,
+            count: d.count,
+        })
+        .collect();
 
     Json(entries)
 }

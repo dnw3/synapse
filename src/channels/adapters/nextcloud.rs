@@ -1,8 +1,14 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use reqwest::Client;
 use tokio::time::Duration;
 
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 use synaptic::DeliveryContext;
 
 use crate::agent;
@@ -156,5 +162,128 @@ pub async fn run(
         }
 
         tokio::time::sleep(poll_interval).await;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// Status constants used by [`NextcloudAdapter`].
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the Nextcloud Talk bot.
+#[allow(dead_code)]
+pub struct NextcloudAdapter {
+    /// HTTP client for making API calls.
+    client: Client,
+    /// Base URL of the Nextcloud instance, e.g. `https://cloud.example.com`.
+    base_url: String,
+    /// Nextcloud username used for Basic Auth.
+    username: String,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(dead_code)]
+impl NextcloudAdapter {
+    pub fn new(base_url: impl Into<String>, username: impl Into<String>) -> Self {
+        Self {
+            client: Client::new(),
+            base_url: base_url.into(),
+            username: username.into(),
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelAdapter for NextcloudAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "nextcloud".to_string(),
+            name: "Nextcloud Talk".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Groups,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(32000),
+            supports_streaming: false,
+            supports_threads: false,
+            supports_reactions: false,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "nextcloud", "NextcloudAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "nextcloud", "NextcloudAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl Outbound for NextcloudAdapter {
+    async fn send(
+        &self,
+        _envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        // Placeholder: a full implementation would POST to
+        // `{base_url}/ocs/v2.php/apps/spreed/api/v1/chat/{room_token}`
+        // using Basic Auth with `self.username`.
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelHealth for NextcloudAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        let url = format!(
+            "{}/ocs/v2.php/apps/spreed/api/v1/room",
+            self.base_url.trim_end_matches('/')
+        );
+        match self
+            .client
+            .get(&url)
+            .basic_auth(&self.username, Some(""))
+            .header("OCS-APIRequest", "true")
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() || resp.status().as_u16() == 401 => {
+                // 401 means the server is reachable; credentials may just be wrong.
+                self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+                HealthStatus::Healthy
+            }
+            Ok(resp) => {
+                let msg = format!("health probe returned HTTP {}", resp.status());
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(msg)
+            }
+            Err(e) => {
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(e.to_string())
+            }
+        }
     }
 }

@@ -7,6 +7,7 @@ pub mod link_understanding;
 mod mcp;
 pub(crate) mod middleware;
 mod model;
+pub mod prose_vm;
 pub mod registry;
 pub mod runtime;
 pub mod self_awareness;

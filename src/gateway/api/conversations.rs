@@ -5,6 +5,7 @@ use axum::routing::{delete, get, post};
 use axum::Router;
 use serde::Serialize;
 use synaptic::core::MemoryStore;
+use synaptic::events::{Event, EventKind};
 use tracing;
 
 use crate::gateway::state::AppState;
@@ -125,6 +126,20 @@ async fn delete_conversation(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     tracing::info!(conversation_id = %id, "conversation deleted");
+
+    // Emit SessionEnd (fire-and-forget)
+    {
+        let event_bus = state.event_bus.clone();
+        let session_id = id.clone();
+        tokio::spawn(async move {
+            let mut event = Event::new(
+                EventKind::SessionEnd,
+                serde_json::json!({ "session_id": session_id }),
+            )
+            .with_source("gateway/api");
+            let _ = event_bus.emit(&mut event).await;
+        });
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

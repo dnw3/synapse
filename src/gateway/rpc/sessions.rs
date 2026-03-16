@@ -7,6 +7,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use synaptic::core::MemoryStore;
+use synaptic::events::{Event, EventKind};
 
 use super::router::RpcContext;
 use super::types::RpcError;
@@ -260,6 +261,20 @@ pub async fn handle_delete(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
             }),
         )
         .await;
+
+    // Emit SessionEnd (fire-and-forget)
+    {
+        let event_bus = ctx.state.event_bus.clone();
+        let session_id = id.to_string();
+        tokio::spawn(async move {
+            let mut event = Event::new(
+                EventKind::SessionEnd,
+                serde_json::json!({ "session_id": session_id }),
+            )
+            .with_source("gateway/rpc");
+            let _ = event_bus.emit(&mut event).await;
+        });
+    }
 
     Ok(json!({ "ok": true }))
 }

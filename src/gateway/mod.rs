@@ -29,6 +29,8 @@ use colored::Colorize;
 use serde::Serialize;
 use tokio::sync::Mutex;
 
+use synaptic::events::{Event, EventKind};
+
 use crate::config::SynapseConfig;
 
 /// Start the web server.
@@ -203,12 +205,33 @@ pub async fn run_server_with_log_buffer(
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
 
+    // Emit GatewayStart after successful bind
+    {
+        let event_bus = app_state.event_bus.clone();
+        let port_val = port;
+        tokio::spawn(async move {
+            let mut event = Event::new(
+                EventKind::GatewayStart,
+                serde_json::json!({ "port": port_val }),
+            )
+            .with_source("gateway");
+            let _ = event_bus.emit(&mut event).await;
+        });
+    }
+
     // Graceful shutdown: broadcast shutdown event, then stop accepting connections
     let broadcaster = shutdown_broadcaster;
+    let event_bus_shutdown = app_state.event_bus.clone();
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             let _ = tokio::signal::ctrl_c().await;
             eprintln!("\n{}", "Shutting down gracefully...".yellow().bold());
+            // Emit GatewayStop before broadcasting shutdown to clients
+            {
+                let mut event = Event::new(EventKind::GatewayStop, serde_json::json!({}))
+                    .with_source("gateway");
+                let _ = event_bus_shutdown.emit(&mut event).await;
+            }
             // Broadcast shutdown event to all connected clients
             broadcaster
                 .broadcast("shutdown", serde_json::json!({"reason": "server_shutdown"}))

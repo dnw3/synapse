@@ -23,6 +23,8 @@ use uuid::Uuid;
 
 use regex::Regex;
 
+use synaptic::events::{Event, EventKind};
+
 use crate::agent::callbacks::{ApprovalResponse, WebSocketApprovalCallback};
 use crate::agent::{build_deep_agent_with_callback, SessionOverrides};
 use crate::gateway::messages::{Attachment as EnvelopeAttachment, MessageEnvelope};
@@ -528,6 +530,26 @@ async fn handle_legacy_connection(
                     attachments = attachment_count,
                     "user message received"
                 );
+
+                // Emit MessageReceived event (fire-and-forget)
+                {
+                    let event_bus = state.event_bus.clone();
+                    let req_id = request_id.clone();
+                    let conv_id = conversation_id.clone();
+                    tokio::spawn(async move {
+                        let mut event = Event::new(
+                            EventKind::MessageReceived,
+                            serde_json::json!({
+                                "request_id": req_id,
+                                "conversation_id": conv_id,
+                                "channel": "web",
+                            }),
+                        )
+                        .with_source("gateway/ws");
+                        let _ = event_bus.emit(&mut event).await;
+                    });
+                }
+
                 let execution_start = std::time::Instant::now();
 
                 // Serialize concurrent executions for the same session
@@ -564,14 +586,33 @@ async fn handle_legacy_connection(
                     .flatten()
                     .is_none()
                 {
-                    if let Err(e) = state.sessions.create_session().await {
-                        let _ = sender
-                            .send(ws_json(&WsEvent::Error {
-                                message: e.to_string(),
-                                request_id: Some(request_id.clone()),
-                            }))
-                            .await;
-                        continue;
+                    match state.sessions.create_session().await {
+                        Ok(session_id) => {
+                            // Emit SessionStart (fire-and-forget)
+                            let event_bus = state.event_bus.clone();
+                            let conv_id = conversation_id.clone();
+                            tokio::spawn(async move {
+                                let mut event = Event::new(
+                                    EventKind::SessionStart,
+                                    serde_json::json!({
+                                        "session_id": session_id,
+                                        "conversation_id": conv_id,
+                                        "channel": "web",
+                                    }),
+                                )
+                                .with_source("gateway/ws");
+                                let _ = event_bus.emit(&mut event).await;
+                            });
+                        }
+                        Err(e) => {
+                            let _ = sender
+                                .send(ws_json(&WsEvent::Error {
+                                    message: e.to_string(),
+                                    request_id: Some(request_id.clone()),
+                                }))
+                                .await;
+                            continue;
+                        }
                     }
                 }
 
@@ -870,6 +911,26 @@ async fn handle_legacy_connection(
                                         model: model_name,
                                         stop_reason: Some("end_turn".to_string()),
                                     })).await;
+
+                                    // Emit MessageSent (fire-and-forget)
+                                    {
+                                        let event_bus = state.event_bus.clone();
+                                        let req_id = request_id.clone();
+                                        let conv_id = conversation_id.clone();
+                                        tokio::spawn(async move {
+                                            let mut event = Event::new(
+                                                EventKind::MessageSent,
+                                                serde_json::json!({
+                                                    "request_id": req_id,
+                                                    "conversation_id": conv_id,
+                                                    "channel": "web",
+                                                }),
+                                            )
+                                            .with_source("gateway/ws");
+                                            let _ = event_bus.emit(&mut event).await;
+                                        });
+                                    }
+
                                     break;
                                 }
                             }
@@ -920,6 +981,27 @@ async fn handle_legacy_connection(
                 let _req_guard = req_span.enter();
 
                 tracing::info!(msg_type = "form_submit", "ws message received");
+
+                // Emit MessageReceived event (fire-and-forget)
+                {
+                    let event_bus = state.event_bus.clone();
+                    let req_id = request_id.clone();
+                    let conv_id = conversation_id.clone();
+                    tokio::spawn(async move {
+                        let mut event = Event::new(
+                            EventKind::MessageReceived,
+                            serde_json::json!({
+                                "request_id": req_id,
+                                "conversation_id": conv_id,
+                                "channel": "web",
+                                "source": "form_submit",
+                            }),
+                        )
+                        .with_source("gateway/ws");
+                        let _ = event_bus.emit(&mut event).await;
+                    });
+                }
+
                 let execution_start = std::time::Instant::now();
 
                 // Serialize concurrent executions for the same session
@@ -1228,6 +1310,26 @@ async fn handle_legacy_connection(
                                         model: model_name,
                                         stop_reason: Some("end_turn".to_string()),
                                     })).await;
+
+                                    // Emit MessageSent (fire-and-forget)
+                                    {
+                                        let event_bus = state.event_bus.clone();
+                                        let req_id = request_id.clone();
+                                        let conv_id = conversation_id.clone();
+                                        tokio::spawn(async move {
+                                            let mut event = Event::new(
+                                                EventKind::MessageSent,
+                                                serde_json::json!({
+                                                    "request_id": req_id,
+                                                    "conversation_id": conv_id,
+                                                    "channel": "web",
+                                                }),
+                                            )
+                                            .with_source("gateway/ws");
+                                            let _ = event_bus.emit(&mut event).await;
+                                        });
+                                    }
+
                                     break;
                                 }
                             }
@@ -1605,6 +1707,26 @@ async fn handle_v3_agent(
         "v3 agent request"
     );
 
+    // Emit MessageReceived event (fire-and-forget)
+    {
+        let event_bus = state.event_bus.clone();
+        let req_id = request_id.clone();
+        let conv_id = conversation_id.to_string();
+        tokio::spawn(async move {
+            let mut event = Event::new(
+                EventKind::MessageReceived,
+                serde_json::json!({
+                    "request_id": req_id,
+                    "conversation_id": conv_id,
+                    "channel": "web",
+                    "protocol": "v3",
+                }),
+            )
+            .with_source("gateway/ws");
+            let _ = event_bus.emit(&mut event).await;
+        });
+    }
+
     // Helper to send a v3 event frame
     macro_rules! send_event {
         ($event:expr, $payload:expr) => {{
@@ -1649,13 +1771,33 @@ async fn handle_v3_agent(
         .flatten()
         .is_none()
     {
-        if let Err(e) = state.sessions.create_session().await {
-            let err = ServerFrame::err(request_id_rpc, RpcError::internal(e.to_string()));
-            let _ = sender
-                .send(WsMessage::Text(serde_json::to_string(&err).unwrap().into()))
-                .await;
-            state.write_lock.release(conversation_id, conn_id).await;
-            return;
+        match state.sessions.create_session().await {
+            Ok(session_id) => {
+                // Emit SessionStart (fire-and-forget)
+                let event_bus = state.event_bus.clone();
+                let conv_id = conversation_id.to_string();
+                tokio::spawn(async move {
+                    let mut event = Event::new(
+                        EventKind::SessionStart,
+                        serde_json::json!({
+                            "session_id": session_id,
+                            "conversation_id": conv_id,
+                            "channel": "web",
+                            "protocol": "v3",
+                        }),
+                    )
+                    .with_source("gateway/ws");
+                    let _ = event_bus.emit(&mut event).await;
+                });
+            }
+            Err(e) => {
+                let err = ServerFrame::err(request_id_rpc, RpcError::internal(e.to_string()));
+                let _ = sender
+                    .send(WsMessage::Text(serde_json::to_string(&err).unwrap().into()))
+                    .await;
+                state.write_lock.release(conversation_id, conn_id).await;
+                return;
+            }
         }
     }
 
@@ -1965,6 +2107,27 @@ async fn handle_v3_agent(
                         send_event!("agent.turn.complete", serde_json::json!({
                             "request_id": request_id,
                         }));
+
+                        // Emit MessageSent (fire-and-forget)
+                        {
+                            let event_bus = state.event_bus.clone();
+                            let req_id = request_id.clone();
+                            let conv_id = conversation_id.to_string();
+                            tokio::spawn(async move {
+                                let mut event = Event::new(
+                                    EventKind::MessageSent,
+                                    serde_json::json!({
+                                        "request_id": req_id,
+                                        "conversation_id": conv_id,
+                                        "channel": "web",
+                                        "protocol": "v3",
+                                    }),
+                                )
+                                .with_source("gateway/ws");
+                                let _ = event_bus.emit(&mut event).await;
+                            });
+                        }
+
                         break;
                     }
                 }

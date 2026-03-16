@@ -2,6 +2,16 @@ export interface Conversation {
   id: string;
   created_at: string;
   message_count: number;
+  /** Channel source: "web", "lark", "discord", "slack", etc. */
+  channel?: string;
+  /** Session kind: "web", "main", "dm", "group" */
+  kind?: string;
+  /** Peer display name extracted from session key */
+  display_name?: string;
+  /** First human message or label */
+  title?: string;
+  /** Cumulative token count */
+  token_count?: number;
 }
 
 export interface ToolCall {

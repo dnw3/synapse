@@ -63,6 +63,92 @@ fn parse_system_time_string(s: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// Session key parsing — extract channel/kind/display_name from session key
+// ---------------------------------------------------------------------------
+
+/// Parsed session key metadata.
+struct SessionKeyMeta {
+    channel: String,
+    kind: String,
+    display_name: String,
+}
+
+/// Parse a session key to extract channel, kind, and display_name.
+///
+/// Key formats (from session_key.rs):
+///   `agent:{agent_id}:main`                                    → web/main
+///   `agent:{agent_id}:{channel}:dm:{peer_id}`                  → channel/dm
+///   `agent:{agent_id}:{channel}:{account}:dm:{peer_id}`        → channel/dm (multi-account)
+///   `agent:{agent_id}:{channel}:grp:{peer_id}[:{extras}]`      → channel/group
+///   UUID (web sessions)                                         → web
+fn parse_session_key(id: &str) -> SessionKeyMeta {
+    let parts: Vec<&str> = id.split(':').collect();
+
+    // UUID-style web session (no colons, or doesn't start with "agent:")
+    if !id.starts_with("agent:") {
+        return SessionKeyMeta {
+            channel: "web".to_string(),
+            kind: "web".to_string(),
+            display_name: String::new(),
+        };
+    }
+
+    // agent:{agent_id}:main
+    if parts.len() == 3 && parts[2] == "main" {
+        return SessionKeyMeta {
+            channel: "web".to_string(),
+            kind: "main".to_string(),
+            display_name: "main".to_string(),
+        };
+    }
+
+    // Find "dm" or "grp" marker to determine kind and channel
+    for (i, part) in parts.iter().enumerate() {
+        if *part == "dm" && i >= 2 {
+            let channel = parts[2].to_string();
+            let peer_id = if i + 1 < parts.len() {
+                parts[i + 1].to_string()
+            } else {
+                String::new()
+            };
+            return SessionKeyMeta {
+                channel,
+                kind: "dm".to_string(),
+                display_name: peer_id,
+            };
+        }
+        if *part == "grp" && i >= 2 {
+            let channel = parts[2].to_string();
+            let peer_id = if i + 1 < parts.len() {
+                parts[i + 1].to_string()
+            } else {
+                String::new()
+            };
+            // Check for extra scoping (sender/topic)
+            let mut display = peer_id;
+            if i + 2 < parts.len() {
+                let extras = parts[i + 2..].join(":");
+                if !extras.is_empty() {
+                    display = format!("{}:{}", display, extras);
+                }
+            }
+            return SessionKeyMeta {
+                channel,
+                kind: "group".to_string(),
+                display_name: display,
+            };
+        }
+    }
+
+    // Fallback: agent key but unrecognized format
+    SessionKeyMeta {
+        channel: "web".to_string(),
+        kind: "web".to_string(),
+        display_name: String::new(),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // sessions.list
 // ---------------------------------------------------------------------------
 
@@ -90,6 +176,7 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
             }
         });
         let ovr = overrides.get(&s.id);
+        let meta = parse_session_key(&s.id);
         result.push(json!({
             "id": s.id,
             "created_at": parse_system_time_string(&s.created_at),
@@ -100,6 +187,9 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
             "label": ovr.and_then(|o| o.label.clone()),
             "thinking_level": ovr.and_then(|o| o.thinking.clone()),
             "verbose_level": ovr.and_then(|o| o.verbose.clone()),
+            "channel": meta.channel,
+            "kind": meta.kind,
+            "display_name": meta.display_name,
         }));
     }
 
@@ -142,6 +232,7 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
 
     let overrides = load_overrides();
     let ovr = overrides.get(id);
+    let meta = parse_session_key(&session.id);
 
     Ok(json!({
         "id": session.id,
@@ -153,6 +244,9 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
         "label": ovr.and_then(|o| o.label.clone()),
         "thinking_level": ovr.and_then(|o| o.thinking.clone()),
         "verbose_level": ovr.and_then(|o| o.verbose.clone()),
+        "channel": meta.channel,
+        "kind": meta.kind,
+        "display_name": meta.display_name,
     }))
 }
 

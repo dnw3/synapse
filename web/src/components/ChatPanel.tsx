@@ -75,6 +75,29 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
+function formatRelativeTime(dateStr: string): string {
+  try {
+    // Handle both ISO strings and millisecond timestamps
+    const ts = /^\d+$/.test(dateStr) ? Number(dateStr) : new Date(dateStr).getTime();
+    if (isNaN(ts)) return "";
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60_000);
+    if (mins < 1) return "now";
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `${days}d`;
+  } catch {
+    return "";
+  }
+}
+
+function truncateLabel(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max) + "...";
+}
+
 function exportToMarkdown(messages: Message[]): string {
   return messages
     .map((msg) => {
@@ -538,13 +561,21 @@ export default function ChatPanel({
             <select
               value={activeSessionId ?? ""}
               onChange={(e) => onSelectSession?.(e.target.value)}
-              className="appearance-none pl-2 pr-6 py-1 text-[12px] font-medium bg-[var(--bg-grouped)] text-[var(--text-primary)] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] outline-none cursor-pointer max-w-[200px] truncate"
+              className="appearance-none pl-2 pr-6 py-1 text-[12px] font-medium bg-[var(--bg-grouped)] text-[var(--text-primary)] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] outline-none cursor-pointer max-w-[260px] truncate"
             >
-              {conversations.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {sessionTitles?.[s.id] || s.id.slice(0, 8)}
-                </option>
-              ))}
+              {conversations.map((s) => {
+                const label = sessionTitles?.[s.id] || s.title || s.display_name || s.id.slice(0, 12);
+                const channel = s.channel || "web";
+                const kind = s.kind && s.kind !== "web" && s.kind !== channel ? `:${s.kind}` : "";
+                const channelTag = `[${channel}${kind}]`;
+                const timeAgo = s.created_at ? formatRelativeTime(s.created_at) : "";
+                const displayLabel = truncateLabel(label, 24);
+                return (
+                  <option key={s.id} value={s.id}>
+                    {displayLabel} {channelTag}{timeAgo ? ` ${timeAgo}` : ""}
+                  </option>
+                );
+              })}
             </select>
             <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--text-tertiary)] pointer-events-none" />
           </div>

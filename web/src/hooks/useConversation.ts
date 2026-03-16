@@ -14,20 +14,19 @@ export function useConversation() {
   const messageCacheRef = useRef<Record<string, Message[]>>({});
   const prevActiveIdRef = useRef<string | null>(null);
 
-  // Load conversations on mount, then fetch titles for ones with messages
+  // Load conversations on mount — titles come from the server response
   useEffect(() => {
     api.listConversations().then((convs) => {
       setConversations(convs);
-      convs.forEach((conv) => {
-        if (conv.message_count > 0) {
-          api.getMessages(conv.id).then((msgs) => {
-            const first = msgs.find((m) => m.role === "human");
-            if (first) {
-              setTitles((prev) => ({ ...prev, [conv.id]: first.content }));
-            }
-          }).catch(() => {});
+      const newTitles: Record<string, string> = {};
+      for (const conv of convs) {
+        if (conv.title) {
+          newTitles[conv.id] = conv.title;
         }
-      });
+      }
+      if (Object.keys(newTitles).length > 0) {
+        setTitles((prev) => ({ ...prev, ...newTitles }));
+      }
     }).catch(console.error);
   }, []);
 

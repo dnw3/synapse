@@ -2,6 +2,7 @@ mod builder;
 pub mod callbacks;
 mod context;
 pub mod discovery;
+pub mod link_understanding;
 mod mcp;
 pub(crate) mod middleware;
 mod model;

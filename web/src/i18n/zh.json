@@ -6,6 +6,8 @@
     "disconnected": "未连接"
   },
   "sidebar": {
+    "chat": "聊天",
+    "chatTab": "聊天",
     "chats": "会话",
     "conversations": "会话列表",
     "newChat": "新建会话",

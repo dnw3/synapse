@@ -6,6 +6,8 @@
     "disconnected": "Disconnected"
   },
   "sidebar": {
+    "chat": "Chat",
+    "chatTab": "Chat",
     "chats": "Chats",
     "conversations": "CONVERSATIONS",
     "newChat": "New Chat",

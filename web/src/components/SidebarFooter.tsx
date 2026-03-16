@@ -9,8 +9,10 @@ interface SidebarFooterProps {
   themeMode: string;
   onCycleTheme: () => void;
   onToggleLanguage: () => void;
-  sidebarMode: "chat" | "dashboard";
-  onSwitchMode: () => void;
+  /** @deprecated Mode switch is no longer needed with unified sidebar */
+  sidebarMode?: "chat" | "dashboard";
+  /** @deprecated Mode switch is no longer needed with unified sidebar */
+  onSwitchMode?: () => void;
 }
 
 export default function SidebarFooter({
@@ -41,15 +43,17 @@ export default function SidebarFooter({
           {identity?.name || t("sidebar.brand")}
         </span>
       </div>
-      {/* Right: mode switch + theme + language */}
+      {/* Right: mode switch (legacy) + theme + language */}
       <div className="flex items-center gap-0.5 flex-shrink-0">
-        <button
-          onClick={onSwitchMode}
-          className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)]"
-          title={switchTitle}
-        >
-          <SwitchIcon className="h-3.5 w-3.5" />
-        </button>
+        {onSwitchMode && (
+          <button
+            onClick={onSwitchMode}
+            className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)]"
+            title={switchTitle}
+          >
+            <SwitchIcon className="h-3.5 w-3.5" />
+          </button>
+        )}
         <button
           onClick={onCycleTheme}
           className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)]"

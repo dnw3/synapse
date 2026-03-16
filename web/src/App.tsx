@@ -4,14 +4,12 @@ import { useConversation } from "./hooks/useConversation";
 import { useGatewayWS } from "./hooks/useGatewayWS";
 import { useTheme } from "./hooks/useTheme";
 import { Toaster, useToast } from "./components/ui/toast";
-import Sidebar from "./components/Sidebar";
+import UnifiedSidebar from "./components/UnifiedSidebar";
 import Toolbar from "./components/Toolbar";
 import ChatPanel, { FocusModeExitButton } from "./components/ChatPanel";
 import Dashboard, { TABS, type TabKey } from "./components/Dashboard";
 import CommandPalette, { type PaletteEntry } from "./components/CommandPalette";
 
-// All dashboard tab keys for mode derivation
-const DASHBOARD_TABS = new Set<string>(TABS.map((t) => t.key));
 import SetupWizard from "./components/SetupWizard";
 import ToolOutputSidebar from "./components/ToolOutputSidebar";
 import type { Message, FileAttachment } from "./types";
@@ -66,20 +64,7 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  // Derived sidebar mode: "chat" or "dashboard"
-  const sidebarMode = DASHBOARD_TABS.has(activeView) ? "dashboard" : "chat";
-  const lastDashboardTabRef = useRef<TabKey>("overview");
-  // Track last dashboard tab for mode switching
-  if (DASHBOARD_TABS.has(activeView)) {
-    lastDashboardTabRef.current = activeView as TabKey;
-  }
-  const handleSwitchSidebarMode = () => {
-    if (sidebarMode === "chat") {
-      setActiveView(lastDashboardTabRef.current);
-    } else {
-      setActiveView("chat");
-    }
-  };
+  // (Mode toggle removed — unified sidebar handles all navigation)
 
   // Fetch agent identity + model name from health
   useEffect(() => {
@@ -336,8 +321,8 @@ export default function App() {
 
   const isChatView = activeView === "chat";
 
-  // Toolbar title/subtitle computation
-  const toolbarTitle = isChatView
+  // Toolbar title: breadcrumb style — "Synapse > Page"
+  const currentPageTitle = isChatView
     ? (conv.titles[conv.activeId ?? ""] || t("chat.newChat"))
     : t(TABS.find((tb) => tb.key === activeView)?.i18nKey ?? "app.title");
   const toolbarSubtitle = isChatView ? t("sidebar.messages", { count: allMessages.length }) : undefined;
@@ -456,8 +441,8 @@ export default function App() {
             />
           )}
 
-          {/* Unified Sidebar */}
-          <Sidebar
+          {/* Unified Sidebar — single sidebar with all nav groups */}
+          <UnifiedSidebar
             conversations={conv.conversations}
             activeConversationId={conv.activeId}
             titles={conv.titles}
@@ -466,8 +451,6 @@ export default function App() {
             onDeleteConversation={conv.deleteConversation}
             activeView={activeView}
             onViewChange={(v) => { setActiveView(v as ViewKey); setMobileMenuOpen(false); }}
-            sidebarMode={sidebarMode as "chat" | "dashboard"}
-            onSwitchMode={() => { handleSwitchSidebarMode(); setMobileMenuOpen(false); }}
             identity={identity}
             themeMode={theme.mode}
             onCycleTheme={theme.cycleMode}
@@ -479,7 +462,7 @@ export default function App() {
           {/* Main content */}
           <main className="flex-1 flex flex-col min-w-0">
             <Toolbar
-              title={toolbarTitle}
+              title={currentPageTitle}
               subtitle={toolbarSubtitle}
               modelBadge={toolbarModel}
               connected={ws.connected}

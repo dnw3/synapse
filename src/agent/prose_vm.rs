@@ -208,7 +208,7 @@ mod tests {
         vm.execute(&instructions, &mut state).await.unwrap();
         assert_eq!(
             state.output,
-            vec!["item: \"a\"", "item: \"b\"", "item: \"c\""]
+            vec!["item: a", "item: b", "item: c"]
         );
     }
 }

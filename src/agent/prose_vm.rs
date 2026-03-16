@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 /// Instructions that can appear in a Prose skill body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,12 +46,14 @@ pub struct ProseState {
 
 /// The VM that interprets prose instructions.
 #[allow(dead_code)]
-pub struct ProseVm;
+pub struct ProseVm {
+    plugin_registry: Option<Arc<RwLock<synaptic::plugin::PluginRegistry>>>,
+}
 
 #[allow(dead_code)]
 impl ProseVm {
-    pub fn new() -> Self {
-        Self
+    pub fn new(plugin_registry: Option<Arc<RwLock<synaptic::plugin::PluginRegistry>>>) -> Self {
+        Self { plugin_registry }
     }
 
     /// Execute a list of instructions against the given state.
@@ -72,12 +75,45 @@ impl ProseVm {
                     tracing::info!(prose_vm = true, "{}", resolved);
                     state.output.push(resolved);
                 }
-                ProseInstruction::CallTool { name, args: _ } => {
-                    // TODO: wire to actual tool execution via PluginRegistry
-                    tracing::info!(tool = %name, "ProseVM: would call tool");
-                    state
-                        .output
-                        .push(format!("[tool:{}] placeholder result", name));
+                ProseInstruction::CallTool { name, args } => {
+                    if let Some(ref registry) = self.plugin_registry {
+                        let tool = {
+                            let reg = registry
+                                .read()
+                                .map_err(|e| format!("PluginRegistry lock poisoned: {e}"))?;
+                            reg.tools()
+                                .iter()
+                                .find(|t| t.name() == name.as_str())
+                                .cloned()
+                        };
+                        if let Some(tool) = tool {
+                            tracing::info!(tool = %name, "ProseVM: calling tool via PluginRegistry");
+                            match tool.call(args.clone()).await {
+                                Ok(result) => {
+                                    let result_str = match &result {
+                                        Value::String(s) => s.clone(),
+                                        other => other.to_string(),
+                                    };
+                                    state
+                                        .variables
+                                        .insert(format!("_{}_result", name), result.clone());
+                                    state.output.push(result_str);
+                                }
+                                Err(e) => {
+                                    tracing::warn!(tool = %name, error = %e, "ProseVM: tool call failed");
+                                    state.output.push(format!("[tool:{} error] {}", name, e));
+                                }
+                            }
+                        } else {
+                            tracing::warn!(tool = %name, "ProseVM: tool not found in PluginRegistry");
+                            state.output.push(format!("[tool:{} not found]", name));
+                        }
+                    } else {
+                        tracing::info!(tool = %name, "ProseVM: no PluginRegistry, skipping tool call");
+                        state
+                            .output
+                            .push(format!("[tool:{}] placeholder result", name));
+                    }
                 }
                 ProseInstruction::AskUser { prompt } => {
                     let resolved = self.resolve_template(prompt, &state.variables);
@@ -142,7 +178,7 @@ mod tests {
 
     #[tokio::test]
     async fn set_var_and_log() {
-        let vm = ProseVm::new();
+        let vm = ProseVm::new(None);
         let mut state = ProseState::default();
         let instructions = vec![
             ProseInstruction::SetVar {
@@ -159,7 +195,7 @@ mod tests {
 
     #[tokio::test]
     async fn branch_true() {
-        let vm = ProseVm::new();
+        let vm = ProseVm::new(None);
         let mut state = ProseState::default();
         state.variables.insert("flag".into(), Value::Bool(true));
         let instructions = vec![ProseInstruction::Branch {
@@ -177,7 +213,7 @@ mod tests {
 
     #[tokio::test]
     async fn ask_user_suspends() {
-        let vm = ProseVm::new();
+        let vm = ProseVm::new(None);
         let mut state = ProseState::default();
         let instructions = vec![
             ProseInstruction::AskUser {
@@ -194,7 +230,7 @@ mod tests {
 
     #[tokio::test]
     async fn loop_over_array() {
-        let vm = ProseVm::new();
+        let vm = ProseVm::new(None);
         let mut state = ProseState::default();
         state
             .variables
@@ -207,5 +243,50 @@ mod tests {
         }];
         vm.execute(&instructions, &mut state).await.unwrap();
         assert_eq!(state.output, vec!["item: a", "item: b", "item: c"]);
+    }
+
+    #[tokio::test]
+    async fn call_tool_via_plugin_registry() {
+        use std::sync::Arc;
+        use synaptic::plugin::PluginRegistry;
+
+        // A minimal mock tool that echoes its args back as a string.
+        struct EchoTool;
+
+        #[async_trait::async_trait]
+        impl synaptic::core::Tool for EchoTool {
+            fn name(&self) -> &'static str {
+                "echo"
+            }
+            fn description(&self) -> &'static str {
+                "Echoes arguments"
+            }
+            async fn call(&self, args: Value) -> Result<Value, synaptic::core::SynapticError> {
+                Ok(Value::String(args.to_string()))
+            }
+        }
+
+        let event_bus = Arc::new(synaptic::events::EventBus::new());
+        let mut registry = PluginRegistry::new(event_bus);
+        registry.register_tool(Arc::new(EchoTool));
+        let registry = Arc::new(std::sync::RwLock::new(registry));
+
+        let vm = ProseVm::new(Some(registry));
+        let mut state = ProseState::default();
+        let instructions = vec![ProseInstruction::CallTool {
+            name: "echo".into(),
+            args: serde_json::json!({"msg": "hello"}),
+        }];
+        vm.execute(&instructions, &mut state).await.unwrap();
+
+        // Output should contain the echoed args string, not the placeholder.
+        assert_eq!(state.output.len(), 1);
+        assert!(
+            state.output[0].contains("hello"),
+            "expected echoed output, got: {}",
+            state.output[0]
+        );
+        // The result should have been stored in a variable.
+        assert!(state.variables.contains_key("_echo_result"));
     }
 }

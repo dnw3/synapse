@@ -100,6 +100,8 @@ pub struct AgentSession {
     usage_tracker: Option<Arc<crate::usage::UsageTracker>>,
     /// Per-session run queue to serialize concurrent agent executions.
     run_queue: Arc<crate::gateway::run_queue::AgentRunQueue>,
+    /// Optional Outbound trait impl for the new channel trait interface.
+    outbound: Option<Arc<dyn synaptic::core::Outbound>>,
 }
 
 impl AgentSession {
@@ -122,6 +124,7 @@ impl AgentSession {
             cost_tracker: None,
             usage_tracker: None,
             run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
+            outbound: None,
         }
     }
 
@@ -166,6 +169,7 @@ impl AgentSession {
             cost_tracker: None,
             usage_tracker: None,
             run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
+            outbound: None,
         }
     }
 
@@ -208,6 +212,13 @@ impl AgentSession {
     ) -> Self {
         self.channel_registry = Some(channel_registry);
         self.broadcaster = Some(broadcaster);
+        self
+    }
+
+    /// Set the Outbound trait impl for the new channel trait interface.
+    #[allow(dead_code)]
+    pub fn with_outbound(mut self, outbound: Arc<dyn synaptic::core::Outbound>) -> Self {
+        self.outbound = Some(outbound);
         self
     }
 
@@ -511,7 +522,85 @@ impl AgentSession {
 
         // Dispatch outbound (for non-webchat channels only)
         if delivery_target.channel != "webchat" {
-            if let Some(ref registry) = self.channel_registry {
+            // Try new Outbound trait first
+            if let Some(ref outbound) = self.outbound {
+                let envelope = synaptic::core::channel::MessageEnvelope {
+                    channel_id: delivery_target.channel.clone(),
+                    sender_id: "agent".to_string(),
+                    content: response.clone(),
+                    thread_id: delivery_target.thread_id.clone(),
+                    attachments: vec![],
+                    metadata: serde_json::Value::Null,
+                };
+                match outbound.send(&envelope).await {
+                    Ok(()) => {
+                        if let Some(ref broadcaster) = self.broadcaster {
+                            let now_ms = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_millis() as u64;
+                            let sent_event = MessageSentEvent {
+                                request_id: request_id.clone(),
+                                channel: delivery_target.channel.clone(),
+                                to: delivery_target.to.clone(),
+                                timestamp_ms: now_ms,
+                                message_id: None,
+                            };
+                            if let Ok(payload) = serde_json::to_value(&sent_event) {
+                                broadcaster.broadcast("message.sent", payload).await;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            channel = %delivery_target.channel,
+                            error = %e,
+                            "Outbound trait send failed, falling through to legacy dispatch"
+                        );
+                        // Fall through to legacy channel_registry path below
+                        if let Some(ref registry) = self.channel_registry {
+                            let sender = {
+                                let reg = registry.read().await;
+                                reg.get(&delivery_target.channel).cloned()
+                            };
+                            if let Some(sender) = sender {
+                                match sender
+                                    .send(
+                                        &delivery_target,
+                                        &response,
+                                        delivery_target.meta.as_ref(),
+                                    )
+                                    .await
+                                {
+                                    Ok(send_result) => {
+                                        if let Some(ref broadcaster) = self.broadcaster {
+                                            let sent_event = MessageSentEvent {
+                                                request_id: request_id.clone(),
+                                                channel: delivery_target.channel.clone(),
+                                                to: delivery_target.to.clone(),
+                                                timestamp_ms: send_result.delivered_at_ms,
+                                                message_id: send_result.message_id,
+                                            };
+                                            if let Ok(payload) = serde_json::to_value(&sent_event) {
+                                                broadcaster
+                                                    .broadcast("message.sent", payload)
+                                                    .await;
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::error!(
+                                            "failed to dispatch to {}: {}",
+                                            delivery_target.channel,
+                                            e
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if let Some(ref registry) = self.channel_registry {
                 let sender = {
                     let reg = registry.read().await;
                     reg.get(&delivery_target.channel).cloned()
@@ -881,6 +970,7 @@ impl AgentSession {
             self.cost_tracker.clone(),
             &self.channel,
             None, // agent routing resolved at higher level
+            None, // no event bus in bot mode
         )
         .await
         .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;
@@ -1034,6 +1124,7 @@ impl AgentSession {
                                 None,
                                 "broadcast",
                                 None,
+                                None, // no event bus in broadcast mode
                             )
                             .await
                             .map_err(|e| AgentError(format!("agent build: {}", e)))?;
@@ -1244,6 +1335,7 @@ impl AgentSession {
             None,
             &self.channel,
             None, // agent routing resolved at higher level
+            None, // no event bus in bot mode
         )
         .await
         .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;

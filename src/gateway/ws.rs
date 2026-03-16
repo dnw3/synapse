@@ -33,6 +33,7 @@ use crate::gateway::rpc::{
     ServerFrame, ServerInfo, SnapshotInfo, StateVersion, GATEWAY_EVENTS, PROTOCOL_VERSION,
 };
 use crate::gateway::state::AppState;
+use crate::gateway::voice_ws::VoiceSession;
 
 // ---------------------------------------------------------------------------
 // Streaming proxy: wraps a ChatModel, uses stream_chat() internally,
@@ -121,7 +122,12 @@ impl ChatModel for StreamingProxy {
 }
 
 /// Parse `[canvas:type attrs]content[/canvas]` directives from text.
-fn extract_canvas_directives(text: &str) -> Vec<WsEvent> {
+/// When `engine` recognises the block type the raw content is replaced with
+/// the rendered HTML produced by the matching [`CanvasRenderer`].
+fn extract_canvas_directives(
+    text: &str,
+    engine: &crate::gateway::canvas::CanvasEngine,
+) -> Vec<WsEvent> {
     let re = Regex::new(r"\[canvas:(\w+)([^\]]*)\]([\s\S]*?)\[/canvas\]").unwrap();
     let attr_re = Regex::new(r"(\w+)=(\S+)").unwrap();
     let mut events = Vec::new();
@@ -148,11 +154,55 @@ fn extract_canvas_directives(text: &str) -> Vec<WsEvent> {
             Some(serde_json::Value::Object(attrs))
         };
 
+        // Build the data payload passed to the renderer: merge inline attrs with
+        // the raw content so renderers can access both.
+        let mut render_data = serde_json::json!({ "content": content });
+        if let Some(serde_json::Value::Object(ref extra)) = attributes {
+            for (k, v) in extra {
+                render_data
+                    .as_object_mut()
+                    .unwrap()
+                    .insert(k.clone(), v.clone());
+            }
+        }
+
+        // Try the CanvasEngine first; fall back to raw content on miss.
+        let (final_content, interactive) =
+            if let Some(rendered) = engine.render(&block_type, &render_data) {
+                (rendered.html, rendered.interactive)
+            } else {
+                (content, false)
+            };
+
+        let mut final_attrs = if interactive {
+            // Surface the interactive flag via attributes so the frontend can
+            // activate any embedded form/action logic.
+            let mut m = serde_json::Map::new();
+            m.insert("interactive".to_string(), serde_json::Value::Bool(true));
+            // Merge original attrs back.
+            if let Some(serde_json::Value::Object(orig)) = &attributes {
+                for (k, v) in orig {
+                    m.insert(k.clone(), v.clone());
+                }
+            }
+            Some(serde_json::Value::Object(m))
+        } else {
+            attributes
+        };
+
+        // Remove "interactive" key from attributes if it was already there
+        // to avoid duplicating it at the top level (already captured above).
+        if let Some(serde_json::Value::Object(ref mut m)) = final_attrs {
+            if !interactive {
+                m.remove("interactive");
+            }
+        }
+
         events.push(WsEvent::CanvasUpdate {
             block_type,
-            content,
+            content: final_content,
             language,
-            attributes,
+            attributes: final_attrs,
         });
     }
 
@@ -284,6 +334,15 @@ enum WsCommand {
     /// Heartbeat ping from client.
     #[serde(rename = "ping")]
     Ping {},
+    /// Start a voice input session.
+    #[serde(rename = "voice_start")]
+    VoiceStart { format: String },
+    /// Append a base64-encoded audio chunk to the active voice session.
+    #[serde(rename = "voice_chunk")]
+    VoiceChunk { data: String },
+    /// End the current voice input session.
+    #[serde(rename = "voice_end")]
+    VoiceEnd,
 }
 
 pub fn ws_router(state: AppState) -> Router {
@@ -374,6 +433,7 @@ async fn handle_legacy_connection(
     first_msg: Option<String>,
 ) {
     let mut processed_idempotency_keys: HashSet<String> = HashSet::new();
+    let mut voice_session: Option<VoiceSession> = None;
 
     // Send legacy hello event with server capabilities
     let _ = sender
@@ -649,6 +709,7 @@ async fn handle_legacy_connection(
                     Some(state.cost_tracker.clone()),
                     "web",
                     None, // web UI uses default agent workspace
+                    Some(state.event_bus.clone()),
                 )
                 .await
                 {
@@ -805,7 +866,7 @@ async fn handle_legacy_connection(
                                                 }
                                             } else {
                                                 let content = msg.content();
-                                                for canvas_evt in extract_canvas_directives(content) {
+                                                for canvas_evt in extract_canvas_directives(content, &state.canvas_engine) {
                                                     let _ = sender.send(ws_json(&canvas_evt)).await;
                                                 }
                                             }
@@ -1072,6 +1133,7 @@ async fn handle_legacy_connection(
                     Some(state.cost_tracker.clone()),
                     "web",
                     None, // web UI uses default agent workspace
+                    Some(state.event_bus.clone()),
                 )
                 .await
                 {
@@ -1204,7 +1266,7 @@ async fn handle_legacy_connection(
                                                 }
                                             } else {
                                                 let content = msg.content();
-                                                for canvas_evt in extract_canvas_directives(content) {
+                                                for canvas_evt in extract_canvas_directives(content, &state.canvas_engine) {
                                                     let _ = sender.send(ws_json(&canvas_evt)).await;
                                                 }
                                             }
@@ -1373,6 +1435,28 @@ async fn handle_legacy_connection(
             WsCommand::Cancel {} => {
                 if let Some(tx) = state.cancel_tokens.read().await.get(&conversation_id) {
                     let _ = tx.send(true);
+                }
+            }
+            WsCommand::VoiceStart { format } => {
+                voice_session = Some(VoiceSession::new(format));
+                tracing::info!("voice session started");
+            }
+            WsCommand::VoiceChunk { data } => {
+                if let Some(ref mut session) = voice_session {
+                    if let Err(e) = session.append_chunk(&data) {
+                        tracing::warn!(error = %e, "failed to decode voice chunk");
+                    }
+                }
+            }
+            WsCommand::VoiceEnd => {
+                if let Some(mut session) = voice_session.take() {
+                    session.end();
+                    let audio_data = session.take_buffer();
+                    tracing::info!(
+                        bytes = audio_data.len(),
+                        "voice session ended, audio captured"
+                    );
+                    // TODO: pipe to STT provider in Wave 2
                 }
             }
         }
@@ -1832,6 +1916,7 @@ async fn handle_v3_agent(
         Some(state.cost_tracker.clone()),
         "web",
         None,
+        Some(state.event_bus.clone()),
     )
     .await
     {
@@ -1999,7 +2084,7 @@ async fn handle_v3_agent(
                                     }
                                 } else {
                                     let content = msg.content();
-                                    for canvas_evt in extract_canvas_directives(content) {
+                                    for canvas_evt in extract_canvas_directives(content, &state.canvas_engine) {
                                         let _ = sender.send(ws_json(&canvas_evt)).await;
                                     }
                                 }

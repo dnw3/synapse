@@ -9,6 +9,7 @@ use synaptic::condenser::{
 };
 use synaptic::core::{ChatModel, SynapticError, TokenCounter, Tool};
 use synaptic::deep::{create_deep_agent, DeepAgentOptions};
+use synaptic::events::EventBus;
 use synaptic::graph::{Checkpointer, CompiledGraph, MessageState};
 use synaptic::middleware::{
     CircuitBreakerConfig, CircuitBreakerMiddleware, RiskLevel, RuleBasedAnalyzer,
@@ -116,6 +117,7 @@ pub async fn build_deep_agent(
         None,
         "unknown",
         None,
+        None,
     )
     .await
 }
@@ -136,6 +138,7 @@ pub async fn build_deep_agent_with_callback(
     cost_tracker: Option<Arc<CostTrackingCallback>>,
     channel: &str,
     agent_name: Option<&str>,
+    event_bus: Option<Arc<EventBus>>,
 ) -> Result<CompiledGraph<MessageState>, SynapticError> {
     // Use docker backend if configured, otherwise filesystem
     #[cfg(feature = "docker")]
@@ -647,6 +650,9 @@ pub async fn build_deep_agent_with_callback(
             }
         }
     }
+
+    // Wire EventBus into deep agent for lifecycle event emission
+    options.event_bus = event_bus;
 
     create_deep_agent(model, options)
 }

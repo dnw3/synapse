@@ -195,6 +195,19 @@ case "$MODE" in
     fi
     ;;
 
+  coverage)
+    echo "Running Rust coverage..."
+    cargo llvm-cov --features "$FEATURES" --html --output-dir coverage/rust
+    echo "Running TS coverage..."
+    cd "$ROOT/web"
+    npx vitest run --coverage
+    cd "$ROOT"
+    echo ""
+    echo "Coverage reports generated:"
+    echo "  Rust: coverage/rust/index.html"
+    echo "  TS:   web/coverage/"
+    ;;
+
   connect)
     URL="${1:?usage: ./start.sh connect <ws://host:port>}"
     shift
@@ -213,6 +226,7 @@ case "$MODE" in
     echo "  dev [port] [fe-port]  Dev mode: backend + vite HMR (3000 + 5173)"
     echo "  build                 Build frontend + backend for production"
     echo "  bot <platform>        Start bot adapter (telegram, lark, etc.)"
+    echo "  coverage              Run coverage reports (Rust + TS)"
     echo "  stop                  Stop all local synapse/vite processes"
     echo "  connect <ws-url>      Connect to remote gateway"
     exit 1

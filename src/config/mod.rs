@@ -354,6 +354,36 @@ impl SynapseConfig {
     }
 }
 
+/// Summary of which config sections changed between two [`SynapseConfig`] loads.
+///
+/// Used by [`crate::gateway::state::AppState::reload_config`] to apply only
+/// the fields that actually changed without a full restart.
+#[derive(Debug, Clone, Default)]
+pub struct ConfigDiff {
+    pub agents_changed: bool,
+    pub bindings_changed: bool,
+    pub tools_changed: bool,
+    pub memory_changed: bool,
+    pub schedules_changed: bool,
+    pub auth_changed: bool,
+    pub serve_changed: bool,
+    pub channels_changed: bool,
+}
+
+impl ConfigDiff {
+    /// Returns `true` if any field indicates a change.
+    pub fn any_changed(&self) -> bool {
+        self.agents_changed
+            || self.bindings_changed
+            || self.tools_changed
+            || self.memory_changed
+            || self.schedules_changed
+            || self.auth_changed
+            || self.serve_changed
+            || self.channels_changed
+    }
+}
+
 impl Default for SynapseConfig {
     fn default() -> Self {
         toml::from_str(

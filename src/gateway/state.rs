@@ -13,6 +13,7 @@ use super::canvas::CanvasEngine;
 use super::rpc::{Broadcaster, RpcRouter};
 use super::run_queue::AgentRunQueue;
 use crate::agent;
+use crate::agent::context_engine::{ContextEngine, SharedContextEngine};
 use crate::config::SynapseConfig;
 use crate::gateway::messages::ChannelRegistry;
 use crate::gateway::rpc::wizard::WizardSession;
@@ -98,6 +99,9 @@ pub struct AppState {
     pub canvas_engine: Arc<CanvasEngine>,
     /// Plugin registry — loaded once at startup, shared across all agent builds.
     pub plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
+    /// Per-request context scopes (TTL: 30 min).  Used for variable passing
+    /// across multi-step agent pipelines and sub-agent spawning.
+    pub context_engine: SharedContextEngine,
 }
 
 impl AppState {
@@ -284,6 +288,7 @@ impl AppState {
             event_bus,
             canvas_engine: Arc::new(CanvasEngine::new()),
             plugin_registry,
+            context_engine: Arc::new(ContextEngine::new(std::time::Duration::from_secs(1800))),
         };
 
         Ok(state)

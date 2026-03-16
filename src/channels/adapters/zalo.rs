@@ -1,8 +1,14 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 use synaptic::DeliveryContext;
 
 use crate::agent;
@@ -145,4 +151,114 @@ async fn handle_webhook(
     });
 
     StatusCode::OK
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// Status constants used by [`ZaloAdapter`].
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the Zalo OA bot.
+#[allow(dead_code)]
+pub struct ZaloAdapter {
+    client: reqwest::Client,
+    access_token: String,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(dead_code)]
+impl ZaloAdapter {
+    pub fn new(access_token: String) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            access_token,
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelAdapter for ZaloAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "zalo".to_string(),
+            name: "Zalo".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(2000),
+            supports_streaming: false,
+            supports_threads: false,
+            supports_reactions: false,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "zalo", "ZaloAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "zalo", "ZaloAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl Outbound for ZaloAdapter {
+    async fn send(
+        &self,
+        envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        // Derive user_id from thread_id ("user:<id>") or channel_id.
+        let raw = envelope
+            .thread_id
+            .as_deref()
+            .unwrap_or(envelope.channel_id.as_str());
+        let user_id = raw.strip_prefix("user:").unwrap_or(raw);
+
+        self.client
+            .post("https://openapi.zalo.me/v3.0/oa/message/cs")
+            .header("access_token", &self.access_token)
+            .json(&serde_json::json!({
+                "recipient": { "user_id": user_id },
+                "message": { "text": envelope.content }
+            }))
+            .send()
+            .await
+            .map_err(|e| synaptic::core::SynapticError::Tool(e.to_string()))?;
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelHealth for ZaloAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        // Zalo OA does not expose a simple ping endpoint; report last known state.
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => HealthStatus::Healthy,
+            STATUS_ERROR => HealthStatus::Unhealthy("adapter in error state".to_string()),
+            _ => HealthStatus::Unhealthy("adapter not started".to_string()),
+        }
+    }
 }

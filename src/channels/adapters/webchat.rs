@@ -1,5 +1,7 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::{
     extract::State,
     http::{HeaderValue, Method, StatusCode},
@@ -10,6 +12,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 use synaptic::DeliveryContext;
 
 use crate::agent;
@@ -181,4 +187,110 @@ async fn handle_widget_js(State(state): State<AppState>) -> impl IntoResponse {
         [("content-type", "application/javascript; charset=utf-8")],
         js,
     )
+}
+
+// ---------------------------------------------------------------------------
+// ChannelAdapter / Outbound / ChannelHealth trait implementations
+// ---------------------------------------------------------------------------
+
+/// Status constants used by [`WebChatAdapter`].
+const STATUS_DISCONNECTED: u8 = 0;
+const STATUS_CONNECTED: u8 = 1;
+const STATUS_ERROR: u8 = 2;
+
+/// Channel adapter facade for the embeddable WebChat widget.
+#[allow(dead_code)]
+pub struct WebChatAdapter {
+    client: reqwest::Client,
+    /// Port the HTTP server is listening on (for health probing).
+    port: u16,
+    /// Atomic status: 0 = Disconnected, 1 = Connected, 2 = Error.
+    status: AtomicU8,
+}
+
+#[allow(dead_code)]
+impl WebChatAdapter {
+    pub fn new(port: u16) -> Self {
+        Self {
+            client: reqwest::Client::new(),
+            port,
+            status: AtomicU8::new(STATUS_DISCONNECTED),
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelAdapter for WebChatAdapter {
+    fn manifest(&self) -> ChannelManifest {
+        ChannelManifest {
+            id: "webchat".to_string(),
+            name: "WebChat".to_string(),
+            capabilities: vec![
+                ChannelCap::Inbound,
+                ChannelCap::Outbound,
+                ChannelCap::Health,
+            ],
+            message_limit: Some(65536),
+            supports_streaming: false,
+            supports_threads: false,
+            supports_reactions: false,
+        }
+    }
+
+    async fn start(&self, _ctx: ChannelContext) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "webchat", "WebChatAdapter started");
+        Ok(())
+    }
+
+    async fn stop(&self) -> Result<(), synaptic::core::SynapticError> {
+        self.status.store(STATUS_DISCONNECTED, Ordering::SeqCst);
+        tracing::info!(channel = "webchat", "WebChatAdapter stopped");
+        Ok(())
+    }
+
+    fn status(&self) -> ChannelStatus {
+        match self.status.load(Ordering::SeqCst) {
+            STATUS_CONNECTED => ChannelStatus::Connected,
+            STATUS_ERROR => ChannelStatus::Error("adapter error".to_string()),
+            _ => ChannelStatus::Disconnected,
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl Outbound for WebChatAdapter {
+    async fn send(
+        &self,
+        _envelope: &CoreMessageEnvelope,
+    ) -> Result<(), synaptic::core::SynapticError> {
+        // WebChat replies are delivered synchronously in the HTTP response body
+        // of /api/chat — no separate outbound push is required.
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+#[async_trait]
+impl ChannelHealth for WebChatAdapter {
+    async fn health_check(&self) -> HealthStatus {
+        let url = format!("http://127.0.0.1:{}/health", self.port);
+        match self.client.get(&url).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                self.status.store(STATUS_CONNECTED, Ordering::SeqCst);
+                HealthStatus::Healthy
+            }
+            Ok(resp) => {
+                let msg = format!("/health returned HTTP {}", resp.status());
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(msg)
+            }
+            Err(e) => {
+                self.status.store(STATUS_ERROR, Ordering::SeqCst);
+                HealthStatus::Unhealthy(e.to_string())
+            }
+        }
+    }
 }

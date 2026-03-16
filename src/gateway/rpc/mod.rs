@@ -22,6 +22,7 @@ mod logs_rpc;
 mod misc;
 mod models;
 mod nodes;
+mod plugins_rpc;
 mod presence;
 mod schedules;
 mod secrets_rpc;
@@ -149,6 +150,24 @@ pub fn register_all(router: &mut RpcRouter) {
     router.register(
         "skills.update",
         Box::new(|ctx, params| Box::pin(skills::handle_update(ctx, params))),
+    );
+
+    // Plugins
+    router.register(
+        "plugins.list",
+        Box::new(|ctx, params| Box::pin(plugins_rpc::handle_list(ctx, params))),
+    );
+    router.register(
+        "plugins.install",
+        Box::new(|ctx, params| Box::pin(plugins_rpc::handle_install(ctx, params))),
+    );
+    router.register(
+        "plugins.remove",
+        Box::new(|ctx, params| Box::pin(plugins_rpc::handle_remove(ctx, params))),
+    );
+    router.register(
+        "plugins.marketplace",
+        Box::new(|ctx, params| Box::pin(plugins_rpc::handle_marketplace(ctx, params))),
     );
 
     // Channels

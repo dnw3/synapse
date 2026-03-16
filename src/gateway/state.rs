@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use synaptic::callbacks::{default_pricing, CostTrackingCallback};
 use synaptic::core::{ChatModel, Tool};
+use synaptic::events::EventBus;
 use synaptic::session::SessionManager;
 use tokio::sync::RwLock;
 
@@ -88,6 +89,8 @@ pub struct AppState {
     pub approve_notifiers: Arc<crate::channels::dm::ApproveNotifierRegistry>,
     /// Per-session run queue to serialize concurrent agent executions.
     pub run_queue: Arc<AgentRunQueue>,
+    /// Central event bus for agent lifecycle and gateway events.
+    pub event_bus: Arc<EventBus>,
 }
 
 impl AppState {
@@ -189,6 +192,7 @@ impl AppState {
             },
             approve_notifiers: Arc::new(crate::channels::dm::ApproveNotifierRegistry::default()),
             run_queue: Arc::new(AgentRunQueue::new()),
+            event_bus: Arc::new(EventBus::new()),
         })
     }
 }

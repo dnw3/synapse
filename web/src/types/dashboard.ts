@@ -61,8 +61,15 @@ export interface HealthData {
 }
 
 export interface SessionEntry {
+  // Primary key from backend (session_id or structured key like "agent:default:main")
+  key: string;
+  // Legacy alias — populated from `key` for backward compat
   id: string;
   created_at: string;
+  updated_at?: string;
+  channel?: string;
+  kind?: string;
+  display_name?: string;
   message_count: number;
   token_count: number;
   compaction_count?: number;
@@ -72,7 +79,6 @@ export interface SessionEntry {
   verbose_level?: string;
   cost?: number;
   model?: string;
-  updated_at?: string;
   input_tokens?: number;
   output_tokens?: number;
   cache_tokens?: number;

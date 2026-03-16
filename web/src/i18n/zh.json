@@ -311,7 +311,12 @@
     "compacted": "已压缩",
     "compactFailed": "压缩失败",
     "agentFilter": "Agent",
-    "allAgents": "所有 Agent"
+    "allAgents": "所有 Agent",
+    "colKey": "KEY",
+    "colLabel": "标签",
+    "colChannel": "渠道",
+    "colKind": "类型",
+    "colUpdated": "更新时间"
   },
   "browser": {
     "noSession": "暂无浏览器会话。",

@@ -311,7 +311,12 @@
     "compacted": "Compacted",
     "compactFailed": "Failed to compact",
     "agentFilter": "Agent",
-    "allAgents": "All Agents"
+    "allAgents": "All Agents",
+    "colKey": "Key",
+    "colLabel": "Label",
+    "colChannel": "Channel",
+    "colKind": "Kind",
+    "colUpdated": "Updated"
   },
   "browser": {
     "noSession": "No browser session active.",

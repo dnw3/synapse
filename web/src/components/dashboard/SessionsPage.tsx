@@ -31,6 +31,113 @@ function extractAgentId(sessionKey: string): string {
 
 const THINKING_OPTIONS = ["off", "low", "medium", "high", "adaptive"] as const;
 
+/** Normalize a raw API session object: ensure `id` mirrors `key`. */
+function normalizeSession(raw: Record<string, unknown>): SessionEntry {
+  const key = (raw.key as string) ?? (raw.id as string) ?? "";
+  return {
+    ...(raw as unknown as SessionEntry),
+    key,
+    id: key,
+  };
+}
+
+/** Badge component for channel / kind labels. */
+function Badge({ value, colorClass }: { value: string; colorClass?: string }) {
+  return (
+    <span
+      className={cn(
+        "px-1.5 py-0.5 rounded text-[10px] font-medium border flex-shrink-0",
+        colorClass ??
+          "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20"
+      )}
+    >
+      {value}
+    </span>
+  );
+}
+
+const CHANNEL_COLORS: Record<string, string> = {
+  web: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  lark: "bg-teal-500/10 text-teal-400 border-teal-500/20",
+  telegram: "bg-sky-500/10 text-sky-400 border-sky-500/20",
+  discord: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+  slack: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+};
+
+const KIND_COLORS: Record<string, string> = {
+  direct: "bg-green-500/10 text-green-400 border-green-500/20",
+  group: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  main: "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20",
+};
+
+/** Sort column header button. */
+function SortHeader({
+  field,
+  label,
+  align,
+  sortField,
+  sortOrder,
+  onSort,
+}: {
+  field: SortField;
+  label: string;
+  align?: "right";
+  sortField: SortField;
+  sortOrder: SortOrder;
+  onSort: (f: SortField) => void;
+}) {
+  return (
+    <th
+      className={cn(
+        "px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)] cursor-pointer select-none hover:text-[var(--text-secondary)] transition-colors",
+        align === "right" && "text-right"
+      )}
+      onClick={() => onSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        <ChevronDown
+          className={cn(
+            "h-3 w-3 transition-transform",
+            sortField === field ? "opacity-100" : "opacity-0",
+            sortField === field && sortOrder === "asc" && "rotate-180"
+          )}
+        />
+      </span>
+    </th>
+  );
+}
+
+/** Inline dropdown selector. */
+function InlineSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: readonly string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-grouped)] border border-[var(--separator)] text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none pr-5"
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "right 4px center",
+      }}
+    >
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 interface SessionsPageProps {
   onNavigateToChat?: (conversationId: string) => void;
 }
@@ -53,6 +160,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
   const [includeGlobal, setIncludeGlobal] = useState(false);
   const [limitInput, setLimitInput] = useState<string>("");
   const [agentFilter, setAgentFilter] = useState<string>("");
+
 
   // Inline label editing
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
@@ -79,14 +187,16 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
       order: sortOrder,
     });
     if (data) {
-      if (Array.isArray(data)) {
-        const sessions = data as SessionEntry[];
-        setSessions(sessions);
-        setTotal(sessions.length);
-      } else {
-        setSessions(data.sessions ?? []);
-        setTotal(data.total ?? data.sessions?.length ?? 0);
-      }
+      const dataUnk = data as unknown;
+      const raw: Record<string, unknown>[] = Array.isArray(dataUnk)
+        ? (dataUnk as Record<string, unknown>[])
+        : (((dataUnk as { sessions?: Record<string, unknown>[] }).sessions) ?? []);
+      const normalized = raw.map(normalizeSession);
+      setSessions(normalized);
+      const tot = Array.isArray(dataUnk)
+        ? normalized.length
+        : (((dataUnk as { total?: number }).total) ?? normalized.length);
+      setTotal(tot);
     }
     setLoading(false);
   }, [api, offset, sortField, sortOrder, limitInput]);
@@ -249,56 +359,6 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
   const totalMessages = sessions.reduce((sum, s) => sum + (s.message_count ?? 0), 0);
   const totalTokens = sessions.reduce((sum, s) => sum + (s.token_count ?? 0), 0);
 
-  // Sort header component
-  const SortHeader = ({ field, label, align }: { field: SortField; label: string; align?: "right" }) => (
-    <th
-      className={cn(
-        "px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)] cursor-pointer select-none hover:text-[var(--text-secondary)] transition-colors",
-        align === "right" && "text-right"
-      )}
-      onClick={() => handleSort(field)}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        <ChevronDown
-          className={cn(
-            "h-3 w-3 transition-transform",
-            sortField === field ? "opacity-100" : "opacity-0",
-            sortField === field && sortOrder === "asc" && "rotate-180"
-          )}
-        />
-      </span>
-    </th>
-  );
-
-  // Inline dropdown component
-  const InlineSelect = ({
-    value,
-    options,
-    onChange,
-  }: {
-    value: string;
-    options: readonly string[];
-    onChange: (v: string) => void;
-  }) => (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="px-1.5 py-0.5 text-[11px] rounded-[var(--radius-sm)] bg-[var(--bg-grouped)] border border-[var(--separator)] text-[var(--text-secondary)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer appearance-none pr-5"
-      style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "right 4px center",
-      }}
-    >
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </select>
-  );
-
   return (
     <div className="flex flex-col h-full min-h-0 gap-5">
       {/* Stats cards */}
@@ -437,13 +497,26 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                 <thead>
                   <tr>
                     <th className="w-6 px-1 py-2.5 border-b border-[var(--border-subtle)]" />
-                    <SortHeader field="id" label="ID" />
+                    {/* KEY column */}
                     <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
-                      {t("sessions.title")}
+                      {t("sessions.colKey")}
                     </th>
-                    <SortHeader field="created_at" label={t("sessions.created")} />
-                    <SortHeader field="message_count" label={t("sessions.messages")} align="right" />
-                    <SortHeader field="token_count" label="Tokens" align="right" />
+                    {/* LABEL column */}
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
+                      {t("sessions.colLabel")}
+                    </th>
+                    {/* CHANNEL column */}
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
+                      {t("sessions.colChannel")}
+                    </th>
+                    {/* KIND column */}
+                    <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
+                      {t("sessions.colKind")}
+                    </th>
+                    {/* UPDATED column */}
+                    <SortHeader field="created_at" label={t("sessions.colUpdated")} sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                    <SortHeader field="message_count" label={t("sessions.messages")} align="right" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
+                    <SortHeader field="token_count" label="Tokens" align="right" sortField={sortField} sortOrder={sortOrder} onSort={handleSort} />
                     <th className="px-3 py-2.5 text-xs uppercase tracking-wider text-[var(--text-tertiary)] border-b border-[var(--border-subtle)]">
                       Thinking
                     </th>
@@ -475,7 +548,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                           </button>
                         </td>
 
-                        {/* ID */}
+                        {/* KEY */}
                         <td className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
                           {editingId === session.id ? (
                             <input
@@ -493,64 +566,85 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                           ) : (
                             <span
                               className="font-mono text-[var(--accent-light)] cursor-default"
-                              title={session.id}
+                              title={session.key}
                             >
-                              {session.id.length > 12 ? `${session.id.slice(0, 12)}...` : session.id}
+                              {session.key.length > 14 ? `${session.key.slice(0, 14)}…` : session.key}
                             </span>
                           )}
                         </td>
 
-                        {/* Title / Label — click to navigate to chat */}
-                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] max-w-[280px] overflow-hidden">
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-medium border border-[var(--accent)]/20 flex-shrink-0">
-                              {extractAgentId(session.id)}
+                        {/* LABEL — click to navigate to chat */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] max-w-[220px] overflow-hidden">
+                          {editingLabelId === session.id ? (
+                            <input
+                              ref={labelEditRef}
+                              type="text"
+                              value={editLabelValue}
+                              onChange={(e) => setEditLabelValue(e.target.value)}
+                              onBlur={() => handleLabelSave(session.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleLabelSave(session.id);
+                                if (e.key === "Escape") setEditingLabelId(null);
+                              }}
+                              placeholder={t("sessions.enterLabel")}
+                              className="px-1.5 py-0.5 text-[12px] bg-[var(--bg-grouped)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-40"
+                            />
+                          ) : (
+                            <span
+                              onClick={() => onNavigateToChat?.(session.id)}
+                              className={cn(
+                                "flex items-center gap-1 group truncate",
+                                onNavigateToChat
+                                  ? "cursor-pointer hover:text-[var(--accent)] transition-colors"
+                                  : "cursor-default"
+                              )}
+                              title={session.label || session.display_name || session.id}
+                            >
+                              {session.label ? (
+                                <span className="font-medium text-[var(--text-secondary)]">{session.label}</span>
+                              ) : session.display_name ? (
+                                <span className="truncate text-[var(--text-secondary)]">{session.display_name}</span>
+                              ) : (
+                                <span className="text-[var(--text-tertiary)] italic text-[11px]">
+                                  {t("sessions.noLabel")}
+                                </span>
+                              )}
+                              {onNavigateToChat && (
+                                <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
+                              )}
                             </span>
-                            {editingLabelId === session.id ? (
-                              <input
-                                ref={labelEditRef}
-                                type="text"
-                                value={editLabelValue}
-                                onChange={(e) => setEditLabelValue(e.target.value)}
-                                onBlur={() => handleLabelSave(session.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") handleLabelSave(session.id);
-                                  if (e.key === "Escape") setEditingLabelId(null);
-                                }}
-                                placeholder={t("sessions.enterLabel")}
-                                className="px-1.5 py-0.5 text-[12px] bg-[var(--bg-grouped)] border border-[var(--accent)] rounded-[var(--radius-sm)] text-[var(--text-primary)] focus:outline-none w-40"
-                              />
-                            ) : (
-                              <span
-                                onClick={() => onNavigateToChat?.(session.id)}
-                                className={cn(
-                                  "text-[var(--text-secondary)] flex items-center gap-1 group truncate",
-                                  onNavigateToChat
-                                    ? "cursor-pointer hover:text-[var(--accent)] transition-colors"
-                                    : "cursor-default"
-                                )}
-                                title={session.label || session.title || session.id}
-                              >
-                                {session.label ? (
-                                  <span className="font-medium">{session.label}</span>
-                                ) : session.title ? (
-                                  <span className="truncate">{session.title}</span>
-                                ) : (
-                                  <span className="text-[var(--text-tertiary)] italic text-[11px]">
-                                    {t("sessions.noLabel")}
-                                  </span>
-                                )}
-                                {onNavigateToChat && (
-                                  <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
-                                )}
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </td>
 
-                        {/* Created */}
-                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                          {formatDate(session.created_at, i18n.language)}
+                        {/* CHANNEL badge */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
+                          {session.channel ? (
+                            <Badge
+                              value={session.channel}
+                              colorClass={CHANNEL_COLORS[session.channel.toLowerCase()]}
+                            />
+                          ) : (
+                            <span className="text-[var(--text-tertiary)] text-[11px]">—</span>
+                          )}
+                        </td>
+
+                        {/* KIND badge */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)]">
+                          {session.kind ? (
+                            <Badge
+                              value={session.kind}
+                              colorClass={KIND_COLORS[session.kind.toLowerCase()]}
+                            />
+                          ) : (
+                            <span className="text-[var(--text-tertiary)] text-[11px]">—</span>
+                          )}
+                        </td>
+
+                        {/* UPDATED */}
+                        <td className="px-3 py-2.5 border-b border-[var(--border-subtle)] text-[var(--text-secondary)] whitespace-nowrap">
+                          {session.updated_at
+                            ? formatDate(session.updated_at, i18n.language)
+                            : formatDate(session.created_at, i18n.language)}
                         </td>
 
                         {/* Messages */}
@@ -620,7 +714,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                       {expandedId === session.id && (
                         <tr key={`${session.id}-detail`}>
                           <td
-                            colSpan={8}
+                            colSpan={10}
                             className="px-6 py-3 border-b border-[var(--separator)] bg-[var(--bg-grouped)]"
                           >
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[11px]">

@@ -136,11 +136,11 @@ pub enum Command {
         name: Option<String>,
     },
 
-    /// Manage plugins (list, install, enable, disable, remove).
+    /// Manage plugins (list, install, create, enable, disable, remove, search, update).
     Plugin {
-        /// Action: list, install, enable, disable, remove.
+        /// Action: list, install, create, enable, disable, remove, search, update.
         action: String,
-        /// Plugin name or path (depends on action).
+        /// Plugin name, path, or search query (depends on action).
         name: Option<String>,
     },
 

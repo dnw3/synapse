@@ -420,7 +420,7 @@ impl ChannelAdapter for TeamsAdapter {
                 ChannelCap::Inbound,
                 ChannelCap::Outbound,
                 ChannelCap::Groups,
-                ChannelCap::Threads,
+                ChannelCap::Threading,
                 ChannelCap::Health,
             ],
             message_limit: Some(28000),

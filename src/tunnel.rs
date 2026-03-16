@@ -1,7 +1,7 @@
 //! Tunnel/remote access support.
 //!
 //! Exposes the local Synapse web server to the internet via a reverse tunnel.
-//! Supports: cloudflared (Cloudflare Tunnel), bore, and SSH tunneling.
+//! Supports: cloudflared (Cloudflare Tunnel), bore, SSH tunneling, and Tailscale Funnel.
 
 use colored::Colorize;
 
@@ -14,6 +14,8 @@ pub enum TunnelProvider {
     Bore,
     /// SSH reverse tunnel.
     Ssh { host: String },
+    /// Tailscale Funnel (requires `tailscale` binary with funnel enabled).
+    Tailscale,
 }
 
 /// Start a tunnel to expose the local port.
@@ -32,8 +34,9 @@ pub async fn start_tunnel(
             let host = remote_host.ok_or("SSH tunnel requires --remote-host")?;
             run_ssh_tunnel(local_port, host).await
         }
+        "tailscale" => run_tailscale_funnel(local_port).await,
         _ => Err(format!(
-            "Unknown tunnel provider '{}'. Available: cloudflared, bore, ssh",
+            "Unknown tunnel provider '{}'. Available: cloudflared, bore, ssh, tailscale",
             provider
         )
         .into()),
@@ -132,10 +135,122 @@ async fn run_ssh_tunnel(
     Ok(())
 }
 
+async fn run_tailscale_funnel(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+    // Check if tailscale is available
+    let which = tokio::process::Command::new("which")
+        .arg("tailscale")
+        .output()
+        .await;
+
+    if which.is_err() || !which.unwrap().status.success() {
+        return Err("tailscale not found. Install: https://tailscale.com/download".into());
+    }
+
+    eprintln!(
+        "{} Starting Tailscale funnel on port {}...",
+        "tunnel:".cyan().bold(),
+        port
+    );
+
+    // Enable the funnel in the background
+    let funnel_output = tokio::process::Command::new("tailscale")
+        .args(["funnel", &port.to_string(), "--bg"])
+        .output()
+        .await?;
+
+    if !funnel_output.status.success() {
+        let stderr = String::from_utf8_lossy(&funnel_output.stderr);
+        return Err(format!("tailscale funnel failed: {}", stderr).into());
+    }
+
+    // Retrieve the Tailscale node's DNS name to construct the public URL
+    let status_output = tokio::process::Command::new("tailscale")
+        .args(["status", "--json"])
+        .output()
+        .await?;
+
+    let url = if status_output.status.success() {
+        let status: serde_json::Value =
+            serde_json::from_slice(&status_output.stdout).unwrap_or(serde_json::Value::Null);
+        let dns_name = status
+            .get("Self")
+            .and_then(|s| s.get("DNSName"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .trim_end_matches('.');
+        format!("https://{}", dns_name)
+    } else {
+        "https://<your-tailscale-node>".to_string()
+    };
+
+    eprintln!(
+        "{} Tailscale funnel active: {}",
+        "tunnel:".cyan().bold(),
+        url
+    );
+    eprintln!(
+        "{} Press Ctrl-C to stop the funnel.",
+        "tunnel:".cyan().bold()
+    );
+
+    // Keep the process alive; funnel runs as a background daemon via tailscale
+    // Wait for a signal to shut down
+    tokio::signal::ctrl_c().await?;
+
+    // Disable funnel on exit
+    eprintln!("{} Stopping Tailscale funnel...", "tunnel:".cyan().bold());
+    let _ = tokio::process::Command::new("tailscale")
+        .args(["funnel", "--reset"])
+        .output()
+        .await;
+
+    Ok(())
+}
+
+/// Expose the local port via Tailscale Funnel and return the public URL.
+///
+/// This is a non-blocking variant that starts the funnel in the background
+/// and returns the URL immediately.
+#[allow(dead_code)]
+pub async fn setup_tailscale_funnel(port: u16) -> Result<String, Box<dyn std::error::Error>> {
+    let output = tokio::process::Command::new("tailscale")
+        .args(["funnel", &port.to_string(), "--bg"])
+        .output()
+        .await?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("tailscale funnel failed: {}", stderr).into());
+    }
+
+    // Get the hostname
+    let hostname_output = tokio::process::Command::new("tailscale")
+        .args(["status", "--json"])
+        .output()
+        .await?;
+
+    let status: serde_json::Value = serde_json::from_slice(&hostname_output.stdout)?;
+    let dns_name = status
+        .get("Self")
+        .and_then(|s| s.get("DNSName"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .trim_end_matches('.');
+
+    Ok(format!("https://{}", dns_name))
+}
+
 /// Auto-detect available tunnel provider.
 #[allow(dead_code)]
 pub fn detect_provider() -> Option<&'static str> {
     // Check in order of preference
+    if std::process::Command::new("tailscale")
+        .arg("--version")
+        .output()
+        .is_ok()
+    {
+        return Some("tailscale");
+    }
     if std::process::Command::new("cloudflared")
         .arg("--version")
         .output()

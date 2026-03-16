@@ -634,5 +634,14 @@
   "toast": {
     "sessionCompacted": "上下文已压缩",
     "updateAvailable": "有更新可用: {{version}}"
+  },
+  "canvas": {
+    "diagram": "流程图",
+    "form": "表单",
+    "table": "数据表",
+    "plot": "图表",
+    "card": "卡片",
+    "unknown": "画布块",
+    "fallback": "不支持的画布类型"
   }
 }

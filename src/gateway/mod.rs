@@ -1,8 +1,10 @@
 mod api;
 pub mod auth;
+pub mod canvas;
 pub mod channel_health;
 pub mod channel_manager;
 pub mod client;
+pub mod discovery;
 pub mod error;
 pub mod exec_approvals;
 pub mod messages;
@@ -16,6 +18,7 @@ pub mod run_queue;
 mod sse;
 pub mod state;
 mod terminal;
+pub mod voice_ws;
 pub mod webhooks;
 mod ws;
 

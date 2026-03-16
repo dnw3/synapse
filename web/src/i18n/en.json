@@ -634,5 +634,14 @@
   "toast": {
     "sessionCompacted": "Context compacted",
     "updateAvailable": "Update available: {{version}}"
+  },
+  "canvas": {
+    "diagram": "Diagram",
+    "form": "Form",
+    "table": "Table",
+    "plot": "Chart",
+    "card": "Card",
+    "unknown": "Canvas Block",
+    "fallback": "Unsupported canvas type"
   }
 }

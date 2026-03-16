@@ -12,6 +12,7 @@ mod openai_compat;
 pub mod presence;
 mod request_id;
 pub mod rpc;
+pub mod run_queue;
 mod sse;
 pub mod state;
 mod terminal;

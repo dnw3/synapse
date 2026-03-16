@@ -98,6 +98,8 @@ pub struct AgentSession {
     cost_tracker: Option<Arc<synaptic::callbacks::CostTrackingCallback>>,
     /// Optional multi-dimensional usage tracker.
     usage_tracker: Option<Arc<crate::usage::UsageTracker>>,
+    /// Per-session run queue to serialize concurrent agent executions.
+    run_queue: Arc<crate::gateway::run_queue::AgentRunQueue>,
 }
 
 impl AgentSession {
@@ -119,6 +121,7 @@ impl AgentSession {
             router: None,
             cost_tracker: None,
             usage_tracker: None,
+            run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
         }
     }
 
@@ -162,6 +165,7 @@ impl AgentSession {
             router: None,
             cost_tracker: None,
             usage_tracker: None,
+            run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
         }
     }
 
@@ -388,6 +392,9 @@ impl AgentSession {
         );
         let _guard = span.enter();
 
+        // Serialize concurrent executions for the same session
+        let _run_guard = self.run_queue.acquire(&session_key).await;
+
         // Resolve routing (single agent or broadcast)
         let route = self.resolve_route(&envelope);
 
@@ -575,6 +582,9 @@ impl AgentSession {
             provenance = ?envelope.provenance.kind,
         );
         let _guard = span.enter();
+
+        // Serialize concurrent executions for the same session
+        let _run_guard = self.run_queue.acquire(&session_key).await;
 
         // Resolve routing (single agent or broadcast)
         let route = self.resolve_route(&envelope);

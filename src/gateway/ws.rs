@@ -530,6 +530,9 @@ async fn handle_legacy_connection(
                 );
                 let execution_start = std::time::Instant::now();
 
+                // Serialize concurrent executions for the same session
+                let _run_guard = state.run_queue.acquire(&conversation_id).await;
+
                 // Acquire session write lock before processing.
                 if let Err(lock_err) = state
                     .write_lock
@@ -918,6 +921,9 @@ async fn handle_legacy_connection(
 
                 tracing::info!(msg_type = "form_submit", "ws message received");
                 let execution_start = std::time::Instant::now();
+
+                // Serialize concurrent executions for the same session
+                let _run_guard = state.run_queue.acquire(&conversation_id).await;
 
                 if let Err(lock_err) = state
                     .write_lock
@@ -1611,6 +1617,9 @@ async fn handle_v3_agent(
                 .await;
         }};
     }
+
+    // Serialize concurrent executions for the same session
+    let _run_guard = state.run_queue.acquire(conversation_id).await;
 
     // Acquire session write lock
     if let Err(lock_err) = state.write_lock.try_acquire(conversation_id, conn_id).await {

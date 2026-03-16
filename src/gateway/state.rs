@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 
 use super::auth::AuthState;
 use super::rpc::{Broadcaster, RpcRouter};
+use super::run_queue::AgentRunQueue;
 use crate::agent;
 use crate::config::SynapseConfig;
 use crate::gateway::messages::ChannelRegistry;
@@ -85,6 +86,8 @@ pub struct AppState {
     pub dm_enforcer: Arc<crate::channels::dm::FileDmPolicyEnforcer>,
     /// Registry of per-channel approval notifiers.
     pub approve_notifiers: Arc<crate::channels::dm::ApproveNotifierRegistry>,
+    /// Per-session run queue to serialize concurrent agent executions.
+    pub run_queue: Arc<AgentRunQueue>,
 }
 
 impl AppState {
@@ -185,6 +188,7 @@ impl AppState {
                 ))
             },
             approve_notifiers: Arc::new(crate::channels::dm::ApproveNotifierRegistry::default()),
+            run_queue: Arc::new(AgentRunQueue::new()),
         })
     }
 }

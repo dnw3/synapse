@@ -4420,6 +4420,7 @@ dependencies = [
  "colored",
  "cpal",
  "crossterm",
+ "dashmap",
  "dirs",
  "dotenvy",
  "futures",
@@ -4474,6 +4475,7 @@ dependencies = [
  "synaptic-core",
  "synaptic-deep",
  "synaptic-embeddings",
+ "synaptic-events",
  "synaptic-graph",
  "synaptic-jina",
  "synaptic-lark",
@@ -4604,6 +4606,20 @@ dependencies = [
  "sha2",
  "synaptic-core",
  "tokio",
+]
+
+[[package]]
+name = "synaptic-events"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "futures",
+ "serde",
+ "serde_json",
+ "synaptic-core",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

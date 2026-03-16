@@ -332,23 +332,106 @@ impl AgentSession {
         }
     }
 
-    /// Resolve or create a persistent session ID for a given chat key.
-    async fn resolve_session(&self, session_key: &str) -> Result<String, AgentError> {
-        // Check if we already have a mapping
+    /// Resolve or create a persistent session ID for a given session key.
+    ///
+    /// Uses deterministic session keys so the same person/chat always maps to the
+    /// same session.  Metadata (channel, chat_type, display_name) is written on
+    /// creation and `updated_at` is bumped on every access.
+    async fn resolve_session(
+        &self,
+        session_key: &str,
+        envelope: &MessageEnvelope,
+    ) -> Result<String, AgentError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
+        // 1. Fast path: check in-memory cache
         {
             let map = self.session_map.read().await;
             if let Some(sid) = map.get(session_key) {
+                // Bump updated_at in the background (best-effort)
+                if let Ok(Some(mut info)) = self.session_mgr.get_session(sid).await {
+                    info.updated_at = now;
+                    let _ = self.session_mgr.update_session(&info).await;
+                }
                 return Ok(sid.clone());
             }
         }
 
-        // Try to find an existing session for this key by searching the store
-        // Convention: we store the session_key → session_id mapping under a special namespace
+        // 2. Search existing sessions by session_key field
+        if let Ok(sessions) = self.session_mgr.list_sessions().await {
+            if let Some(mut info) = sessions
+                .into_iter()
+                .find(|s| s.session_key.as_deref() == Some(session_key))
+            {
+                let sid = info.session_id.clone();
+                // Bump updated_at
+                info.updated_at = now;
+                let _ = self.session_mgr.update_session(&info).await;
+                // Cache
+                let mut map = self.session_map.write().await;
+                map.insert(session_key.to_string(), sid.clone());
+                tracing::info!(session_key = %session_key, session_id = %sid, "resolved existing session by key");
+                return Ok(sid);
+            }
+        }
+
+        // 3. Legacy fallback: check bot_sessions namespace mapping
         let store = self.session_mgr.store();
         let ns = &["bot_sessions"];
+        let legacy_sid = self.try_legacy_session(store, ns, session_key).await;
+        if let Some(sid) = legacy_sid {
+            // Migrate: write session_key into SessionInfo so future lookups use field match
+            if let Ok(Some(mut info)) = self.session_mgr.get_session(&sid).await {
+                info.session_key = Some(session_key.to_string());
+                info.channel = Some(envelope.delivery.channel.clone());
+                info.chat_type = Some(Self::peer_kind_to_chat_type(&envelope.routing.peer_kind));
+                if info.display_name.is_none() {
+                    info.display_name = envelope.sender_id.clone();
+                }
+                info.updated_at = now;
+                let _ = self.session_mgr.update_session(&info).await;
+            }
+            let mut map = self.session_map.write().await;
+            map.insert(session_key.to_string(), sid.clone());
+            tracing::info!(session_key = %session_key, session_id = %sid, "migrated legacy bot_sessions mapping");
+            return Ok(sid);
+        }
+
+        // 4. Create a new session and populate metadata
+        let sid = self
+            .session_mgr
+            .create_session()
+            .await
+            .map_err(|e| AgentError(format!("failed to create session: {}", e)))?;
+
+        if let Ok(Some(mut info)) = self.session_mgr.get_session(&sid).await {
+            info.session_key = Some(session_key.to_string());
+            info.channel = Some(envelope.delivery.channel.clone());
+            info.chat_type = Some(Self::peer_kind_to_chat_type(&envelope.routing.peer_kind));
+            info.display_name = envelope.sender_id.clone();
+            info.updated_at = now;
+            let _ = self.session_mgr.update_session(&info).await;
+        }
+
+        let mut map = self.session_map.write().await;
+        map.insert(session_key.to_string(), sid.clone());
+        tracing::info!(session_key = %session_key, session_id = %sid, "created new session");
+        Ok(sid)
+    }
+
+    /// Try to find a session via legacy bot_sessions namespace mapping.
+    async fn try_legacy_session(
+        &self,
+        store: &Arc<dyn synaptic::core::Store>,
+        ns: &[&str],
+        session_key: &str,
+    ) -> Option<String> {
+        // Try exact key
         if let Ok(Some(item)) = store.get(ns, session_key).await {
             if let Some(sid) = item.value.as_str() {
-                // Verify the session still exists
                 if self
                     .session_mgr
                     .get_session(sid)
@@ -357,15 +440,11 @@ impl AgentSession {
                     .flatten()
                     .is_some()
                 {
-                    let mut map = self.session_map.write().await;
-                    map.insert(session_key.to_string(), sid.to_string());
-                    return Ok(sid.to_string());
+                    return Some(sid.to_string());
                 }
             }
         }
-
-        // Legacy key fallback: try stripping the "agent:default:" prefix
-        // Old keys look like "lark:dm:xxx", new keys like "agent:default:lark:dm:xxx"
+        // Try stripping "agent:default:" prefix for old-format keys
         if let Some(legacy_key) = session_key.strip_prefix("agent:default:") {
             if let Ok(Some(item)) = store.get(ns, legacy_key).await {
                 if let Some(sid) = item.value.as_str() {
@@ -377,34 +456,22 @@ impl AgentSession {
                         .flatten()
                         .is_some()
                     {
-                        // Migrate: save under new key, cache
-                        let _ = store
-                            .put(ns, session_key, serde_json::Value::String(sid.to_string()))
-                            .await;
-                        let mut map = self.session_map.write().await;
-                        map.insert(session_key.to_string(), sid.to_string());
-                        tracing::info!(old_key = %legacy_key, new_key = %session_key, "migrated legacy session key");
-                        return Ok(sid.to_string());
+                        return Some(sid.to_string());
                     }
                 }
             }
         }
+        None
+    }
 
-        // Create a new session
-        let sid = self
-            .session_mgr
-            .create_session()
-            .await
-            .map_err(|e| AgentError(format!("failed to create session: {}", e)))?;
-
-        // Persist the mapping
-        let _ = store
-            .put(ns, session_key, serde_json::Value::String(sid.clone()))
-            .await;
-
-        let mut map = self.session_map.write().await;
-        map.insert(session_key.to_string(), sid.clone());
-        Ok(sid)
+    /// Convert PeerKind to a chat_type string for SessionInfo.
+    fn peer_kind_to_chat_type(peer_kind: &Option<crate::config::PeerKind>) -> String {
+        match peer_kind {
+            Some(crate::config::PeerKind::Direct) => "direct".to_string(),
+            Some(crate::config::PeerKind::Group) => "group".to_string(),
+            Some(crate::config::PeerKind::Channel) => "channel".to_string(),
+            None => "unknown".to_string(),
+        }
     }
 
     /// Process a message through the agent pipeline.
@@ -477,7 +544,7 @@ impl AgentSession {
             }
         }
 
-        let sid = self.resolve_session(&session_key).await?;
+        let sid = self.resolve_session(&session_key, &envelope).await?;
 
         // Build content blocks from attachments
         let content_blocks = self.download_attachments(&envelope.attachments).await;
@@ -713,7 +780,7 @@ impl AgentSession {
             }
         }
 
-        let sid = self.resolve_session(&session_key).await?;
+        let sid = self.resolve_session(&session_key, &envelope).await?;
 
         // Build content blocks from attachments
         let content_blocks = self.download_attachments(&envelope.attachments).await;
@@ -1151,7 +1218,7 @@ impl AgentSession {
                 // Process agents one by one, return last response
                 let mut last_response = String::new();
                 for agent_info in agents {
-                    let sid = self.resolve_session(&session_key).await?;
+                    let sid = self.resolve_session(&session_key, envelope).await?;
                     match self
                         .handle_deep_agent(&sid, &envelope.content, &content_blocks, agent_info)
                         .await

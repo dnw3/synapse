@@ -3,6 +3,7 @@ pub(crate) mod bot;
 pub(crate) mod memory;
 mod misc;
 mod models;
+pub mod reset_policy;
 pub mod secrets_vault;
 mod security;
 mod server;
@@ -188,6 +189,10 @@ pub struct SynapseConfig {
     /// Post-session reflection for agent self-evolution.
     #[serde(default)]
     pub reflection: ReflectionSynapseConfig,
+
+    /// Session reset policy (daily boundary, idle timeout, or never).
+    #[serde(default)]
+    pub session_reset: crate::config::reset_policy::ResetConfig,
 
     /// Logging configuration (console, file, in-memory buffer).
     #[serde(default)]

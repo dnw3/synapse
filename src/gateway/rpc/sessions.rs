@@ -232,7 +232,7 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
 
     let overrides = load_overrides();
     let ovr = overrides.get(id);
-    let meta = parse_session_key(&session.id);
+    let meta = parse_session_key(&session.session_id);
 
     Ok(json!({
         "id": session.id,

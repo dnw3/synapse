@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::sync::RwLock as StdRwLock;
 
 use synaptic::callbacks::{default_pricing, CostTrackingCallback};
 use synaptic::core::{ChatModel, Tool};
@@ -8,6 +9,7 @@ use synaptic::session::SessionManager;
 use tokio::sync::RwLock;
 
 use super::auth::AuthState;
+use super::canvas::CanvasEngine;
 use super::rpc::{Broadcaster, RpcRouter};
 use super::run_queue::AgentRunQueue;
 use crate::agent;
@@ -92,9 +94,85 @@ pub struct AppState {
     /// Central event bus for agent lifecycle and gateway events.
     #[allow(dead_code)]
     pub event_bus: Arc<EventBus>,
+    /// Canvas rendering engine for WebSocket canvas_update pipeline.
+    pub canvas_engine: Arc<CanvasEngine>,
+    /// Plugin registry — loaded once at startup, shared across all agent builds.
+    pub plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
 }
 
 impl AppState {
+    /// Apply a hot-reload diff to the running state.
+    ///
+    /// Each section is checked and the relevant in-process state is updated where
+    /// safe to do so without restarting. Changes that require a restart (e.g.
+    /// serve port) are logged but not applied.
+    pub fn reload_config(&mut self, new_config: SynapseConfig, diff: &crate::config::ConfigDiff) {
+        if diff.agents_changed {
+            tracing::info!("hot-reload: agents configuration changed — updating agent definitions");
+            // Update the stored config so new agent builds use the new definitions.
+            // Running sessions are not interrupted.
+            self.config.agents = new_config.agents.clone();
+            self.config.bindings = new_config.bindings.clone();
+        }
+
+        if diff.bindings_changed && !diff.agents_changed {
+            tracing::info!("hot-reload: bindings changed — updating routing rules");
+            self.config.bindings = new_config.bindings.clone();
+        }
+
+        if diff.tools_changed {
+            tracing::info!("hot-reload: tool_policy changed — updating tool policy");
+            self.config.tool_policy = new_config.tool_policy.clone();
+        }
+
+        if diff.memory_changed {
+            tracing::info!("hot-reload: memory configuration changed");
+            self.config.memory = new_config.memory.clone();
+        }
+
+        if diff.schedules_changed {
+            tracing::info!(
+                "hot-reload: schedule definitions changed — restart required for full effect"
+            );
+            self.config.schedules = new_config.schedules.clone();
+        }
+
+        if diff.auth_changed {
+            tracing::info!("hot-reload: auth configuration changed — rebuilding auth state");
+            self.auth = new_config
+                .auth
+                .as_ref()
+                .map(|auth_config| Arc::new(super::auth::AuthState::new(auth_config.clone())));
+            self.config.auth = new_config.auth.clone();
+        }
+
+        if diff.serve_changed {
+            tracing::warn!(
+                "hot-reload: serve configuration changed — host/port changes require a restart"
+            );
+        }
+
+        if diff.channels_changed {
+            tracing::info!(
+                "hot-reload: channel configuration changed — restart required for full effect"
+            );
+        }
+
+        if diff.any_changed() {
+            tracing::info!(
+                agents = diff.agents_changed,
+                bindings = diff.bindings_changed,
+                channels = diff.channels_changed,
+                tools = diff.tools_changed,
+                memory = diff.memory_changed,
+                schedules = diff.schedules_changed,
+                serve = diff.serve_changed,
+                auth = diff.auth_changed,
+                "config hot-reload complete"
+            );
+        }
+    }
+
     pub async fn with_log_buffer(
         config: &SynapseConfig,
         log_buffer: LogBuffer,
@@ -155,6 +233,16 @@ impl AppState {
             crate::gateway::exec_approvals::ExecApprovalsConfig::load(),
         ));
 
+        let event_bus = Arc::new(EventBus::new());
+
+        // Register builtin plugins so their event subscribers are wired into the
+        // event bus and their manifests are visible via the plugin registry.
+        let mut plugin_registry = synaptic::plugin::PluginRegistry::new(event_bus.clone());
+        if let Err(e) = crate::plugin::register_builtin_plugins(&mut plugin_registry) {
+            tracing::warn!(error = %e, "failed to register builtin plugins");
+        }
+        let plugin_registry = Arc::new(StdRwLock::new(plugin_registry));
+
         let state = Self {
             config: config.clone(),
             model,
@@ -193,15 +281,10 @@ impl AppState {
             },
             approve_notifiers: Arc::new(crate::channels::dm::ApproveNotifierRegistry::default()),
             run_queue: Arc::new(AgentRunQueue::new()),
-            event_bus: Arc::new(EventBus::new()),
+            event_bus,
+            canvas_engine: Arc::new(CanvasEngine::new()),
+            plugin_registry,
         };
-
-        // Register builtin plugins so their event subscribers are wired into the
-        // event bus and their manifests are visible via the plugin registry.
-        let mut plugin_registry = synaptic::plugin::PluginRegistry::new(state.event_bus.clone());
-        if let Err(e) = crate::plugin::register_builtin_plugins(&mut plugin_registry) {
-            tracing::warn!(error = %e, "failed to register builtin plugins");
-        }
 
         Ok(state)
     }

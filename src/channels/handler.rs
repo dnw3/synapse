@@ -971,6 +971,7 @@ impl AgentSession {
             &self.channel,
             None, // agent routing resolved at higher level
             None, // no event bus in bot mode
+            None, // no plugin registry in bot mode
         )
         .await
         .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;
@@ -1125,6 +1126,7 @@ impl AgentSession {
                                 "broadcast",
                                 None,
                                 None, // no event bus in broadcast mode
+                                None, // no plugin registry in broadcast mode
                             )
                             .await
                             .map_err(|e| AgentError(format!("agent build: {}", e)))?;
@@ -1336,6 +1338,7 @@ impl AgentSession {
             &self.channel,
             None, // agent routing resolved at higher level
             None, // no event bus in bot mode
+            None, // no plugin registry in bot mode
         )
         .await
         .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;

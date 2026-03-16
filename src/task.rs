@@ -82,6 +82,8 @@ pub async fn run_task(
         None,
         "repl",
         None,
+        None,
+        None, // no plugin registry in task/repl mode
     )
     .await?;
 

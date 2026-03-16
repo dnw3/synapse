@@ -1,5 +1,6 @@
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use async_trait::async_trait;
 use synaptic::callbacks::CostTrackingCallback;
@@ -118,6 +119,7 @@ pub async fn build_deep_agent(
         "unknown",
         None,
         None,
+        None,
     )
     .await
 }
@@ -139,6 +141,7 @@ pub async fn build_deep_agent_with_callback(
     channel: &str,
     agent_name: Option<&str>,
     event_bus: Option<Arc<EventBus>>,
+    plugin_registry: Option<Arc<RwLock<synaptic::plugin::PluginRegistry>>>,
 ) -> Result<CompiledGraph<MessageState>, SynapticError> {
     // Use docker backend if configured, otherwise filesystem
     #[cfg(feature = "docker")]
@@ -320,6 +323,15 @@ pub async fn build_deep_agent_with_callback(
 
     // Add MCP tools
     options.tools.extend(mcp_tools);
+
+    // Add plugin-registered tools
+    if let Some(ref registry) = plugin_registry {
+        let reg = registry.read().unwrap();
+        for tool in reg.tools() {
+            options.tools.push(tool.clone());
+        }
+        tracing::debug!(count = reg.tools().len(), "Plugin tools merged into agent");
+    }
 
     // Add apply_patch tool
     options.tools.push(crate::tools::ApplyPatchTool::new(cwd));

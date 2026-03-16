@@ -1,6 +1,7 @@
 mod builder;
 pub mod callbacks;
 mod context;
+pub mod copilot_proxy;
 pub mod discovery;
 pub mod link_understanding;
 mod mcp;

@@ -29,6 +29,9 @@ pub mod whatsapp;
 pub mod signal;
 
 #[cfg(feature = "bot-imessage")]
+pub mod bluebubbles;
+
+#[cfg(feature = "bot-imessage")]
 pub mod imessage;
 
 #[cfg(feature = "bot-line")]

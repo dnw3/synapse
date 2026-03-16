@@ -346,12 +346,19 @@ export default function App() {
             conv.createConversation();
           }
         }}
+        onResetSession={() => conv.resetSession()}
         onToggleFocus={() => setFocusMode((f) => !f)}
         onClearMessages={() => conv.setMessages([])}
+        onRefreshMessages={() => conv.refreshMessages()}
         queueSize={messageQueue.length}
         chatError={chatError}
         onDismissError={() => setChatError(null)}
         onToolResultClick={(content, toolName) => setToolSidebar({ open: true, content, toolName })}
+        conversations={conv.conversations}
+        activeSessionId={conv.activeId}
+        sessionTitles={conv.titles}
+        onSelectSession={(id) => { conv.setActiveId(id); }}
+        modelName={modelName}
       />
       <ToolOutputSidebar
         open={toolSidebar.open}

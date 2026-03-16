@@ -36,6 +36,11 @@
     "newChat": "新建会话",
     "attachFile": "附件",
     "searchPlaceholder": "搜索消息...",
+    "sessionSelector": "会话",
+    "resetSession": "重置会话",
+    "resetConfirm": "重置此会话？消息将被清空。",
+    "export": "导出",
+    "refresh": "刷新",
     "copyMarkdown": "复制为 Markdown",
     "deleteMessage": "删除消息",
     "exportTitle": "导出对话"

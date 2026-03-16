@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Send, Square, Loader2, Paperclip, X, Search, AlertTriangle, Minimize2 } from "lucide-react";
+import { Send, Square, Loader2, Paperclip, X, Search, AlertTriangle, Minimize2, Plus, Download, RefreshCw, ChevronDown } from "lucide-react";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
-import type { Message, FileAttachment } from "../types";
+import type { Message, FileAttachment, Conversation } from "../types";
 import { api } from "../api";
 import MessageBubble from "./MessageBubble";
 import ApprovalDialog from "./ApprovalDialog";
@@ -32,6 +32,7 @@ interface Props {
   onApprovalRespond?: (approved: boolean, allowAll?: boolean) => void;
   onNewChat?: () => void;
   onReset?: () => void;
+  onResetSession?: () => void;
   onCompact?: () => void;
   onToggleFocus?: () => void;
   onSetModel?: (name: string) => void;
@@ -44,11 +45,18 @@ interface Props {
   onListAgents?: () => void;
   onRunSkill?: (name: string) => void;
   onClearMessages?: () => void;
+  onRefreshMessages?: () => void;
   queueSize?: number;
   chatError?: string | null;
   onDismissError?: () => void;
   contextUsage?: { tokens: number; limit: number };
   onToolResultClick?: (content: string, toolName?: string) => void;
+  /* Session selector (OpenClaw pattern) */
+  conversations?: Conversation[];
+  activeSessionId?: string | null;
+  sessionTitles?: Record<string, string>;
+  onSelectSession?: (id: string) => void;
+  modelName?: string | null;
 }
 
 function MessageDivider({ label }: { label: string }) {
@@ -96,6 +104,7 @@ export default function ChatPanel({
   onApprovalRespond,
   onNewChat,
   onReset,
+  onResetSession,
   onCompact,
   onToggleFocus,
   onSetModel,
@@ -108,11 +117,17 @@ export default function ChatPanel({
   onListAgents,
   onRunSkill,
   onClearMessages,
+  onRefreshMessages,
   queueSize,
   chatError,
   onDismissError,
   contextUsage,
   onToolResultClick,
+  conversations,
+  activeSessionId,
+  sessionTitles,
+  onSelectSession,
+  modelName,
 }: Props) {
   const { t, i18n } = useTranslation();
   const [input, setInput] = useState("");
@@ -453,7 +468,7 @@ export default function ChatPanel({
       }
     }
 
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSubmit();
     }
@@ -507,8 +522,48 @@ export default function ChatPanel({
     );
   })();
 
+  const handleResetSession = useCallback(() => {
+    if (onResetSession) {
+      if (messages.length > 0 && !window.confirm(t("chat.resetConfirm"))) return;
+      onResetSession();
+    }
+  }, [onResetSession, messages.length, t]);
+
   return (
     <div className="flex flex-col flex-1 min-w-0 min-h-0">
+      {/* Top bar: session dropdown + model + refresh (OpenClaw pattern) */}
+      <div className="flex items-center gap-3 px-4 h-[40px] flex-shrink-0 border-b border-[var(--separator)] bg-[var(--bg-window)]/80 backdrop-blur-[20px]">
+        {conversations && conversations.length > 0 && (
+          <div className="relative">
+            <select
+              value={activeSessionId ?? ""}
+              onChange={(e) => onSelectSession?.(e.target.value)}
+              className="appearance-none pl-2 pr-6 py-1 text-[12px] font-medium bg-[var(--bg-grouped)] text-[var(--text-primary)] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] outline-none cursor-pointer max-w-[200px] truncate"
+            >
+              {conversations.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {sessionTitles?.[s.id] || s.id.slice(0, 8)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--text-tertiary)] pointer-events-none" />
+          </div>
+        )}
+        {modelName && (
+          <span className="text-[11px] font-mono text-[var(--text-tertiary)] truncate max-w-[180px]">
+            {modelName}
+          </span>
+        )}
+        <div className="flex-1" />
+        <button
+          onClick={() => onRefreshMessages?.()}
+          className="p-1 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          title={t("chat.refresh")}
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
       {/* Message search bar */}
       {showSearch && (
         <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--separator)] bg-[var(--bg-grouped)]">
@@ -713,6 +768,26 @@ export default function ChatPanel({
               className="flex-1 resize-none bg-[var(--bg-content)] border border-[var(--separator)] rounded-[var(--radius-xl)] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/30 focus:border-[var(--accent)]/40 min-h-[44px] max-h-[140px] transition-all duration-150"
               rows={1}
             />
+            {/* Reset session (+ button, OpenClaw pattern) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleResetSession}
+              className="h-7 w-7 rounded-full shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+              title={t("chat.resetSession")}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+            {/* Export button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleExport}
+              className="h-7 w-7 rounded-full shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+              title={t("chat.export")}
+            >
+              <Download className="h-3.5 w-3.5" />
+            </Button>
             {loading ? (
               <div className="flex gap-1.5">
                 <Button variant="destructive" size="icon" onClick={onCancel} className="h-7 w-7 rounded-full" title={t("chat.stop")}>

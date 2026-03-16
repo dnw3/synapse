@@ -39,6 +39,7 @@ export function useConversation() {
       messageCacheRef.current[prevId] = messages;
     }
     prevActiveIdRef.current = activeId;
+    setLoading(false); // Reset loading when switching conversations
 
     if (!activeId) {
       setMessages([]);
@@ -77,6 +78,7 @@ export function useConversation() {
     const conv = await api.createConversation();
     justCreatedRef.current = true;
     pendingInitialMsgsRef.current = initialMessages ?? null;
+    setLoading(false); // Reset loading state for clean new session
     setConversations((prev) => [conv, ...prev]);
     setActiveId(conv.id);
     return conv;
@@ -133,6 +135,23 @@ export function useConversation() {
     return msgs;
   }, []);
 
+  /** Reset the current session: delete old conversation + create fresh one. */
+  const resetSession = useCallback(async () => {
+    const oldId = activeId;
+    if (oldId) {
+      await api.deleteConversation(oldId);
+      delete messageCacheRef.current[oldId];
+      setConversations((prev) => prev.filter((c) => c.id !== oldId));
+    }
+    const conv = await api.createConversation();
+    justCreatedRef.current = true;
+    pendingInitialMsgsRef.current = null;
+    setLoading(false);
+    setConversations((prev) => [conv, ...prev]);
+    setActiveId(conv.id);
+    return conv;
+  }, [activeId]);
+
   /** Ensure a conversation with the given id exists in the local list. */
   const ensureConversation = useCallback((id: string) => {
     setConversations((prev) => {
@@ -154,6 +173,7 @@ export function useConversation() {
     deleteConversation,
     sendMessage,
     refreshMessages,
+    resetSession,
     ensureConversation,
   };
 }

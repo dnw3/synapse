@@ -36,6 +36,11 @@
     "newChat": "New Chat",
     "attachFile": "Attach file",
     "searchPlaceholder": "Search messages...",
+    "sessionSelector": "Session",
+    "resetSession": "New session",
+    "resetConfirm": "Reset this session? Messages will be cleared.",
+    "export": "Export",
+    "refresh": "Refresh",
     "copyMarkdown": "Copy as Markdown",
     "deleteMessage": "Delete message",
     "exportTitle": "Export Conversation"

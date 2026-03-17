@@ -608,7 +608,153 @@ impl EventSubscriber for ToolPolicySubscriber {
 }
 
 // ---------------------------------------------------------------------------
-// 6. CostTrackingSubscriber — replaces CostTrackingMw in builder.rs
+// 6. MemoryRecallSubscriber — auto-recalls memories before each LLM call
+// ---------------------------------------------------------------------------
+
+/// Auto-recalls relevant memories before each LLM call.
+/// Subscribes to BeforePromptBuild (Sequential/Mutable).
+#[allow(dead_code)]
+pub struct MemoryRecallSubscriber {
+    memory: Arc<dyn synaptic::memory::MemoryProvider>,
+    recall_limit: usize,
+}
+
+impl MemoryRecallSubscriber {
+    #[allow(dead_code)]
+    pub fn new(memory: Arc<dyn synaptic::memory::MemoryProvider>, recall_limit: usize) -> Self {
+        Self {
+            memory,
+            recall_limit,
+        }
+    }
+}
+
+#[async_trait]
+impl EventSubscriber for MemoryRecallSubscriber {
+    fn subscriptions(&self) -> Vec<EventFilter> {
+        vec![EventFilter::Exact(EventKind::BeforePromptBuild)]
+    }
+
+    async fn handle(&self, event: &mut Event) -> Result<EventAction, SynapticError> {
+        // Extract last user messages as query
+        let query = event
+            .payload
+            .get("user_message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        if query.is_empty() {
+            return Ok(EventAction::Continue);
+        }
+
+        let session_key = event.payload.get("session_key").and_then(|v| v.as_str());
+
+        match self
+            .memory
+            .search(query, session_key, self.recall_limit)
+            .await
+        {
+            Ok(results) if !results.is_empty() => {
+                let memory_text = results
+                    .iter()
+                    .map(|r| format!("- {}", r.content))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+
+                if let Some(obj) = event.payload.as_object_mut() {
+                    obj.insert(
+                        "memory_context".to_string(),
+                        serde_json::Value::String(memory_text),
+                    );
+                }
+                tracing::debug!(count = results.len(), "recalled memories for prompt");
+                Ok(EventAction::Modify)
+            }
+            Ok(_) => Ok(EventAction::Continue),
+            Err(e) => {
+                tracing::warn!(error = %e, "memory recall failed");
+                Ok(EventAction::Continue) // Don't block on memory failures
+            }
+        }
+    }
+
+    fn name(&self) -> &str {
+        "MemoryRecallSubscriber"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 7. MemoryCaptureSubscriber — auto-captures messages to STM
+// ---------------------------------------------------------------------------
+
+/// Auto-captures messages to STM for Viking provider.
+/// Subscribes to MessageReceived + AgentEnd (Parallel).
+#[allow(dead_code)]
+pub struct MemoryCaptureSubscriber {
+    memory: Arc<dyn synaptic::memory::MemoryProvider>,
+}
+
+impl MemoryCaptureSubscriber {
+    #[allow(dead_code)]
+    pub fn new(memory: Arc<dyn synaptic::memory::MemoryProvider>) -> Self {
+        Self { memory }
+    }
+}
+
+#[async_trait]
+impl EventSubscriber for MemoryCaptureSubscriber {
+    fn subscriptions(&self) -> Vec<EventFilter> {
+        vec![EventFilter::AnyOf(vec![
+            EventKind::MessageReceived,
+            EventKind::AgentEnd,
+        ])]
+    }
+
+    async fn handle(&self, event: &mut Event) -> Result<EventAction, SynapticError> {
+        let session_key = event
+            .payload
+            .get("session_key")
+            .or_else(|| event.payload.get("conversation_id"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("default");
+
+        match event.kind {
+            EventKind::MessageReceived => {
+                let content = event
+                    .payload
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if !content.is_empty() {
+                    let _ = self.memory.add_message(session_key, "user", content).await;
+                }
+            }
+            EventKind::AgentEnd => {
+                let content = event
+                    .payload
+                    .get("response")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if !content.is_empty() {
+                    let _ = self
+                        .memory
+                        .add_message(session_key, "assistant", content)
+                        .await;
+                }
+            }
+            _ => {}
+        }
+
+        Ok(EventAction::Continue)
+    }
+
+    fn name(&self) -> &str {
+        "MemoryCaptureSubscriber"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 8. CostTrackingSubscriber — replaces CostTrackingMw in builder.rs
 // ---------------------------------------------------------------------------
 
 /// Records token usage from every LLM response for cost accounting.
@@ -675,12 +821,21 @@ impl EventSubscriber for CostTrackingSubscriber {
                 .unwrap_or("unknown")
                 .to_string();
 
+            let channel = event.payload["channel"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string();
+            let agent_id = event.payload["agent_id"]
+                .as_str()
+                .unwrap_or("default")
+                .to_string();
+
             self.usage_tracker
                 .record(crate::usage::UsageRecord {
                     model,
                     provider,
-                    channel: "eventbus".to_string(),
-                    agent_id: "default".to_string(),
+                    channel,
+                    agent_id,
                     session_key: event.metadata.request_id.clone().unwrap_or_default(),
                     input_tokens: input_tokens as u64,
                     output_tokens: output_tokens as u64,

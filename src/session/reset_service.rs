@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use synaptic::session::{SessionInfo, SessionManager};
 
 #[allow(dead_code)]
@@ -8,13 +10,34 @@ impl ResetService {
     /// Reset a session: archive transcript, generate new session_id, preserve session_key + metadata.
     ///
     /// `reason` should be one of `"daily"`, `"idle"`, or `"user"`.
+    ///
+    /// If `memory_provider` is given, memories are committed before the transcript is archived
+    /// so that important context is preserved in long-term storage.
     pub async fn reset(
         session_mgr: &SessionManager,
         session_key: &str,
         old_info: &SessionInfo,
         reason: &str,
+        memory_provider: Option<&Arc<dyn synaptic::memory::MemoryProvider>>,
     ) -> Result<SessionInfo, Box<dyn std::error::Error + Send + Sync>> {
         let old_session_id = &old_info.session_id;
+
+        // 0. Before archiving, commit memories so important context is persisted
+        if let Some(memory) = memory_provider {
+            match memory.commit(session_key).await {
+                Ok(result) => {
+                    tracing::info!(
+                        session_key,
+                        extracted = result.memories_extracted,
+                        merged = result.memories_merged,
+                        "memory commit on session reset"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, session_key, "memory commit failed on reset");
+                }
+            }
+        }
 
         // 1. Archive old transcript
         crate::session::archive::archive_transcript(old_session_id, reason).await;

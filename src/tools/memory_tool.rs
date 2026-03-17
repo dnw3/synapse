@@ -1,25 +1,26 @@
 //! Agent tools for querying long-term memory.
 //!
-//! `memory_search` — semantic search over LTM.
-//! `memory_get` — list or count stored memories.
+//! `memory_search` — semantic search over the configured memory provider.
+//! `memory_get` — list or count stored memories (LTM-specific).
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use synaptic::core::{SynapticError, Tool};
+use synaptic::memory::MemoryProvider;
 
 use crate::memory::LongTermMemory;
 
-/// Tool that allows the agent to search long-term memory.
+/// Tool that allows the agent to search memory via the configured [`MemoryProvider`].
 pub struct MemorySearchTool {
-    ltm: Arc<LongTermMemory>,
+    provider: Arc<dyn MemoryProvider>,
 }
 
 #[allow(clippy::new_ret_no_self)]
 impl MemorySearchTool {
-    pub fn new(ltm: Arc<LongTermMemory>) -> Arc<dyn Tool> {
-        Arc::new(Self { ltm })
+    pub fn new(provider: Arc<dyn MemoryProvider>) -> Arc<dyn Tool> {
+        Arc::new(Self { provider })
     }
 }
 
@@ -61,7 +62,7 @@ impl Tool for MemorySearchTool {
 
         tracing::debug!("memory search");
 
-        let results = self.ltm.recall_with_sources(query, limit).await;
+        let results = self.provider.recall(query, limit).await?;
 
         if results.is_empty() {
             Ok(json!("No relevant memories found."))
@@ -70,8 +71,12 @@ impl Tool for MemorySearchTool {
                 .iter()
                 .enumerate()
                 .map(|(i, r)| {
-                    let tag = if r.evergreen { " [evergreen]" } else { "" };
-                    format!("{}. [{}]{} {}", i + 1, r.source_key, tag, r.content)
+                    let layer_tag = r
+                        .layer
+                        .as_deref()
+                        .map(|l| format!(" [{}]", l))
+                        .unwrap_or_default();
+                    format!("{}. [{}]{} {}", i + 1, r.uri, layer_tag, r.content)
                 })
                 .collect();
             Ok(json!(formatted.join("\n")))

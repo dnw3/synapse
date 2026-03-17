@@ -5,6 +5,7 @@ use std::sync::RwLock as StdRwLock;
 use synaptic::callbacks::{default_pricing, CostTrackingCallback};
 use synaptic::core::{ChatModel, Tool};
 use synaptic::events::EventBus;
+use synaptic::memory::MemoryProvider;
 use synaptic::session::SessionManager;
 use tokio::sync::RwLock;
 
@@ -99,6 +100,9 @@ pub struct AppState {
     pub canvas_engine: Arc<CanvasEngine>,
     /// Plugin registry — loaded once at startup, shared across all agent builds.
     pub plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
+    /// Memory provider (native LTM or Viking), built from config at startup.
+    #[allow(dead_code)]
+    pub memory_provider: Arc<dyn MemoryProvider>,
     /// Per-request context scopes (TTL: 30 min).  Used for variable passing
     /// across multi-step agent pipelines and sub-agent spawning.
     #[allow(dead_code)]
@@ -253,6 +257,9 @@ impl AppState {
         }
         let plugin_registry = Arc::new(StdRwLock::new(plugin_registry));
 
+        // Build memory provider from config (native LTM or Viking)
+        let memory_provider = crate::memory::build_memory_provider(config, None);
+
         let state = Self {
             config: config.clone(),
             model,
@@ -294,6 +301,7 @@ impl AppState {
             event_bus,
             canvas_engine: Arc::new(CanvasEngine::new()),
             plugin_registry,
+            memory_provider,
             context_engine: Arc::new(ContextEngine::new(std::time::Duration::from_secs(1800))),
         };
 

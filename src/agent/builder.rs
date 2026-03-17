@@ -360,15 +360,20 @@ pub async fn build_deep_agent_with_callback(
         }
     }
 
-    // Add memory tools if LTM is available
+    // Add memory tools — memory_search uses the configured MemoryProvider,
+    // memory_get uses LTM directly (count/list are LTM-specific).
+    {
+        let memory_provider = crate::memory::build_memory_provider(config, ltm.clone());
+        options
+            .tools
+            .push(crate::tools::MemorySearchTool::new(memory_provider));
+        tracing::info!("memory_search tool registered");
+    }
     if let Some(ref ltm) = ltm {
         options
             .tools
-            .push(crate::tools::MemorySearchTool::new(ltm.clone()));
-        options
-            .tools
             .push(crate::tools::MemoryGetTool::new(ltm.clone()));
-        tracing::info!("Memory tools registered (memory_search, memory_get)");
+        tracing::info!("memory_get tool registered");
     }
 
     // Add session tools if SessionManager is available
@@ -681,6 +686,10 @@ pub async fn build_deep_agent_with_callback(
 
     // Wire EventBus into deep agent for lifecycle event emission
     options.event_bus = event_bus;
+    options.model_name = Some(config.base.model.model.clone());
+    options.provider_name = Some(config.base.model.provider.clone());
+    options.channel = Some(channel.to_string());
+    options.agent_id = agent_name.map(|s| s.to_string());
 
     create_deep_agent(model, options)
 }

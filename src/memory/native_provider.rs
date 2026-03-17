@@ -14,13 +14,20 @@ use crate::memory::LongTermMemory;
 /// Synapse's local memory without knowing about the implementation details.
 #[allow(dead_code)]
 pub struct NativeMemoryProvider {
-    ltm: Arc<LongTermMemory>,
+    ltm: Option<Arc<LongTermMemory>>,
 }
 
 #[allow(dead_code)]
 impl NativeMemoryProvider {
     pub fn new(ltm: Arc<LongTermMemory>) -> Self {
-        Self { ltm }
+        Self { ltm: Some(ltm) }
+    }
+
+    /// Create a no-op provider that returns empty results for all queries.
+    ///
+    /// Used when no LTM is available (e.g. LTM is disabled in config).
+    pub fn new_noop() -> Self {
+        Self { ltm: None }
     }
 }
 
@@ -51,7 +58,10 @@ impl MemoryProvider for NativeMemoryProvider {
     /// Retrieve the most relevant memories for `query` by delegating to the
     /// LTM hybrid-search / keyword-search pipeline.
     async fn recall(&self, query: &str, limit: usize) -> Result<Vec<MemoryResult>, SynapticError> {
-        let contents = self.ltm.recall(query, limit).await;
+        let Some(ref ltm) = self.ltm else {
+            return Ok(Vec::new());
+        };
+        let contents = ltm.recall(query, limit).await;
         let results = contents
             .into_iter()
             .enumerate()

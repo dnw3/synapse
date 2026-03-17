@@ -102,6 +102,7 @@ const CHUNK_OVERLAP: usize = 320;
 
 /// A memory search result with source citation.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct MemoryResult {
     pub content: String,
     pub source_key: String,
@@ -386,6 +387,7 @@ impl LongTermMemory {
         self.recall_by_keywords(query, limit).await
     }
 
+    #[allow(dead_code)]
     pub async fn recall_with_sources(&self, query: &str, limit: usize) -> Vec<MemoryResult> {
         let limit = if limit == 0 {
             self.config.ltm_recall_limit

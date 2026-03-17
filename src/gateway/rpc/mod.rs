@@ -19,6 +19,7 @@ mod health;
 mod heartbeat_rpc;
 mod identity;
 mod logs_rpc;
+mod memory_rpc;
 mod misc;
 mod models;
 mod nodes;
@@ -612,6 +613,16 @@ pub fn register_all(router: &mut RpcRouter) {
     router.register(
         "secrets.resolve",
         Box::new(|ctx, params| Box::pin(secrets_rpc::handle_resolve(ctx, params))),
+    );
+
+    // Memory
+    router.register(
+        "memory.search",
+        Box::new(|ctx, params| Box::pin(memory_rpc::handle_search(ctx, params))),
+    );
+    router.register(
+        "memory.add_resource",
+        Box::new(|ctx, params| Box::pin(memory_rpc::handle_add_resource(ctx, params))),
     );
 
     // Misc

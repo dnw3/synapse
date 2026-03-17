@@ -196,6 +196,27 @@ pub async fn build_deep_agent_with_callback(
 
     options.system_prompt = Some(system_prompt);
 
+    // Build the memory provider once — used for profile injection and the
+    // memory_search tool below.
+    let memory_provider_arc = crate::memory::build_memory_provider(config, ltm.clone());
+
+    // Inject user profile from memory provider (if available)
+    {
+        let user_id = if channel == "web" || channel == "unknown" {
+            "default"
+        } else {
+            channel
+        };
+        match memory_provider_arc.get_profile(user_id).await {
+            Ok(Some(profile)) if !profile.is_empty() => {
+                let base = options.system_prompt.as_deref().unwrap_or("").to_string();
+                options.system_prompt = Some(format!("{}\n\n## User Profile\n{}", base, profile));
+                tracing::debug!(user_id, "injected user profile into system prompt");
+            }
+            _ => {} // No profile or error — skip silently
+        }
+    }
+
     // Self-awareness: environment detection + agent identity / self-modification guide
     {
         use synaptic_deep::{ChannelInfo, EnvironmentInfo};
@@ -363,10 +384,9 @@ pub async fn build_deep_agent_with_callback(
     // Add memory tools — memory_search uses the configured MemoryProvider,
     // memory_get uses LTM directly (count/list are LTM-specific).
     {
-        let memory_provider = crate::memory::build_memory_provider(config, ltm.clone());
-        options
-            .tools
-            .push(crate::tools::MemorySearchTool::new(memory_provider));
+        options.tools.push(crate::tools::MemorySearchTool::new(
+            memory_provider_arc.clone(),
+        ));
         tracing::info!("memory_search tool registered");
     }
     if let Some(ref ltm) = ltm {

@@ -103,6 +103,8 @@ impl ChannelSender for LarkSender {
 
 struct LarkStreamingOutput {
     writer: StreamingCardWriter,
+    card_config: crate::config::bot::LarkCardConfig,
+    bot_name: String,
 }
 
 #[async_trait]
@@ -118,16 +120,42 @@ impl StreamingOutput for LarkStreamingOutput {
             .ok();
     }
 
-    async fn on_complete(&self, _full_response: &str) {
-        self.writer.finish().await.ok();
+    async fn on_complete(&self, full_response: &str) {
+        use crate::channels::card_builder::assemble_final_card;
+        use synaptic::core::message_ir::{parse_markdown, RenderOptions, RenderTarget};
+        use synaptic::lark::card_elements::render_lark_card_elements;
+
+        // Skip styled card for very short responses
+        let ir = parse_markdown(full_response);
+        if ir.blocks.len() <= 1 && full_response.len() < 20 {
+            self.writer.finish().await.ok();
+            return;
+        }
+
+        let options = RenderOptions::new(RenderTarget::LarkCard);
+        let elements = render_lark_card_elements(&ir, &options);
+        let card_json = assemble_final_card(elements, &self.card_config, &self.bot_name);
+        self.writer.finish_with_card(card_json).await.ok();
     }
 
     async fn on_error(&self, error: &str) {
-        self.writer
-            .write(&format!("\n**Error:** {}", error))
-            .await
-            .ok();
-        self.writer.finish().await.ok();
+        use crate::channels::card_builder::assemble_final_card;
+        use crate::config::bot::LarkCardConfig;
+        use synaptic::lark::card_elements::LarkCardElement;
+
+        let error_config = LarkCardConfig {
+            template: "red".into(),
+            header_title: "Error".into(),
+            show_feedback: false,
+            ..self.card_config.clone()
+        };
+        let elements = vec![LarkCardElement {
+            tag: "markdown".into(),
+            element_id: "e0md".into(),
+            properties: serde_json::json!({"content": error}),
+        }];
+        let card_json = assemble_final_card(elements, &error_config, &self.bot_name);
+        self.writer.finish_with_card(card_json).await.ok();
     }
 }
 
@@ -189,12 +217,12 @@ fn has_rich_content(text: &str) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Build a Lark interactive card for displaying a setup code.
-fn build_pair_card(setup_code: &str, gateway_url: &str) -> serde_json::Value {
+fn build_pair_card(setup_code: &str, gateway_url: &str, template: &str) -> serde_json::Value {
     serde_json::json!({
         "config": { "wide_screen_mode": true },
         "header": {
             "title": { "tag": "plain_text", "content": "Device Pairing" },
-            "template": "blue"
+            "template": template
         },
         "elements": [
             {
@@ -212,12 +240,17 @@ fn build_pair_card(setup_code: &str, gateway_url: &str) -> serde_json::Value {
 
 /// Build a Lark interactive card for pairing approval.
 #[allow(dead_code)]
-fn build_approval_card(request_id: &str, device_name: &str, platform: &str) -> serde_json::Value {
+fn build_approval_card(
+    request_id: &str,
+    device_name: &str,
+    platform: &str,
+    template: &str,
+) -> serde_json::Value {
     serde_json::json!({
         "config": { "wide_screen_mode": true },
         "header": {
             "title": { "tag": "plain_text", "content": "New Device Pairing Request" },
-            "template": "orange"
+            "template": template
         },
         "elements": [
             {
@@ -278,6 +311,8 @@ struct LarkHandlerConfig {
     group_policy: GroupPolicy,
     allowlist: BotAllowlist,
     text_chunk_limit: usize,
+    card: crate::config::bot::LarkCardConfig,
+    bot_name: String,
 }
 
 impl LarkHandler {
@@ -367,14 +402,24 @@ impl LarkHandler {
         };
 
         if use_streaming {
-            let writer = client
-                .streaming_reply(
-                    event.message_id(),
-                    StreamingCardOptions::new().with_title("Synapse"),
-                )
-                .await?;
+            let card_cfg = &self.config.card;
+            let title = if card_cfg.header_title.is_empty() {
+                self.config.bot_name.clone()
+            } else {
+                card_cfg.header_title.clone()
+            };
+            let options = StreamingCardOptions::new()
+                .with_title(title)
+                .with_template(card_cfg.template.clone())
+                .with_icon(card_cfg.header_icon.clone());
 
-            let output: Arc<dyn StreamingOutput> = Arc::new(LarkStreamingOutput { writer });
+            let writer = client.streaming_reply(event.message_id(), options).await?;
+
+            let output: Arc<dyn StreamingOutput> = Arc::new(LarkStreamingOutput {
+                writer,
+                card_config: self.config.card.clone(),
+                bot_name: self.config.bot_name.clone(),
+            });
 
             let envelope = build_envelope(delivery);
             self.agent_session
@@ -389,12 +434,17 @@ impl LarkHandler {
                     if matches!(self.config.render_mode, LarkRenderMode::Auto)
                         && has_rich_content(&reply.content)
                     {
-                        let writer = client
-                            .streaming_reply(
-                                event.message_id(),
-                                StreamingCardOptions::new().with_title("Synapse"),
-                            )
-                            .await?;
+                        let card_cfg = &self.config.card;
+                        let title = if card_cfg.header_title.is_empty() {
+                            self.config.bot_name.clone()
+                        } else {
+                            card_cfg.header_title.clone()
+                        };
+                        let opts = StreamingCardOptions::new()
+                            .with_title(title)
+                            .with_template(card_cfg.template.clone())
+                            .with_icon(card_cfg.header_icon.clone());
+                        let writer = client.streaming_reply(event.message_id(), opts).await?;
                         writer.write(&reply.content).await.ok();
                         writer.finish().await.ok();
                     } else {
@@ -569,7 +619,7 @@ impl MessageHandler for LarkHandler {
             let gateway_url = format!("ws://localhost:{}/ws", self.gateway_port);
             let setup_code =
                 crate::gateway::nodes::bootstrap::encode_setup_code(&gateway_url, &token);
-            let card = build_pair_card(&setup_code, &gateway_url);
+            let card = build_pair_card(&setup_code, &gateway_url, &self.config.card.template);
             client
                 .send_card("chat_id", event.chat_id(), &card)
                 .await
@@ -858,6 +908,8 @@ pub async fn run(
         group_policy: lark_config.group_policy.clone(),
         allowlist: lark_config.allowlist.clone(),
         text_chunk_limit: lark_config.text_chunk_limit,
+        card: lark_config.card.clone(),
+        bot_name: bot_info.app_name.clone(),
     });
 
     let pairing_dir = dirs::home_dir()

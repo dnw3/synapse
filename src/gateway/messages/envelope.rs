@@ -20,6 +20,7 @@ pub struct MessageEnvelope {
     pub attachments: Vec<Attachment>,
     pub delivery: DeliveryContext,
     pub provenance: InputProvenance,
+    #[allow(dead_code)]
     pub idempotency_key: Option<String>,
     pub timestamp_ms: u64,
     /// Sender identity (user ID) for routing and session isolation.

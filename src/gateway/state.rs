@@ -114,6 +114,7 @@ pub struct AppState {
     /// Used to deduplicate messages across connections (e.g. reconnects after
     /// network failures).  Entries expire after 5 minutes and are periodically
     /// cleaned up by a background task spawned in `new()`.
+    #[allow(dead_code)]
     pub idempotency_cache: Arc<DashMap<String, Instant>>,
 }
 

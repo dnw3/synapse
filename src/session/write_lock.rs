@@ -84,6 +84,7 @@ impl SessionWriteLock {
     }
 
     /// Check whether `session_id` currently has an active (non-expired) lock.
+    #[allow(dead_code)]
     pub async fn is_locked(&self, session_id: &str) -> bool {
         let locks = self.locks.lock().await;
         match locks.get(session_id) {

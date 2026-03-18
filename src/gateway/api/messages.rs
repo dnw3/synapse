@@ -11,6 +11,7 @@ use synaptic::core::{MemoryStore, Message};
 use synaptic::graph::{MessageState, StreamMode};
 
 use tracing;
+use tracing::Instrument;
 
 use crate::agent::build_deep_agent;
 use crate::gateway::state::AppState;
@@ -59,7 +60,15 @@ async fn send_message(
         .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?
         .ok_or_else(|| (StatusCode::NOT_FOUND, format!("session '{}' not found", id)))?;
 
-    tracing::info!(conversation_id = %id, "message received via HTTP");
+    let request_id = synaptic::logging::generate_request_id();
+    let req_span = tracing::info_span!(
+        "http_message",
+        %request_id,
+        conversation_id = %id,
+    );
+    let _guard = req_span.enter();
+
+    tracing::info!("message received via HTTP");
 
     let memory = state.sessions.memory();
 
@@ -94,8 +103,10 @@ async fn send_message(
         let initial_state = MessageState::with_messages(messages);
         let mut stream = agent.stream(initial_state, StreamMode::Values);
 
+        // Drop the sync guard before async loop, use .instrument() instead
+        drop(_guard);
         let mut final_messages = Vec::new();
-        while let Some(event) = stream.next().await {
+        while let Some(event) = stream.next().instrument(req_span.clone()).await {
             match event {
                 Ok(graph_event) => {
                     final_messages = graph_event.state.messages;
@@ -131,9 +142,12 @@ async fn send_message(
 
         let request = synaptic::core::ChatRequest::new(messages);
         let llm_start = std::time::Instant::now();
+        // Drop sync guard before await, use .instrument() for async span propagation
+        drop(_guard);
         let response = state
             .model
             .chat(request)
+            .instrument(req_span.clone())
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
         let llm_duration = llm_start.elapsed().as_secs_f64();

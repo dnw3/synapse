@@ -15,6 +15,7 @@ use futures::stream::Stream;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use synaptic::core::{ChatRequest, Message};
+use tracing::Instrument;
 
 use super::state::AppState;
 
@@ -94,6 +95,16 @@ async fn chat_completions(
     State(state): State<AppState>,
     Json(req): Json<CompletionRequest>,
 ) -> Result<axum::response::Response, (StatusCode, String)> {
+    let request_id = synaptic::logging::generate_request_id();
+    let req_span = tracing::info_span!(
+        "openai_compat",
+        %request_id,
+        stream = req.stream,
+    );
+    let _guard = req_span.enter();
+
+    tracing::info!("OpenAI-compatible chat completions request");
+
     // Build model — use override if provided, else default
     let model = if let Some(ref model_name) = req.model {
         crate::agent::build_model_by_name(&state.config, model_name)
@@ -119,22 +130,27 @@ async fn chat_completions(
         .unwrap_or_else(|| state.config.base.model.model.clone());
 
     if req.stream {
-        // SSE streaming mode
+        // SSE streaming mode — pass span into spawned task
+        drop(_guard);
         let chat_request = ChatRequest::new(messages);
-        let stream = make_streaming_response(model, chat_request, model_name);
+        let stream = make_streaming_response(model, chat_request, model_name, req_span);
         Ok(Sse::new(stream)
             .keep_alive(KeepAlive::default())
             .into_response())
     } else {
         // Non-streaming mode
         let chat_request = ChatRequest::new(messages);
-
-        let response = model.chat(chat_request).await.map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("model error: {e}"),
-            )
-        })?;
+        drop(_guard);
+        let response = model
+            .chat(chat_request)
+            .instrument(req_span)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("model error: {e}"),
+                )
+            })?;
 
         let content = response.message.content().to_string();
 
@@ -197,91 +213,97 @@ fn make_streaming_response(
     model: std::sync::Arc<dyn synaptic::core::ChatModel>,
     request: ChatRequest,
     model_name: String,
+    req_span: tracing::Span,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     let (tx, rx) = tokio::sync::mpsc::channel::<Event>(64);
 
-    tokio::spawn(async move {
-        let completion_id = format!("chatcmpl-{}", uuid::Uuid::new_v4());
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+    tokio::spawn(
+        async move {
+            let completion_id = format!("chatcmpl-{}", uuid::Uuid::new_v4());
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
 
-        // Send initial chunk with role
-        let initial = StreamChunk {
-            id: completion_id.clone(),
-            object: "chat.completion.chunk".to_string(),
-            created: now,
-            model: model_name.clone(),
-            choices: vec![StreamChoice {
-                index: 0,
-                delta: StreamDelta {
-                    role: Some("assistant".to_string()),
-                    content: None,
-                },
-                finish_reason: None,
-            }],
-        };
-        let _ = tx
-            .send(Event::default().data(serde_json::to_string(&initial).unwrap_or_default()))
-            .await;
+            // Send initial chunk with role
+            let initial = StreamChunk {
+                id: completion_id.clone(),
+                object: "chat.completion.chunk".to_string(),
+                created: now,
+                model: model_name.clone(),
+                choices: vec![StreamChoice {
+                    index: 0,
+                    delta: StreamDelta {
+                        role: Some("assistant".to_string()),
+                        content: None,
+                    },
+                    finish_reason: None,
+                }],
+            };
+            let _ = tx
+                .send(Event::default().data(serde_json::to_string(&initial).unwrap_or_default()))
+                .await;
 
-        // Stream content tokens
-        let mut chat_stream = model.stream_chat(request);
-        while let Some(chunk) = chat_stream.next().await {
-            match chunk {
-                Ok(c) => {
-                    let chunk_data = StreamChunk {
-                        id: completion_id.clone(),
-                        object: "chat.completion.chunk".to_string(),
-                        created: now,
-                        model: model_name.clone(),
-                        choices: vec![StreamChoice {
-                            index: 0,
-                            delta: StreamDelta {
-                                role: None,
-                                content: Some(c.content),
-                            },
-                            finish_reason: None,
-                        }],
-                    };
-                    if tx
-                        .send(
-                            Event::default()
-                                .data(serde_json::to_string(&chunk_data).unwrap_or_default()),
-                        )
-                        .await
-                        .is_err()
-                    {
-                        break;
+            // Stream content tokens
+            let mut chat_stream = model.stream_chat(request);
+            while let Some(chunk) = chat_stream.next().await {
+                match chunk {
+                    Ok(c) => {
+                        let chunk_data = StreamChunk {
+                            id: completion_id.clone(),
+                            object: "chat.completion.chunk".to_string(),
+                            created: now,
+                            model: model_name.clone(),
+                            choices: vec![StreamChoice {
+                                index: 0,
+                                delta: StreamDelta {
+                                    role: None,
+                                    content: Some(c.content),
+                                },
+                                finish_reason: None,
+                            }],
+                        };
+                        if tx
+                            .send(
+                                Event::default()
+                                    .data(serde_json::to_string(&chunk_data).unwrap_or_default()),
+                            )
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
                     }
+                    Err(_) => break,
                 }
-                Err(_) => break,
             }
+
+            // Send final chunk with finish_reason
+            let final_chunk = StreamChunk {
+                id: completion_id,
+                object: "chat.completion.chunk".to_string(),
+                created: now,
+                model: model_name,
+                choices: vec![StreamChoice {
+                    index: 0,
+                    delta: StreamDelta {
+                        role: None,
+                        content: None,
+                    },
+                    finish_reason: Some("stop".to_string()),
+                }],
+            };
+            let _ = tx
+                .send(
+                    Event::default().data(serde_json::to_string(&final_chunk).unwrap_or_default()),
+                )
+                .await;
+
+            // Send [DONE] marker
+            let _ = tx.send(Event::default().data("[DONE]")).await;
         }
-
-        // Send final chunk with finish_reason
-        let final_chunk = StreamChunk {
-            id: completion_id,
-            object: "chat.completion.chunk".to_string(),
-            created: now,
-            model: model_name,
-            choices: vec![StreamChoice {
-                index: 0,
-                delta: StreamDelta {
-                    role: None,
-                    content: None,
-                },
-                finish_reason: Some("stop".to_string()),
-            }],
-        };
-        let _ = tx
-            .send(Event::default().data(serde_json::to_string(&final_chunk).unwrap_or_default()))
-            .await;
-
-        // Send [DONE] marker
-        let _ = tx.send(Event::default().data("[DONE]")).await;
-    });
+        .instrument(req_span),
+    );
 
     tokio_stream::wrappers::ReceiverStream::new(rx).map(Ok)
 }

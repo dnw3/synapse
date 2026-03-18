@@ -17,6 +17,7 @@ use futures::StreamExt;
 use serde::Deserialize;
 use synaptic::core::{ChatRequest, MemoryStore, Message};
 use synaptic::graph::{MessageState, StreamMode};
+use tracing::Instrument;
 
 use crate::agent::build_deep_agent;
 use crate::gateway::state::AppState;
@@ -48,17 +49,28 @@ fn make_sse_stream(
     state: AppState,
     query: SseQuery,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
-    // We use an async stream via futures::stream::unfold
     let (tx, rx) = tokio::sync::mpsc::channel::<Event>(64);
 
-    tokio::spawn(async move {
-        if let Err(e) = run_sse_session(state, query, tx.clone()).await {
-            let _ = tx
-                .send(Event::default().event("error").data(e.to_string()))
-                .await;
+    let request_id = synaptic::logging::generate_request_id();
+    let req_span = tracing::info_span!(
+        "sse_chat",
+        %request_id,
+        session_id = %query.session_id,
+        task_mode = query.task_mode,
+    );
+
+    tokio::spawn(
+        async move {
+            tracing::info!("SSE chat request");
+            if let Err(e) = run_sse_session(state, query, tx.clone()).await {
+                let _ = tx
+                    .send(Event::default().event("error").data(e.to_string()))
+                    .await;
+            }
+            let _ = tx.send(Event::default().event("done").data("")).await;
         }
-        let _ = tx.send(Event::default().event("done").data("")).await;
-    });
+        .instrument(req_span),
+    );
 
     tokio_stream::wrappers::ReceiverStream::new(rx).map(Ok)
 }

@@ -1,42 +1,82 @@
+// Modules available regardless of feature flags
+pub mod tunnel;
+pub mod usage;
+
+// Web gateway modules — only compiled with the "web" feature
+#[cfg(feature = "web")]
 mod api;
+#[cfg(feature = "web")]
 pub mod auth;
+#[cfg(feature = "web")]
 pub mod canvas;
+#[cfg(feature = "web")]
 pub mod channel_health;
+#[cfg(feature = "web")]
 pub mod channel_manager;
+#[cfg(feature = "web")]
 pub mod client;
+#[cfg(feature = "web")]
 pub mod discovery;
+#[cfg(feature = "web")]
 pub mod error;
+#[cfg(feature = "web")]
 pub mod exec_approvals;
+#[cfg(feature = "web")]
 pub mod messages;
+#[cfg(feature = "web")]
 mod metrics;
+#[cfg(feature = "web")]
 pub mod nodes;
+#[cfg(feature = "web")]
 mod openai_compat;
+#[cfg(feature = "web")]
 pub mod pairing;
+#[cfg(feature = "web")]
 pub mod presence;
+#[cfg(feature = "web")]
 mod request_id;
+#[cfg(feature = "web")]
 pub mod rpc;
+#[cfg(feature = "web")]
 pub mod run_queue;
+#[cfg(feature = "web")]
 mod sse;
+#[cfg(feature = "web")]
 pub mod state;
+#[cfg(feature = "web")]
 mod terminal;
+#[cfg(feature = "web")]
 pub mod voice_ws;
+#[cfg(feature = "web")]
 pub mod webhooks;
+#[cfg(feature = "web")]
 mod ws;
 
+#[cfg(feature = "web")]
 use std::sync::Arc;
+#[cfg(feature = "web")]
 use std::time::Instant;
 
+#[cfg(feature = "web")]
 use axum::http::StatusCode;
+#[cfg(feature = "web")]
 use axum::middleware;
+#[cfg(feature = "web")]
 use axum::response::IntoResponse;
+#[cfg(feature = "web")]
 use colored::Colorize;
+#[cfg(feature = "web")]
 use serde::Serialize;
+#[cfg(feature = "web")]
 use tokio::sync::Mutex;
 
+#[cfg(feature = "web")]
 use synaptic::events::{Event, EventKind};
 
+#[cfg(feature = "web")]
 use crate::config::SynapseConfig;
 
+#[cfg(feature = "web")]
 /// Start the web server.
 #[allow(dead_code)]
 pub async fn run_server(
@@ -47,6 +87,7 @@ pub async fn run_server(
     run_server_with_log_buffer(config, host, port, None).await
 }
 
+#[cfg(feature = "web")]
 /// Start the web server with an optional shared log buffer.
 pub async fn run_server_with_log_buffer(
     config: &SynapseConfig,
@@ -252,6 +293,7 @@ pub async fn run_server_with_log_buffer(
 // Rate limiting (simple token bucket)
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "web")]
 #[derive(Clone)]
 struct RateLimiter {
     state: Arc<Mutex<(f64, Instant)>>, // (tokens, last_refill)
@@ -259,6 +301,7 @@ struct RateLimiter {
     refill_rate: f64,
 }
 
+#[cfg(feature = "web")]
 impl RateLimiter {
     fn new(capacity: f64, refill_rate: f64) -> Self {
         Self {
@@ -286,6 +329,7 @@ impl RateLimiter {
     }
 }
 
+#[cfg(feature = "web")]
 async fn rate_limit_middleware(
     axum::extract::State(limiter): axum::extract::State<RateLimiter>,
     request: axum::http::Request<axum::body::Body>,
@@ -306,6 +350,7 @@ async fn rate_limit_middleware(
 // Request metrics tracking
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "web")]
 async fn request_metrics_middleware(
     axum::extract::State(metrics): axum::extract::State<state::RequestMetrics>,
     request: axum::http::Request<axum::body::Body>,
@@ -343,6 +388,7 @@ async fn request_metrics_middleware(
 // Health endpoint
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "web")]
 #[derive(Serialize)]
 struct HealthResponse {
     status: String,
@@ -354,6 +400,7 @@ struct HealthResponse {
 // Channel adapter spawning — start enabled bot adapters within the gateway
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "web")]
 fn spawn_channel_adapters(
     config: &SynapseConfig,
     manager: Arc<channel_manager::ChannelAdapterManager>,
@@ -497,6 +544,7 @@ fn spawn_channel_adapters(
     }
 }
 
+#[cfg(feature = "web")]
 async fn health_handler(state: state::AppState) -> axum::Json<HealthResponse> {
     let uptime = state.started_at.elapsed().as_secs();
     let auth_enabled = state

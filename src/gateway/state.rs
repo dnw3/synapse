@@ -15,6 +15,7 @@ use super::auth::AuthState;
 use super::canvas::CanvasEngine;
 use super::rpc::{Broadcaster, RpcRouter};
 use super::run_queue::AgentRunQueue;
+use super::usage::UsageTracker;
 use crate::agent;
 use crate::agent::context_engine::{ContextEngine, SharedContextEngine};
 use crate::config::SynapseConfig;
@@ -22,7 +23,6 @@ use crate::gateway::messages::ChannelRegistry;
 use crate::gateway::rpc::wizard::WizardSession;
 use crate::logging::LogBuffer;
 use crate::session::SessionWriteLock;
-use crate::usage::UsageTracker;
 
 /// Request counter key: (method, path, status).
 type RequestKey = (String, String, u16);
@@ -213,7 +213,7 @@ impl AppState {
         let cost_tracker = Arc::new(CostTrackingCallback::new(default_pricing()));
 
         // Multi-dimensional usage tracker with JSONL persistence
-        let usage_path = crate::usage::default_usage_path();
+        let usage_path = super::usage::default_usage_path();
         let usage_tracker = Arc::new(UsageTracker::with_persistence(
             Arc::clone(&cost_tracker),
             usage_path,

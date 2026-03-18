@@ -97,7 +97,7 @@ pub struct AgentSession {
     /// Optional cost tracker for usage statistics.
     cost_tracker: Option<Arc<synaptic::callbacks::CostTrackingCallback>>,
     /// Optional multi-dimensional usage tracker.
-    usage_tracker: Option<Arc<crate::usage::UsageTracker>>,
+    usage_tracker: Option<Arc<crate::gateway::usage::UsageTracker>>,
     /// Per-session run queue to serialize concurrent agent executions.
     run_queue: Arc<crate::gateway::run_queue::AgentRunQueue>,
     /// Optional Outbound trait impl for the new channel trait interface.
@@ -208,7 +208,7 @@ impl AgentSession {
 
     /// Set the multi-dimensional usage tracker.
     #[allow(dead_code)]
-    pub fn with_usage_tracker(mut self, tracker: Arc<crate::usage::UsageTracker>) -> Self {
+    pub fn with_usage_tracker(mut self, tracker: Arc<crate::gateway::usage::UsageTracker>) -> Self {
         self.usage_tracker = Some(tracker);
         self
     }

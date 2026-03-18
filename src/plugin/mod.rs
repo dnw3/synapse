@@ -8,6 +8,8 @@
 //! - Dynamic loading via `libloading` (shared objects / `.dll` / `.dylib`).
 //! - A remote plugin registry for distribution and versioning.
 
+pub mod loader;
+
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
@@ -445,7 +447,7 @@ pub fn load_state() -> HashSet<String> {
 pub fn register_builtin_plugins(
     registry: &mut PluginRegistry,
     cost_tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
-    usage_tracker: Arc<crate::usage::UsageTracker>,
+    usage_tracker: Arc<crate::gateway::usage::UsageTracker>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // --- 1. Tracing subscriber ---
     registry.register_event_subscriber(

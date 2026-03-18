@@ -767,13 +767,13 @@ impl EventSubscriber for MemoryCaptureSubscriber {
 pub struct CostTrackingSubscriber {
     tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
     /// Multi-dimensional usage tracker with JSONL persistence.
-    usage_tracker: Arc<crate::usage::UsageTracker>,
+    usage_tracker: Arc<crate::gateway::usage::UsageTracker>,
 }
 
 impl CostTrackingSubscriber {
     pub fn new(
         tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
-        usage_tracker: Arc<crate::usage::UsageTracker>,
+        usage_tracker: Arc<crate::gateway::usage::UsageTracker>,
     ) -> Self {
         Self {
             tracker,
@@ -831,7 +831,7 @@ impl EventSubscriber for CostTrackingSubscriber {
                 .to_string();
 
             self.usage_tracker
-                .record(crate::usage::UsageRecord {
+                .record(crate::gateway::usage::UsageRecord {
                     model,
                     provider,
                     channel,

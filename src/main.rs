@@ -21,8 +21,6 @@ mod memory;
 mod notify;
 #[allow(dead_code)]
 mod plugin;
-#[allow(dead_code)]
-mod plugin_loader;
 mod repl;
 #[allow(dead_code)]
 mod router;
@@ -31,15 +29,12 @@ mod service;
 mod session;
 mod task;
 mod tools;
-mod tunnel;
-mod usage;
 mod voice;
 mod workflow;
 
 #[cfg(feature = "otel")]
 mod otel;
 
-#[cfg(feature = "web")]
 mod gateway;
 
 #[cfg(any(
@@ -263,7 +258,7 @@ async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             provider,
             port,
             remote_host,
-        }) => tunnel::start_tunnel(&provider, port, remote_host.as_deref()).await,
+        }) => gateway::tunnel::start_tunnel(&provider, port, remote_host.as_deref()).await,
         Some(Command::Skill { action, name }) => {
             commands::run_skill_command(&action, name.as_deref())
         }
@@ -431,7 +426,7 @@ async fn run_chat(
     }
 
     // Create cost tracker
-    let tracker = usage::create_tracker();
+    let tracker = gateway::usage::create_tracker();
 
     if let Some(user_message) = message {
         repl::single_shot(model, &memory, &sid, &mut messages, user_message, &ltm).await

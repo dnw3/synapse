@@ -788,6 +788,8 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
     status_handle: Option<Arc<dyn synaptic::ChannelStatusHandle>>,
+    event_bus: Option<Arc<synaptic::events::EventBus>>,
+    plugin_registry: Option<Arc<std::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let lark_config = config
         .lark
@@ -806,21 +808,26 @@ pub async fn run(
     let cost_tracker = Arc::new(synaptic::callbacks::CostTrackingCallback::new(
         synaptic::callbacks::default_pricing(),
     ));
-    let usage_tracker = Arc::new(crate::usage::UsageTracker::with_persistence(
+    let usage_tracker = Arc::new(crate::gateway::usage::UsageTracker::with_persistence(
         Arc::clone(&cost_tracker),
-        crate::usage::default_usage_path(),
+        crate::gateway::usage::default_usage_path(),
     ));
     if let Err(e) = usage_tracker.load().await {
         tracing::warn!(error = %e, "failed to load usage records for lark adapter");
     }
     usage_tracker.spawn_periodic_flush(std::time::Duration::from_secs(60));
 
-    let agent_session = Arc::new(
-        AgentSession::new(model, config_arc, true)
-            .with_channel("lark")
-            .with_cost_tracker(cost_tracker)
-            .with_usage_tracker(usage_tracker),
-    );
+    let mut session = AgentSession::new(model, config_arc, true)
+        .with_channel("lark")
+        .with_cost_tracker(cost_tracker)
+        .with_usage_tracker(usage_tracker);
+    if let Some(eb) = event_bus {
+        session = session.with_event_bus(eb);
+    }
+    if let Some(pr) = plugin_registry {
+        session = session.with_plugin_registry(pr);
+    }
+    let agent_session = Arc::new(session);
 
     let lark = LarkConfig::new(&lark_config.app_id, &app_secret);
     let client = LarkBotClient::new(lark.clone());

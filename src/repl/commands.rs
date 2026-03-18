@@ -12,8 +12,8 @@ use synaptic::session::SessionManager;
 
 use crate::agent;
 use crate::config::SynapseConfig;
+use crate::gateway::usage;
 use crate::memory::LongTermMemory;
-use crate::usage;
 
 use super::session::{list_sessions, prune_sessions, send_to_session, view_session_history};
 use super::skills::{resolve_skill_slash_command, SkillSlashResult};

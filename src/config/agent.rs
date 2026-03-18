@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::bot::GroupSessionScope;
 use super::memory::default_true;
@@ -63,7 +63,7 @@ pub struct AgentDef {
 }
 
 /// DM session isolation level — controls how sessions are keyed for direct messages.
-#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DmSessionScope {
     /// All DMs share a single session (unsafe for multi-user).

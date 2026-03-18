@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 fn default_true() -> bool {
     true
@@ -35,7 +35,7 @@ pub fn resolve_secret(
 /// If both `allowed_users` and `allowed_channels` are empty (or unset),
 /// the bot accepts all messages. Otherwise, only matching users/channels
 /// are allowed.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[allow(dead_code)]
 pub struct BotAllowlist {
     /// Allowed user IDs (platform-specific).
@@ -75,7 +75,7 @@ impl BotAllowlist {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum LarkRenderMode {
     #[default]
@@ -84,7 +84,36 @@ pub enum LarkRenderMode {
     Card,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+/// Lark card appearance configuration.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct LarkCardConfig {
+    /// Header template color: blue, wathet, turquoise, green, yellow,
+    /// orange, red, carmine, violet, purple, indigo, grey, default.
+    #[serde(default = "default_card_template")]
+    pub template: String,
+
+    /// Header title text. Empty = use bot name.
+    #[serde(default)]
+    pub header_title: String,
+
+    /// Header icon token (standard_icon token string, e.g. "chat_outlined").
+    #[serde(default)]
+    pub header_icon: String,
+
+    /// Show thumbs up/down feedback buttons. Default: true.
+    #[serde(default = "default_true")]
+    pub show_feedback: bool,
+
+    /// Show timestamp in card footer. Default: false.
+    #[serde(default)]
+    pub show_timestamp: bool,
+}
+
+fn default_card_template() -> String {
+    "blue".into()
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum GroupSessionScope {
     #[default]
@@ -96,7 +125,7 @@ pub enum GroupSessionScope {
 
 pub use synaptic::DmPolicy;
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum GroupPolicy {
     #[default]
@@ -105,7 +134,7 @@ pub enum GroupPolicy {
     Disabled,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[allow(dead_code)]
 pub struct GroupToolPolicy {
     #[serde(default)]
@@ -114,7 +143,7 @@ pub struct GroupToolPolicy {
     pub deny: Vec<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[allow(dead_code)]
 pub struct GroupConfig {
     #[serde(default)]
@@ -123,7 +152,7 @@ pub struct GroupConfig {
     pub session_scope: Option<GroupSessionScope>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[allow(dead_code)]
 pub struct LarkBotConfig {
     #[serde(default = "default_account_id")]
@@ -147,6 +176,10 @@ pub struct LarkBotConfig {
     pub streaming: bool,
     #[serde(default = "default_4000")]
     pub text_chunk_limit: usize,
+
+    /// Card styling configuration.
+    #[serde(default)]
+    pub card: LarkCardConfig,
 
     // Policy
     #[serde(default)]

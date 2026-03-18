@@ -255,19 +255,23 @@ export default function App() {
       return;
     }
 
-    if (ws.connected) {
-      setSendLock(true);
-      draftRef.current = { content, attachments };
+    if (!ws.connected) {
+      // Queue message until WS connects — no HTTP fallback
+      pendingMessageRef.current = content;
+      pendingAttachmentsRef.current = attachments ?? null;
       conv.setMessages((prev) => [...prev, humanMsg]);
-      ws.send({
-        type: "message",
-        content,
-        attachments: attachments && attachments.length > 0 ? attachments : undefined,
-        idempotency_key: idempotencyKey,
-      });
-    } else {
-      await conv.sendMessage(content);
+      return;
     }
+
+    setSendLock(true);
+    draftRef.current = { content, attachments };
+    conv.setMessages((prev) => [...prev, humanMsg]);
+    ws.send({
+      type: "message",
+      content,
+      attachments: attachments && attachments.length > 0 ? attachments : undefined,
+      idempotency_key: idempotencyKey,
+    });
   };
 
   const handleCancel = () => {

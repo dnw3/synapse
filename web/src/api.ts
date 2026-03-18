@@ -29,19 +29,7 @@ export const api = {
     await fetch(`${BASE}/conversations/${id}`, { method: "DELETE" });
   },
 
-  // Messages
-  async sendMessage(
-    conversationId: string,
-    content: string,
-    taskMode = true
-  ): Promise<Message[]> {
-    return fetchJson(`${BASE}/conversations/${conversationId}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, task_mode: taskMode }),
-    });
-  },
-
+  // Messages (read-only — sending goes through WebSocket)
   async getMessages(conversationId: string): Promise<Message[]> {
     return fetchJson(`${BASE}/conversations/${conversationId}/messages`);
   },

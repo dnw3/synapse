@@ -7,28 +7,31 @@ export function useConversation() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
-  const [titles, setTitles] = useState<Record<string, string>>({});
 
   // Per-conversation message cache: preserves local (optimistic) messages
   // so switching away and back doesn't lose unsaved state.
   const messageCacheRef = useRef<Record<string, Message[]>>({});
   const prevActiveIdRef = useRef<string | null>(null);
 
-  // Load conversations on mount — titles come from the server response
+  // Load conversations on mount — select the main web session
   useEffect(() => {
     api.listConversations().then((convs) => {
       setConversations(convs);
-      const newTitles: Record<string, string> = {};
-      for (const conv of convs) {
-        if (conv.title) {
-          newTitles[conv.id] = conv.title;
+      if (!activeId) {
+        // Find the main web session (or most recent)
+        const main = convs.find((c) => c.channel === "web") || convs[convs.length - 1];
+        if (main) {
+          setActiveId(main.id);
+        } else {
+          // No sessions at all — create the main session
+          api.createConversation().then((conv) => {
+            setConversations([conv]);
+            setActiveId(conv.id);
+          });
         }
       }
-      if (Object.keys(newTitles).length > 0) {
-        setTitles((prev) => ({ ...prev, ...newTitles }));
-      }
     }).catch(console.error);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load messages when active conversation changes
   useEffect(() => {
@@ -42,15 +45,6 @@ export function useConversation() {
 
     if (!activeId) {
       setMessages([]);
-      return;
-    }
-    // Skip loading for just-created conversations
-    if (justCreatedRef.current) {
-      justCreatedRef.current = false;
-      // Use initial messages if provided (e.g. the first human message),
-      // otherwise empty for "new chat" without a message.
-      setMessages(pendingInitialMsgsRef.current ?? []);
-      pendingInitialMsgsRef.current = null;
       return;
     }
 
@@ -70,19 +64,6 @@ export function useConversation() {
     }).catch(console.error);
   }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const justCreatedRef = useRef(false);
-  const pendingInitialMsgsRef = useRef<Message[] | null>(null);
-
-  const createConversation = useCallback(async (initialMessages?: Message[]) => {
-    const conv = await api.createConversation();
-    justCreatedRef.current = true;
-    pendingInitialMsgsRef.current = initialMessages ?? null;
-    setLoading(false); // Reset loading state for clean new session
-    setConversations((prev) => [conv, ...prev]);
-    setActiveId(conv.id);
-    return conv;
-  }, []);
-
   const deleteConversation = useCallback(
     async (id: string) => {
       await api.deleteConversation(id);
@@ -90,32 +71,6 @@ export function useConversation() {
       setConversations((prev) => prev.filter((c) => c.id !== id));
       if (activeId === id) {
         setActiveId(null);
-      }
-    },
-    [activeId]
-  );
-
-  const sendMessage = useCallback(
-    async (content: string, taskMode = true) => {
-      if (!activeId) return;
-      setLoading(true);
-
-      // Add human message immediately
-      const humanMsg: Message = { role: "human", content, tool_calls: [] };
-      setMessages((prev) => [...prev, humanMsg]);
-
-      // Set title from the first human message
-      if (activeId) {
-        setTitles((prev) => prev[activeId] ? prev : { ...prev, [activeId]: content });
-      }
-
-      try {
-        const response = await api.sendMessage(activeId, content, taskMode);
-        setMessages((prev) => [...prev, ...response]);
-      } catch (e) {
-        console.error("Send message failed:", e);
-      } finally {
-        setLoading(false);
       }
     },
     [activeId]
@@ -134,21 +89,21 @@ export function useConversation() {
     return msgs;
   }, []);
 
-  /** Reset the current session: delete old conversation + create fresh one. */
+  /** Reset the current session: delete + re-fetch (backend preserves session key). */
   const resetSession = useCallback(async () => {
     const oldId = activeId;
     if (oldId) {
       await api.deleteConversation(oldId);
       delete messageCacheRef.current[oldId];
-      setConversations((prev) => prev.filter((c) => c.id !== oldId));
     }
-    const conv = await api.createConversation();
-    justCreatedRef.current = true;
-    pendingInitialMsgsRef.current = null;
-    setLoading(false);
-    setConversations((prev) => [conv, ...prev]);
-    setActiveId(conv.id);
-    return conv;
+    // Backend auto-creates new session with same key on next list
+    const convs = await api.listConversations();
+    setConversations(convs);
+    const main = convs.find((c) => c.channel === "web") || convs[0];
+    if (main) {
+      setActiveId(main.id);
+      setMessages([]);
+    }
   }, [activeId]);
 
   /** Ensure a conversation with the given id exists in the local list. */
@@ -166,11 +121,7 @@ export function useConversation() {
     messages,
     setMessages,
     loading,
-    titles,
-    setTitles,
-    createConversation,
     deleteConversation,
-    sendMessage,
     refreshMessages,
     resetSession,
     ensureConversation,

@@ -1,4 +1,6 @@
 pub mod adapters;
+#[cfg(feature = "bot-lark")]
+pub mod card_builder;
 pub mod dedup;
 pub mod dm;
 pub mod formatter;
@@ -17,7 +19,7 @@ pub async fn run_bot(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match platform {
         #[cfg(feature = "bot-lark")]
-        "lark" | "feishu" => adapters::lark::run(config, model_override, None).await,
+        "lark" | "feishu" => adapters::lark::run(config, model_override, None, None, None).await,
 
         #[cfg(feature = "bot-slack")]
         "slack" => adapters::slack::run(config, model_override).await,

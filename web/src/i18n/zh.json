@@ -55,7 +55,10 @@
     "toolsCollapsed": "{{count}} 个工具",
     "showSystem": "显示系统消息",
     "hideSystem": "隐藏系统消息",
-    "exportTitle": "导出对话"
+    "exportTitle": "导出对话",
+    "voiceInput": "语音输入",
+    "stopRecording": "停止录音",
+    "selectModel": "选择模型"
   },
   "commands": {
     "stop": "取消当前执行",
@@ -73,7 +76,17 @@
     "usage": "显示 Token 用量",
     "agents": "列出 Agent",
     "skill": "运行技能",
-    "clear": "清空消息"
+    "clear": "清空消息",
+    "cmd": {
+      "help": "显示帮助",
+      "clear": "清空会话",
+      "status": "系统状态",
+      "model": "切换模型",
+      "new": "新建会话",
+      "reset": "重置会话",
+      "export": "导出聊天",
+      "compact": "压缩上下文"
+    }
   },
   "focus": {
     "exit": "退出专注模式"
@@ -658,6 +671,19 @@
   "toast": {
     "sessionCompacted": "上下文已压缩",
     "updateAvailable": "有更新可用: {{version}}"
+  },
+  "larkCard": {
+    "title": "飞书卡片样式",
+    "template": "主题色",
+    "headerTitle": "标题文字",
+    "headerTitlePlaceholder": "留空使用 Bot 名称",
+    "headerIcon": "标题图标",
+    "showFeedback": "显示反馈按钮",
+    "showFeedbackDesc": "在卡片底部显示 👍👎 按钮",
+    "showTimestamp": "显示时间戳",
+    "showTimestampDesc": "在卡片底部显示回复时间",
+    "preview": "预览卡片",
+    "saved": "卡片设置已保存"
   },
   "canvas": {
     "diagram": "流程图",

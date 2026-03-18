@@ -55,7 +55,10 @@
     "toolsCollapsed": "{{count}} tools",
     "showSystem": "Show system messages",
     "hideSystem": "Hide system messages",
-    "exportTitle": "Export Conversation"
+    "exportTitle": "Export Conversation",
+    "voiceInput": "Voice input",
+    "stopRecording": "Stop recording",
+    "selectModel": "Select model"
   },
   "commands": {
     "stop": "Cancel current execution",
@@ -73,7 +76,17 @@
     "usage": "Show token usage",
     "agents": "List agents",
     "skill": "Run a skill",
-    "clear": "Clear messages"
+    "clear": "Clear messages",
+    "cmd": {
+      "help": "Show help",
+      "clear": "Clear session",
+      "status": "System status",
+      "model": "Switch model",
+      "new": "New session",
+      "reset": "Reset session",
+      "export": "Export chat",
+      "compact": "Compact context"
+    }
   },
   "focus": {
     "exit": "Exit focus mode"
@@ -658,6 +671,19 @@
   "toast": {
     "sessionCompacted": "Context compacted",
     "updateAvailable": "Update available: {{version}}"
+  },
+  "larkCard": {
+    "title": "Lark Card Styling",
+    "template": "Theme Color",
+    "headerTitle": "Header Title",
+    "headerTitlePlaceholder": "Leave empty to use bot name",
+    "headerIcon": "Header Icon",
+    "showFeedback": "Show Feedback Buttons",
+    "showFeedbackDesc": "Display thumbs up/down buttons on cards",
+    "showTimestamp": "Show Timestamp",
+    "showTimestampDesc": "Display response time in card footer",
+    "preview": "Preview Card",
+    "saved": "Card settings saved"
   },
   "canvas": {
     "diagram": "Diagram",

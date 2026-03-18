@@ -244,11 +244,7 @@ export default function App() {
     setChatError(null);
 
     if (!conv.activeId) {
-      const created = await conv.createConversation([humanMsg]);
-      conv.setTitles((prev) => ({ ...prev, [created.id]: content }));
-      pendingMessageRef.current = content;
-      pendingAttachmentsRef.current = attachments ?? null;
-      setSendLock(true);
+      // No active session — main session auto-creates on mount; skip.
       return;
     }
 
@@ -263,7 +259,6 @@ export default function App() {
       setSendLock(true);
       draftRef.current = { content, attachments };
       conv.setMessages((prev) => [...prev, humanMsg]);
-      conv.setTitles((prev) => prev[conv.activeId!] ? prev : { ...prev, [conv.activeId!]: content });
       ws.send({
         type: "message",
         content,
@@ -322,8 +317,9 @@ export default function App() {
   const isChatView = activeView === "chat";
 
   // Toolbar title: breadcrumb style — "Synapse > Page"
+  const activeConv = conv.conversations.find((c) => c.id === conv.activeId);
   const currentPageTitle = isChatView
-    ? (conv.titles[conv.activeId ?? ""] || t("chat.newChat"))
+    ? (activeConv?.display_name || activeConv?.title || t("chat.newChat"))
     : t(TABS.find((tb) => tb.key === activeView)?.i18nKey ?? "app.title");
   const toolbarSubtitle = isChatView ? t("sidebar.messages", { count: allMessages.length }) : undefined;
   const toolbarModel = isChatView ? (modelName ?? undefined) : undefined;
@@ -339,15 +335,11 @@ export default function App() {
         onSend={handleSendMessage}
         onCancel={handleCancel}
         onApprovalRespond={handleApprovalRespond}
-        onNewChat={() => conv.createConversation()}
-        onReset={() => {
-          if (conv.activeId) {
-            conv.deleteConversation(conv.activeId);
-            conv.createConversation();
-          }
-        }}
+        onNewChat={() => conv.resetSession()}
+        onReset={() => conv.resetSession()}
         onResetSession={() => conv.resetSession()}
         onToggleFocus={() => setFocusMode((f) => !f)}
+        focusMode={focusMode}
         onClearMessages={() => conv.setMessages([])}
         onRefreshMessages={() => conv.refreshMessages()}
         queueSize={messageQueue.length}
@@ -356,7 +348,6 @@ export default function App() {
         onToolResultClick={(content, toolName) => setToolSidebar({ open: true, content, toolName })}
         conversations={conv.conversations}
         activeSessionId={conv.activeId}
-        sessionTitles={conv.titles}
         onSelectSession={(id) => { conv.setActiveId(id); }}
         modelName={modelName}
       />
@@ -395,7 +386,7 @@ export default function App() {
       labelZh: "新建会话",
       category: "command",
       icon: <Terminal className="h-3.5 w-3.5" />,
-      action: () => conv.createConversation(),
+      action: () => conv.resetSession(),
     },
     {
       id: "cmd:focus",
@@ -416,8 +407,8 @@ export default function App() {
     // Sessions — recent conversations
     ...conv.conversations.slice(0, 10).map((c) => ({
       id: `session:${c.id}`,
-      label: conv.titles[c.id] || c.id.slice(0, 8),
-      labelZh: conv.titles[c.id] || c.id.slice(0, 8),
+      label: c.display_name || c.title || c.id.slice(0, 8),
+      labelZh: c.display_name || c.title || c.id.slice(0, 8),
       category: "session" as const,
       icon: <MessageSquare className="h-3.5 w-3.5" />,
       action: () => {
@@ -450,12 +441,6 @@ export default function App() {
 
           {/* Unified Sidebar — single sidebar with all nav groups */}
           <UnifiedSidebar
-            conversations={conv.conversations}
-            activeConversationId={conv.activeId}
-            titles={conv.titles}
-            onSelectConversation={(id) => { conv.setActiveId(id); setActiveView("chat"); setMobileMenuOpen(false); }}
-            onNewConversation={() => { conv.createConversation(); setActiveView("chat"); setMobileMenuOpen(false); }}
-            onDeleteConversation={conv.deleteConversation}
             activeView={activeView}
             onViewChange={(v) => { setActiveView(v as ViewKey); setMobileMenuOpen(false); }}
             identity={identity}
@@ -468,26 +453,18 @@ export default function App() {
 
           {/* Main content */}
           <main className="flex-1 flex flex-col min-w-0">
-            <Toolbar
-              title={currentPageTitle}
-              subtitle={toolbarSubtitle}
-              modelBadge={toolbarModel}
-              connected={ws.connected}
-              status={toolbarStatus}
-              onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              showMenu={true}
-              agentSelector={isChatView && agentList.length > 0 ? (
-                <select
-                  value={chatAgent}
-                  onChange={(e) => setChatAgent(e.target.value)}
-                  className="px-2 py-0.5 text-[11px] font-mono bg-[var(--bg-grouped)] text-[var(--text-secondary)] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] outline-none cursor-pointer"
-                >
-                  {agentList.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-                </select>
-              ) : undefined}
-            />
+            {/* Chat view has its own top bar (session selector + model) — hide Toolbar */}
+            {!isChatView && (
+              <Toolbar
+                title={currentPageTitle}
+                subtitle={toolbarSubtitle}
+                modelBadge={undefined}
+                connected={ws.connected}
+                status={toolbarStatus}
+                onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                showMenu={true}
+              />
+            )}
 
             <div className="flex-1 flex overflow-hidden">
               {isChatView ? (

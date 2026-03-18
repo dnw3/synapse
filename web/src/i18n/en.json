@@ -48,6 +48,13 @@
     "refresh": "Refresh",
     "copyMarkdown": "Copy as Markdown",
     "deleteMessage": "Delete message",
+    "readAloud": "Read aloud",
+    "toggleToolOutput": "Toggle tool output",
+    "focusMode": "Focus mode",
+    "exitFocus": "Exit focus mode",
+    "toolsCollapsed": "{{count}} tools",
+    "showSystem": "Show system messages",
+    "hideSystem": "Hide system messages",
     "exportTitle": "Export Conversation"
   },
   "commands": {

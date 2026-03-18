@@ -48,6 +48,13 @@
     "refresh": "刷新",
     "copyMarkdown": "复制为 Markdown",
     "deleteMessage": "删除消息",
+    "readAloud": "朗读",
+    "toggleToolOutput": "切换工具输出",
+    "focusMode": "专注模式",
+    "exitFocus": "退出专注模式",
+    "toolsCollapsed": "{{count}} 个工具",
+    "showSystem": "显示系统消息",
+    "hideSystem": "隐藏系统消息",
     "exportTitle": "导出对话"
   },
   "commands": {

@@ -568,10 +568,22 @@ async fn handle_legacy_connection(
                 );
                 let _req_guard = req_span.enter();
 
-                // Deduplicate by idempotency key (OpenClaw pattern)
+                // Deduplicate by idempotency key (OpenClaw pattern).
+                // Check both the per-connection HashSet (fast path for reconnects within the
+                // same WS session) and the global DashMap (cross-connection dedup).
                 if let Some(ref key) = idempotency_key {
-                    if !processed_idempotency_keys.insert(key.clone()) {
-                        tracing::warn!(idempotency_key = %key, "duplicate message deduplicated");
+                    // Per-connection check first
+                    let already_seen_local = !processed_idempotency_keys.insert(key.clone());
+                    // Global cross-connection check
+                    let already_seen_global = state.idempotency_cache.contains_key(key.as_str());
+
+                    if already_seen_local || already_seen_global {
+                        tracing::warn!(
+                            idempotency_key = %key,
+                            local = already_seen_local,
+                            global = already_seen_global,
+                            "duplicate message deduplicated"
+                        );
                         let _ = sender
                             .send(ws_json(&WsEvent::Done {
                                 usage: None,
@@ -581,6 +593,11 @@ async fn handle_legacy_connection(
                             .await;
                         continue;
                     }
+
+                    // Register in global cache for cross-connection dedup
+                    state
+                        .idempotency_cache
+                        .insert(key.clone(), std::time::Instant::now());
                 }
 
                 // Truncate content for logging (avoid huge payloads in logs)

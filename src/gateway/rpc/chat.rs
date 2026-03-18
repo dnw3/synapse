@@ -38,7 +38,38 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
         })
         .collect();
 
-    Ok(json!({ "messages": items }))
+    // Build session_config from stored SessionInfo fields.
+    let session_config = {
+        let all_sessions = ctx.state.sessions.list_sessions().await.unwrap_or_default();
+        if let Some(s) = all_sessions.iter().find(|s| s.session_id == session_id) {
+            // Derive channel: prefer stored field, fall back to session_id prefix
+            let channel = s
+                .channel
+                .clone()
+                .or_else(|| s.chat_type.clone())
+                .unwrap_or_else(|| "web".to_string());
+            json!({
+                "thinking_level": s.thinking_level,
+                "verbose_level": s.verbose_level,
+                "fast_mode": s.fast_mode.unwrap_or(false),
+                "model": s.model,
+                "channel": channel,
+            })
+        } else {
+            json!({
+                "thinking_level": null,
+                "verbose_level": null,
+                "fast_mode": false,
+                "model": null,
+                "channel": "web",
+            })
+        }
+    };
+
+    Ok(json!({
+        "messages": items,
+        "session_config": session_config,
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -46,17 +77,33 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
 // ---------------------------------------------------------------------------
 
 pub async fn handle_abort(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    // Accept session_id, session_key, or sessionKey — all refer to the same concept.
     let session_id = params
         .get("session_id")
+        .or_else(|| params.get("session_key"))
+        .or_else(|| params.get("sessionKey"))
         .and_then(|v| v.as_str())
-        .ok_or_else(|| RpcError::invalid_request("missing 'session_id' parameter"))?;
+        .ok_or_else(|| {
+            RpcError::invalid_request(
+                "missing session identifier: provide 'session_id', 'session_key', or 'sessionKey'",
+            )
+        })?;
 
     let tokens = ctx.state.cancel_tokens.read().await;
-    if let Some(sender) = tokens.get(session_id) {
+    let aborted = if let Some(sender) = tokens.get(session_id) {
         let _ = sender.send(true);
-    }
+        tracing::info!(session_id, "chat.abort: cancel signal sent");
+        true
+    } else {
+        tracing::debug!(session_id, "chat.abort: no active token for session");
+        false
+    };
 
-    Ok(json!({ "ok": true }))
+    Ok(json!({
+        "ok": true,
+        "aborted": aborted,
+        "session_key": session_id,
+    }))
 }
 
 // ---------------------------------------------------------------------------

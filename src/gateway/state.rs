@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::RwLock as StdRwLock;
+use std::time::Instant;
 
+use dashmap::DashMap;
 use synaptic::callbacks::{default_pricing, CostTrackingCallback};
 use synaptic::core::{ChatModel, Tool};
 use synaptic::events::EventBus;
@@ -107,6 +109,12 @@ pub struct AppState {
     /// across multi-step agent pipelines and sub-agent spawning.
     #[allow(dead_code)]
     pub context_engine: SharedContextEngine,
+    /// Global idempotency cache: key → insertion time.
+    ///
+    /// Used to deduplicate messages across connections (e.g. reconnects after
+    /// network failures).  Entries expire after 5 minutes and are periodically
+    /// cleaned up by a background task spawned in `new()`.
+    pub idempotency_cache: Arc<DashMap<String, Instant>>,
 }
 
 impl AppState {
@@ -260,6 +268,27 @@ impl AppState {
         // Build memory provider from config (native LTM or Viking)
         let memory_provider = crate::memory::build_memory_provider(config, None);
 
+        let idempotency_cache: Arc<DashMap<String, Instant>> = Arc::new(DashMap::new());
+
+        // Background cleanup: remove idempotency entries older than 5 minutes every 60 seconds.
+        {
+            let cache = Arc::clone(&idempotency_cache);
+            tokio::spawn(async move {
+                let ttl = std::time::Duration::from_secs(300); // 5 minutes
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                loop {
+                    interval.tick().await;
+                    let now = Instant::now();
+                    cache.retain(|_, inserted| now.duration_since(*inserted) < ttl);
+                    tracing::debug!(
+                        remaining = cache.len(),
+                        "idempotency cache cleanup complete"
+                    );
+                }
+            });
+        }
+
         let state = Self {
             config: config.clone(),
             model,
@@ -303,6 +332,7 @@ impl AppState {
             plugin_registry,
             memory_provider,
             context_engine: Arc::new(ContextEngine::new(std::time::Duration::from_secs(1800))),
+            idempotency_cache,
         };
 
         Ok(state)

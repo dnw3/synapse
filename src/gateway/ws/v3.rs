@@ -369,7 +369,7 @@ async fn handle_v3_agent(
     params: &Value,
     seq: &AtomicU64,
 ) {
-    let request_id = crate::logging::generate_request_id();
+    let request_id = synaptic::logging::generate_request_id();
 
     let req_span = tracing::info_span!(
         "ws_v3_request",

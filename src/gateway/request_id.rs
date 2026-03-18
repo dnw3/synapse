@@ -2,7 +2,7 @@ use axum::body::Body;
 use axum::http::{HeaderValue, Request, Response};
 use axum::middleware::Next;
 
-use crate::logging::generate_request_id;
+use synaptic::logging::generate_request_id;
 
 /// Validate that a request ID is reasonable: alphanumeric, dashes, underscores only, max 64 chars.
 fn is_valid_request_id(id: &str) -> bool {

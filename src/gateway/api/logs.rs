@@ -23,7 +23,7 @@ pub struct LogsQuery {
 
 #[derive(Serialize)]
 pub struct LogsResponse {
-    pub entries: Vec<crate::logging::LogEntry>,
+    pub entries: Vec<synaptic::logging::LogEntry>,
     pub total: usize,
 }
 

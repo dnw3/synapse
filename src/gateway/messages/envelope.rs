@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use synaptic::{DeliveryContext, InputProvenance, ProvenanceKind};
 
 use crate::gateway::presence::now_ms;
-use crate::logging;
+use synaptic::logging;
 
 /// File attachment from any channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]

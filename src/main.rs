@@ -16,7 +16,6 @@ mod heartbeat;
 mod hooks;
 mod hub;
 mod init;
-mod logging;
 mod memory;
 mod notify;
 #[allow(dead_code)]
@@ -107,15 +106,35 @@ async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let config = SynapseConfig::load_or_default(cli.config_path.as_deref())?;
 
     // Initialize structured logging (console + optional file + in-memory buffer)
-    let log_buffer = logging::init_tracing(&config.logging);
+    let mut log_config = config.logging.clone();
+    // Override framework defaults with synapse-specific defaults:
+    // - log path: ~/.synapse/logs (framework defaults to ~/.local/share/logs)
+    // - file prefix: "synapse.log" (framework defaults to "app.log")
+    let framework_default_path = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".local/share/logs")
+        .to_string_lossy()
+        .to_string();
+    if log_config.file.path == framework_default_path {
+        log_config.file.path = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".synapse/logs")
+            .to_string_lossy()
+            .to_string();
+    }
+    if log_config.file.file_prefix == "app.log" {
+        log_config.file.file_prefix = "synapse.log".to_string();
+    }
+    let log_buffer = synaptic::logging::init_tracing(&log_config);
 
     // Clean up old log files on startup
-    if config.logging.file.enabled {
-        let log_dir = std::path::PathBuf::from(logging::expand_log_path(&config.logging.file.path));
-        logging::cleanup_old_logs(
+    if log_config.file.enabled {
+        let log_dir =
+            std::path::PathBuf::from(synaptic::logging::expand_log_path(&log_config.file.path));
+        synaptic::logging::cleanup_old_logs(
             &log_dir,
-            config.logging.file.max_days,
-            config.logging.file.max_files,
+            log_config.file.max_days,
+            log_config.file.max_files,
         );
     }
 

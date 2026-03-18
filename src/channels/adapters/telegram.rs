@@ -21,7 +21,7 @@ use crate::config::SynapseConfig;
 use crate::gateway::messages::sender::{ChannelSender, SendResult};
 use crate::gateway::messages::{Attachment, MessageEnvelope};
 use crate::gateway::presence::now_ms;
-use crate::logging;
+use synaptic::logging;
 
 // ---------------------------------------------------------------------------
 // ChannelSender implementation

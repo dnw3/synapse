@@ -6,7 +6,7 @@ description = "AI Agent product powered by Synaptic framework"
 
 [dependencies]
 # Framework
-synaptic = { path = "../synaptic/crates/synaptic", features = ["agent", "mcp", "deep-config", "store-filesystem", "embeddings", "vectorstores", "scheduler", "sqlite", "ollama", "splitters", "voyage", "jina", "cohere", "nomic", "message-ir", "events", "plugin"] }
+synaptic = { path = "../synaptic/crates/synaptic", features = ["agent", "mcp", "deep-config", "store-filesystem", "embeddings", "vectorstores", "scheduler", "sqlite", "ollama", "splitters", "voyage", "jina", "cohere", "nomic", "message-ir", "events", "plugin", "viking"] }
 synaptic-deep = { path = "../synaptic/crates/synaptic-deep", features = ["filesystem"] }
 
 # CLI
@@ -27,8 +27,6 @@ toml = "0.8"
 
 # Logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "json", "registry"] }
-tracing-appender = "0.2"
 
 # PDF extraction
 pdf-extract = "0.10"

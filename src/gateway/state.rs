@@ -21,8 +21,8 @@ use crate::agent::context_engine::{ContextEngine, SharedContextEngine};
 use crate::config::SynapseConfig;
 use crate::gateway::messages::ChannelRegistry;
 use crate::gateway::rpc::wizard::WizardSession;
-use crate::logging::LogBuffer;
 use crate::session::SessionWriteLock;
+use synaptic::logging::LogBuffer;
 
 /// Request counter key: (method, path, status).
 type RequestKey = (String, String, u16);

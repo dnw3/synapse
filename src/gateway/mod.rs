@@ -93,7 +93,7 @@ pub async fn run_server_with_log_buffer(
     config: &SynapseConfig,
     host: &str,
     port: u16,
-    log_buffer: Option<crate::logging::LogBuffer>,
+    log_buffer: Option<synaptic::logging::LogBuffer>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app_state = if let Some(buf) = log_buffer {
         state::AppState::with_log_buffer(config, buf).await?

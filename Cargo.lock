@@ -4456,8 +4456,6 @@ dependencies = [
  "toml",
  "tower-http",
  "tracing",
- "tracing-appender",
- "tracing-subscriber",
  "urlencoding",
  "uuid",
  "which",
@@ -4480,6 +4478,7 @@ dependencies = [
  "synaptic-graph",
  "synaptic-jina",
  "synaptic-lark",
+ "synaptic-logging",
  "synaptic-mcp",
  "synaptic-memory",
  "synaptic-middleware",
@@ -4681,6 +4680,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "synaptic-logging"
+version = "0.4.0"
+dependencies = [
+ "chrono",
+ "dirs",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "synaptic-macros"
 version = "0.4.0"
 dependencies = [
@@ -4711,11 +4725,13 @@ name = "synaptic-memory"
 version = "0.4.0"
 dependencies = [
  "async-trait",
+ "reqwest 0.13.2",
  "serde",
  "serde_json",
  "synaptic-core",
  "synaptic-runnables",
  "tokio",
+ "urlencoding",
 ]
 
 [[package]]

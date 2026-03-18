@@ -252,7 +252,7 @@ async fn run_agent_for_session(
     out_tx: mpsc::Sender<String>,
 ) {
     let conversation_id = session_key.clone();
-    let request_id = crate::logging::generate_request_id();
+    let request_id = synaptic::logging::generate_request_id();
 
     let req_span = tracing::info_span!(
         "ws_mux_request",

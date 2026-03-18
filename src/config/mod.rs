@@ -196,7 +196,7 @@ pub struct SynapseConfig {
 
     /// Logging configuration (console, file, in-memory buffer).
     #[serde(default)]
-    pub logging: crate::logging::LogConfig,
+    pub logging: synaptic::logging::LogConfig,
 
     /// Workspace directory for context files (SOUL.md, IDENTITY.md, etc.).
     /// Defaults to `~/.synapse/workspace/`.

@@ -1,105 +1,247 @@
-# Synapse Configuration
-# Copy to synapse.toml and edit as needed.
+# ============================================================================
+# Synapse Configuration Reference
+# ============================================================================
+# Copy this file to `synapse.toml` and customize.
+# Search order: ./synapse.toml → ~/.synapse/config.toml → defaults
+# All sections are optional — defaults shown as comments.
+# ============================================================================
 
+# ── Model ──────────────────────────────────────────────────────────────────
 [model]
-provider = "openai"
-model = "gpt-4o"
-api_key_env = "OPENAI_API_KEY"
-# base_url = "https://api.openai.com/v1"   # Override for compatible providers
+provider = "ark"                           # openai | anthropic | gemini | ollama | bedrock | ark | deepseek | groq | ...
+model = "ep-20260125170616-c6dnz"          # Model name or endpoint ID
+api_key_env = "ARK_API_KEY"                # Env var holding the API key
+# api_key = "sk-..."                       # Or hardcode (not recommended)
+# api_base = "https://custom.endpoint/v1"  # Custom API base URL
 # temperature = 0.7
 # max_tokens = 4096
 
-# Fallback models for automatic failover (tried in order on primary failure)
-# fallback_models = ["gpt-4o-mini", "gpt-3.5-turbo"]
+# Fallback models (auto-failover on rate limit/error)
+fallback_models = [
+    "doubao-seed-2-0-pro-260215",
+]
 
-# --- Custom Providers ---
-# Register providers with custom base_url and API key configuration.
-# Supports single key (api_key_env) and multi-key rotation (api_keys_env).
-
-# [[providers]]
-# name = "ark"
-# base_url = "https://ark.cn-beijing.volces.com/api/v3"
-# api_key_env = "ARK_API_KEY"
-# api_keys_env = "ARK_API_KEYS"  # comma-separated keys for round-robin rotation
-
-# [[providers]]
-# name = "my-openai"
-# base_url = "https://api.openai.com/v1"
-# api_key_env = "OPENAI_API_KEY"
-
-# --- Model Catalog ---
-# Named models with aliases and per-model parameter overrides.
-# Use `synapse models list` or `/model list` to view.
-
-# [[models]]
-# name = "doubao-seed-2-0-pro-260215"
-# aliases = ["pro", "default"]
-# provider = "ark"
-# temperature = 0.7
-
-# [[models]]
-# name = "glm-4-7-251222"
-# aliases = ["glm"]
-# provider = "ark"
-
-# [[models]]
-# name = "gpt-4o"
-# aliases = ["4o"]
-
-# --- Channel Model Bindings ---
-# Bind specific models to channels. Supports exact match and platform wildcards.
-
-# [[channel_models]]
-# channel = "telegram:-1001234"
-# model = "glm"             # uses alias
-
-# [[channel_models]]
-# channel = "slack:*"       # all Slack channels
-# model = "gpt-4o"
-
+# ── Agent ──────────────────────────────────────────────────────────────────
 [agent]
-system_prompt = "You are Synapse, a helpful AI assistant powered by the Synaptic framework. You can read and write files, execute commands, and help with complex coding tasks."
-max_turns = 50
+system_prompt = "You are Synapse, a helpful AI assistant."
+max_turns = 50                             # Max tool-use turns per request
+# workspace = "~/.synapse/workspace"       # Agent working directory
 
 [agent.tools]
-filesystem = true
-# sandbox_root = "/workspace"
+filesystem = true                          # ls, read, write, edit, glob, grep
+execute = false                            # Shell command execution (default: off)
 
-[paths]
-sessions_dir = ".sessions"
-memory_file = "AGENTS.md"
-# skills_dir = ".skills"
-
-# Web server (synapse serve)
-# [serve]
-# host = "0.0.0.0"
-# port = 3000
-
-# Docker sandbox (synapse task --docker)
-# [docker]
-# enabled = false
-# image = "synapse-sandbox:latest"
-# memory_limit = "4g"
-# cpu_limit = 2
-# network = true
-
-# MCP servers (tools automatically available to agent)
+# ── MCP (Model Context Protocol) Servers ───────────────────────────────────
 # [[mcp]]
-# name = "browser"
+# name = "context7"
 # transport = "stdio"
 # command = "npx"
-# args = ["-y", "@anthropic/mcp-server-chrome-devtools"]
+# args = ["-y", "@anthropic-ai/context7-mcp"]
 
-# Lark bot (synapse bot lark)
-# [lark]
-# app_id = "cli_xxx"
-# app_secret_env = "LARK_APP_SECRET"
+# ── Memory Provider ────────────────────────────────────────────────────────
+[memory]
+memory_provider = "native"                 # "native" (built-in LTM) or "viking" (OpenViking)
 
-# Slack bot (synapse bot slack)
-# [slack]
-# app_token_env = "SLACK_APP_TOKEN"
+# Native mode (default) — built-in hybrid search
+# ltm_backend = "sqlite"                   # file | sqlite | postgres | redis
+# embedding_provider = "openai"            # openai | jina | voyage | fake
+# ltm_hybrid_search = true
+# ltm_mmr_lambda = 0.5
+# ltm_decay_half_life_days = 30
+
+# Viking mode — OpenViking server (pip install openviking)
+# [memory.viking]
+# url = "http://127.0.0.1:1933"
+# auto_recall = true                       # Per-turn auto memory retrieval
+# recall_limit = 6                         # Max memories per recall
+# recall_score_threshold = 0.01            # Min relevance score
+# auto_capture = true                      # Auto-record messages to STM
+# capture_on_reset = true                  # Commit STM→LTM on session reset
+
+# ── Session Reset Policy ───────────────────────────────────────────────────
+[session_reset]
+mode = "daily"                             # daily | idle | never
+at_hour = 4                                # For daily: reset at this hour (0-23)
+idle_minutes = 60                          # For idle: reset after N minutes inactivity
+
+# Per-channel override
+# [session_reset.channels.lark]
+# mode = "daily"
+# at_hour = 9
+
+# Per-type override (direct/group/thread)
+# [session_reset.types.group]
+# mode = "idle"
+# idle_minutes = 120
+
+# ── Web Server ─────────────────────────────────────────────────────────────
+[serve]
+host = "127.0.0.1"
+port = 3000
+
+[auth]
+# token_salt = "your-secret-salt"          # HMAC token auth
+# password_hash = "$argon2..."             # Password auth (argon2 hash)
+
+# ── Multi-Agent ────────────────────────────────────────────────────────────
+[agents]
+default = "default"                        # Default agent ID
+
+# [[agents.list]]
+# id = "coder"
+# model = "claude-3-opus"
+# system_prompt = "You are an expert coder."
+# workspace = "~/code"
+# tool_allow = ["read_*", "write_*", "execute"]
+# tool_deny = ["delete_*"]
+
+# [[agents.list]]
+# id = "researcher"
+# model = "gpt-4o"
+# system_prompt = "You are a research assistant."
+
+# ── Route Bindings ─────────────────────────────────────────────────────────
+# Map specific channels/users to specific agents
+# [[bindings]]
+# channel = "lark"
+# agent = "default"
+
+# [[bindings]]
+# channel = "lark"
+# peer = "ou_specific_user_id"
+# agent = "coder"
+
+# ── Broadcast Groups ──────────────────────────────────────────────────────
+# Fan out messages to multiple agents
+# [[broadcasts]]
+# channel = "lark"
+# agents = ["coder", "researcher"]
+# strategy = "parallel"                   # parallel | sequential | aggregated
+
+# ── Bot Channels ───────────────────────────────────────────────────────────
+# Each channel supports multi-account: use [[channel]] (array of tables)
+
+[[lark]]
+enabled = true
+app_id = "cli_xxxxxxxxxxxx"
+app_secret_env = "LARK_APP_SECRET"         # Env var or use app_secret = "..."
+# account_id = "main"                      # For multi-account
+# render_mode = "card"                     # text | card
+# dm_policy = "allowlist"                  # allowlist | denylist | open
+# group_session_scope = "per_channel"      # main | per_channel | per_sender
+
+# [[slack]]
+# enabled = true
 # bot_token_env = "SLACK_BOT_TOKEN"
+# app_token_env = "SLACK_APP_TOKEN"
 
-# Telegram bot (synapse bot telegram)
-# [telegram]
+# [[telegram]]
+# enabled = true
 # bot_token_env = "TELEGRAM_BOT_TOKEN"
+
+# [[discord]]
+# enabled = true
+# bot_token_env = "DISCORD_BOT_TOKEN"
+
+# [[dingtalk]]
+# enabled = true
+# app_key_env = "DINGTALK_APP_KEY"
+# app_secret_env = "DINGTALK_APP_SECRET"
+
+# [[teams]]
+# enabled = true
+# app_id = "..."
+# app_password_env = "TEAMS_APP_PASSWORD"
+
+# [[wechat]]
+# enabled = true
+# corp_id = "..."
+# agent_id = 1000002
+# secret_env = "WECHAT_SECRET"
+
+# ── Tool Policy ────────────────────────────────────────────────────────────
+[tool_policy]
+# allow = ["read_*", "write_*"]           # Glob patterns for allowed tools
+# deny = ["delete_*"]                     # Glob patterns for denied tools
+# owner_only = ["execute"]                # Tools only the session owner can call
+
+# ── Security ───────────────────────────────────────────────────────────────
+# [security]
+# approval_mode = "allowlist"             # allowlist | on_miss | always
+# ssrf_guard = true                       # Block private IP access
+# circuit_breaker_threshold = 5           # Consecutive failures before tripping
+
+# [secrets]
+# patterns = ["sk-*", "token_*"]          # Patterns to mask in logs
+
+# ── Rate Limiting ──────────────────────────────────────────────────────────
+# [rate_limit]
+# requests_per_minute = 60
+# tokens_per_minute = 100000
+
+# ── Scheduled Jobs ─────────────────────────────────────────────────────────
+# [[schedule]]
+# name = "daily-summary"
+# cron = "0 9 * * MON-FRI"
+# agent = "default"
+# channel = "lark"
+# message = "Generate today's summary"
+
+# ── Sub-Agent ──────────────────────────────────────────────────────────────
+[subagent]
+# enabled = true
+# max_depth = 3                           # Max nesting depth
+# max_concurrent = 5
+# timeout_secs = 300
+
+# ── Skills ─────────────────────────────────────────────────────────────────
+[skills]
+# bundled_dirs = ["~/.claude/skills/", ".claude/skills/"]
+# description_budget = 16000              # Max tokens for skill descriptions
+
+# ── Heartbeat ──────────────────────────────────────────────────────────────
+[heartbeat]
+# enabled = false
+# interval_secs = 300                     # Proactive check every 5 minutes
+# channel = "lark"                        # Where to send heartbeat
+
+# ── Reflection ─────────────────────────────────────────────────────────────
+[reflection]
+# enabled = false                         # Post-session self-evolution
+# model = "gpt-4o"                        # Model for reflection
+
+# ── Context Injection ──────────────────────────────────────────────────────
+[context]
+# soul_file = "SOUL.md"                   # Agent personality file
+# identity_file = "IDENTITY.md"           # Agent identity file
+
+# ── Session ────────────────────────────────────────────────────────────────
+[session]
+# idle_timeout_secs = 1800                # Session idle timeout
+# max_history_messages = 100              # Max messages in context
+
+# ── Docker Sandbox ─────────────────────────────────────────────────────────
+# [docker]
+# enabled = false
+# image = "ubuntu:22.04"
+
+# ── Voice ──────────────────────────────────────────────────────────────────
+# [voice]
+# stt_provider = "openai"                 # STT provider
+# tts_provider = "openai"                 # TTS provider
+# tts_voice = "alloy"                     # Voice selection
+
+# ── Multi-Gateway ──────────────────────────────────────────────────────────
+# [gateway]
+# instance_id = "gw-1"                    # Unique instance ID
+# discovery = "mdns"                      # mdns | static
+
+# ── ClawHub ────────────────────────────────────────────────────────────────
+# [hub]
+# registry_url = "https://hub.synapse.dev/api/v1"
+
+# ── Logging ────────────────────────────────────────────────────────────────
+[logging]
+# level = "info"                          # trace | debug | info | warn | error
+# file = "~/.synapse/logs/synapse.log"    # Log file path
+# buffer_size = 1000                      # In-memory ring buffer size

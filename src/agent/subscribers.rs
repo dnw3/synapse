@@ -1,4 +1,4 @@
-//! EventSubscriber implementations that mirror the 6 business-layer AgentMiddleware impls.
+//! EventSubscriber implementations for business-layer lifecycle hooks.
 //!
 //! These subscribers are NOT yet wired into the agent builder — they exist alongside
 //! the old middleware so we can switch over gradually.  Each subscriber is marked

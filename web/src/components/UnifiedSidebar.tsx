@@ -1,13 +1,10 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { X, Plus, Trash2, ChevronDown, MessageSquare } from "lucide-react";
+import { X, ChevronDown, MessageSquare } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { cn } from "../lib/cn";
 import { TABS, SIDEBAR_SECTIONS } from "./Dashboard";
 import type { TabKey } from "./Dashboard";
-import type { Conversation } from "../types";
 import type { IdentityInfo } from "../types/dashboard";
 import SidebarFooter from "./SidebarFooter";
 
@@ -22,28 +19,7 @@ function loadCollapsed(): Record<string, boolean> {
   }
 }
 
-function formatRelativeTime(dateStr: string): string {
-  const now = Date.now();
-  const parsed = /^\d+$/.test(dateStr) ? parseInt(dateStr, 10) : new Date(dateStr).getTime();
-  if (isNaN(parsed)) return "";
-  const diffMs = now - parsed;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "now";
-  if (diffMin < 60) return `${diffMin}m`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH}h`;
-  const diffD = Math.floor(diffH / 24);
-  return `${diffD}d`;
-}
-
 interface UnifiedSidebarProps {
-  // Conversations
-  conversations: Conversation[];
-  activeConversationId: string | null;
-  titles: Record<string, string>;
-  onSelectConversation: (id: string) => void;
-  onNewConversation: () => void;
-  onDeleteConversation: (id: string) => void;
   // Navigation
   activeView: string;
   onViewChange: (view: string) => void;
@@ -59,12 +35,6 @@ interface UnifiedSidebarProps {
 }
 
 export default function UnifiedSidebar({
-  conversations,
-  activeConversationId,
-  titles,
-  onSelectConversation,
-  onNewConversation,
-  onDeleteConversation,
   activeView,
   onViewChange,
   identity,
@@ -76,7 +46,6 @@ export default function UnifiedSidebar({
 }: UnifiedSidebarProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
-  const [search, setSearch] = useState("");
 
   // Persist collapse state
   useEffect(() => {
@@ -88,14 +57,6 @@ export default function UnifiedSidebar({
   };
 
   const isChatActive = activeView === "chat";
-
-  // Filter conversations for search
-  const filtered = search.trim()
-    ? conversations.filter((c) => {
-        const title = titles[c.id] ?? c.id;
-        return title.toLowerCase().includes(search.toLowerCase());
-      })
-    : conversations;
 
   return (
     <aside
@@ -157,84 +118,6 @@ export default function UnifiedSidebar({
                 <span className="truncate">{t("sidebar.chatTab")}</span>
               </button>
 
-              {/* Inline conversation list (when chat is active) */}
-              {isChatActive && (
-                <div className="mt-1">
-                  {/* Search */}
-                  <div className="px-1 pb-1.5">
-                    <Input
-                      variant="search"
-                      placeholder={t("sidebar.search")}
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
-
-                  {/* New Chat button */}
-                  <div className="px-1 pb-1.5">
-                    <Button onClick={onNewConversation} className="w-full gap-1.5" size="sm">
-                      <Plus className="h-3.5 w-3.5" />
-                      {t("sidebar.newChat")}
-                    </Button>
-                  </div>
-
-                  {/* Conversation items */}
-                  <div className="px-0 space-y-px">
-                    <div className="px-2 pt-1 pb-0.5">
-                      <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-[0.5px]">
-                        {t("sidebar.conversations")}
-                      </span>
-                    </div>
-                    {filtered.map((conv) => {
-                      const isActive = activeConversationId === conv.id;
-                      const title = titles[conv.id]
-                        ? titles[conv.id].slice(0, 40)
-                        : conv.message_count === 0
-                          ? t("sidebar.newChat")
-                          : conv.id.slice(0, 8);
-                      return (
-                        <div
-                          key={conv.id}
-                          onClick={() => onSelectConversation(conv.id)}
-                          className={cn(
-                            "group/item relative flex items-center gap-2 px-2 py-1.5 rounded-[6px] cursor-pointer transition-all duration-150 ml-4",
-                            isActive
-                              ? "bg-[var(--accent)]/12 font-medium"
-                              : "hover:bg-[var(--bg-hover)]"
-                          )}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className={cn(
-                              "truncate text-[12px] leading-tight",
-                              isActive ? "text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)]"
-                            )}>
-                              {title}
-                            </div>
-                          </div>
-                          <span className="text-[10px] text-[var(--text-tertiary)] flex-shrink-0 group-hover/item:hidden">
-                            {formatRelativeTime(conv.created_at)}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteConversation(conv.id);
-                            }}
-                            className="hidden group-hover/item:flex items-center justify-center w-5 h-5 rounded text-[var(--text-tertiary)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 transition-all duration-150 flex-shrink-0 absolute right-1.5"
-                            title={t("sidebar.deleteConfirm")}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                    {filtered.length === 0 && (
-                      <div className="px-2 py-4 text-[11px] text-[var(--text-tertiary)] text-center">
-                        {t("sidebar.noConversations")}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="my-1.5 mx-2 border-t border-[var(--separator)]" />

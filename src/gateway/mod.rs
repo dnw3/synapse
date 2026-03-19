@@ -28,8 +28,6 @@ mod metrics;
 #[cfg(feature = "web")]
 pub mod nodes;
 #[cfg(feature = "web")]
-mod openai_compat;
-#[cfg(feature = "web")]
 pub mod pairing;
 #[cfg(feature = "web")]
 pub mod presence;
@@ -39,8 +37,6 @@ mod request_id;
 pub mod rpc;
 #[cfg(feature = "web")]
 pub mod run_queue;
-#[cfg(feature = "web")]
-mod sse;
 #[cfg(feature = "web")]
 pub mod state;
 #[cfg(feature = "web")]
@@ -147,8 +143,6 @@ pub async fn run_server_with_log_buffer(
         .merge(public_routes)
         .merge(health_route)
         .merge(metrics::routes().with_state(app_state.clone()))
-        .merge(sse::routes().with_state(app_state.clone()))
-        .merge(openai_compat::routes().with_state(app_state.clone()))
         .merge(crate::acp::server::routes().with_state(app_state.clone()))
         .merge(ws::ws_router(app_state.clone()))
         .layer(middleware::from_fn_with_state(

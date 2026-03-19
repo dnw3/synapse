@@ -445,6 +445,12 @@ export default function App() {
 
           {/* Unified Sidebar — single sidebar with all nav groups */}
           <UnifiedSidebar
+            conversations={conv.conversations}
+            activeConversationId={conv.activeId}
+            titles={{}}
+            onSelectConversation={(id) => conv.setActiveId(id)}
+            onNewConversation={() => conv.resetSession()}
+            onDeleteConversation={(id) => conv.deleteConversation(id)}
             activeView={activeView}
             onViewChange={(v) => { setActiveView(v as ViewKey); setMobileMenuOpen(false); }}
             identity={identity}

@@ -409,8 +409,10 @@ async fn handle_v3_agent(
     let _req_guard = req_span.enter();
 
     // --- Parse content and attachments from params ---
+    // Accept both "message" (OpenClaw-aligned) and "content" (legacy) parameter names
     let content = params
-        .get("content")
+        .get("message")
+        .or_else(|| params.get("content"))
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();

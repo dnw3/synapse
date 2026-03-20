@@ -8,6 +8,7 @@ pub fn to_store_key(agent_id: &str, request_key: &str) -> String {
 /// Extract the client-facing request key from an internal storage key.
 /// "agent:default:main" → "main"
 /// "agent:default:lark:direct:user123" → "lark:direct:user123"
+#[allow(dead_code)]
 pub fn to_request_key(store_key: &str) -> &str {
     let mut parts = store_key.splitn(3, ':');
     let _ = parts.next(); // "agent"
@@ -17,6 +18,7 @@ pub fn to_request_key(store_key: &str) -> &str {
 
 /// Extract agent ID from a storage key.
 /// "agent:default:main" → "default"
+#[allow(dead_code)]
 pub fn agent_id_from_store_key(store_key: &str) -> &str {
     store_key.split(':').nth(1).unwrap_or("default")
 }
@@ -37,12 +39,14 @@ pub fn validate_request_key(key: &str) -> Result<(), String> {
 
 /// Build a session key for a channel DM.
 /// "lark", "user123" → "lark:direct:user123"
+#[allow(dead_code)]
 pub fn channel_dm_key(channel: &str, peer_id: &str) -> String {
     format!("{}:direct:{}", channel, peer_id)
 }
 
 /// Build a session key for a channel group.
 /// "lark", "chat123" → "lark:group:chat123"
+#[allow(dead_code)]
 pub fn channel_group_key(channel: &str, group_id: &str) -> String {
     format!("{}:group:{}", channel, group_id)
 }

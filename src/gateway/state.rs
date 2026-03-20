@@ -54,6 +54,7 @@ pub struct AppState {
     // ── Agent & model ───────────────────────────────────────────────────
     pub model: Arc<dyn ChatModel>,
     /// Pre-loaded MCP tools (loaded once at startup, shared across requests).
+    #[allow(dead_code)]
     pub mcp_tools: Vec<Arc<dyn Tool>>,
     /// Cost and token usage tracking across all requests.
     pub cost_tracker: Arc<CostTrackingCallback>,
@@ -69,7 +70,7 @@ pub struct AppState {
 
     // ── Session management ──────────────────────────────────────────────
     pub sessions: Arc<SessionManager>,
-    /// Active agent cancel tokens, keyed by conversation_id.
+    /// Active agent cancel tokens, keyed by store_key (e.g. "agent:default:main").
     pub cancel_tokens: Arc<RwLock<HashMap<String, tokio::sync::watch::Sender<bool>>>>,
     /// Per-session write locks to prevent concurrent modifications.
     pub write_lock: Arc<SessionWriteLock>,

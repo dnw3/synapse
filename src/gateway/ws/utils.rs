@@ -10,6 +10,7 @@ pub(crate) fn ws_json(event: &WsEvent) -> WsMessage {
     WsMessage::Text(serde_json::to_string(event).unwrap().into())
 }
 
+#[allow(dead_code)]
 pub(crate) fn find_tool_name(messages: &[Message], displayed: usize, tool_msg: &Message) -> String {
     let tool_call_id = tool_msg.tool_call_id().unwrap_or_default();
     if tool_call_id.is_empty() {
@@ -27,6 +28,7 @@ pub(crate) fn find_tool_name(messages: &[Message], displayed: usize, tool_msg: &
     "tool".to_string()
 }
 
+#[allow(dead_code)]
 pub(crate) fn truncate(s: &str, max: usize) -> String {
     if s.len() <= max {
         s.to_string()

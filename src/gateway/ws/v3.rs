@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use axum::extract::ws::{Message as WsMessage, WebSocket};
-use axum::extract::{Path, State, WebSocketUpgrade};
+use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
@@ -22,22 +22,26 @@ use crate::gateway::rpc::{
     ServerFrame, ServerInfo, SnapshotInfo, StateVersion, GATEWAY_EVENTS, PROTOCOL_VERSION,
 };
 use crate::gateway::state::AppState;
+use crate::session::key as session_key;
 
+/// Unified WebSocket handler — single `/ws` endpoint, no session in URL.
+///
+/// Each `chat.send` request carries a `sessionKey` in its params, allowing
+/// a single connection to interact with multiple sessions.
 pub(crate) async fn ws_handler(
     ws: WebSocketUpgrade,
-    Path(conversation_id): Path<String>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, conversation_id, state))
+    ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 
-async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppState) {
+async fn handle_socket(socket: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
 
     // Unique identifier for this WebSocket connection (used as lock holder).
     let conn_id = Uuid::new_v4().to_string();
 
-    tracing::info!(%conn_id, %conversation_id, "websocket connected");
+    tracing::info!(%conn_id, "websocket connected");
 
     // --- Protocol v3: send connect.challenge before anything else ---
     let nonce = Uuid::new_v4().to_string();
@@ -72,7 +76,7 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
         .unwrap_or(false);
 
     if is_v3 {
-        handle_v3_connection(sender, receiver, conversation_id, state, conn_id, first_msg).await;
+        handle_v3_connection(sender, receiver, state, conn_id, first_msg).await;
     } else {
         let err = serde_json::json!({
             "type": "event", "event": "error",
@@ -88,7 +92,6 @@ async fn handle_socket(socket: WebSocket, conversation_id: String, state: AppSta
 async fn handle_v3_connection(
     mut sender: SplitSink<WebSocket, WsMessage>,
     mut receiver: SplitStream<WebSocket>,
-    conversation_id: String,
     state: AppState,
     conn_id: String,
     first_msg: String,
@@ -228,15 +231,7 @@ async fn handle_v3_connection(
         ))
         .await;
 
-    tracing::info!(%conn_id, %conversation_id, ?role, "v3 connection established");
-
-    // --- Create cancel channel ---
-    let (cancel_tx, _cancel_rx) = tokio::sync::watch::channel(false);
-    state
-        .cancel_tokens
-        .write()
-        .await
-        .insert(conversation_id.clone(), cancel_tx);
+    tracing::info!(%conn_id, ?role, "v3 connection established");
 
     // Event sequence counter for this connection
     let seq = AtomicU64::new(1);
@@ -244,6 +239,9 @@ async fn handle_v3_connection(
     // Tick timer for keepalive / heartbeat
     let mut tick_interval = tokio::time::interval(std::time::Duration::from_secs(30));
     tick_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    // Track which session keys this connection has used (for cleanup)
+    let mut active_session_keys: HashSet<String> = HashSet::new();
 
     // --- V3 main loop ---
     loop {
@@ -298,11 +296,35 @@ async fn handle_v3_connection(
                 match frame {
                     ClientFrame::Request { id, method, params } => {
                         if method == "agent" || method == "chat.send" {
-                            // Handle agent execution — reuse existing streaming logic
+                            // Extract sessionKey from params (default: "main")
+                            let sk = params
+                                .get("sessionKey")
+                                .or_else(|| params.get("session_key"))
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("main")
+                                .to_string();
+
+                            // Validate the session key
+                            if let Err(e) = session_key::validate_request_key(&sk) {
+                                let err = ServerFrame::err(
+                                    &id,
+                                    RpcError::invalid_request(format!("Invalid sessionKey: {e}")),
+                                );
+                                let _ = sender
+                                    .send(WsMessage::Text(
+                                        serde_json::to_string(&err).unwrap().into(),
+                                    ))
+                                    .await;
+                                continue;
+                            }
+
+                            active_session_keys.insert(sk.clone());
+
+                            // Handle agent execution with per-request session key
                             handle_v3_agent(
                                 &mut sender,
                                 &mut receiver,
-                                &conversation_id,
+                                &sk,
                                 &state,
                                 &conn_id,
                                 &id,
@@ -345,12 +367,20 @@ async fn handle_v3_connection(
 
     // --- Cleanup ---
     state.broadcaster.unregister(&conn_id).await;
-    state.cancel_tokens.write().await.remove(&conversation_id);
-    state.write_lock.release(&conversation_id, &conn_id).await;
-    tracing::info!(%conn_id, %conversation_id, "v3 connection closed");
+    // Release write locks and cancel tokens for all session keys used by this connection
+    for sk in &active_session_keys {
+        let store_key = session_key::to_store_key("default", sk);
+        state.cancel_tokens.write().await.remove(&store_key);
+        state.write_lock.release(&store_key, &conn_id).await;
+    }
+    tracing::info!(%conn_id, "v3 connection closed");
 }
 
 /// Handle an `agent` or `chat.send` RPC request in v3 protocol.
+///
+/// The `session_key_str` is the client-facing session key (e.g. "main"),
+/// extracted from the request params. It is converted to a store key
+/// (e.g. "agent:default:main") for internal use.
 ///
 /// Uses the unified `AgentSession::handle_message_streaming_with_context()`
 /// pipeline with `WsStreamingOutput` for real-time event forwarding. The
@@ -360,7 +390,7 @@ async fn handle_v3_connection(
 async fn handle_v3_agent(
     sender: &mut SplitSink<WebSocket, WsMessage>,
     receiver: &mut SplitStream<WebSocket>,
-    conversation_id: &str,
+    session_key_str: &str,
     state: &AppState,
     conn_id: &str,
     request_id_rpc: &str,
@@ -368,12 +398,13 @@ async fn handle_v3_agent(
     seq: &AtomicU64,
 ) {
     let request_id = synaptic::logging::generate_request_id();
+    let store_key = session_key::to_store_key("default", session_key_str);
 
     let req_span = tracing::info_span!(
         "ws_v3_request",
         %request_id,
         %conn_id,
-        %conversation_id,
+        session_key = %session_key_str,
     );
     let _req_guard = req_span.enter();
 
@@ -402,6 +433,7 @@ async fn handle_v3_agent(
     tracing::info!(
         msg_type = "agent",
         content_len = content.len(),
+        session_key = %session_key_str,
         "v3 agent request"
     );
 
@@ -409,13 +441,13 @@ async fn handle_v3_agent(
     {
         let event_bus = state.event_bus.clone();
         let req_id = request_id.clone();
-        let conv_id = conversation_id.to_string();
+        let sk = session_key_str.to_string();
         tokio::spawn(async move {
             let mut event = Event::new(
                 EventKind::MessageReceived,
                 serde_json::json!({
                     "request_id": req_id,
-                    "conversation_id": conv_id,
+                    "session_key": sk,
                     "channel": "web",
                     "protocol": "v3",
                 }),
@@ -439,10 +471,10 @@ async fn handle_v3_agent(
     }
 
     // --- Serialize concurrent executions ---
-    let _run_guard = state.run_queue.acquire(conversation_id).await;
+    let _run_guard = state.run_queue.acquire(&store_key).await;
 
     // --- Acquire session write lock ---
-    if let Err(lock_err) = state.write_lock.try_acquire(conversation_id, conn_id).await {
+    if let Err(lock_err) = state.write_lock.try_acquire(&store_key, conn_id).await {
         let err = ServerFrame::err(
             request_id_rpc,
             RpcError::invalid_request(format!("Session busy: {lock_err}")),
@@ -455,13 +487,16 @@ async fn handle_v3_agent(
 
     send_event!(
         "agent.message.start",
-        serde_json::json!({"request_id": request_id})
+        serde_json::json!({
+            "request_id": request_id,
+            "sessionKey": session_key_str,
+        })
     );
 
     // --- Ensure session exists ---
     if state
         .sessions
-        .get_session(conversation_id)
+        .get_session(&store_key)
         .await
         .ok()
         .flatten()
@@ -470,20 +505,20 @@ async fn handle_v3_agent(
         match state.sessions.create_session().await {
             Ok(session_id) => {
                 if let Ok(Some(mut info)) = state.sessions.get_session(&session_id).await {
-                    info.session_key = Some("agent:default:main".to_string());
+                    info.session_key = Some(store_key.clone());
                     info.channel = Some("web".to_string());
                     info.chat_type = Some("direct".to_string());
-                    info.display_name = Some("main".to_string());
+                    info.display_name = Some(session_key_str.to_string());
                     let _ = state.sessions.update_session(&info).await;
                 }
                 let event_bus = state.event_bus.clone();
-                let conv_id = conversation_id.to_string();
+                let sk = session_key_str.to_string();
                 tokio::spawn(async move {
                     let mut event = Event::new(
                         EventKind::SessionStart,
                         serde_json::json!({
                             "session_id": session_id,
-                            "conversation_id": conv_id,
+                            "session_key": sk,
                             "channel": "web",
                             "protocol": "v3",
                         }),
@@ -497,16 +532,19 @@ async fn handle_v3_agent(
                 let _ = sender
                     .send(WsMessage::Text(serde_json::to_string(&err).unwrap().into()))
                     .await;
-                state.write_lock.release(conversation_id, conn_id).await;
+                state.write_lock.release(&store_key, conn_id).await;
                 return;
             }
         }
     }
 
     // --- Build MessageEnvelope ---
-    let session_key = format!("agent:default:{}", conversation_id);
-    let mut envelope =
-        MessageEnvelope::webchat(request_id.clone(), session_key, content.clone(), conn_id);
+    let mut envelope = MessageEnvelope::webchat(
+        request_id.clone(),
+        store_key.clone(),
+        content.clone(),
+        conn_id,
+    );
 
     // Convert ws attachments to envelope attachments
     if !ws_attachments.is_empty() {
@@ -534,6 +572,7 @@ async fn handle_v3_agent(
         frame_tx,
         Arc::new(AtomicU64::new(seq.load(Ordering::Relaxed))),
         request_id.clone(),
+        session_key_str.to_string(),
     ));
     let streaming_handle = StreamingOutputHandle::new(ws_output);
 
@@ -543,7 +582,7 @@ async fn handle_v3_agent(
         .cancel_tokens
         .write()
         .await
-        .insert(conversation_id.to_string(), cancel_tx);
+        .insert(store_key.clone(), cancel_tx);
 
     let ctx = RunContext {
         cancel_token: Some(cancel_rx.clone()),
@@ -605,7 +644,7 @@ async fn handle_v3_agent(
                         {
                             match method.as_str() {
                                 "chat.stop" => {
-                                    if let Some(tx) = state.cancel_tokens.read().await.get(conversation_id) {
+                                    if let Some(tx) = state.cancel_tokens.read().await.get(&store_key) {
                                         let _ = tx.send(true);
                                     }
                                     let ok = ServerFrame::ok(&id, serde_json::json!({"stopped": true}));
@@ -667,7 +706,7 @@ async fn handle_v3_agent(
                     let post_tokens = snap.total_input_tokens + snap.total_output_tokens;
                     let delta = post_tokens.saturating_sub(pre_tokens);
                     if delta > 0 {
-                        if let Ok(Some(mut info)) = state.sessions.get_session(conversation_id).await {
+                        if let Ok(Some(mut info)) = state.sessions.get_session(&store_key).await {
                             info.total_tokens += delta;
                             let _ = state.sessions.update_session(&info).await;
                         }
@@ -695,13 +734,13 @@ async fn handle_v3_agent(
                 {
                     let event_bus = state.event_bus.clone();
                     let req_id = request_id.clone();
-                    let conv_id = conversation_id.to_string();
+                    let sk = session_key_str.to_string();
                     tokio::spawn(async move {
                         let mut event = Event::new(
                             EventKind::MessageSent,
                             serde_json::json!({
                                 "request_id": req_id,
-                                "conversation_id": conv_id,
+                                "session_key": sk,
                                 "channel": "web",
                                 "protocol": "v3",
                             }),
@@ -717,7 +756,7 @@ async fn handle_v3_agent(
     }
 
     // --- Cleanup ---
-    state.write_lock.release(conversation_id, conn_id).await;
+    state.write_lock.release(&store_key, conn_id).await;
 
     // Send the final RPC response for the agent/chat.send request
     let response = ServerFrame::ok(
@@ -725,7 +764,7 @@ async fn handle_v3_agent(
         serde_json::json!({
             "request_id": request_id,
             "content": final_content_text,
-            "conversation_id": conversation_id,
+            "sessionKey": session_key_str,
         }),
     );
     let _ = sender

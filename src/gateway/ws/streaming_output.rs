@@ -80,6 +80,9 @@ pub struct WsStreamingOutput {
     seq: Arc<AtomicU64>,
     /// Request id included in completion / error events.
     request_id: String,
+    /// Client-facing session key included in all event payloads so the
+    /// frontend knows which session an event belongs to.
+    session_key: String,
     /// Token buffer with 150 ms flush throttle.
     buffer: Mutex<TokenBuffer>,
 }
@@ -94,11 +97,13 @@ impl WsStreamingOutput {
         tx: mpsc::UnboundedSender<String>,
         seq: Arc<AtomicU64>,
         request_id: impl Into<String>,
+        session_key: impl Into<String>,
     ) -> Self {
         Self {
             tx,
             seq,
             request_id: request_id.into(),
+            session_key: session_key.into(),
             buffer: Mutex::new(TokenBuffer::new()),
         }
     }
@@ -119,7 +124,7 @@ impl WsStreamingOutput {
             drop(buf);
             self.send_event(
                 "agent.message.delta",
-                serde_json::json!({ "type": "text", "content": chunk }),
+                serde_json::json!({ "type": "text", "content": chunk, "sessionKey": self.session_key }),
             );
         }
     }
@@ -139,7 +144,7 @@ impl StreamingOutput for WsStreamingOutput {
             drop(buf);
             self.send_event(
                 "agent.message.delta",
-                serde_json::json!({ "type": "text", "content": chunk }),
+                serde_json::json!({ "type": "text", "content": chunk, "sessionKey": self.session_key }),
             );
         }
     }
@@ -148,7 +153,7 @@ impl StreamingOutput for WsStreamingOutput {
     async fn on_reasoning(&self, content: &str) {
         self.send_event(
             "agent.thinking.delta",
-            serde_json::json!({ "content": content }),
+            serde_json::json!({ "content": content, "sessionKey": self.session_key }),
         );
     }
 
@@ -160,6 +165,7 @@ impl StreamingOutput for WsStreamingOutput {
                 "name": info.name,
                 "id":   info.id,
                 "args": info.args,
+                "sessionKey": self.session_key,
             }),
         );
     }
@@ -168,7 +174,7 @@ impl StreamingOutput for WsStreamingOutput {
     async fn on_tool_result(&self, name: &str, content: &str) {
         self.send_event(
             "agent.tool.result",
-            serde_json::json!({ "name": name, "content": content }),
+            serde_json::json!({ "name": name, "content": content, "sessionKey": self.session_key }),
         );
     }
 
@@ -176,7 +182,10 @@ impl StreamingOutput for WsStreamingOutput {
     async fn on_complete(&self, _full_response: &str, meta: Option<&CompletionMeta>) {
         self.flush_buffer().await;
 
-        let mut payload = serde_json::json!({ "request_id": self.request_id });
+        let mut payload = serde_json::json!({
+            "request_id": self.request_id,
+            "sessionKey": self.session_key,
+        });
         if let Some(m) = meta {
             payload["input_tokens"] = m.input_tokens.into();
             payload["output_tokens"] = m.output_tokens.into();
@@ -193,6 +202,7 @@ impl StreamingOutput for WsStreamingOutput {
             serde_json::json!({
                 "message":    error,
                 "request_id": self.request_id,
+                "sessionKey": self.session_key,
             }),
         );
     }

@@ -8,7 +8,7 @@ use tracing;
 
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 use synaptic::DeliveryContext;
 
@@ -310,7 +310,7 @@ pub async fn run(
                 msg.attachments = attachments;
                 msg.finalize();
 
-                match session.handle_message(msg).await {
+                match session.handle_message(msg, RunContext::default()).await {
                     Ok(reply) => {
                         // Split long replies into chunks
                         let chunks =

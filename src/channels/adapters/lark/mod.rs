@@ -10,7 +10,8 @@ use synaptic::core::channel::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
     HealthStatus, MessageEnvelope as ChannelMessageEnvelope, Outbound,
 };
-use synaptic::core::SynapticError;
+use synaptic::core::{RunContext, SynapticError};
+use synaptic::deep::StreamingOutputHandle;
 use synaptic::lark::bot::events::{LarkEvent, LarkEventHandler};
 use synaptic::lark::bot::CardActionEvent;
 use synaptic::lark::{LarkBotClient, LarkMessageEvent, StreamingCardOptions};
@@ -303,13 +304,22 @@ impl LarkHandler {
             });
 
             let msg = build_inbound();
+            let streaming_handle = StreamingOutputHandle::new(output);
+            let ctx = RunContext {
+                cancel_token: None,
+                streaming_output: Some(Arc::new(streaming_handle)),
+            };
             self.agent_session
-                .handle_message_streaming(msg, output)
+                .handle_message(msg, ctx)
                 .await
                 .map_err(|e| SynapticError::Tool(e.to_string()))?;
         } else {
             let msg = build_inbound();
-            match self.agent_session.handle_message(msg).await {
+            match self
+                .agent_session
+                .handle_message(msg, RunContext::default())
+                .await
+            {
                 Ok(reply) => {
                     // Auto mode: use card for rich content even without streaming
                     if matches!(self.config.render_mode, LarkRenderMode::Auto)
@@ -398,7 +408,11 @@ impl LarkHandler {
         msg.thread.thread_id = event.root_id.clone();
         msg.finalize();
 
-        match self.agent_session.handle_message(msg).await {
+        match self
+            .agent_session
+            .handle_message(msg, RunContext::default())
+            .await
+        {
             Ok(reply) => self.send_reply(event, client, &reply.content).await?,
             Err(e) => {
                 client
@@ -468,7 +482,11 @@ impl LarkHandler {
         msg.thread.thread_id = event.root_id.clone();
         msg.finalize();
 
-        match self.agent_session.handle_message(msg).await {
+        match self
+            .agent_session
+            .handle_message(msg, RunContext::default())
+            .await
+        {
             Ok(reply) => self.send_reply(event, client, &reply.content).await?,
             Err(e) => {
                 client
@@ -626,7 +644,11 @@ impl LarkHandler {
         let mut msg =
             InboundMessage::channel(session_key, text, channel_info, sender_info, chat_info);
         msg.finalize();
-        match self.agent_session.handle_message(msg).await {
+        match self
+            .agent_session
+            .handle_message(msg, RunContext::default())
+            .await
+        {
             Ok(reply) => {
                 client
                     .send_text("chat_id", &event.chat_id, &reply.content)

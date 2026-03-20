@@ -14,7 +14,7 @@ use crate::config::{BotAllowlist, SynapseConfig, TwitchBotConfig};
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 /// Run the Twitch bot adapter using IRC over TCP (irc.chat.twitch.tv:6667).
@@ -166,7 +166,7 @@ async fn run_twitch_irc(
                 chat_info,
             );
             msg.finalize();
-            match session.handle_message(msg).await {
+            match session.handle_message(msg, RunContext::default()).await {
                 Ok(reply) => {
                     let chunks = formatter::format_for_channel(&reply.content, "twitch", 400);
                     for chunk in chunks {

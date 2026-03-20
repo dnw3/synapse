@@ -18,7 +18,7 @@ use crate::config::{SynapseConfig, WebChatBotConfig};
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 #[derive(Clone)]
@@ -148,7 +148,11 @@ async fn handle_chat(
         chat_info,
     );
     msg.finalize();
-    match state.agent_session.handle_message(msg).await {
+    match state
+        .agent_session
+        .handle_message(msg, RunContext::default())
+        .await
+    {
         Ok(reply) => (
             StatusCode::OK,
             Json(serde_json::json!(ChatResponse {

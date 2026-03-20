@@ -558,11 +558,8 @@ async fn handle_v3_agent(
 
     // --- Spawn agent execution task ---
     let agent_session = state.agent_session.clone();
-    let mut agent_handle = tokio::spawn(async move {
-        agent_session
-            .handle_message_streaming_with_context(msg, ctx)
-            .await
-    });
+    let mut agent_handle =
+        tokio::spawn(async move { agent_session.handle_message(msg, ctx).await });
 
     // Drop span guard before async select loop
     drop(_req_guard);

@@ -15,7 +15,7 @@ use axum::Json;
 use axum::Router;
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 /// Shared state for the axum webhook server.
@@ -164,7 +164,11 @@ async fn handle_webhook(
         chat_info,
     );
     msg.finalize();
-    let reply_text = match state.agent_session.handle_message(msg).await {
+    let reply_text = match state
+        .agent_session
+        .handle_message(msg, RunContext::default())
+        .await
+    {
         Ok(reply) => {
             let chunks = formatter::format_for_channel(&reply.content, "googlechat", 4096);
             // Google Chat synchronous replies support only a single text body.

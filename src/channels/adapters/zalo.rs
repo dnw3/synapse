@@ -12,7 +12,7 @@ use crate::config::{SynapseConfig, ZaloBotConfig};
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 #[derive(Clone)]
@@ -134,7 +134,7 @@ async fn handle_webhook(
             chat_info,
         );
         msg.finalize();
-        match session.handle_message(msg).await {
+        match session.handle_message(msg, RunContext::default()).await {
             Ok(reply) => {
                 // Send reply via Zalo OA API
                 let client = reqwest::Client::new();

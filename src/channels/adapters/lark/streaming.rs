@@ -223,10 +223,12 @@ pub(super) fn build_card_footer(config: &LarkCardConfig, meta: &CompletionMeta) 
 
     if config.show_logid {
         if let Some(ref rid) = meta.request_id {
-            if main_line.is_empty() {
-                return format!("\u{1f517} `{}`", rid);
+            if !rid.is_empty() {
+                if main_line.is_empty() {
+                    return format!("\u{1f517} `{}`", rid);
+                }
+                return format!("{}\n\u{1f517} `{}`", main_line, rid);
             }
-            return format!("{}\n\u{1f517} `{}`", main_line, rid);
         }
     }
 

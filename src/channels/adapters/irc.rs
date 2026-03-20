@@ -14,7 +14,7 @@ use crate::config::{BotAllowlist, IrcBotConfig, SynapseConfig};
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 /// Run the IRC bot adapter using raw TCP.
@@ -204,7 +204,7 @@ async fn run_tcp(
                 chat_info,
             );
             msg.finalize();
-            match session.handle_message(msg).await {
+            match session.handle_message(msg, RunContext::default()).await {
                 Ok(reply) => {
                     let chunks = formatter::format_for_channel(&reply.content, "irc", 400);
                     for chunk in chunks {

@@ -11,7 +11,7 @@ use crate::config::{SynapseConfig, SynologyBotConfig};
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 #[derive(Clone)]
@@ -118,7 +118,11 @@ async fn handle_webhook(
         chat_info,
     );
     msg.finalize();
-    match state.agent_session.handle_message(msg).await {
+    match state
+        .agent_session
+        .handle_message(msg, RunContext::default())
+        .await
+    {
         Ok(reply) => {
             // If outgoing webhook URL is configured, send there
             if let Some(ref url) = state.outgoing_url {

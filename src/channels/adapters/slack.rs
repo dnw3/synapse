@@ -10,7 +10,7 @@ use tracing;
 
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 use synaptic::DeliveryContext;
 
@@ -445,7 +445,7 @@ async fn run_socket_mode(
             msg.thread.thread_id = Some(ts.clone());
             msg.finalize();
 
-            match session.handle_message(msg).await {
+            match session.handle_message(msg, RunContext::default()).await {
                 Ok(reply) => {
                     // Split long replies into chunks
                     let chunks = formatter::format_for_channel(&reply.content, "slack", 4000);

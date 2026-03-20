@@ -10,7 +10,7 @@ use tracing;
 
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 use crate::agent;
@@ -287,7 +287,7 @@ async fn handle_message(
             chat_info,
         );
         msg.finalize();
-        match session.handle_message(msg).await {
+        match session.handle_message(msg, RunContext::default()).await {
             Ok(reply) => {
                 let chunks = formatter::format_for_channel(&reply.content, "teams", 4000);
                 for chunk in &chunks {

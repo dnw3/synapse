@@ -12,7 +12,7 @@ use crate::config::{NextcloudBotConfig, SynapseConfig};
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 /// Run the Nextcloud Talk bot adapter using REST long-polling.
@@ -135,7 +135,7 @@ pub async fn run(
                                         chat_info,
                                     );
                                     msg.finalize();
-                                    match session.handle_message(msg).await {
+                                    match session.handle_message(msg, RunContext::default()).await {
                                         Ok(reply) => {
                                             let _ = client
                                                 .post(&reply_url)

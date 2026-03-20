@@ -12,7 +12,7 @@ use crate::config::SynapseConfig;
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 /// Run the Signal bot adapter using the signal-cli REST API bridge.
@@ -151,7 +151,7 @@ pub async fn run(
                     chat_info,
                 );
                 msg.finalize();
-                match session.handle_message(msg).await {
+                match session.handle_message(msg, RunContext::default()).await {
                     Ok(reply) => {
                         let chunks = formatter::format_for_channel(&reply.content, "signal", 4096);
                         for chunk in chunks {

@@ -20,7 +20,7 @@ use crate::config::{BotAllowlist, SynapseConfig};
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound, RunContext,
 };
 
 type HmacSha256 = Hmac<Sha256>;
@@ -313,7 +313,7 @@ async fn handle_webhook(
                 chat_info,
             );
             msg.finalize();
-            match session.handle_message(msg).await {
+            match session.handle_message(msg, RunContext::default()).await {
                 Ok(reply) => {
                     send_reply(&channel_token, &reply_token, &reply.content).await;
                 }

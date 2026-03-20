@@ -55,6 +55,10 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
   // Pending message for when WS reconnects
   const pendingMessageRef = useRef<{ content: string; attachments?: FileAttachment[] } | null>(null);
 
+  // Stable ref to gw — prevents callbacks from depending on gwRef.current.connected
+  const gwRef = useRef(gw);
+  gwRef.current = gw;
+
   // Keep activeKeyRef in sync via effect (not during render)
   useEffect(() => {
     activeKeyRef.current = activeKey;
@@ -68,36 +72,36 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
     reasoningContentRef.current = "";
   }, []);
 
-  // Load sessions on mount + when connected
+  // Load sessions — uses gwRef to avoid dependency on gwRef.current.connected
   const refreshSessions = useCallback(async () => {
-    if (!gw.connected) return;
+    if (!gwRef.current.connected) return;
     try {
-      const result = await gw.call<{ sessions: Session[] }>("sessions.list");
+      const result = await gwRef.current.call<{ sessions: Session[] }>("sessions.list");
       const list = result.sessions ?? (result as unknown as Session[]);
       setSessions(Array.isArray(list) ? list : []);
     } catch {
       // Will retry on reconnect
     }
-  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Load messages for active session
+  // Load messages for active session — uses gwRef
   const refreshMessages = useCallback(async () => {
     const key = activeKeyRef.current;
-    if (!key || !gw.connected) return;
+    if (!key || !gwRef.current.connected) return;
     try {
-      const result = await gw.call<{ messages: Message[] }>("chat.history", { sessionKey: key });
+      const result = await gwRef.current.call<{ messages: Message[] }>("chat.history", { sessionKey: key });
       const msgs = result.messages ?? (result as unknown as Message[]);
       setMessages(msgs);
       messageCacheRef.current[key] = msgs;
     } catch {
       // ignore
     }
-  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // On connect: load sessions, select default
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    if (!gw.connected) return;
+    if (!gwRef.current.connected) return;
     refreshSessions().then(() => {
       // Send pending message if any
       if (pendingMessageRef.current && activeKeyRef.current) {
@@ -112,7 +116,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
         if (attachments && attachments.length > 0) {
           params.attachments = attachments;
         }
-        gw.send({
+        gwRef.current.send({
           type: "request",
           id,
           method: "chat.send",
@@ -120,7 +124,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
         });
       }
     });
-  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Select default session when sessions load and no active key
   useEffect(() => {
@@ -151,9 +155,9 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
     setChatError(null);
 
     // Fetch from server
-    if (gw.connected) {
+    if (gwRef.current.connected) {
       setLoading(true);
-      gw.call<{ messages: Message[] }>("chat.history", { sessionKey: activeKey })
+      gwRef.current.call<{ messages: Message[] }>("chat.history", { sessionKey: activeKey })
         .then(result => {
           const msgs = result.messages ?? (result as unknown as Message[]);
           setMessages(current => (msgs.length >= current.length ? msgs : current));
@@ -162,12 +166,12 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
         .catch(() => {})
         .finally(() => setLoading(false));
     }
-  }, [activeKey, gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeKey, gwRef.current.connected]); // eslint-disable-line react-hooks/exhaustive-deps
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Subscribe to streaming events
   useEffect(() => {
-    const unsubscribe = gw.subscribe((event, payload) => {
+    const unsubscribe = gwRef.current.subscribe((event, payload) => {
       // Filter by sessionKey if present
       const evtKey = payload.sessionKey as string | undefined;
       if (evtKey && evtKey !== activeKeyRef.current) return;
@@ -272,8 +276,8 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
           setSendLock(false);
           // Refresh messages from server, then clear streaming
           const key = activeKeyRef.current;
-          if (key && gw.connected) {
-            gw.call<{ messages: Message[] }>("chat.history", { sessionKey: key })
+          if (key && gwRef.current.connected) {
+            gwRef.current.call<{ messages: Message[] }>("chat.history", { sessionKey: key })
               .then(result => {
                 const msgs = result.messages ?? (result as unknown as Message[]);
                 setMessages(msgs);
@@ -287,7 +291,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
                   if (prev.length === 0) return prev;
                   const [next, ...rest] = prev;
                   setSendLock(true);
-                  gw.send({
+                  gwRef.current.send({
                     type: "request",
                     id: next.id,
                     method: "chat.send",
@@ -332,7 +336,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
     });
 
     return unsubscribe;
-  }, [gw, clearStreaming, refreshSessions, refreshMessages]);
+  }, [clearStreaming]);
 
   const sendMessage = useCallback((content: string, attachments?: FileAttachment[]) => {
     const key = activeKeyRef.current;
@@ -349,7 +353,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
       return;
     }
 
-    if (!gw.connected) {
+    if (!gwRef.current.connected) {
       pendingMessageRef.current = { content, attachments };
       setMessages(prev => [...prev, humanMsg]);
       return;
@@ -366,29 +370,29 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
     if (attachments && attachments.length > 0) {
       params.attachments = attachments;
     }
-    gw.send({
+    gwRef.current.send({
       type: "request",
       id: rpcId(),
       method: "chat.send",
       params,
     });
-  }, [gw, sendLock]);
+  }, [sendLock]);
 
   const deleteSession = useCallback(async (key: string) => {
-    await gw.call("sessions.delete", { sessionKey: key });
+    await gwRef.current.call("sessions.delete", { sessionKey: key });
     delete messageCacheRef.current[key];
     setSessions(prev => prev.filter(s => s.sessionKey !== key));
     if (activeKey === key) {
       setActiveKey(null);
       setMessages([]);
     }
-  }, [gw, activeKey]);
+  }, [activeKey]);
 
   const resetSession = useCallback(async () => {
     const key = activeKeyRef.current;
     if (key) {
       try {
-        await gw.call("sessions.delete", { sessionKey: key });
+        await gwRef.current.call("sessions.delete", { sessionKey: key });
       } catch {
         // ignore
       }
@@ -400,26 +404,26 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
     setChatError(null);
     // Refresh sessions — backend may auto-recreate
     await refreshSessions();
-  }, [gw, clearStreaming, refreshSessions]);
+  }, [clearStreaming, refreshSessions]);
 
   const cancelGeneration = useCallback(() => {
-    gw.send({
+    gwRef.current.send({
       type: "request",
       id: rpcId(),
       method: "chat.stop",
       params: {},
     });
-  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const respondApproval = useCallback((approved: boolean, allowAll?: boolean) => {
     const method = approved ? "approval.approve" : "approval.deny";
-    gw.send({
+    gwRef.current.send({
       type: "request",
       id: rpcId(),
       method,
       params: { allow_all: allowAll ?? false },
     });
-  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dismissError = useCallback(() => setChatError(null), []);
 

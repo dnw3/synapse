@@ -198,7 +198,7 @@ pub enum Command {
     Connect {
         /// Gateway WebSocket URL (e.g. ws://localhost:3000).
         url: String,
-        /// Session/conversation ID (auto-created if omitted).
+        /// Session key (auto-created if omitted).
         #[arg(short, long)]
         session: Option<String>,
         /// Auth token (or set SYNAPSE_GATEWAY_TOKEN env).

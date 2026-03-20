@@ -714,7 +714,7 @@ impl EventSubscriber for MemoryCaptureSubscriber {
         let session_key = event
             .payload
             .get("session_key")
-            .or_else(|| event.payload.get("conversation_id"))
+            .or_else(|| event.payload.get("sessionKey"))
             .and_then(|v| v.as_str())
             .unwrap_or("default");
 

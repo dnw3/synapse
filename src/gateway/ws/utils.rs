@@ -41,7 +41,7 @@ pub(crate) fn truncate(s: &str, max: usize) -> String {
 #[allow(dead_code)]
 pub(crate) async fn handle_rpc(
     state: &AppState,
-    conversation_id: &str,
+    session_key: &str,
     method: &str,
     _params: &serde_json::Value,
 ) -> Result<serde_json::Value, String> {
@@ -57,12 +57,12 @@ pub(crate) async fn handle_rpc(
                 "status": "ok",
                 "uptime_secs": uptime,
                 "auth_enabled": auth_enabled,
-                "conversation_id": conversation_id,
+                "sessionKey": session_key,
             }))
         }
         "get_messages" => {
             let memory = state.sessions.memory();
-            let messages = memory.load(conversation_id).await.unwrap_or_default();
+            let messages = memory.load(session_key).await.unwrap_or_default();
             let msg_list: Vec<serde_json::Value> = messages
                 .iter()
                 .map(|m| {
@@ -76,16 +76,16 @@ pub(crate) async fn handle_rpc(
         }
         "get_session_info" => {
             let memory = state.sessions.memory();
-            let messages = memory.load(conversation_id).await.unwrap_or_default();
-            let overrides = load_session_overrides(conversation_id);
+            let messages = memory.load(session_key).await.unwrap_or_default();
+            let overrides = load_session_overrides(session_key);
             Ok(serde_json::json!({
-                "conversation_id": conversation_id,
+                "sessionKey": session_key,
                 "message_count": messages.len(),
                 "thinking": overrides.as_ref().and_then(|o| o.thinking.as_deref()),
             }))
         }
         "check_execution" => {
-            let is_executing = state.write_lock.is_locked(conversation_id).await;
+            let is_executing = state.write_lock.is_locked(session_key).await;
             Ok(serde_json::json!({ "executing": is_executing }))
         }
         _ => Err(format!("unknown method: {}", method)),
@@ -93,7 +93,7 @@ pub(crate) async fn handle_rpc(
 }
 
 /// Load session overrides (thinking/verbose) from the dashboard overrides file.
-pub(crate) fn load_session_overrides(conversation_id: &str) -> Option<SessionOverrides> {
+pub(crate) fn load_session_overrides(session_key: &str) -> Option<SessionOverrides> {
     let path = std::path::PathBuf::from("data/session_overrides.json");
     if !path.exists() {
         return None;
@@ -101,7 +101,7 @@ pub(crate) fn load_session_overrides(conversation_id: &str) -> Option<SessionOve
     let content = std::fs::read_to_string(&path).ok()?;
     let map: std::collections::HashMap<String, serde_json::Value> =
         serde_json::from_str(&content).ok()?;
-    let entry = map.get(conversation_id)?;
+    let entry = map.get(session_key)?;
     let thinking = entry
         .get("thinking")
         .and_then(|v| v.as_str())

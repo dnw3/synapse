@@ -1,10 +1,8 @@
-pub mod conversations;
 pub mod dashboard;
 pub mod files;
 pub mod lark_callback;
 pub mod lark_card_config;
 pub mod logs;
-pub mod messages;
 pub mod upload;
 
 use axum::Router;
@@ -18,8 +16,6 @@ pub fn create_router(state: AppState) -> Router {
 
 fn api_routes() -> Router<AppState> {
     Router::new()
-        .merge(conversations::routes())
-        .merge(messages::routes())
         .merge(files::routes())
         .merge(dashboard::routes())
         .merge(logs::routes())

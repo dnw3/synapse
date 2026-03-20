@@ -60,8 +60,6 @@ const CHAT_METHODS: &[&str] = &[
 
 /// Read-only operator methods.
 const READ_METHODS: &[&str] = &[
-    "conversations.list",
-    "conversations.get",
     "messages.list",
     "sessions.list",
     "sessions.get",
@@ -114,9 +112,6 @@ const READ_METHODS: &[&str] = &[
 
 /// Write operator methods.
 const WRITE_METHODS: &[&str] = &[
-    "conversations.create",
-    "conversations.delete",
-    "conversations.update",
     "messages.send",
     "sessions.create",
     "sessions.delete",
@@ -280,10 +275,10 @@ mod tests {
     #[test]
     fn read_methods_require_read_scope() {
         let empty = HashSet::new();
-        assert!(check_scope("conversations.list", Role::Operator, &empty).is_err());
+        assert!(check_scope("sessions.list", Role::Operator, &empty).is_err());
 
         let read = HashSet::from(["operator.read".to_string()]);
-        assert!(check_scope("conversations.list", Role::Operator, &read).is_ok());
+        assert!(check_scope("sessions.list", Role::Operator, &read).is_ok());
     }
 
     #[test]

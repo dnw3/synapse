@@ -12,6 +12,40 @@ use synaptic::core::MemoryStore;
 use super::{parse_system_time_string, OkResponse};
 use crate::gateway::state::AppState;
 
+/// Parse a legacy session key to extract channel/kind/display_name.
+///
+/// Legacy keys follow patterns like `agent:default:main`, `agent:default:lark:dm:user123`, etc.
+fn parse_session_channel(id: &str) -> (String, String, String) {
+    if !id.starts_with("agent:") {
+        return ("web".to_string(), "web".to_string(), String::new());
+    }
+    let parts: Vec<&str> = id.split(':').collect();
+    if parts.len() == 3 && parts[2] == "main" {
+        return ("web".to_string(), "main".to_string(), "main".to_string());
+    }
+    for (i, part) in parts.iter().enumerate() {
+        if *part == "dm" && i >= 2 {
+            let channel = parts[2].to_string();
+            let peer = if i + 1 < parts.len() {
+                parts[i + 1]
+            } else {
+                ""
+            };
+            return (channel, "dm".to_string(), peer.to_string());
+        }
+        if *part == "grp" && i >= 2 {
+            let channel = parts[2].to_string();
+            let peer = if i + 1 < parts.len() {
+                parts[i + 1..].join(":")
+            } else {
+                String::new()
+            };
+            return (channel, "group".to_string(), peer);
+        }
+    }
+    ("web".to_string(), "web".to_string(), String::new())
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/dashboard/sessions", get(get_sessions))
@@ -117,8 +151,7 @@ async fn get_sessions(
                 s.display_name.clone(),
             )
         } else {
-            let (ch, k, dn) =
-                crate::gateway::api::conversations::parse_session_channel(&s.session_id);
+            let (ch, k, dn) = parse_session_channel(&s.session_id);
             (
                 if ch.is_empty() { None } else { Some(ch) },
                 if k.is_empty() { None } else { Some(k) },

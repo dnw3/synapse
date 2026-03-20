@@ -65,7 +65,7 @@ pub(crate) enum WsEvent {
     Hello {
         version: String,
         features: Vec<String>,
-        conversation_id: String,
+        session_key: String,
     },
     /// RPC response to a client request.
     #[serde(rename = "rpc_response")]

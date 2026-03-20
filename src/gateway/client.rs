@@ -69,13 +69,13 @@ impl GatewayClient {
         session: Option<&str>,
         _token: Option<&str>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        // Ensure URL ends with a conversation path
-        let ws_url = if url.contains("/ws/") {
+        // Ensure URL ends with /ws (unified endpoint, session key sent per-request)
+        let _ = session; // session key is now sent per-request in chat.send params
+        let ws_url = if url.ends_with("/ws") {
             url.to_string()
         } else {
-            let session_id = session.unwrap_or("cli-default");
             let base = url.trim_end_matches('/');
-            format!("{}/ws/{}", base, session_id)
+            format!("{}/ws", base)
         };
 
         tracing::info!(url = %ws_url, "connecting to gateway");

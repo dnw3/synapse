@@ -17,14 +17,25 @@ use super::types::RpcError;
 // ---------------------------------------------------------------------------
 
 pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
-    let session_id = params
-        .get("session_id")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| RpcError::invalid_request("missing 'session_id' parameter"))?;
+    // Accept sessionKey (client-facing) or session_id (internal UUID) for backwards compat
+    let session_id = if let Some(sk) = params.get("sessionKey").and_then(|v| v.as_str()) {
+        // Resolve sessionKey → session_id via session list lookup
+        let store_key = crate::session::key::to_store_key("default", sk);
+        let sessions = ctx.state.sessions.list_sessions().await.unwrap_or_default();
+        sessions
+            .iter()
+            .find(|s| s.session_key.as_deref() == Some(&store_key))
+            .map(|s| s.session_id.clone())
+            .ok_or_else(|| RpcError::invalid_request(format!("session not found: {}", sk)))?
+    } else if let Some(id) = params.get("session_id").and_then(|v| v.as_str()) {
+        id.to_string()
+    } else {
+        return Err(RpcError::invalid_request("missing 'sessionKey' parameter"));
+    };
 
     let memory = ctx.state.sessions.memory();
     let messages = memory
-        .load(session_id)
+        .load(&session_id)
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
 

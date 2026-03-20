@@ -192,20 +192,20 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
             .session_key
             .clone()
             .unwrap_or_else(|| s.session_id.clone());
+        // Convert store key to request key for client display
+        let request_key = crate::session::key::to_request_key(&key);
         result.push(json!({
-            "id": s.session_id,
-            "key": key,
-            "created_at": parse_system_time_string(&s.created_at),
-            "message_count": count,
-            "token_count": s.total_tokens,
-            "compaction_count": s.compaction_count,
-            "title": title,
-            "label": ovr.and_then(|o| o.label.clone()),
-            "thinking_level": ovr.and_then(|o| o.thinking.clone()),
-            "verbose_level": ovr.and_then(|o| o.verbose.clone()),
+            "sessionKey": request_key,
+            "displayName": display_name,
             "channel": channel,
             "kind": kind,
-            "display_name": display_name,
+            "messageCount": count,
+            "createdAt": parse_system_time_string(&s.created_at),
+            "tokenCount": s.total_tokens,
+            "title": title,
+            "label": ovr.and_then(|o| o.label.clone()),
+            "thinkingLevel": ovr.and_then(|o| o.thinking.clone()),
+            "verboseLevel": ovr.and_then(|o| o.verbose.clone()),
         }));
     }
 

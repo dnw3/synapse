@@ -495,50 +495,8 @@ async fn handle_v3_agent(
         })
     );
 
-    // --- Ensure session exists ---
-    if state
-        .sessions
-        .get_session(&store_key)
-        .await
-        .ok()
-        .flatten()
-        .is_none()
-    {
-        match state.sessions.create_session().await {
-            Ok(session_id) => {
-                if let Ok(Some(mut info)) = state.sessions.get_session(&session_id).await {
-                    info.session_key = Some(store_key.clone());
-                    info.channel = Some("web".to_string());
-                    info.chat_type = Some("direct".to_string());
-                    info.display_name = Some(session_key_str.to_string());
-                    let _ = state.sessions.update_session(&info).await;
-                }
-                let event_bus = state.event_bus.clone();
-                let sk = session_key_str.to_string();
-                tokio::spawn(async move {
-                    let mut event = Event::new(
-                        EventKind::SessionStart,
-                        serde_json::json!({
-                            "session_id": session_id,
-                            "session_key": sk,
-                            "channel": "web",
-                            "protocol": "v3",
-                        }),
-                    )
-                    .with_source("gateway/ws");
-                    let _ = event_bus.emit(&mut event).await;
-                });
-            }
-            Err(e) => {
-                let err = ServerFrame::err(request_id_rpc, RpcError::internal(e.to_string()));
-                let _ = sender
-                    .send(WsMessage::Text(serde_json::to_string(&err).unwrap().into()))
-                    .await;
-                state.write_lock.release(&store_key, conn_id).await;
-                return;
-            }
-        }
-    }
+    // Session creation/resolution is handled by AgentSession.resolve_session()
+    // inside handle_message_streaming_with_context(). No need to pre-create here.
 
     // --- Build MessageEnvelope ---
     let mut envelope = MessageEnvelope::webchat(
@@ -702,15 +660,21 @@ async fn handle_v3_agent(
                         .await;
                 }
 
-                // Update session token count
+                // Update session token count — find by session_key field (store key),
+                // since get_session() expects a UUID session_id.
                 {
                     let snap = state.cost_tracker.snapshot().await;
                     let post_tokens = snap.total_input_tokens + snap.total_output_tokens;
                     let delta = post_tokens.saturating_sub(pre_tokens);
                     if delta > 0 {
-                        if let Ok(Some(mut info)) = state.sessions.get_session(&store_key).await {
-                            info.total_tokens += delta;
-                            let _ = state.sessions.update_session(&info).await;
+                        if let Ok(sessions) = state.sessions.list_sessions().await {
+                            if let Some(mut info) = sessions
+                                .into_iter()
+                                .find(|s| s.session_key.as_deref() == Some(&store_key))
+                            {
+                                info.total_tokens += delta;
+                                let _ = state.sessions.update_session(&info).await;
+                            }
                         }
                     }
                 }

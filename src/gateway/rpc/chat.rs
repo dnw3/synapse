@@ -106,7 +106,7 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
 
 pub async fn handle_abort(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     // Accept session_id, session_key, or sessionKey — all refer to the same concept.
-    let session_id = params
+    let raw_key = params
         .get("session_id")
         .or_else(|| params.get("session_key"))
         .or_else(|| params.get("sessionKey"))
@@ -117,20 +117,28 @@ pub async fn handle_abort(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
             )
         })?;
 
+    // cancel_tokens are keyed by store key (e.g. "agent:default:main").
+    // If the client sent a request key (e.g. "main"), convert it.
+    let store_key = if raw_key.starts_with("agent:") {
+        raw_key.to_string()
+    } else {
+        crate::session::key::to_store_key("default", raw_key)
+    };
+
     let tokens = ctx.state.cancel_tokens.read().await;
-    let aborted = if let Some(sender) = tokens.get(session_id) {
+    let aborted = if let Some(sender) = tokens.get(&store_key) {
         let _ = sender.send(true);
-        tracing::info!(session_id, "chat.abort: cancel signal sent");
+        tracing::info!(store_key = %store_key, "chat.abort: cancel signal sent");
         true
     } else {
-        tracing::debug!(session_id, "chat.abort: no active token for session");
+        tracing::debug!(store_key = %store_key, "chat.abort: no active token for session");
         false
     };
 
     Ok(json!({
         "ok": true,
         "aborted": aborted,
-        "session_key": session_id,
+        "session_key": raw_key,
     }))
 }
 

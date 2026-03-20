@@ -510,14 +510,22 @@ pub async fn handle_usage_timeseries(
 // ---------------------------------------------------------------------------
 
 pub async fn handle_abort(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
-    let session_id = params
+    let raw_key = params
         .get("session_id")
         .and_then(|v| v.as_str())
         .or_else(|| params.get("id").and_then(|v| v.as_str()))
         .ok_or_else(|| RpcError::invalid_request("missing 'session_id' or 'id'"))?;
 
+    // cancel_tokens are keyed by store key (e.g. "agent:default:main").
+    // If the client sent a request key (e.g. "main"), convert it.
+    let store_key = if raw_key.starts_with("agent:") {
+        raw_key.to_string()
+    } else {
+        crate::session::key::to_store_key("default", raw_key)
+    };
+
     let tokens = ctx.state.cancel_tokens.read().await;
-    let aborted = if let Some(sender) = tokens.get(session_id) {
+    let aborted = if let Some(sender) = tokens.get(&store_key) {
         let _ = sender.send(true);
         true
     } else {

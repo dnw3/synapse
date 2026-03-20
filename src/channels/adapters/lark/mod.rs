@@ -24,7 +24,7 @@ use crate::channels::handler::{AgentSession, StreamingOutput};
 use crate::config::bots::{DmPolicy, GroupPolicy, GroupSessionScope, LarkRenderMode};
 use crate::config::BotAllowlist;
 use crate::gateway::messages::sender::{ChannelSender, SendResult};
-use crate::gateway::messages::{Attachment, MessageEnvelope};
+use crate::gateway::messages::{Attachment, ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use crate::gateway::presence::now_ms;
 
 use policy::{compute_session_key, strip_bot_mention};
@@ -250,24 +250,36 @@ impl LarkHandler {
                 LarkRenderMode::Card | LarkRenderMode::Auto
             );
 
-        let delivery = DeliveryContext {
-            channel: "lark".into(),
-            to: Some(format!("chat:{}", event.chat_id())),
-            account_id: Some(self.account_id.clone()),
-            ..Default::default()
-        };
-
-        let build_envelope = |delivery: DeliveryContext| {
-            let mut env =
-                MessageEnvelope::channel(session_key.to_string(), text.to_string(), delivery);
-            env.sender_id = Some(event.sender_open_id().to_string());
-            env.routing.peer_kind = Some(if event.is_dm() {
-                crate::config::PeerKind::Direct
-            } else {
-                crate::config::PeerKind::Group
-            });
-            env.routing.peer_id = Some(event.chat_id().to_string());
-            env
+        let build_inbound = || {
+            let channel_info = ChannelInfo {
+                platform: "lark".into(),
+                account_id: Some(self.account_id.clone()),
+                native_channel_id: Some(event.chat_id().to_string()),
+                ..Default::default()
+            };
+            let sender_info = SenderInfo {
+                id: Some(event.sender_open_id().to_string()),
+                ..Default::default()
+            };
+            let chat_info = ChatInfo {
+                chat_type: if event.is_dm() {
+                    "direct".to_string()
+                } else {
+                    "group".to_string()
+                },
+                ..Default::default()
+            };
+            let mut msg = InboundMessage::channel(
+                session_key.to_string(),
+                text.to_string(),
+                channel_info,
+                sender_info,
+                chat_info,
+            );
+            msg.message.id = Some(event.message_id().to_string());
+            msg.thread.thread_id = event.root_id.clone();
+            msg.finalize();
+            msg
         };
 
         if use_streaming {
@@ -290,14 +302,14 @@ impl LarkHandler {
                 bot_name: self.config.bot_name.clone(),
             });
 
-            let envelope = build_envelope(delivery);
+            let msg = build_inbound();
             self.agent_session
-                .handle_message_streaming(envelope, output)
+                .handle_inbound_streaming(msg, output)
                 .await
                 .map_err(|e| SynapticError::Tool(e.to_string()))?;
         } else {
-            let envelope = build_envelope(delivery);
-            match self.agent_session.handle_message(envelope).await {
+            let msg = build_inbound();
+            match self.agent_session.handle_inbound(msg).await {
                 Ok(reply) => {
                     // Auto mode: use card for rich content even without streaming
                     if matches!(self.config.render_mode, LarkRenderMode::Auto)
@@ -356,19 +368,37 @@ impl LarkHandler {
             mime_type: Some("image/png".into()),
         }];
 
-        let delivery = DeliveryContext {
-            channel: "lark".into(),
-            to: Some(format!("chat:{}", event.chat_id())),
+        let channel_info = ChannelInfo {
+            platform: "lark".into(),
+            account_id: Some(self.account_id.clone()),
+            native_channel_id: Some(event.chat_id().to_string()),
             ..Default::default()
         };
-        let mut envelope = MessageEnvelope::channel(
+        let sender_info = SenderInfo {
+            id: Some(event.sender_open_id().to_string()),
+            ..Default::default()
+        };
+        let chat_info = ChatInfo {
+            chat_type: if event.is_dm() {
+                "direct".to_string()
+            } else {
+                "group".to_string()
+            },
+            ..Default::default()
+        };
+        let mut msg = InboundMessage::channel(
             session_key.to_string(),
             "[User sent an image]".to_string(),
-            delivery,
+            channel_info,
+            sender_info,
+            chat_info,
         );
-        envelope.attachments = attachments;
+        msg.attachments = attachments;
+        msg.message.id = Some(event.message_id().to_string());
+        msg.thread.thread_id = event.root_id.clone();
+        msg.finalize();
 
-        match self.agent_session.handle_message(envelope).await {
+        match self.agent_session.handle_inbound(msg).await {
             Ok(reply) => self.send_reply(event, client, &reply.content).await?,
             Err(e) => {
                 client
@@ -408,19 +438,37 @@ impl LarkHandler {
             mime_type: None,
         }];
 
-        let delivery = DeliveryContext {
-            channel: "lark".into(),
-            to: Some(format!("chat:{}", event.chat_id())),
+        let channel_info = ChannelInfo {
+            platform: "lark".into(),
+            account_id: Some(self.account_id.clone()),
+            native_channel_id: Some(event.chat_id().to_string()),
             ..Default::default()
         };
-        let mut envelope = MessageEnvelope::channel(
+        let sender_info = SenderInfo {
+            id: Some(event.sender_open_id().to_string()),
+            ..Default::default()
+        };
+        let chat_info = ChatInfo {
+            chat_type: if event.is_dm() {
+                "direct".to_string()
+            } else {
+                "group".to_string()
+            },
+            ..Default::default()
+        };
+        let mut msg = InboundMessage::channel(
             session_key.to_string(),
             format!("[User sent file: {}]", filename),
-            delivery,
+            channel_info,
+            sender_info,
+            chat_info,
         );
-        envelope.attachments = attachments;
+        msg.attachments = attachments;
+        msg.message.id = Some(event.message_id().to_string());
+        msg.thread.thread_id = event.root_id.clone();
+        msg.finalize();
 
-        match self.agent_session.handle_message(envelope).await {
+        match self.agent_session.handle_inbound(msg).await {
             Ok(reply) => self.send_reply(event, client, &reply.content).await?,
             Err(e) => {
                 client
@@ -562,13 +610,23 @@ impl LarkHandler {
             });
 
         let session_key = format!("lark:card:{}", event.chat_id);
-        let delivery = DeliveryContext {
-            channel: "lark".into(),
-            to: Some(format!("chat:{}", event.chat_id)),
+        let channel_info = ChannelInfo {
+            platform: "lark".into(),
+            native_channel_id: Some(event.chat_id.clone()),
             ..Default::default()
         };
-        let envelope = MessageEnvelope::channel(session_key, text, delivery);
-        match self.agent_session.handle_message(envelope).await {
+        let sender_info = SenderInfo {
+            id: Some(event.operator_open_id.clone()),
+            ..Default::default()
+        };
+        let chat_info = ChatInfo {
+            chat_type: "group".to_string(),
+            ..Default::default()
+        };
+        let mut msg =
+            InboundMessage::channel(session_key, text, channel_info, sender_info, chat_info);
+        msg.finalize();
+        match self.agent_session.handle_inbound(msg).await {
             Ok(reply) => {
                 client
                     .send_text("chat_id", &event.chat_id, &reply.content)

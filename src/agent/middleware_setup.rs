@@ -24,6 +24,7 @@ use super::callbacks::AutoApproveCallback;
 use super::middleware::{build_fallback_interceptor, LoopDetectionMiddleware};
 use super::thinking::{ThinkingMiddleware, VerboseMiddleware};
 use synaptic::deep::AgentTracingMiddleware;
+use synaptic::deep::StreamingInterceptor;
 
 /// Lightweight interceptor that records token usage on every LLM response.
 pub(crate) struct CostTrackingInterceptor(pub Arc<CostTrackingCallback>);
@@ -72,6 +73,12 @@ pub(crate) async fn setup_middleware(
     options
         .interceptors
         .push(Arc::new(AgentTracingMiddleware::new()));
+
+    // Streaming interceptor — if RunContext contains a StreamingOutputHandle,
+    // intercepts model calls to use stream_chat() and forward token deltas.
+    options
+        .interceptors
+        .push(Arc::new(StreamingInterceptor::new(model.clone())));
 
     // Secret masking middleware
     setup_secret_masking(options, config);

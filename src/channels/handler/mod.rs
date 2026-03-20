@@ -634,6 +634,176 @@ impl AgentSession {
         })
     }
 
+    /// Process a message with real-time streaming output via RunContext.
+    ///
+    /// Like `handle_message_streaming`, but the caller provides a full `RunContext`
+    /// which may carry a cancel token and a `StreamingOutputHandle`. The framework's
+    /// `StreamingInterceptor` will use the handle to forward tokens automatically.
+    pub async fn handle_message_streaming_with_context(
+        &self,
+        envelope: MessageEnvelope,
+        ctx: synaptic::core::RunContext,
+    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
+        use synaptic::deep::StreamingOutputHandle;
+
+        let request_id = envelope.request_id.clone();
+        let session_key = envelope.session_key.clone();
+        let channel = envelope.delivery.channel.clone();
+
+        let start = Instant::now();
+        let span = tracing::info_span!("agent_message",
+            request_id = %request_id,
+            channel = %channel,
+            session_key = %session_key,
+            provenance = ?envelope.provenance.kind,
+        );
+        let _guard = span.enter();
+
+        // Serialize concurrent executions for the same session
+        let _run_guard = self.run_queue.acquire(&session_key).await;
+
+        // Resolve routing (single agent or broadcast)
+        let route = self.resolve_route(&envelope);
+
+        // Broadcast in streaming mode: fall back to non-streaming broadcast
+        if let ResolvedRoute::Broadcast {
+            ref group_name,
+            ref strategy,
+            ref agents,
+            ..
+        } = route
+        {
+            tracing::info!(broadcast = %group_name, "dispatching broadcast (streaming fallback)");
+            return self
+                .handle_broadcast_message(&envelope, agents, strategy)
+                .await;
+        }
+
+        let agent_info = match route {
+            ResolvedRoute::Single(info) => info,
+            _ => unreachable!(),
+        };
+        tracing::info!(agent = %agent_info.id, "processing streaming channel message (with context)");
+
+        // Load delivery state
+        let mut delivery_state = self.load_delivery_state(&session_key).await;
+
+        // Set active_turn_source (cross-channel race prevention)
+        delivery_state.active_turn_source = Some(TurnSource {
+            turn_id: request_id.clone(),
+            channel: envelope.delivery.channel.clone(),
+            to: envelope.delivery.to.clone(),
+            account_id: envelope.delivery.account_id.clone(),
+            thread_id: envelope.delivery.thread_id.clone(),
+        });
+
+        // Save delivery state for crash recovery
+        self.save_delivery_state(&session_key, &delivery_state)
+            .await;
+
+        // Broadcast message.received
+        if let Some(ref broadcaster) = self.broadcaster {
+            let event = MessageReceivedEvent::from_envelope(&envelope);
+            if let Ok(payload) = serde_json::to_value(&event) {
+                broadcaster.broadcast("message.received", payload).await;
+            }
+        }
+
+        let sid = self.resolve_session(&session_key, &envelope).await?;
+
+        // Build content blocks from attachments
+        let content_blocks = self.download_attachments(&envelope.attachments).await;
+
+        // Extract StreamingOutput from RunContext for on_complete/on_error callbacks
+        let output_handle = ctx.streaming_output::<StreamingOutputHandle>();
+
+        let result: Result<(String, u32, u32), Box<dyn std::error::Error + Send + Sync>> =
+            if self.deep_agent {
+                self.handle_deep_agent_streaming_with_context(
+                    &sid,
+                    &envelope.content,
+                    &content_blocks,
+                    ctx,
+                    &agent_info,
+                )
+                .await
+            } else {
+                // Simple chat doesn't support streaming, fall back
+                let res = self
+                    .handle_simple_chat(&sid, &envelope.content, &content_blocks)
+                    .await;
+                if let Ok(ref response) = res {
+                    if let Some(ref handle) = output_handle {
+                        handle.0.on_token(response).await;
+                    }
+                }
+                res.map(|r| (r, 0u32, 0u32))
+            };
+
+        let duration_ms = start.elapsed().as_millis() as u64;
+        match &result {
+            Ok((response, input_tokens, output_tokens)) => {
+                if let Some(ref handle) = output_handle {
+                    let meta = CompletionMeta {
+                        input_tokens: *input_tokens,
+                        output_tokens: *output_tokens,
+                        duration_ms,
+                        request_id: Some(envelope.request_id.clone()),
+                    };
+                    handle.0.on_complete(response, Some(&meta)).await;
+                }
+                tracing::info!(duration_ms, "streaming message processed (with context)");
+            }
+            Err(e) => {
+                if let Some(ref handle) = output_handle {
+                    handle.0.on_error(&e.to_string()).await;
+                }
+                tracing::error!(duration_ms = duration_ms, error = %e, "streaming message failed (with context)");
+            }
+        }
+
+        let (response, _, _) = result?;
+
+        // Resolve delivery target via priority chain
+        let delivery_target =
+            resolve_delivery_target(&delivery_state, delivery_state.active_turn_source.as_ref())
+                .unwrap_or_else(|_| envelope.delivery.clone());
+
+        // Broadcast message.sent
+        if let Some(ref broadcaster) = self.broadcaster {
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64;
+            let sent_event = MessageSentEvent {
+                request_id: request_id.clone(),
+                channel: delivery_target.channel.clone(),
+                to: delivery_target.to.clone(),
+                timestamp_ms: now_ms,
+                message_id: None,
+            };
+            if let Ok(payload) = serde_json::to_value(&sent_event) {
+                broadcaster.broadcast("message.sent", payload).await;
+            }
+        }
+
+        // Update last_* fields
+        update_last_route(&mut delivery_state, &delivery_target);
+
+        // Clear active_turn_source
+        delivery_state.active_turn_source = None;
+
+        // Save delivery state
+        self.save_delivery_state(&session_key, &delivery_state)
+            .await;
+
+        Ok(AgentReply {
+            content: response,
+            delivery_target,
+            turn_id: request_id,
+        })
+    }
+
     /// Download attachments and convert to ContentBlocks.
     /// Images and audio become multimodal blocks; other files become text references.
     pub(super) async fn download_attachments(

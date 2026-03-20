@@ -75,19 +75,22 @@ impl MessageEnvelope {
             content,
             attachments: Vec::new(),
             delivery: DeliveryContext {
-                channel: "webchat".into(),
+                channel: "web".into(),
                 to: Some(format!("conn:{}", conn_id)),
                 ..Default::default()
             },
             provenance: InputProvenance {
                 kind: ProvenanceKind::ExternalUser,
-                source_channel: Some("webchat".into()),
+                source_channel: Some("web".into()),
                 ..Default::default()
             },
             idempotency_key: None,
             timestamp_ms: now_ms(),
             sender_id: None,
-            routing: RoutingMeta::default(),
+            routing: RoutingMeta {
+                peer_kind: Some(crate::config::PeerKind::Direct),
+                ..Default::default()
+            },
         }
     }
 

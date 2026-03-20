@@ -9,6 +9,7 @@ use synaptic::core::{
 use synaptic::graph::{MessageState, StreamMode};
 use synaptic::session::SessionManager;
 use synaptic::store::FileStore;
+use synaptic::DeliveryContext;
 use tokio::sync::RwLock;
 use tracing;
 
@@ -20,7 +21,7 @@ use crate::gateway::messages::routing::{
     resolve_delivery_target, update_last_route, SessionDeliveryState, TurnSource,
 };
 use crate::gateway::messages::{
-    AgentReply, Attachment, ChannelRegistry, MessageEnvelope, MessageReceivedEvent,
+    AgentReply, Attachment, ChannelRegistry, InboundMessage, MessageReceivedEvent,
     MessageSentEvent, OutboundPayload,
 };
 use crate::gateway::rpc::Broadcaster;
@@ -238,22 +239,54 @@ impl AgentSession {
         self
     }
 
+    /// Build a `DeliveryContext` from an `InboundMessage` for outbound dispatch.
+    ///
+    /// This is used as a fallback when the delivery routing system cannot determine
+    /// a target from session state.
+    pub(super) fn delivery_context_from_inbound(msg: &InboundMessage) -> DeliveryContext {
+        DeliveryContext {
+            channel: msg.channel.platform.clone(),
+            to: msg
+                .sender
+                .id
+                .clone()
+                .map(|id| format!("{}:{}", msg.chat.chat_type, id)),
+            account_id: msg.channel.account_id.clone(),
+            thread_id: msg.thread.thread_id.clone(),
+            meta: None,
+        }
+    }
+
+    /// Build a `TurnSource` from an `InboundMessage` for cross-channel race prevention.
+    fn turn_source_from_inbound(msg: &InboundMessage) -> TurnSource {
+        TurnSource {
+            turn_id: msg.request_id.clone(),
+            channel: msg.channel.platform.clone(),
+            to: msg
+                .sender
+                .id
+                .clone()
+                .map(|id| format!("{}:{}", msg.chat.chat_type, id)),
+            account_id: msg.channel.account_id.clone(),
+            thread_id: msg.thread.thread_id.clone(),
+        }
+    }
+
     /// Process a message through the agent pipeline.
     /// This is the unified entry point for all channels.
     pub async fn handle_message(
         &self,
-        envelope: MessageEnvelope,
+        msg: InboundMessage,
     ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
-        let request_id = envelope.request_id.clone();
-        let session_key = envelope.session_key.clone();
-        let channel = envelope.delivery.channel.clone();
+        let request_id = msg.request_id.clone();
+        let session_key = msg.session_key.clone();
+        let channel = msg.channel.platform.clone();
 
         let start = Instant::now();
         let span = tracing::info_span!("agent_message",
             request_id = %request_id,
             channel = %channel,
             session_key = %session_key,
-            provenance = ?envelope.provenance.kind,
         );
         let _guard = span.enter();
 
@@ -261,7 +294,7 @@ impl AgentSession {
         let _run_guard = self.run_queue.acquire(&session_key).await;
 
         // Resolve routing (single agent or broadcast)
-        let route = self.resolve_route(&envelope);
+        let route = self.resolve_route(&msg);
 
         // Handle broadcast: fan out to multiple agents
         if let ResolvedRoute::Broadcast {
@@ -272,9 +305,7 @@ impl AgentSession {
         } = route
         {
             tracing::info!(broadcast = %group_name, "dispatching broadcast");
-            return self
-                .handle_broadcast_message(&envelope, agents, strategy)
-                .await;
+            return self.handle_broadcast_message(&msg, agents, strategy).await;
         }
 
         // Single agent path
@@ -288,13 +319,7 @@ impl AgentSession {
         let mut delivery_state = self.load_delivery_state(&session_key).await;
 
         // Set active_turn_source (cross-channel race prevention)
-        delivery_state.active_turn_source = Some(TurnSource {
-            turn_id: request_id.clone(),
-            channel: envelope.delivery.channel.clone(),
-            to: envelope.delivery.to.clone(),
-            account_id: envelope.delivery.account_id.clone(),
-            thread_id: envelope.delivery.thread_id.clone(),
-        });
+        delivery_state.active_turn_source = Some(Self::turn_source_from_inbound(&msg));
 
         // Save delivery state for crash recovery
         self.save_delivery_state(&session_key, &delivery_state)
@@ -302,24 +327,24 @@ impl AgentSession {
 
         // Broadcast message.received
         if let Some(ref broadcaster) = self.broadcaster {
-            let event = MessageReceivedEvent::from_envelope(&envelope);
+            let event = MessageReceivedEvent::from_inbound(&msg);
             if let Ok(payload) = serde_json::to_value(&event) {
                 broadcaster.broadcast("message.received", payload).await;
             }
         }
 
-        let sid = self.resolve_session(&session_key, &envelope).await?;
+        let sid = self.resolve_session(&session_key, &msg).await?;
 
         // Build content blocks from attachments
-        let content_blocks = self.download_attachments(&envelope.attachments).await;
+        let content_blocks = self.download_attachments(&msg.attachments).await;
 
         // Usage tracking is handled by CostTrackingSubscriber via EventBus.
 
         let result = if self.deep_agent {
-            self.handle_deep_agent(&sid, &envelope.content, &content_blocks, &agent_info)
+            self.handle_deep_agent(&sid, &msg.content, &content_blocks, &agent_info)
                 .await
         } else {
-            self.handle_simple_chat(&sid, &envelope.content, &content_blocks)
+            self.handle_simple_chat(&sid, &msg.content, &content_blocks)
                 .await
         };
 
@@ -338,9 +363,10 @@ impl AgentSession {
         let response = result?;
 
         // Resolve delivery target via priority chain
+        let fallback_delivery = Self::delivery_context_from_inbound(&msg);
         let delivery_target =
             resolve_delivery_target(&delivery_state, delivery_state.active_turn_source.as_ref())
-                .unwrap_or_else(|_| envelope.delivery.clone());
+                .unwrap_or(fallback_delivery);
 
         // Dispatch outbound (for non-webchat channels only)
         if delivery_target.channel != "webchat" {
@@ -482,19 +508,18 @@ impl AgentSession {
     /// Process a message with real-time streaming output.
     pub async fn handle_message_streaming(
         &self,
-        envelope: MessageEnvelope,
+        msg: InboundMessage,
         output: Arc<dyn StreamingOutput>,
     ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
-        let request_id = envelope.request_id.clone();
-        let session_key = envelope.session_key.clone();
-        let channel = envelope.delivery.channel.clone();
+        let request_id = msg.request_id.clone();
+        let session_key = msg.session_key.clone();
+        let channel = msg.channel.platform.clone();
 
         let start = Instant::now();
         let span = tracing::info_span!("agent_message",
             request_id = %request_id,
             channel = %channel,
             session_key = %session_key,
-            provenance = ?envelope.provenance.kind,
         );
         let _guard = span.enter();
 
@@ -502,7 +527,7 @@ impl AgentSession {
         let _run_guard = self.run_queue.acquire(&session_key).await;
 
         // Resolve routing (single agent or broadcast)
-        let route = self.resolve_route(&envelope);
+        let route = self.resolve_route(&msg);
 
         // Broadcast in streaming mode: fall back to non-streaming broadcast
         if let ResolvedRoute::Broadcast {
@@ -513,9 +538,7 @@ impl AgentSession {
         } = route
         {
             tracing::info!(broadcast = %group_name, "dispatching broadcast (streaming fallback)");
-            return self
-                .handle_broadcast_message(&envelope, agents, strategy)
-                .await;
+            return self.handle_broadcast_message(&msg, agents, strategy).await;
         }
 
         let agent_info = match route {
@@ -528,13 +551,7 @@ impl AgentSession {
         let mut delivery_state = self.load_delivery_state(&session_key).await;
 
         // Set active_turn_source (cross-channel race prevention)
-        delivery_state.active_turn_source = Some(TurnSource {
-            turn_id: request_id.clone(),
-            channel: envelope.delivery.channel.clone(),
-            to: envelope.delivery.to.clone(),
-            account_id: envelope.delivery.account_id.clone(),
-            thread_id: envelope.delivery.thread_id.clone(),
-        });
+        delivery_state.active_turn_source = Some(Self::turn_source_from_inbound(&msg));
 
         // Save delivery state for crash recovery
         self.save_delivery_state(&session_key, &delivery_state)
@@ -542,16 +559,16 @@ impl AgentSession {
 
         // Broadcast message.received
         if let Some(ref broadcaster) = self.broadcaster {
-            let event = MessageReceivedEvent::from_envelope(&envelope);
+            let event = MessageReceivedEvent::from_inbound(&msg);
             if let Ok(payload) = serde_json::to_value(&event) {
                 broadcaster.broadcast("message.received", payload).await;
             }
         }
 
-        let sid = self.resolve_session(&session_key, &envelope).await?;
+        let sid = self.resolve_session(&session_key, &msg).await?;
 
         // Build content blocks from attachments
-        let content_blocks = self.download_attachments(&envelope.attachments).await;
+        let content_blocks = self.download_attachments(&msg.attachments).await;
 
         // Usage tracking is handled by CostTrackingSubscriber via EventBus.
 
@@ -559,7 +576,7 @@ impl AgentSession {
             if self.deep_agent {
                 self.handle_deep_agent_streaming(
                     &sid,
-                    &envelope.content,
+                    &msg.content,
                     &content_blocks,
                     output.clone(),
                     &agent_info,
@@ -568,7 +585,7 @@ impl AgentSession {
             } else {
                 // Simple chat doesn't support streaming, fall back and emit via callbacks
                 let res = self
-                    .handle_simple_chat(&sid, &envelope.content, &content_blocks)
+                    .handle_simple_chat(&sid, &msg.content, &content_blocks)
                     .await;
                 if let Ok(ref response) = res {
                     output.on_token(response).await;
@@ -583,7 +600,7 @@ impl AgentSession {
                     input_tokens: *input_tokens,
                     output_tokens: *output_tokens,
                     duration_ms,
-                    request_id: Some(envelope.request_id.clone()),
+                    request_id: Some(msg.request_id.clone()),
                 };
                 output.on_complete(response, Some(&meta)).await;
                 tracing::info!(duration_ms, "streaming message processed");
@@ -597,9 +614,10 @@ impl AgentSession {
         let (response, _, _) = result?;
 
         // Resolve delivery target via priority chain
+        let fallback_delivery = Self::delivery_context_from_inbound(&msg);
         let delivery_target =
             resolve_delivery_target(&delivery_state, delivery_state.active_turn_source.as_ref())
-                .unwrap_or_else(|_| envelope.delivery.clone());
+                .unwrap_or(fallback_delivery);
 
         // For webchat streaming, actual delivery is via WebSocket (caller handles it).
         // For other channels, streaming is not typically used for dispatch,
@@ -649,21 +667,20 @@ impl AgentSession {
     /// `StreamingInterceptor` will use the handle to forward tokens automatically.
     pub async fn handle_message_streaming_with_context(
         &self,
-        envelope: MessageEnvelope,
+        msg: InboundMessage,
         ctx: synaptic::core::RunContext,
     ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
         use synaptic::deep::StreamingOutputHandle;
 
-        let request_id = envelope.request_id.clone();
-        let session_key = envelope.session_key.clone();
-        let channel = envelope.delivery.channel.clone();
+        let request_id = msg.request_id.clone();
+        let session_key = msg.session_key.clone();
+        let channel = msg.channel.platform.clone();
 
         let start = Instant::now();
         let span = tracing::info_span!("agent_message",
             request_id = %request_id,
             channel = %channel,
             session_key = %session_key,
-            provenance = ?envelope.provenance.kind,
         );
         let _guard = span.enter();
 
@@ -671,7 +688,7 @@ impl AgentSession {
         let _run_guard = self.run_queue.acquire(&session_key).await;
 
         // Resolve routing (single agent or broadcast)
-        let route = self.resolve_route(&envelope);
+        let route = self.resolve_route(&msg);
 
         // Broadcast in streaming mode: fall back to non-streaming broadcast
         if let ResolvedRoute::Broadcast {
@@ -682,9 +699,7 @@ impl AgentSession {
         } = route
         {
             tracing::info!(broadcast = %group_name, "dispatching broadcast (streaming fallback)");
-            return self
-                .handle_broadcast_message(&envelope, agents, strategy)
-                .await;
+            return self.handle_broadcast_message(&msg, agents, strategy).await;
         }
 
         let agent_info = match route {
@@ -697,13 +712,7 @@ impl AgentSession {
         let mut delivery_state = self.load_delivery_state(&session_key).await;
 
         // Set active_turn_source (cross-channel race prevention)
-        delivery_state.active_turn_source = Some(TurnSource {
-            turn_id: request_id.clone(),
-            channel: envelope.delivery.channel.clone(),
-            to: envelope.delivery.to.clone(),
-            account_id: envelope.delivery.account_id.clone(),
-            thread_id: envelope.delivery.thread_id.clone(),
-        });
+        delivery_state.active_turn_source = Some(Self::turn_source_from_inbound(&msg));
 
         // Save delivery state for crash recovery
         self.save_delivery_state(&session_key, &delivery_state)
@@ -711,16 +720,16 @@ impl AgentSession {
 
         // Broadcast message.received
         if let Some(ref broadcaster) = self.broadcaster {
-            let event = MessageReceivedEvent::from_envelope(&envelope);
+            let event = MessageReceivedEvent::from_inbound(&msg);
             if let Ok(payload) = serde_json::to_value(&event) {
                 broadcaster.broadcast("message.received", payload).await;
             }
         }
 
-        let sid = self.resolve_session(&session_key, &envelope).await?;
+        let sid = self.resolve_session(&session_key, &msg).await?;
 
         // Build content blocks from attachments
-        let content_blocks = self.download_attachments(&envelope.attachments).await;
+        let content_blocks = self.download_attachments(&msg.attachments).await;
 
         // Extract StreamingOutput from RunContext for on_complete/on_error callbacks
         let output_handle = ctx.streaming_output::<StreamingOutputHandle>();
@@ -729,7 +738,7 @@ impl AgentSession {
             if self.deep_agent {
                 self.handle_deep_agent_streaming_with_context(
                     &sid,
-                    &envelope.content,
+                    &msg.content,
                     &content_blocks,
                     ctx,
                     &agent_info,
@@ -738,7 +747,7 @@ impl AgentSession {
             } else {
                 // Simple chat doesn't support streaming, fall back
                 let res = self
-                    .handle_simple_chat(&sid, &envelope.content, &content_blocks)
+                    .handle_simple_chat(&sid, &msg.content, &content_blocks)
                     .await;
                 if let Ok(ref response) = res {
                     if let Some(ref handle) = output_handle {
@@ -756,7 +765,7 @@ impl AgentSession {
                         input_tokens: *input_tokens,
                         output_tokens: *output_tokens,
                         duration_ms,
-                        request_id: Some(envelope.request_id.clone()),
+                        request_id: Some(msg.request_id.clone()),
                     };
                     handle.0.on_complete(response, Some(&meta)).await;
                 }
@@ -773,9 +782,10 @@ impl AgentSession {
         let (response, _, _) = result?;
 
         // Resolve delivery target via priority chain
+        let fallback_delivery = Self::delivery_context_from_inbound(&msg);
         let delivery_target =
             resolve_delivery_target(&delivery_state, delivery_state.active_turn_source.as_ref())
-                .unwrap_or_else(|_| envelope.delivery.clone());
+                .unwrap_or(fallback_delivery);
 
         // Broadcast message.sent
         if let Some(ref broadcaster) = self.broadcaster {
@@ -814,47 +824,6 @@ impl AgentSession {
             delivery_target,
             turn_id: request_id,
         })
-    }
-
-    /// Handle an inbound message (new API using `InboundMessage`).
-    ///
-    /// Converts to `MessageEnvelope` internally and delegates to `handle_message`.
-    /// This will become the primary entry point once all adapters migrate.
-    #[allow(dead_code)]
-    pub async fn handle_inbound(
-        &self,
-        msg: crate::gateway::messages::InboundMessage,
-    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
-        let envelope = msg.to_envelope();
-        self.handle_message(envelope).await
-    }
-
-    /// Handle an inbound message with streaming (new API using `InboundMessage`).
-    ///
-    /// Converts to `MessageEnvelope` internally and delegates to `handle_message_streaming`.
-    #[allow(dead_code)]
-    pub async fn handle_inbound_streaming(
-        &self,
-        msg: crate::gateway::messages::InboundMessage,
-        output: Arc<dyn StreamingOutput>,
-    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
-        let envelope = msg.to_envelope();
-        self.handle_message_streaming(envelope, output).await
-    }
-
-    /// Handle an inbound message with streaming + `RunContext` (new API using `InboundMessage`).
-    ///
-    /// Converts to `MessageEnvelope` internally and delegates to
-    /// `handle_message_streaming_with_context`.
-    #[allow(dead_code)]
-    pub async fn handle_inbound_streaming_with_context(
-        &self,
-        msg: crate::gateway::messages::InboundMessage,
-        ctx: synaptic::core::RunContext,
-    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
-        let envelope = msg.to_envelope();
-        self.handle_message_streaming_with_context(envelope, ctx)
-            .await
     }
 
     /// Download attachments and convert to ContentBlocks.

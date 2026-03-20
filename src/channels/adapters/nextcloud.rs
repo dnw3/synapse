@@ -135,7 +135,7 @@ pub async fn run(
                                         chat_info,
                                     );
                                     msg.finalize();
-                                    match session.handle_inbound(msg).await {
+                                    match session.handle_message(msg).await {
                                         Ok(reply) => {
                                             let _ = client
                                                 .post(&reply_url)

@@ -304,12 +304,12 @@ impl LarkHandler {
 
             let msg = build_inbound();
             self.agent_session
-                .handle_inbound_streaming(msg, output)
+                .handle_message_streaming(msg, output)
                 .await
                 .map_err(|e| SynapticError::Tool(e.to_string()))?;
         } else {
             let msg = build_inbound();
-            match self.agent_session.handle_inbound(msg).await {
+            match self.agent_session.handle_message(msg).await {
                 Ok(reply) => {
                     // Auto mode: use card for rich content even without streaming
                     if matches!(self.config.render_mode, LarkRenderMode::Auto)
@@ -398,7 +398,7 @@ impl LarkHandler {
         msg.thread.thread_id = event.root_id.clone();
         msg.finalize();
 
-        match self.agent_session.handle_inbound(msg).await {
+        match self.agent_session.handle_message(msg).await {
             Ok(reply) => self.send_reply(event, client, &reply.content).await?,
             Err(e) => {
                 client
@@ -468,7 +468,7 @@ impl LarkHandler {
         msg.thread.thread_id = event.root_id.clone();
         msg.finalize();
 
-        match self.agent_session.handle_inbound(msg).await {
+        match self.agent_session.handle_message(msg).await {
             Ok(reply) => self.send_reply(event, client, &reply.content).await?,
             Err(e) => {
                 client
@@ -626,7 +626,7 @@ impl LarkHandler {
         let mut msg =
             InboundMessage::channel(session_key, text, channel_info, sender_info, chat_info);
         msg.finalize();
-        match self.agent_session.handle_inbound(msg).await {
+        match self.agent_session.handle_message(msg).await {
             Ok(reply) => {
                 client
                     .send_text("chat_id", &event.chat_id, &reply.content)

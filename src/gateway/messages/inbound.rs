@@ -1,16 +1,30 @@
 //! Inbound message type aligned with OpenClaw's `MsgContext`.
 //!
-//! `InboundMessage` replaces `MessageEnvelope` as the unified inbound message
-//! representation for all channels (web, Lark, Telegram, Discord, Slack, etc.).
+//! `InboundMessage` is the unified inbound message representation for all
+//! channels (web, Lark, Telegram, Discord, Slack, etc.).
 
-use super::envelope::Attachment;
+use serde::{Deserialize, Serialize};
+
 use crate::gateway::presence::now_ms;
+
+// ---------------------------------------------------------------------------
+// Attachment (moved from envelope.rs)
+// ---------------------------------------------------------------------------
+
+/// File attachment from any channel.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Attachment {
+    pub filename: String,
+    pub url: String,
+    pub mime_type: Option<String>,
+}
 
 // ---------------------------------------------------------------------------
 // Sub-structs
 // ---------------------------------------------------------------------------
 
 /// Identity of the message sender.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct SenderInfo {
     /// User/sender identifier (platform-specific ID).
@@ -28,6 +42,7 @@ pub struct SenderInfo {
 }
 
 /// Channel/platform origin information.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct ChannelInfo {
     /// Platform code: "lark", "telegram", "discord", "slack", "web", etc.
@@ -47,6 +62,7 @@ pub struct ChannelInfo {
 }
 
 /// Conversation / chat context.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct ChatInfo {
     /// Chat type: "direct", "group", "channel", "forum".
@@ -70,6 +86,7 @@ pub struct ChatInfo {
 }
 
 /// Thread context for threaded conversations.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct ThreadInfo {
     /// Thread identifier (Telegram topic, Matrix thread, Lark thread).
@@ -95,6 +112,7 @@ pub struct ThreadInfo {
 }
 
 /// Platform-level message identifiers and reply/forward context.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct MessageInfo {
     /// Platform-specific message ID (short form).
@@ -116,6 +134,7 @@ pub struct MessageInfo {
 }
 
 /// Context for a reply-to message.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct ReplyInfo {
     pub message_id: Option<String>,
@@ -126,6 +145,7 @@ pub struct ReplyInfo {
 }
 
 /// Context for a forwarded message.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct ForwardInfo {
     pub sender_name: Option<String>,
@@ -136,6 +156,7 @@ pub struct ForwardInfo {
 }
 
 /// Media attachments and understanding results.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct MediaInfo {
     pub paths: Vec<String>,
@@ -152,6 +173,7 @@ pub struct MediaInfo {
 }
 
 /// Result of media understanding (vision, transcription, etc.).
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct MediaUnderstanding {
     pub media_type: String,
@@ -159,6 +181,7 @@ pub struct MediaUnderstanding {
 }
 
 /// Sticker metadata (Telegram, etc.).
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct StickerInfo {
     pub emoji: Option<String>,
@@ -169,6 +192,7 @@ pub struct StickerInfo {
 }
 
 /// Content variants for different consumers (agent, command parser, raw).
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct ContentVariants {
     pub body: Option<String>,
@@ -178,6 +202,7 @@ pub struct ContentVariants {
 }
 
 /// Command system metadata.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct CommandInfo {
     pub authorized: Option<bool>,
@@ -194,8 +219,7 @@ pub struct CommandInfo {
 // ---------------------------------------------------------------------------
 
 /// Unified inbound message from any channel, aligned with OpenClaw's `MsgContext`.
-///
-/// Replaces `MessageEnvelope`. All channel adapters construct this type.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct InboundMessage {
     // === Core ===
@@ -266,61 +290,6 @@ impl InboundMessage {
             chat,
             timestamp_ms: now_ms(),
             ..Default::default()
-        }
-    }
-
-    /// Convert to legacy `MessageEnvelope` for backward compatibility.
-    ///
-    /// Used during migration — will be removed when all consumers use `InboundMessage` directly.
-    /// The conversion is intentionally lossy: fields unique to `InboundMessage` (media, command,
-    /// content_variants, message info, etc.) are not carried over.
-    pub fn to_envelope(&self) -> super::envelope::MessageEnvelope {
-        use super::envelope::RoutingMeta;
-        use synaptic::{DeliveryContext, InputProvenance, ProvenanceKind};
-
-        let delivery = DeliveryContext {
-            channel: self.channel.platform.clone(),
-            to: self
-                .sender
-                .id
-                .clone()
-                .map(|id| format!("{}:{}", self.chat.chat_type, id)),
-            account_id: self.channel.account_id.clone(),
-            thread_id: self.thread.thread_id.clone(),
-            ..Default::default()
-        };
-
-        let provenance = InputProvenance {
-            kind: ProvenanceKind::ExternalUser,
-            source_channel: Some(self.channel.platform.clone()),
-            ..Default::default()
-        };
-
-        let routing = RoutingMeta {
-            guild_id: self.channel.guild_id.clone(),
-            team_id: self.channel.team_id.clone(),
-            roles: self.chat.roles.clone(),
-            peer_kind: if self.chat.chat_type == "direct" {
-                Some(crate::config::PeerKind::Direct)
-            } else if self.chat.chat_type == "group" {
-                Some(crate::config::PeerKind::Group)
-            } else {
-                None
-            },
-            peer_id: self.sender.id.clone(),
-        };
-
-        super::envelope::MessageEnvelope {
-            request_id: self.request_id.clone(),
-            session_key: self.session_key.clone(),
-            content: self.content.clone(),
-            attachments: self.attachments.clone(),
-            delivery,
-            provenance,
-            idempotency_key: self.idempotency_key.clone(),
-            timestamp_ms: self.timestamp_ms,
-            sender_id: self.sender.id.clone(),
-            routing,
         }
     }
 

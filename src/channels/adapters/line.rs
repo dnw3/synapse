@@ -313,7 +313,7 @@ async fn handle_webhook(
                 chat_info,
             );
             msg.finalize();
-            match session.handle_inbound(msg).await {
+            match session.handle_message(msg).await {
                 Ok(reply) => {
                     send_reply(&channel_token, &reply_token, &reply.content).await;
                 }

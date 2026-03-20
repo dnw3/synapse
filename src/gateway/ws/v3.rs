@@ -560,7 +560,7 @@ async fn handle_v3_agent(
     let agent_session = state.agent_session.clone();
     let mut agent_handle = tokio::spawn(async move {
         agent_session
-            .handle_inbound_streaming_with_context(msg, ctx)
+            .handle_message_streaming_with_context(msg, ctx)
             .await
     });
 

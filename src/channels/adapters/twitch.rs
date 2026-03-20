@@ -166,7 +166,7 @@ async fn run_twitch_irc(
                 chat_info,
             );
             msg.finalize();
-            match session.handle_inbound(msg).await {
+            match session.handle_message(msg).await {
                 Ok(reply) => {
                     let chunks = formatter::format_for_channel(&reply.content, "twitch", 400);
                     for chunk in chunks {

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use super::outbound::OutboundPayload;
 
 /// Mirror delivery to additional targets.
+#[allow(dead_code)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeliveryMirror {
     pub channel: String,
@@ -12,6 +13,7 @@ pub struct DeliveryMirror {
 }
 
 /// A persistent delivery task with retry semantics.
+#[allow(dead_code)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QueuedDelivery {
     pub id: String,
@@ -33,11 +35,13 @@ pub struct QueuedDelivery {
 }
 
 /// Persistent delivery queue with disk-backed storage and retry support.
+#[allow(dead_code)]
 pub struct DeliveryQueue {
     queue_dir: PathBuf,
     pending: Vec<QueuedDelivery>,
 }
 
+#[allow(dead_code)]
 impl DeliveryQueue {
     pub fn new(queue_dir: PathBuf) -> Self {
         Self {
@@ -50,8 +54,7 @@ impl DeliveryQueue {
     pub fn enqueue(&mut self, delivery: QueuedDelivery) -> Result<(), std::io::Error> {
         let path = self.queue_dir.join(format!("{}.json", delivery.id));
         std::fs::create_dir_all(&self.queue_dir)?;
-        let json = serde_json::to_string_pretty(&delivery)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let json = serde_json::to_string_pretty(&delivery).map_err(std::io::Error::other)?;
         std::fs::write(&path, json)?;
         self.pending.push(delivery);
         Ok(())
@@ -90,12 +93,7 @@ impl DeliveryQueue {
         }
         for entry in std::fs::read_dir(&self.queue_dir)? {
             let entry = entry?;
-            if entry
-                .path()
-                .extension()
-                .map(|e| e == "json")
-                .unwrap_or(false)
-            {
+            if entry.path().extension().is_some_and(|e| e == "json") {
                 if let Ok(content) = std::fs::read_to_string(entry.path()) {
                     if let Ok(delivery) = serde_json::from_str::<QueuedDelivery>(&content) {
                         self.pending.push(delivery);

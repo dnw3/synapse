@@ -305,7 +305,7 @@ pub async fn run(
                     msg.attachments = attachments;
                     msg.finalize();
 
-                    match session.handle_inbound(msg).await {
+                    match session.handle_message(msg).await {
                         Ok(reply) => {
                             // Split long replies into chunks (Discord 2000 char limit)
                             let chunks =

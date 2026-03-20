@@ -1,6 +1,7 @@
 use super::outbound::OutboundPayload;
 
 /// Phase 1: Normalize payloads for delivery.
+#[allow(dead_code)]
 /// Filters reasoning, merges consecutive text, validates renderability.
 pub fn normalize_for_delivery(
     payloads: Vec<OutboundPayload>,
@@ -15,7 +16,7 @@ pub fn normalize_for_delivery(
         }
 
         // Skip empty payloads (no text and no media)
-        if payload.text.as_deref().map_or(true, |t| t.is_empty())
+        if payload.text.as_deref().is_none_or(|t| t.is_empty())
             && payload.media_urls.is_empty()
             && payload.interactive.is_none()
         {

@@ -2,6 +2,7 @@ use super::outbound::{OutboundDeliveryResult, OutboundPayload};
 use async_trait::async_trait;
 
 /// Context for outbound delivery to a specific target.
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct OutboundContext {
     pub to: String,
@@ -14,6 +15,7 @@ pub struct OutboundContext {
 }
 
 /// Trait that each channel implements for outbound delivery.
+#[allow(dead_code)]
 #[async_trait]
 pub trait ChannelOutboundAdapter: Send + Sync {
     /// Platform text limit for a single message.

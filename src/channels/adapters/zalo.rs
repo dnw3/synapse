@@ -134,7 +134,7 @@ async fn handle_webhook(
             chat_info,
         );
         msg.finalize();
-        match session.handle_inbound(msg).await {
+        match session.handle_message(msg).await {
             Ok(reply) => {
                 // Send reply via Zalo OA API
                 let client = reqwest::Client::new();

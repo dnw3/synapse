@@ -16,6 +16,7 @@ pub struct OutboundPayload {
 }
 
 /// Result of a successful outbound delivery.
+#[allow(dead_code)]
 #[derive(Default, Clone, Debug, Serialize, Deserialize)]
 pub struct OutboundDeliveryResult {
     pub message_id: Option<String>,

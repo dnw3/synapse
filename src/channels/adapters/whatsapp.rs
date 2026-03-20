@@ -232,7 +232,7 @@ async fn run_ws_loop(
                 chat_info,
             );
             msg.finalize();
-            match session.handle_inbound(msg).await {
+            match session.handle_message(msg).await {
                 Ok(reply) => {
                     let chunks = formatter::format_for_channel(&reply.content, "whatsapp", 2000);
                     let http = reqwest::Client::new();

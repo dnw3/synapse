@@ -148,7 +148,7 @@ async fn handle_chat(
         chat_info,
     );
     msg.finalize();
-    match state.agent_session.handle_inbound(msg).await {
+    match state.agent_session.handle_message(msg).await {
         Ok(reply) => (
             StatusCode::OK,
             Json(serde_json::json!(ChatResponse {

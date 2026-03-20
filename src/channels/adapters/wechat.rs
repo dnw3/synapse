@@ -221,7 +221,7 @@ async fn handle_callback(
             chat_info,
         );
         msg.finalize();
-        match session.handle_inbound(msg).await {
+        match session.handle_message(msg).await {
             Ok(reply) => {
                 let client = reqwest::Client::new();
                 let webhook_url = format!("{}?key={}", WECOM_WEBHOOK_BASE, webhook_key);

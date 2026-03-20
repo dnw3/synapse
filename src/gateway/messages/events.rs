@@ -22,8 +22,7 @@ pub struct MessageSentEvent {
 }
 
 impl MessageReceivedEvent {
-    /// Create from an `InboundMessage` (new message model).
-    #[allow(dead_code)]
+    /// Create from an `InboundMessage`.
     pub fn from_inbound(msg: &super::InboundMessage) -> Self {
         let preview = if msg.content.len() > 100 {
             format!("{}...", &msg.content[..100])
@@ -37,23 +36,6 @@ impl MessageReceivedEvent {
             to: msg.sender.id.clone(),
             provenance: ProvenanceKind::ExternalUser,
             timestamp_ms: msg.timestamp_ms,
-            content_preview: preview,
-        }
-    }
-
-    pub fn from_envelope(envelope: &super::MessageEnvelope) -> Self {
-        let preview = if envelope.content.len() > 100 {
-            format!("{}...", &envelope.content[..100])
-        } else {
-            envelope.content.clone()
-        };
-        Self {
-            request_id: envelope.request_id.clone(),
-            session_key: envelope.session_key.clone(),
-            channel: envelope.delivery.channel.clone(),
-            to: envelope.delivery.to.clone(),
-            provenance: envelope.provenance.kind.clone(),
-            timestamp_ms: envelope.timestamp_ms,
             content_preview: preview,
         }
     }

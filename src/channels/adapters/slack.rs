@@ -445,7 +445,7 @@ async fn run_socket_mode(
             msg.thread.thread_id = Some(ts.clone());
             msg.finalize();
 
-            match session.handle_inbound(msg).await {
+            match session.handle_message(msg).await {
                 Ok(reply) => {
                     // Split long replies into chunks
                     let chunks = formatter::format_for_channel(&reply.content, "slack", 4000);

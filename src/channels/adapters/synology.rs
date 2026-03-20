@@ -118,7 +118,7 @@ async fn handle_webhook(
         chat_info,
     );
     msg.finalize();
-    match state.agent_session.handle_inbound(msg).await {
+    match state.agent_session.handle_message(msg).await {
         Ok(reply) => {
             // If outgoing webhook URL is configured, send there
             if let Some(ref url) = state.outgoing_url {

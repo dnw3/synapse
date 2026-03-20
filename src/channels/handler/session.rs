@@ -1,25 +1,26 @@
 use super::*;
+use crate::gateway::messages::InboundMessage;
 
 impl AgentSession {
-    /// Build a routing context from a message envelope.
-    pub(super) fn routing_context(envelope: &MessageEnvelope) -> RoutingContext {
+    /// Build a routing context from an inbound message.
+    pub(super) fn routing_context(msg: &InboundMessage) -> RoutingContext {
         RoutingContext {
-            channel: Some(envelope.delivery.channel.clone()),
-            account_id: envelope.delivery.account_id.clone(),
-            peer_kind: envelope.routing.peer_kind.clone(),
-            peer_id: envelope.routing.peer_id.clone(),
-            sender_id: envelope.sender_id.clone(),
-            guild_id: envelope.routing.guild_id.clone(),
-            team_id: envelope.routing.team_id.clone(),
-            roles: envelope.routing.roles.clone(),
-            message: Some(envelope.content.clone()),
+            channel: Some(msg.channel.platform.clone()),
+            account_id: msg.channel.account_id.clone(),
+            peer_kind: Self::chat_type_to_peer_kind(&msg.chat.chat_type),
+            peer_id: msg.sender.id.clone(),
+            sender_id: msg.sender.id.clone(),
+            guild_id: msg.channel.guild_id.clone(),
+            team_id: msg.channel.team_id.clone(),
+            roles: msg.chat.roles.clone(),
+            message: Some(msg.content.clone()),
         }
     }
 
-    /// Resolve the routing for this envelope via the binding router.
-    pub(super) fn resolve_route(&self, envelope: &MessageEnvelope) -> ResolvedRoute {
+    /// Resolve the routing for this message via the binding router.
+    pub(super) fn resolve_route(&self, msg: &InboundMessage) -> ResolvedRoute {
         if let Some(ref router) = self.router {
-            let ctx = Self::routing_context(envelope);
+            let ctx = Self::routing_context(msg);
             match router.resolve(&ctx) {
                 crate::router::RouteResult::Single(resolved) => {
                     let agent_id = resolved.def.id.clone();
@@ -100,7 +101,7 @@ impl AgentSession {
     pub(super) async fn resolve_session(
         &self,
         session_key: &str,
-        envelope: &MessageEnvelope,
+        msg: &InboundMessage,
     ) -> Result<String, AgentError> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -141,15 +142,16 @@ impl AgentSession {
         // 3. Legacy fallback: check bot_sessions namespace mapping
         let store = self.session_mgr.store();
         let ns = &["bot_sessions"];
+        let peer_kind = Self::chat_type_to_peer_kind(&msg.chat.chat_type);
         let legacy_sid = self.try_legacy_session(store, ns, session_key).await;
         if let Some(sid) = legacy_sid {
             // Migrate: write session_key into SessionInfo so future lookups use field match
             if let Ok(Some(mut info)) = self.session_mgr.get_session(&sid).await {
                 info.session_key = Some(session_key.to_string());
-                info.channel = Some(envelope.delivery.channel.clone());
-                info.chat_type = Some(Self::peer_kind_to_chat_type(&envelope.routing.peer_kind));
+                info.channel = Some(msg.channel.platform.clone());
+                info.chat_type = Some(Self::peer_kind_to_chat_type(&peer_kind));
                 if info.display_name.is_none() {
-                    info.display_name = envelope.sender_id.clone();
+                    info.display_name = msg.sender.id.clone();
                 }
                 info.updated_at = now;
                 let _ = self.session_mgr.update_session(&info).await;
@@ -169,9 +171,9 @@ impl AgentSession {
 
         if let Ok(Some(mut info)) = self.session_mgr.get_session(&sid).await {
             info.session_key = Some(session_key.to_string());
-            info.channel = Some(envelope.delivery.channel.clone());
-            info.chat_type = Some(Self::peer_kind_to_chat_type(&envelope.routing.peer_kind));
-            info.display_name = envelope.sender_id.clone();
+            info.channel = Some(msg.channel.platform.clone());
+            info.chat_type = Some(Self::peer_kind_to_chat_type(&peer_kind));
+            info.display_name = msg.sender.id.clone();
             info.updated_at = now;
             let _ = self.session_mgr.update_session(&info).await;
         }
@@ -231,6 +233,16 @@ impl AgentSession {
             Some(crate::config::PeerKind::Group) => "group".to_string(),
             Some(crate::config::PeerKind::Channel) => "channel".to_string(),
             None => "unknown".to_string(),
+        }
+    }
+
+    /// Convert InboundMessage chat_type string to PeerKind.
+    pub(super) fn chat_type_to_peer_kind(chat_type: &str) -> Option<crate::config::PeerKind> {
+        match chat_type {
+            "direct" => Some(crate::config::PeerKind::Direct),
+            "group" => Some(crate::config::PeerKind::Group),
+            "channel" => Some(crate::config::PeerKind::Channel),
+            _ => None,
         }
     }
 }

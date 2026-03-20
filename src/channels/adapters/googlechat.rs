@@ -164,7 +164,7 @@ async fn handle_webhook(
         chat_info,
     );
     msg.finalize();
-    let reply_text = match state.agent_session.handle_inbound(msg).await {
+    let reply_text = match state.agent_session.handle_message(msg).await {
         Ok(reply) => {
             let chunks = formatter::format_for_channel(&reply.content, "googlechat", 4096);
             // Google Chat synchronous replies support only a single text body.

@@ -2,12 +2,14 @@ use super::inbound::InboundMessage;
 use std::collections::HashMap;
 
 /// LRU-based inbound message deduplicator.
+#[allow(dead_code)]
 pub struct InboundDeduplicator {
     cache: HashMap<String, u64>,
     ttl_ms: u64,
     max_size: usize,
 }
 
+#[allow(dead_code)]
 impl InboundDeduplicator {
     pub fn new(ttl_ms: u64, max_size: usize) -> Self {
         Self {

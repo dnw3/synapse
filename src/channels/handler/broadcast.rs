@@ -1,4 +1,5 @@
 use super::*;
+use crate::gateway::messages::InboundMessage;
 
 impl AgentSession {
     /// Handle broadcast: fan out to multiple agents in parallel.
@@ -7,15 +8,18 @@ impl AgentSession {
     /// Replies are collected and merged into a single response.
     pub(super) async fn handle_broadcast_message(
         &self,
-        envelope: &MessageEnvelope,
+        msg: &InboundMessage,
         agents: &[ResolvedAgentInfo],
         strategy: &crate::config::BroadcastStrategy,
     ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
         use crate::config::BroadcastStrategy;
 
-        let request_id = envelope.request_id.clone();
-        let session_key = envelope.session_key.clone();
-        let content_blocks = self.download_attachments(&envelope.attachments).await;
+        let request_id = msg.request_id.clone();
+        let session_key = msg.session_key.clone();
+        let content_blocks = self.download_attachments(&msg.attachments).await;
+
+        // Build a DeliveryContext from the inbound message for the reply
+        let delivery_target = Self::delivery_context_from_inbound(msg);
 
         match strategy {
             BroadcastStrategy::Parallel | BroadcastStrategy::Aggregated => {
@@ -27,7 +31,7 @@ impl AgentSession {
                         agent_info.id,
                         session_key.trim_start_matches("agent:default:")
                     );
-                    let text = envelope.content.clone();
+                    let text = msg.content.clone();
                     let blocks = content_blocks.clone();
                     let agent_id = agent_info.id.clone();
                     let prompt = agent_info.prompt_override.clone();
@@ -151,7 +155,7 @@ impl AgentSession {
                         ..Default::default()
                     }],
                     content: merged,
-                    delivery_target: envelope.delivery.clone(),
+                    delivery_target,
                     turn_id: request_id,
                 })
             }
@@ -159,9 +163,9 @@ impl AgentSession {
                 // Process agents one by one, return last response
                 let mut last_response = String::new();
                 for agent_info in agents {
-                    let sid = self.resolve_session(&session_key, envelope).await?;
+                    let sid = self.resolve_session(&session_key, msg).await?;
                     match self
-                        .handle_deep_agent(&sid, &envelope.content, &content_blocks, agent_info)
+                        .handle_deep_agent(&sid, &msg.content, &content_blocks, agent_info)
                         .await
                     {
                         Ok(response) => {
@@ -178,7 +182,7 @@ impl AgentSession {
                         ..Default::default()
                     }],
                     content: last_response,
-                    delivery_target: envelope.delivery.clone(),
+                    delivery_target,
                     turn_id: request_id,
                 })
             }

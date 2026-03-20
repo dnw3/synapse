@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const PING_INTERVAL_MS = 30_000;
 const RPC_TIMEOUT_MS = 30_000;
@@ -303,5 +303,5 @@ export function useGateway(): UseGatewayReturn {
     connectRef.current();
   }, [clearTimers]);
 
-  return { connected, status, call, send: sendRawFrame, subscribe, reconnect };
+  return useMemo(() => ({ connected, status, call, send: sendRawFrame, subscribe, reconnect }), [connected, status, call, sendRawFrame, subscribe, reconnect]);
 }

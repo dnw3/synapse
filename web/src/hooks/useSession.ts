@@ -78,7 +78,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
     } catch {
       // Will retry on reconnect
     }
-  }, [gw]);
+  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load messages for active session
   const refreshMessages = useCallback(async () => {
@@ -92,7 +92,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
     } catch {
       // ignore
     }
-  }, [gw]);
+  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // On connect: load sessions, select default
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -409,7 +409,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
       method: "chat.stop",
       params: {},
     });
-  }, [gw]);
+  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const respondApproval = useCallback((approved: boolean, allowAll?: boolean) => {
     const method = approved ? "approval.approve" : "approval.deny";
@@ -419,7 +419,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
       method,
       params: { allow_all: allowAll ?? false },
     });
-  }, [gw]);
+  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dismissError = useCallback(() => setChatError(null), []);
 

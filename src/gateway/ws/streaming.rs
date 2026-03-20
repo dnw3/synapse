@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use regex::Regex;
 use synaptic::core::{
     ChatModel, ChatRequest, ChatResponse, ChatStream, ModelProfile, SynapticError, ToolCall,
 };
 use tokio::sync::mpsc;
-
-use super::types::WsEvent;
 
 // ---------------------------------------------------------------------------
 // Streaming proxy: wraps a ChatModel, uses stream_chat() internally,
@@ -129,93 +126,4 @@ impl ChatModel for StreamingProxy {
     fn stream_chat(&self, request: ChatRequest) -> ChatStream<'_> {
         self.inner.stream_chat(request)
     }
-}
-
-/// Parse `[canvas:type attrs]content[/canvas]` directives from text.
-/// When `engine` recognises the block type the raw content is replaced with
-/// the rendered HTML produced by the matching [`CanvasRenderer`].
-#[allow(dead_code)]
-pub(crate) fn extract_canvas_directives(
-    text: &str,
-    engine: &crate::gateway::canvas::CanvasEngine,
-) -> Vec<WsEvent> {
-    let re = Regex::new(r"\[canvas:(\w+)([^\]]*)\]([\s\S]*?)\[/canvas\]").unwrap();
-    let attr_re = Regex::new(r"(\w+)=(\S+)").unwrap();
-    let mut events = Vec::new();
-
-    for cap in re.captures_iter(text) {
-        let block_type = cap[1].to_string();
-        let attrs_str = cap[2].trim();
-        let content = cap[3].to_string();
-
-        let mut attrs = serde_json::Map::new();
-        for am in attr_re.captures_iter(attrs_str) {
-            attrs.insert(
-                am[1].to_string(),
-                serde_json::Value::String(am[2].to_string()),
-            );
-        }
-
-        let language = attrs
-            .remove("lang")
-            .and_then(|v| v.as_str().map(String::from));
-        let attributes = if attrs.is_empty() {
-            None
-        } else {
-            Some(serde_json::Value::Object(attrs))
-        };
-
-        // Build the data payload passed to the renderer: merge inline attrs with
-        // the raw content so renderers can access both.
-        let mut render_data = serde_json::json!({ "content": content });
-        if let Some(serde_json::Value::Object(ref extra)) = attributes {
-            for (k, v) in extra {
-                render_data
-                    .as_object_mut()
-                    .unwrap()
-                    .insert(k.clone(), v.clone());
-            }
-        }
-
-        // Try the CanvasEngine first; fall back to raw content on miss.
-        let (final_content, interactive) =
-            if let Some(rendered) = engine.render(&block_type, &render_data) {
-                (rendered.html, rendered.interactive)
-            } else {
-                (content, false)
-            };
-
-        let mut final_attrs = if interactive {
-            // Surface the interactive flag via attributes so the frontend can
-            // activate any embedded form/action logic.
-            let mut m = serde_json::Map::new();
-            m.insert("interactive".to_string(), serde_json::Value::Bool(true));
-            // Merge original attrs back.
-            if let Some(serde_json::Value::Object(orig)) = &attributes {
-                for (k, v) in orig {
-                    m.insert(k.clone(), v.clone());
-                }
-            }
-            Some(serde_json::Value::Object(m))
-        } else {
-            attributes
-        };
-
-        // Remove "interactive" key from attributes if it was already there
-        // to avoid duplicating it at the top level (already captured above).
-        if let Some(serde_json::Value::Object(ref mut m)) = final_attrs {
-            if !interactive {
-                m.remove("interactive");
-            }
-        }
-
-        events.push(WsEvent::CanvasUpdate {
-            block_type,
-            content: final_content,
-            language,
-            attributes: final_attrs,
-        });
-    }
-
-    events
 }

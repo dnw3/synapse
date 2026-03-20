@@ -5,6 +5,10 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
+    hmr: {
+      // Use a distinct path for Vite HMR WebSocket to avoid conflict with /ws proxy
+      path: "/__vite_hmr",
+    },
     proxy: {
       "/api": "http://localhost:3000",
       "/ws": {

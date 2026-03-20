@@ -104,22 +104,31 @@ export function useGateway(): UseGatewayReturn {
 
   // Set up the connect function and store in ref for self-referencing
   useEffect(() => {
+    // Track whether this effect instance is still active (handles StrictMode double-mount)
+    let mounted = true;
+
     const doConnect = () => {
       if (wsRef.current) {
-        intentionalCloseRef.current = true;
+        wsRef.current.onclose = null; // detach old handler to prevent stale reconnect
         wsRef.current.close();
         wsRef.current = null;
       }
-      intentionalCloseRef.current = false;
+      if (!mounted) return; // Don't connect if effect was already cleaned up
       v3ReadyRef.current = false;
       pendingFramesRef.current = [];
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const url = `${protocol}//${window.location.host}/ws`;
+      // In dev mode (Vite on :5173), connect directly to backend on :3000
+      // to avoid Vite proxy issues with bare /ws path
+      const host = window.location.port === "5173"
+        ? `${window.location.hostname}:3000`
+        : window.location.host;
+      const url = `${protocol}//${host}/ws`;
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (!mounted) { ws.close(); return; }
         const connectFrame = JSON.stringify({
           type: "request",
           id: rpcId(),
@@ -144,7 +153,8 @@ export function useGateway(): UseGatewayReturn {
         clearTimers();
         rejectAllPendingRpcs("WebSocket connection closed");
 
-        if (!intentionalCloseRef.current) {
+        // Only auto-reconnect if this effect instance is still active
+        if (mounted) {
           const attempt = reconnectAttemptsRef.current;
           const delay = Math.min(BASE_BACKOFF_MS * Math.pow(2, attempt), MAX_BACKOFF_MS);
           reconnectAttemptsRef.current = attempt + 1;
@@ -246,10 +256,11 @@ export function useGateway(): UseGatewayReturn {
     doConnect();
 
     return () => {
+      mounted = false;
       clearTimers();
       rejectAllPendingRpcs("Component unmounting");
       if (wsRef.current) {
-        intentionalCloseRef.current = true;
+        wsRef.current.onclose = null; // prevent reconnect from stale handler
         wsRef.current.close();
         wsRef.current = null;
       }

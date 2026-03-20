@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use synaptic::lark::StreamingCardWriter;
 
@@ -12,6 +14,7 @@ pub(super) struct LarkStreamingOutput {
     pub writer: StreamingCardWriter,
     pub card_config: LarkCardConfig,
     pub bot_name: String,
+    pub reasoning_buffer: Arc<tokio::sync::RwLock<String>>,
 }
 
 #[async_trait]
@@ -19,6 +22,13 @@ impl StreamingOutput for LarkStreamingOutput {
     async fn on_token(&self, token: &str) {
         tracing::debug!(len = token.len(), "lark streaming: on_token");
         self.writer.write(token).await.ok();
+    }
+
+    async fn on_reasoning(&self, content: &str) {
+        self.reasoning_buffer.write().await.push_str(content);
+        // Show reasoning as italic in streaming card
+        let display = format!("*{}*", content);
+        self.writer.write(&display).await.ok();
     }
 
     async fn on_tool_call(&self, info: &ToolCallInfo) {
@@ -61,6 +71,21 @@ impl StreamingOutput for LarkStreamingOutput {
 
         let options = RenderOptions::new(RenderTarget::LarkCard);
         let mut elements = render_lark_card_elements(&ir, &options);
+
+        // Insert reasoning block at the beginning if present
+        let reasoning = self.reasoning_buffer.read().await.clone();
+        if !reasoning.is_empty() {
+            elements.insert(
+                0,
+                synaptic::lark::card_elements::LarkCardElement {
+                    tag: "markdown".into(),
+                    element_id: "reasoning".into(),
+                    properties: serde_json::json!({
+                        "content": format!("> \u{1f4ad} **Thinking**\n> {}", reasoning.replace('\n', "\n> "))
+                    }),
+                },
+            );
+        }
 
         // Build footer info line from metadata + config
         if let Some(meta) = meta {

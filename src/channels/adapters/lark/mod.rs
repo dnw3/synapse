@@ -301,6 +301,7 @@ impl LarkHandler {
                 writer,
                 card_config: self.config.card.clone(),
                 bot_name: self.config.bot_name.clone(),
+                reasoning_buffer: Arc::new(tokio::sync::RwLock::new(String::new())),
             });
 
             let msg = build_inbound();

@@ -5,18 +5,16 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use tracing;
 
-use synaptic::core::{
-    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
-};
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::SynapseConfig;
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 
 /// Run the iMessage bot adapter using the BlueBubbles REST API bridge.
 ///
@@ -163,25 +161,28 @@ pub async fn run(
             let is_group = chat_guid.contains(";+;");
 
             tokio::spawn(async move {
-                let mut envelope = MessageEnvelope::channel(
+                let channel_info = ChannelInfo {
+                    platform: "imessage".into(),
+                    native_channel_id: Some(reply_chat_guid.clone()),
+                    ..Default::default()
+                };
+                let sender_info = SenderInfo {
+                    id: Some(sender.clone()),
+                    ..Default::default()
+                };
+                let chat_info = ChatInfo {
+                    chat_type: if is_group { "group" } else { "direct" }.to_string(),
+                    ..Default::default()
+                };
+                let mut msg = InboundMessage::channel(
                     session_key.clone(),
                     text.clone(),
-                    DeliveryContext {
-                        channel: "imessage".into(),
-                        to: Some(format!("user:{}", session_key)),
-                        account_id: None,
-                        thread_id: None,
-                        meta: None,
-                    },
+                    channel_info,
+                    sender_info,
+                    chat_info,
                 );
-                envelope.sender_id = Some(sender.clone());
-                envelope.routing.peer_kind = Some(if is_group {
-                    crate::config::PeerKind::Group
-                } else {
-                    crate::config::PeerKind::Direct
-                });
-                envelope.routing.peer_id = Some(reply_chat_guid.clone());
-                match session.handle_message(envelope).await {
+                msg.finalize();
+                match session.handle_inbound(msg).await {
                     Ok(reply) => {
                         let chunks =
                             formatter::format_for_channel(&reply.content, "imessage", 10000);

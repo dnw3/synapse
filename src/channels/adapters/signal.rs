@@ -5,17 +5,15 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tracing;
 
-use synaptic::core::{
-    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
-};
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::SynapseConfig;
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 
 /// Run the Signal bot adapter using the signal-cli REST API bridge.
 ///
@@ -132,21 +130,28 @@ pub async fn run(
             let recipient = sender.clone();
 
             tokio::spawn(async move {
-                let mut envelope = MessageEnvelope::channel(
+                let channel_info = ChannelInfo {
+                    platform: "signal".into(),
+                    ..Default::default()
+                };
+                let sender_info = SenderInfo {
+                    id: Some(recipient.clone()),
+                    e164: Some(recipient.clone()),
+                    ..Default::default()
+                };
+                let chat_info = ChatInfo {
+                    chat_type: "direct".into(),
+                    ..Default::default()
+                };
+                let mut msg = InboundMessage::channel(
                     recipient.clone(),
                     text.clone(),
-                    DeliveryContext {
-                        channel: "signal".into(),
-                        to: Some(format!("user:{}", recipient)),
-                        account_id: None,
-                        thread_id: None,
-                        meta: None,
-                    },
+                    channel_info,
+                    sender_info,
+                    chat_info,
                 );
-                envelope.sender_id = Some(recipient.clone());
-                envelope.routing.peer_kind = Some(crate::config::PeerKind::Direct);
-                envelope.routing.peer_id = Some(recipient.clone());
-                match session.handle_message(envelope).await {
+                msg.finalize();
+                match session.handle_inbound(msg).await {
                     Ok(reply) => {
                         let chunks = formatter::format_for_channel(&reply.content, "signal", 4096);
                         for chunk in chunks {

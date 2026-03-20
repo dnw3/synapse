@@ -13,14 +13,12 @@ use synaptic::core::{
     HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
 };
 
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 
 /// Shared state for the axum webhook server.
 #[allow(dead_code)]
@@ -268,27 +266,28 @@ async fn handle_message(
     tokio::spawn(async move {
         let client = reqwest::Client::new();
 
-        let mut envelope = MessageEnvelope::channel(
+        let channel_info = ChannelInfo {
+            platform: "teams".into(),
+            native_channel_id: Some(conversation_id.clone()),
+            ..Default::default()
+        };
+        let sender_info = SenderInfo {
+            id: user_id.clone(),
+            ..Default::default()
+        };
+        let chat_info = ChatInfo {
+            chat_type: if is_group { "group" } else { "direct" }.to_string(),
+            ..Default::default()
+        };
+        let mut msg = InboundMessage::channel(
             session_key.clone(),
             text.clone(),
-            DeliveryContext {
-                channel: "teams".into(),
-                to: Some(format!("conversation:{}", session_key)),
-                account_id: None,
-                thread_id: None,
-                meta: None,
-            },
+            channel_info,
+            sender_info,
+            chat_info,
         );
-        if let Some(ref uid) = user_id {
-            envelope.sender_id = Some(uid.clone());
-        }
-        envelope.routing.peer_kind = Some(if is_group {
-            crate::config::PeerKind::Group
-        } else {
-            crate::config::PeerKind::Direct
-        });
-        envelope.routing.peer_id = Some(conversation_id.clone());
-        match session.handle_message(envelope).await {
+        msg.finalize();
+        match session.handle_inbound(msg).await {
             Ok(reply) => {
                 let chunks = formatter::format_for_channel(&reply.content, "teams", 4000);
                 for chunk in &chunks {

@@ -9,18 +9,16 @@ use axum::Router;
 
 use tracing;
 
-use synaptic::core::{
-    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
-};
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 
 /// WeCom Bot Webhook URL template.
 const WECOM_WEBHOOK_BASE: &str = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send";
@@ -203,21 +201,27 @@ async fn handle_callback(
     // Process in background so we respond to WeCom quickly (5s timeout requirement)
     let session = state.agent_session.clone();
     tokio::spawn(async move {
-        let mut envelope = MessageEnvelope::channel(
+        let channel_info = ChannelInfo {
+            platform: "wechat".into(),
+            ..Default::default()
+        };
+        let sender_info = SenderInfo {
+            id: Some(sender_id.clone()),
+            ..Default::default()
+        };
+        let chat_info = ChatInfo {
+            chat_type: "direct".into(),
+            ..Default::default()
+        };
+        let mut msg = InboundMessage::channel(
             session_key.clone(),
             text.clone(),
-            DeliveryContext {
-                channel: "wechat".into(),
-                to: Some(format!("user:{}", session_key)),
-                account_id: None,
-                thread_id: None,
-                meta: None,
-            },
+            channel_info,
+            sender_info,
+            chat_info,
         );
-        envelope.sender_id = Some(sender_id.clone());
-        envelope.routing.peer_kind = Some(crate::config::PeerKind::Direct);
-        envelope.routing.peer_id = Some(sender_id.clone());
-        match session.handle_message(envelope).await {
+        msg.finalize();
+        match session.handle_inbound(msg).await {
             Ok(reply) => {
                 let client = reqwest::Client::new();
                 let webhook_url = format!("{}?key={}", WECOM_WEBHOOK_BASE, webhook_key);

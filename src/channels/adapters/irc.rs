@@ -6,18 +6,16 @@ use async_trait::async_trait;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 
-use synaptic::core::{
-    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
-};
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::{BotAllowlist, IrcBotConfig, SynapseConfig};
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 
 /// Run the IRC bot adapter using raw TCP.
 pub async fn run(
@@ -185,25 +183,28 @@ async fn run_tcp(
         let session_key = reply_target.clone();
 
         tokio::spawn(async move {
-            let mut envelope = MessageEnvelope::channel(
+            let channel_info = ChannelInfo {
+                platform: "irc".into(),
+                native_channel_id: Some(session_key.clone()),
+                ..Default::default()
+            };
+            let sender_info = SenderInfo {
+                id: Some(sender_nick),
+                ..Default::default()
+            };
+            let chat_info = ChatInfo {
+                chat_type: if is_dm { "direct" } else { "channel" }.to_string(),
+                ..Default::default()
+            };
+            let mut msg = InboundMessage::channel(
                 session_key.clone(),
                 message.clone(),
-                DeliveryContext {
-                    channel: "irc".into(),
-                    to: Some(format!("channel:{}", session_key)),
-                    account_id: None,
-                    thread_id: None,
-                    meta: None,
-                },
+                channel_info,
+                sender_info,
+                chat_info,
             );
-            envelope.sender_id = Some(sender_nick);
-            envelope.routing.peer_kind = Some(if is_dm {
-                crate::config::PeerKind::Direct
-            } else {
-                crate::config::PeerKind::Channel
-            });
-            envelope.routing.peer_id = Some(session_key.clone());
-            match session.handle_message(envelope).await {
+            msg.finalize();
+            match session.handle_inbound(msg).await {
                 Ok(reply) => {
                     let chunks = formatter::format_for_channel(&reply.content, "irc", 400);
                     for chunk in chunks {

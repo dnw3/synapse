@@ -5,17 +5,15 @@ use async_trait::async_trait;
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 
-use synaptic::core::{
-    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
-};
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::{SynapseConfig, ZaloBotConfig};
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 
 #[derive(Clone)]
 struct AppState {
@@ -116,21 +114,27 @@ async fn handle_webhook(
     let access_token = state.access_token.clone();
 
     tokio::spawn(async move {
-        let mut envelope = MessageEnvelope::channel(
+        let channel_info = ChannelInfo {
+            platform: "zalo".into(),
+            ..Default::default()
+        };
+        let sender_info = SenderInfo {
+            id: Some(sender_id.clone()),
+            ..Default::default()
+        };
+        let chat_info = ChatInfo {
+            chat_type: "direct".into(),
+            ..Default::default()
+        };
+        let mut msg = InboundMessage::channel(
             sender_id.clone(),
             text.clone(),
-            DeliveryContext {
-                channel: "zalo".into(),
-                to: Some(format!("user:{}", sender_id)),
-                account_id: None,
-                thread_id: None,
-                meta: None,
-            },
+            channel_info,
+            sender_info,
+            chat_info,
         );
-        envelope.sender_id = Some(sender_id.clone());
-        envelope.routing.peer_kind = Some(crate::config::PeerKind::Direct);
-        envelope.routing.peer_id = Some(sender_id.clone());
-        match session.handle_message(envelope).await {
+        msg.finalize();
+        match session.handle_inbound(msg).await {
             Ok(reply) => {
                 // Send reply via Zalo OA API
                 let client = reqwest::Client::new();

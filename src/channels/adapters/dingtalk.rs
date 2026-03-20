@@ -16,14 +16,12 @@ use synaptic::core::{
 
 use tracing;
 
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -203,25 +201,28 @@ async fn handle_callback(
     // Process in background so we respond to DingTalk quickly
     let session = state.agent_session.clone();
     tokio::spawn(async move {
-        let mut envelope = MessageEnvelope::channel(
+        let channel_info = ChannelInfo {
+            platform: "dingtalk".into(),
+            native_channel_id: Some(conversation_id.clone()),
+            ..Default::default()
+        };
+        let sender_info = SenderInfo {
+            id: Some(sender_id.clone()),
+            ..Default::default()
+        };
+        let chat_info = ChatInfo {
+            chat_type: if is_dm { "direct" } else { "group" }.to_string(),
+            ..Default::default()
+        };
+        let mut msg = InboundMessage::channel(
             session_key.clone(),
             text.clone(),
-            DeliveryContext {
-                channel: "dingtalk".into(),
-                to: Some(format!("conversation:{}", session_key)),
-                account_id: None,
-                thread_id: None,
-                meta: None,
-            },
+            channel_info,
+            sender_info,
+            chat_info,
         );
-        envelope.sender_id = Some(sender_id.clone());
-        envelope.routing.peer_kind = Some(if is_dm {
-            crate::config::PeerKind::Direct
-        } else {
-            crate::config::PeerKind::Group
-        });
-        envelope.routing.peer_id = Some(conversation_id.clone());
-        match session.handle_message(envelope).await {
+        msg.finalize();
+        match session.handle_inbound(msg).await {
             Ok(reply) => {
                 let client = reqwest::Client::new();
                 let chunks = formatter::format_for_channel(&reply.content, "dingtalk", 20000);

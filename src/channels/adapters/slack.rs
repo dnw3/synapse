@@ -21,7 +21,7 @@ use crate::channels::reactions;
 use crate::config::bots::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
 use crate::gateway::messages::sender::{ChannelSender, SendResult};
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use crate::gateway::presence::now_ms;
 
 // ---------------------------------------------------------------------------
@@ -421,23 +421,31 @@ async fn run_socket_mode(
             // Send typing indicator
             send_typing(&bot_token, &channel).await;
 
-            let delivery = DeliveryContext {
-                channel: "slack".into(),
-                to: Some(format!("channel:{}", channel)),
-                thread_id: Some(ts.clone()),
+            let channel_info = ChannelInfo {
+                platform: "slack".into(),
+                native_channel_id: Some(channel.clone()),
+                team_id: team_id.clone(),
                 ..Default::default()
             };
-            let mut envelope = MessageEnvelope::channel(channel.clone(), text, delivery);
-            envelope.sender_id = Some(sender_id.clone());
-            envelope.routing.peer_kind = Some(if is_dm {
-                crate::config::PeerKind::Direct
-            } else {
-                crate::config::PeerKind::Channel
-            });
-            envelope.routing.peer_id = Some(channel.clone());
-            envelope.routing.team_id = team_id.clone();
+            let sender_info = SenderInfo {
+                id: Some(sender_id.clone()),
+                ..Default::default()
+            };
+            let chat_info = ChatInfo {
+                chat_type: if is_dm { "direct" } else { "channel" }.to_string(),
+                ..Default::default()
+            };
+            let mut msg = InboundMessage::channel(
+                channel.clone(),
+                text,
+                channel_info,
+                sender_info,
+                chat_info,
+            );
+            msg.thread.thread_id = Some(ts.clone());
+            msg.finalize();
 
-            match session.handle_message(envelope).await {
+            match session.handle_inbound(msg).await {
                 Ok(reply) => {
                     // Split long replies into chunks
                     let chunks = formatter::format_for_channel(&reply.content, "slack", 4000);

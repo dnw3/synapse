@@ -10,14 +10,12 @@ use synaptic::core::{
     HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
 };
 
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::SynapseConfig;
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 
 /// Run the Matrix bot adapter using the Client-Server REST API (long-polling sync).
 pub async fn run(
@@ -103,21 +101,28 @@ pub async fn run(
                     let rid = room_id.clone();
                     let sender_clone = sender.clone();
                     tokio::spawn(async move {
-                        let mut envelope = MessageEnvelope::channel(
+                        let channel_info = ChannelInfo {
+                            platform: "matrix".into(),
+                            native_channel_id: Some(rid.clone()),
+                            ..Default::default()
+                        };
+                        let sender_info = SenderInfo {
+                            id: Some(sender_clone),
+                            ..Default::default()
+                        };
+                        let chat_info = ChatInfo {
+                            chat_type: "group".into(),
+                            ..Default::default()
+                        };
+                        let mut msg = InboundMessage::channel(
                             rid.clone(),
                             text.clone(),
-                            DeliveryContext {
-                                channel: "matrix".into(),
-                                to: Some(format!("room:{}", rid)),
-                                account_id: None,
-                                thread_id: None,
-                                meta: None,
-                            },
+                            channel_info,
+                            sender_info,
+                            chat_info,
                         );
-                        envelope.sender_id = Some(sender_clone);
-                        envelope.routing.peer_kind = Some(crate::config::PeerKind::Group);
-                        envelope.routing.peer_id = Some(rid.clone());
-                        match session.handle_message(envelope).await {
+                        msg.finalize();
+                        match session.handle_inbound(msg).await {
                             Ok(reply) => {
                                 let chunks =
                                     formatter::format_for_channel(&reply.content, "matrix", 60000);

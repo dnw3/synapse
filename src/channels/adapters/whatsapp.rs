@@ -8,18 +8,16 @@ use tokio_tungstenite::tungstenite::Message as WsMsg;
 
 use tracing;
 
-use synaptic::core::{
-    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
-};
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::SynapseConfig;
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 
 /// Run the WhatsApp bot adapter using a Baileys-compatible REST/WebSocket bridge.
 ///
@@ -209,27 +207,32 @@ async fn run_ws_loop(
         let bridge = bridge_url.to_string();
         let api_key_owned = api_key.map(|k| k.to_string());
         tokio::spawn(async move {
-            let mut envelope = MessageEnvelope::channel(
+            let channel_info = ChannelInfo {
+                platform: "whatsapp".into(),
+                native_channel_id: Some(chat_id.clone()),
+                ..Default::default()
+            };
+            let sender_info = SenderInfo {
+                id: if from.is_empty() {
+                    None
+                } else {
+                    Some(from.clone())
+                },
+                ..Default::default()
+            };
+            let chat_info = ChatInfo {
+                chat_type: if is_group { "group" } else { "direct" }.to_string(),
+                ..Default::default()
+            };
+            let mut msg = InboundMessage::channel(
                 chat_id.clone(),
                 body.clone(),
-                DeliveryContext {
-                    channel: "whatsapp".into(),
-                    to: Some(format!("user:{}", chat_id)),
-                    account_id: None,
-                    thread_id: None,
-                    meta: None,
-                },
+                channel_info,
+                sender_info,
+                chat_info,
             );
-            if !from.is_empty() {
-                envelope.sender_id = Some(from.clone());
-            }
-            envelope.routing.peer_kind = Some(if is_group {
-                crate::config::PeerKind::Group
-            } else {
-                crate::config::PeerKind::Direct
-            });
-            envelope.routing.peer_id = Some(chat_id.clone());
-            match session.handle_message(envelope).await {
+            msg.finalize();
+            match session.handle_inbound(msg).await {
                 Ok(reply) => {
                     let chunks = formatter::format_for_channel(&reply.content, "whatsapp", 2000);
                     let http = reqwest::Client::new();

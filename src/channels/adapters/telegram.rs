@@ -19,7 +19,7 @@ use crate::channels::reactions;
 use crate::config::bots::resolve_secret;
 use crate::config::SynapseConfig;
 use crate::gateway::messages::sender::{ChannelSender, SendResult};
-use crate::gateway::messages::{Attachment, MessageEnvelope};
+use crate::gateway::messages::{Attachment, ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use crate::gateway::presence::now_ms;
 use synaptic::logging;
 
@@ -287,22 +287,30 @@ pub async fn run(
                     .send()
                     .await;
 
-                let delivery = DeliveryContext {
-                    channel: "telegram".into(),
-                    to: Some(format!("chat:{}", chat_id)),
+                let channel_info = ChannelInfo {
+                    platform: "telegram".into(),
+                    native_channel_id: Some(chat_id.to_string()),
                     ..Default::default()
                 };
-                let mut envelope = MessageEnvelope::channel(chat_id.to_string(), text, delivery);
-                envelope.attachments = attachments;
-                envelope.sender_id = Some(sender_id.clone());
-                envelope.routing.peer_kind = Some(if is_private_chat {
-                    crate::config::PeerKind::Direct
-                } else {
-                    crate::config::PeerKind::Group
-                });
-                envelope.routing.peer_id = Some(chat_id.to_string());
+                let sender_info = SenderInfo {
+                    id: Some(sender_id.clone()),
+                    ..Default::default()
+                };
+                let chat_info = ChatInfo {
+                    chat_type: if is_private_chat { "direct" } else { "group" }.to_string(),
+                    ..Default::default()
+                };
+                let mut msg = InboundMessage::channel(
+                    chat_id.to_string(),
+                    text,
+                    channel_info,
+                    sender_info,
+                    chat_info,
+                );
+                msg.attachments = attachments;
+                msg.finalize();
 
-                match session.handle_message(envelope).await {
+                match session.handle_inbound(msg).await {
                     Ok(reply) => {
                         // Split long replies into chunks
                         let chunks =

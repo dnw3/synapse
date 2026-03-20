@@ -12,18 +12,16 @@ use sha2::Sha256;
 
 use tracing;
 
-use synaptic::core::{
-    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
-};
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -286,31 +284,36 @@ async fn handle_webhook(
         let session = state.agent_session.clone();
         let channel_token = state.channel_token.clone();
         tokio::spawn(async move {
-            let mut envelope = MessageEnvelope::channel(
+            let channel_info = ChannelInfo {
+                platform: "line".into(),
+                native_channel_id: Some(if !channel_id.is_empty() {
+                    channel_id.clone()
+                } else {
+                    user_id.clone()
+                }),
+                ..Default::default()
+            };
+            let sender_info = SenderInfo {
+                id: if user_id.is_empty() {
+                    None
+                } else {
+                    Some(user_id.clone())
+                },
+                ..Default::default()
+            };
+            let chat_info = ChatInfo {
+                chat_type: if is_dm { "direct" } else { "group" }.to_string(),
+                ..Default::default()
+            };
+            let mut msg = InboundMessage::channel(
                 session_key.clone(),
                 text.clone(),
-                DeliveryContext {
-                    channel: "line".into(),
-                    to: Some(format!("user:{}", session_key)),
-                    account_id: None,
-                    thread_id: None,
-                    meta: None,
-                },
+                channel_info,
+                sender_info,
+                chat_info,
             );
-            if !user_id.is_empty() {
-                envelope.sender_id = Some(user_id.clone());
-            }
-            envelope.routing.peer_kind = Some(if is_dm {
-                crate::config::PeerKind::Direct
-            } else {
-                crate::config::PeerKind::Group
-            });
-            envelope.routing.peer_id = Some(if !channel_id.is_empty() {
-                channel_id.clone()
-            } else {
-                user_id.clone()
-            });
-            match session.handle_message(envelope).await {
+            msg.finalize();
+            match session.handle_inbound(msg).await {
                 Ok(reply) => {
                     send_reply(&channel_token, &reply_token, &reply.content).await;
                 }

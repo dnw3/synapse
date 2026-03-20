@@ -3,22 +3,20 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use synaptic::core::{
-    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
-    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
-};
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::{BotAllowlist, SynapseConfig};
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::routing::post;
 use axum::Json;
 use axum::Router;
+use synaptic::core::{
+    ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
+    HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
+};
 
 /// Shared state for the axum webhook server.
 struct AppState {
@@ -145,29 +143,28 @@ async fn handle_webhook(
     let is_dm = space_name.is_none();
 
     // Process the message through the agent session.
-    let mut envelope = MessageEnvelope::channel(
+    let channel_info = ChannelInfo {
+        platform: "googlechat".into(),
+        native_channel_id: space_name.clone(),
+        ..Default::default()
+    };
+    let sender_info = SenderInfo {
+        id: sender_name.clone(),
+        ..Default::default()
+    };
+    let chat_info = ChatInfo {
+        chat_type: if is_dm { "direct" } else { "group" }.to_string(),
+        ..Default::default()
+    };
+    let mut msg = InboundMessage::channel(
         session_key.clone(),
         text.clone(),
-        DeliveryContext {
-            channel: "googlechat".into(),
-            to: Some(format!("space:{}", session_key)),
-            account_id: None,
-            thread_id: None,
-            meta: None,
-        },
+        channel_info,
+        sender_info,
+        chat_info,
     );
-    if let Some(ref sn) = sender_name {
-        envelope.sender_id = Some(sn.clone());
-    }
-    envelope.routing.peer_kind = Some(if is_dm {
-        crate::config::PeerKind::Direct
-    } else {
-        crate::config::PeerKind::Group
-    });
-    if let Some(ref sn) = space_name {
-        envelope.routing.peer_id = Some(sn.clone());
-    }
-    let reply_text = match state.agent_session.handle_message(envelope).await {
+    msg.finalize();
+    let reply_text = match state.agent_session.handle_inbound(msg).await {
         Ok(reply) => {
             let chunks = formatter::format_for_channel(&reply.content, "googlechat", 4096);
             // Google Chat synchronous replies support only a single text body.

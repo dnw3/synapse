@@ -13,14 +13,12 @@ use synaptic::core::{
     HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
 };
 
-use synaptic::DeliveryContext;
-
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
 use crate::config::bots::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
-use crate::gateway::messages::MessageEnvelope;
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 
 /// Run the Mattermost bot adapter using WebSocket events.
 pub async fn run(
@@ -188,21 +186,28 @@ async fn run_ws(
         let api_token = token.to_string();
         let sender_id = user_id.to_string();
         tokio::spawn(async move {
-            let mut envelope = MessageEnvelope::channel(
+            let channel_info = ChannelInfo {
+                platform: "mattermost".into(),
+                native_channel_id: Some(channel_id.clone()),
+                ..Default::default()
+            };
+            let sender_info = SenderInfo {
+                id: Some(sender_id),
+                ..Default::default()
+            };
+            let chat_info = ChatInfo {
+                chat_type: "channel".into(),
+                ..Default::default()
+            };
+            let mut msg = InboundMessage::channel(
                 channel_id.clone(),
                 message.clone(),
-                DeliveryContext {
-                    channel: "mattermost".into(),
-                    to: Some(format!("channel:{}", channel_id)),
-                    account_id: None,
-                    thread_id: None,
-                    meta: None,
-                },
+                channel_info,
+                sender_info,
+                chat_info,
             );
-            envelope.sender_id = Some(sender_id);
-            envelope.routing.peer_kind = Some(crate::config::PeerKind::Channel);
-            envelope.routing.peer_id = Some(channel_id.clone());
-            match session.handle_message(envelope).await {
+            msg.finalize();
+            match session.handle_inbound(msg).await {
                 Ok(reply) => {
                     let chunks = formatter::format_for_channel(&reply.content, "mattermost", 16383);
                     let client = reqwest::Client::new();

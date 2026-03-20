@@ -24,7 +24,7 @@ use crate::channels::reactions;
 use crate::config::bots::resolve_secret;
 use crate::config::SynapseConfig;
 use crate::gateway::messages::sender::{ChannelSender, SendResult};
-use crate::gateway::messages::{Attachment, MessageEnvelope};
+use crate::gateway::messages::{Attachment, ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use crate::gateway::presence::now_ms;
 use synaptic::logging;
 
@@ -281,25 +281,31 @@ pub async fn run(
                         .await;
 
                     let is_dm = guild_id.is_none();
-                    let delivery = DeliveryContext {
-                        channel: "discord".into(),
-                        to: Some(format!("channel:{}", channel_id)),
-                        account_id: guild_id.clone(),
+                    let channel_info = ChannelInfo {
+                        platform: "discord".into(),
+                        native_channel_id: Some(channel_id.clone()),
+                        guild_id: guild_id.clone(),
                         ..Default::default()
                     };
-                    let mut envelope =
-                        MessageEnvelope::channel(channel_id.clone(), content, delivery);
-                    envelope.attachments = attachments;
-                    envelope.sender_id = Some(sender_id.clone());
-                    envelope.routing.peer_kind = Some(if is_dm {
-                        crate::config::PeerKind::Direct
-                    } else {
-                        crate::config::PeerKind::Group
-                    });
-                    envelope.routing.peer_id = Some(channel_id.clone());
-                    envelope.routing.guild_id = guild_id;
+                    let sender_info = SenderInfo {
+                        id: Some(sender_id.clone()),
+                        ..Default::default()
+                    };
+                    let chat_info = ChatInfo {
+                        chat_type: if is_dm { "direct" } else { "group" }.to_string(),
+                        ..Default::default()
+                    };
+                    let mut msg = InboundMessage::channel(
+                        channel_id.clone(),
+                        content,
+                        channel_info,
+                        sender_info,
+                        chat_info,
+                    );
+                    msg.attachments = attachments;
+                    msg.finalize();
 
-                    match session.handle_message(envelope).await {
+                    match session.handle_inbound(msg).await {
                         Ok(reply) => {
                             // Split long replies into chunks (Discord 2000 char limit)
                             let chunks =

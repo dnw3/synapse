@@ -5,16 +5,14 @@ use async_trait::async_trait;
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 
+use crate::agent;
+use crate::channels::handler::AgentSession;
+use crate::config::{SynapseConfig, SynologyBotConfig};
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
     HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
 };
-use synaptic::DeliveryContext;
-
-use crate::agent;
-use crate::channels::handler::AgentSession;
-use crate::config::{SynapseConfig, SynologyBotConfig};
-use crate::gateway::messages::MessageEnvelope;
 
 #[derive(Clone)]
 struct AppState {
@@ -94,27 +92,33 @@ async fn handle_webhook(
         .clone()
         .unwrap_or_else(|| syn_user_id.clone().unwrap_or_else(|| "default".to_string()));
 
-    let mut envelope = MessageEnvelope::channel(
+    let channel_info = ChannelInfo {
+        platform: "synology".into(),
+        native_channel_id: syn_channel_id.clone(),
+        ..Default::default()
+    };
+    let sender_info = SenderInfo {
+        id: syn_user_id.clone(),
+        ..Default::default()
+    };
+    let chat_info = ChatInfo {
+        chat_type: if syn_channel_id.is_some() {
+            "group"
+        } else {
+            "direct"
+        }
+        .to_string(),
+        ..Default::default()
+    };
+    let mut msg = InboundMessage::channel(
         session_key.clone(),
         text.clone(),
-        DeliveryContext {
-            channel: "synology".into(),
-            to: Some(format!("chat:{}", session_key)),
-            account_id: None,
-            thread_id: None,
-            meta: None,
-        },
+        channel_info,
+        sender_info,
+        chat_info,
     );
-    if let Some(ref uid) = syn_user_id {
-        envelope.sender_id = Some(uid.clone());
-    }
-    envelope.routing.peer_kind = Some(if syn_channel_id.is_some() {
-        crate::config::PeerKind::Group
-    } else {
-        crate::config::PeerKind::Direct
-    });
-    envelope.routing.peer_id = Some(session_key.clone());
-    match state.agent_session.handle_message(envelope).await {
+    msg.finalize();
+    match state.agent_session.handle_inbound(msg).await {
         Ok(reply) => {
             // If outgoing webhook URL is configured, send there
             if let Some(ref url) = state.outgoing_url {

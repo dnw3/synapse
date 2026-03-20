@@ -12,16 +12,14 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 
+use crate::agent;
+use crate::channels::handler::AgentSession;
+use crate::config::{SynapseConfig, WebChatBotConfig};
+use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 use synaptic::core::{
     ChannelAdapter, ChannelCap, ChannelContext, ChannelHealth, ChannelManifest, ChannelStatus,
     HealthStatus, MessageEnvelope as CoreMessageEnvelope, Outbound,
 };
-use synaptic::DeliveryContext;
-
-use crate::agent;
-use crate::channels::handler::AgentSession;
-use crate::config::{SynapseConfig, WebChatBotConfig};
-use crate::gateway::messages::MessageEnvelope;
 
 #[derive(Clone)]
 struct AppState {
@@ -130,23 +128,27 @@ async fn handle_chat(
     }
 
     let session_id = req.session_id.clone();
-    let mut envelope = MessageEnvelope::channel(
+    let channel_info = ChannelInfo {
+        platform: "webchat-bot".into(),
+        ..Default::default()
+    };
+    let sender_info = SenderInfo {
+        id: req.user_id.clone(),
+        ..Default::default()
+    };
+    let chat_info = ChatInfo {
+        chat_type: "direct".into(),
+        ..Default::default()
+    };
+    let mut msg = InboundMessage::channel(
         session_id.clone(),
         req.message.clone(),
-        DeliveryContext {
-            channel: "webchat-bot".into(),
-            to: Some(format!("user:{}", session_id)),
-            account_id: None,
-            thread_id: None,
-            meta: None,
-        },
+        channel_info,
+        sender_info,
+        chat_info,
     );
-    if let Some(ref uid) = req.user_id {
-        envelope.sender_id = Some(uid.clone());
-    }
-    envelope.routing.peer_kind = Some(crate::config::PeerKind::Direct);
-    envelope.routing.peer_id = Some(session_id.clone());
-    match state.agent_session.handle_message(envelope).await {
+    msg.finalize();
+    match state.agent_session.handle_inbound(msg).await {
         Ok(reply) => (
             StatusCode::OK,
             Json(serde_json::json!(ChatResponse {

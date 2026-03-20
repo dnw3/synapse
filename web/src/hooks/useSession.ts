@@ -124,7 +124,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
         });
       }
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Select default session when sessions load and no active key
   useEffect(() => {
@@ -166,12 +166,12 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
         .catch(() => {})
         .finally(() => setLoading(false));
     }
-  }, [activeKey, gwRef.current.connected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeKey, gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Subscribe to streaming events
   useEffect(() => {
-    const unsubscribe = gwRef.current.subscribe((event, payload) => {
+    const unsubscribe = gw.subscribe((event, payload) => {
       // Filter by sessionKey if present
       const evtKey = payload.sessionKey as string | undefined;
       if (evtKey && evtKey !== activeKeyRef.current) return;

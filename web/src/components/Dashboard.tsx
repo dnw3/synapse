@@ -83,13 +83,13 @@ export const SIDEBAR_SECTIONS: (SidebarSection & { i18nKey: string })[] = [
 
 interface DashboardProps {
   connected: boolean;
-  conversationCount: number;
+  sessionCount: number;
   messageCount: number;
   activeTab: TabKey;
-  onNavigateToChat?: (conversationId: string) => void;
+  onNavigateToChat?: (sessionKey: string) => void;
 }
 
-export default function Dashboard({ connected: wsConnected, conversationCount, messageCount, activeTab, onNavigateToChat }: DashboardProps) {
+export default function Dashboard({ connected: wsConnected, sessionCount, messageCount, activeTab, onNavigateToChat }: DashboardProps) {
   const { t } = useTranslation();
 
   // Use HTTP health check for gateway status (WS is only connected during chat)
@@ -144,7 +144,7 @@ export default function Dashboard({ connected: wsConnected, conversationCount, m
           : "overflow-y-auto [&>*:first-child]:flex-1 [&>*:first-child]:min-h-fit"
       )}>
         {activeTab === "overview" && (
-          <OverviewPage connected={gatewayOnline} conversationCount={conversationCount} messageCount={messageCount} />
+          <OverviewPage connected={gatewayOnline} sessionCount={sessionCount} messageCount={messageCount} />
         )}
         {activeTab === "usage" && <UsagePage />}
         {activeTab === "sessions" && <SessionsPage onNavigateToChat={onNavigateToChat} />}

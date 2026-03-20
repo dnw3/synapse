@@ -3,8 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Send, Square, Loader2, Paperclip, X, Search, AlertTriangle, Minimize2, Plus, Download, RefreshCw, ChevronDown, Brain, Eye, EyeOff, Maximize2, Copy, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
-import type { Message, FileAttachment, Conversation } from "../types";
-import { api } from "../api";
+import type { Message, FileAttachment, Session } from "../types";
 import MessageBubble from "./MessageBubble";
 import ApprovalDialog from "./ApprovalDialog";
 
@@ -53,9 +52,9 @@ interface Props {
   contextUsage?: { tokens: number; limit: number };
   onToolResultClick?: (content: string, toolName?: string) => void;
   /* Session selector (OpenClaw pattern) */
-  conversations?: Conversation[];
-  activeSessionId?: string | null;
-  onSelectSession?: (id: string) => void;
+  sessions?: Session[];
+  activeSessionKey?: string | null;
+  onSelectSession?: (key: string) => void;
   modelName?: string | null;
 }
 
@@ -147,8 +146,8 @@ export default function ChatPanel({
   onDismissError,
   contextUsage,
   onToolResultClick,
-  conversations,
-  activeSessionId,
+  sessions,
+  activeSessionKey,
   onSelectSession,
   modelName,
 }: Props) {
@@ -420,7 +419,11 @@ export default function ChatPanel({
     setUploading(true);
     try {
       for (let i = 0; i < files.length; i++) {
-        const result = await api.uploadFile(files[i]);
+        const formData = new FormData();
+        formData.append("file", files[i]);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+        const result = await res.json() as { id: string; filename: string; mime_type: string; url: string };
         setAttachments((prev) => [
           ...prev,
           { id: result.id, filename: result.filename, mime_type: result.mime_type, url: result.url },
@@ -606,22 +609,22 @@ export default function ChatPanel({
     <div className="flex flex-col flex-1 min-w-0 min-h-0">
       {/* Top bar: session dropdown + model + refresh (OpenClaw pattern) */}
       <div className="flex items-center gap-3 px-4 h-[40px] flex-shrink-0 border-b border-[var(--separator)] bg-[var(--bg-window)]/80 backdrop-blur-[20px]">
-        {conversations && conversations.length > 0 && (
+        {sessions && sessions.length > 0 && (
           <div className="relative">
             <select
-              value={activeSessionId ?? ""}
+              value={activeSessionKey ?? ""}
               onChange={(e) => onSelectSession?.(e.target.value)}
               className="appearance-none pl-2 pr-6 py-1 text-[12px] font-medium bg-[var(--bg-grouped)] text-[var(--text-primary)] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] outline-none cursor-pointer max-w-[260px] truncate"
             >
-              {conversations.map((s) => {
-                const label = s.display_name || (s.channel === "web" ? "main" : s.title) || s.id.slice(0, 12);
+              {sessions.map((s) => {
+                const label = s.displayName || (s.channel === "web" ? "main" : s.sessionKey.slice(0, 12));
                 const channel = s.channel || "web";
                 const kind = s.kind && s.kind !== "web" && s.kind !== channel ? `:${s.kind}` : "";
                 const channelTag = `[${channel}${kind}]`;
-                const timeAgo = s.created_at ? formatRelativeTime(s.created_at) : "";
+                const timeAgo = s.createdAt ? formatRelativeTime(s.createdAt) : "";
                 const displayLabel = truncateLabel(label, 24);
                 return (
-                  <option key={s.id} value={s.id}>
+                  <option key={s.sessionKey} value={s.sessionKey}>
                     {displayLabel} {channelTag}{timeAgo ? ` ${timeAgo}` : ""}
                   </option>
                 );

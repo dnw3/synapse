@@ -139,7 +139,7 @@ function InlineSelect({
 }
 
 interface SessionsPageProps {
-  onNavigateToChat?: (conversationId: string) => void;
+  onNavigateToChat?: (sessionKey: string) => void;
 }
 
 export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {

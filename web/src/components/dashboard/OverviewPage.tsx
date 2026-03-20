@@ -41,11 +41,11 @@ function setCachedUptime(serverUptime: number) {
 
 interface OverviewPageProps {
   connected: boolean;
-  conversationCount: number;
+  sessionCount: number;
   messageCount: number;
 }
 
-export default function OverviewPage({ connected, conversationCount, messageCount }: OverviewPageProps) {
+export default function OverviewPage({ connected, sessionCount, messageCount }: OverviewPageProps) {
   const { t } = useTranslation();
 
   const api = useDashboardAPI();
@@ -160,7 +160,7 @@ export default function OverviewPage({ connected, conversationCount, messageCoun
           <StatsCard
             icon={<MessageSquare className="h-5 w-5" />}
             label={t("overview.sessions")}
-            value={stats?.session_count ?? conversationCount}
+            value={stats?.session_count ?? sessionCount}
             sub={t("overview.messageCount", { count: stats?.total_messages ?? messageCount })}
             accent="var(--chart-1)"
           />

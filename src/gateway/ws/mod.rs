@@ -12,6 +12,6 @@ use crate::gateway::state::AppState;
 
 pub fn ws_router(state: AppState) -> Router {
     Router::new()
-        .route("/ws", get(v3::ws_handler))
+        .route("/ws/gateway", get(v3::ws_handler))
         .with_state(state)
 }

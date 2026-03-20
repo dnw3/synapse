@@ -118,12 +118,7 @@ export function useGateway(): UseGatewayReturn {
       pendingFramesRef.current = [];
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      // In dev mode (Vite on :5173), connect directly to backend on :3000
-      // to avoid Vite proxy issues with bare /ws path
-      const host = window.location.port === "5173"
-        ? `${window.location.hostname}:3000`
-        : window.location.host;
-      const url = `${protocol}//${host}/ws`;
+      const url = `${protocol}//${window.location.host}/ws/gateway`;
       const ws = new WebSocket(url);
       wsRef.current = ws;
 

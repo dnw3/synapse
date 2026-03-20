@@ -114,6 +114,7 @@ impl SecurityConfirmationCallback for InteractiveApprovalCallback {
 }
 
 /// An approval request sent from the agent to the WebSocket handler.
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ApprovalRequest {
     pub tool_name: String,
@@ -122,6 +123,7 @@ pub struct ApprovalRequest {
 }
 
 /// An approval response sent from the WebSocket client back to the agent.
+#[allow(dead_code)]
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ApprovalResponse {
     pub approved: bool,
@@ -134,6 +136,7 @@ pub struct ApprovalResponse {
 ///
 /// Sends approval requests to the client via a channel and waits for responses.
 /// Times out after 30 seconds (defaults to deny).
+#[allow(dead_code)]
 pub struct WebSocketApprovalCallback {
     /// Channel to send approval requests to the WS handler.
     request_tx: mpsc::UnboundedSender<ApprovalRequest>,
@@ -148,6 +151,7 @@ impl WebSocketApprovalCallback {
     ///
     /// Returns the callback and a pair of (request_rx, response_tx) that the
     /// WS handler should use to relay requests/responses.
+    #[allow(dead_code)]
     pub fn new() -> (
         Arc<Self>,
         mpsc::UnboundedReceiver<ApprovalRequest>,

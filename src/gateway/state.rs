@@ -18,6 +18,7 @@ use super::run_queue::AgentRunQueue;
 use super::usage::UsageTracker;
 use crate::agent;
 use crate::agent::context_engine::{ContextEngine, SharedContextEngine};
+use crate::channels::handler::AgentSession;
 use crate::config::SynapseConfig;
 use crate::gateway::messages::ChannelRegistry;
 use crate::gateway::rpc::wizard::WizardSession;
@@ -126,9 +127,12 @@ pub struct AppState {
     #[allow(dead_code)]
     pub event_bus: Arc<EventBus>,
     /// Canvas rendering engine for WebSocket canvas_update pipeline.
+    #[allow(dead_code)]
     pub canvas_engine: Arc<CanvasEngine>,
     /// Plugin registry — loaded once at startup, shared across all agent builds.
     pub plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
+    /// Shared AgentSession for unified message processing pipeline.
+    pub agent_session: Arc<AgentSession>,
 }
 
 // ── Builder helpers ─────────────────────────────────────────────────────────
@@ -396,6 +400,22 @@ impl AppState {
             crate::gateway::exec_approvals::ExecApprovalsConfig::load(),
         ));
 
+        // ── AgentSession for unified pipeline ──────────────────────────
+        let agent_session = {
+            let session = AgentSession::new(
+                agent.model.clone(),
+                Arc::new(config.clone()),
+                true, // deep_agent
+            )
+            .with_channel("web")
+            .with_gateway(channels.channel_registry.clone(), rpc.broadcaster.clone())
+            .with_cost_tracker(agent.cost_tracker.clone())
+            .with_usage_tracker(agent.usage_tracker.clone())
+            .with_event_bus(infra.event_bus.clone())
+            .with_plugin_registry(infra.plugin_registry.clone());
+            Arc::new(session)
+        };
+
         let state = Self {
             // Core config & auth
             config: config.clone(),
@@ -443,6 +463,9 @@ impl AppState {
             event_bus: infra.event_bus,
             canvas_engine: Arc::new(CanvasEngine::new()),
             plugin_registry: infra.plugin_registry,
+
+            // Unified agent session
+            agent_session,
         };
 
         Ok(state)

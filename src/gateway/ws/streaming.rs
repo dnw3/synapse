@@ -134,6 +134,7 @@ impl ChatModel for StreamingProxy {
 /// Parse `[canvas:type attrs]content[/canvas]` directives from text.
 /// When `engine` recognises the block type the raw content is replaced with
 /// the rendered HTML produced by the matching [`CanvasRenderer`].
+#[allow(dead_code)]
 pub(crate) fn extract_canvas_directives(
     text: &str,
     engine: &crate::gateway::canvas::CanvasEngine,

@@ -8,18 +8,15 @@ use axum::response::IntoResponse;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{SinkExt, StreamExt};
 use serde_json::Value;
-use synaptic::core::{ChatModel, MemoryStore, Message};
+use synaptic::core::RunContext;
+use synaptic::deep::StreamingOutputHandle;
 use synaptic::events::{Event, EventKind};
-use synaptic::graph::{MessageState, StreamMode};
 use tokio::sync::mpsc;
-use tracing::Instrument;
 use uuid::Uuid;
 
-use super::streaming::{extract_canvas_directives, StreamingProxy};
+use super::streaming_output::WsStreamingOutput;
 use super::types::Attachment;
-use super::utils::{find_tool_name, load_session_overrides, truncate, ws_json};
-use crate::agent::build_deep_agent_with_callback;
-use crate::agent::callbacks::{ApprovalResponse, WebSocketApprovalCallback};
+use crate::gateway::messages::{Attachment as EnvelopeAttachment, MessageEnvelope};
 use crate::gateway::rpc::{
     AuthResult, ClientFrame, ConnectParams, FeatureInfo, HelloOk, Role, RpcContext, RpcError,
     ServerFrame, ServerInfo, SnapshotInfo, StateVersion, GATEWAY_EVENTS, PROTOCOL_VERSION,
@@ -355,9 +352,10 @@ async fn handle_v3_connection(
 
 /// Handle an `agent` or `chat.send` RPC request in v3 protocol.
 ///
-/// Reuses the existing `StreamingProxy` + agent builder logic. Streams
-/// tokens/reasoning/tool events as v3 `ServerFrame::Event`, then sends
-/// the final result as a `ServerFrame::Response`.
+/// Uses the unified `AgentSession::handle_message_streaming_with_context()`
+/// pipeline with `WsStreamingOutput` for real-time event forwarding. The
+/// `StreamingInterceptor` in the middleware chain handles token streaming
+/// automatically via `RunContext`.
 #[allow(clippy::too_many_arguments)]
 async fn handle_v3_agent(
     sender: &mut SplitSink<WebSocket, WsMessage>,
@@ -379,18 +377,18 @@ async fn handle_v3_agent(
     );
     let _req_guard = req_span.enter();
 
-    // Extract message content from params
+    // --- Parse content and attachments from params ---
     let content = params
         .get("content")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    let attachments: Vec<Attachment> = params
+    let ws_attachments: Vec<Attachment> = params
         .get("attachments")
         .and_then(|v| serde_json::from_value(v.clone()).ok())
         .unwrap_or_default();
 
-    if content.is_empty() && attachments.is_empty() {
+    if content.is_empty() && ws_attachments.is_empty() {
         let err = ServerFrame::err(
             request_id_rpc,
             RpcError::invalid_request("Missing 'content' in params"),
@@ -407,7 +405,7 @@ async fn handle_v3_agent(
         "v3 agent request"
     );
 
-    // Emit MessageReceived event (fire-and-forget)
+    // --- Emit MessageReceived event (fire-and-forget) ---
     {
         let event_bus = state.event_bus.clone();
         let req_id = request_id.clone();
@@ -440,10 +438,10 @@ async fn handle_v3_agent(
         }};
     }
 
-    // Serialize concurrent executions for the same session
+    // --- Serialize concurrent executions ---
     let _run_guard = state.run_queue.acquire(conversation_id).await;
 
-    // Acquire session write lock
+    // --- Acquire session write lock ---
     if let Err(lock_err) = state.write_lock.try_acquire(conversation_id, conn_id).await {
         let err = ServerFrame::err(
             request_id_rpc,
@@ -460,9 +458,7 @@ async fn handle_v3_agent(
         serde_json::json!({"request_id": request_id})
     );
 
-    let memory = state.sessions.memory();
-
-    // Ensure session exists
+    // --- Ensure session exists ---
     if state
         .sessions
         .get_session(conversation_id)
@@ -473,7 +469,6 @@ async fn handle_v3_agent(
     {
         match state.sessions.create_session().await {
             Ok(session_id) => {
-                // Tag the new session as the main web session.
                 if let Ok(Some(mut info)) = state.sessions.get_session(&session_id).await {
                     info.session_key = Some("agent:default:main".to_string());
                     info.channel = Some("web".to_string());
@@ -481,7 +476,6 @@ async fn handle_v3_agent(
                     info.display_name = Some("main".to_string());
                     let _ = state.sessions.update_session(&info).await;
                 }
-                // Emit SessionStart (fire-and-forget)
                 let event_bus = state.event_bus.clone();
                 let conv_id = conversation_id.to_string();
                 tokio::spawn(async move {
@@ -509,347 +503,220 @@ async fn handle_v3_agent(
         }
     }
 
-    let (token_tx, mut token_rx) = mpsc::unbounded_channel::<String>();
-    let (reasoning_tx, mut reasoning_rx) = mpsc::unbounded_channel::<String>();
-    let proxy_model: Arc<dyn ChatModel> = Arc::new(StreamingProxy {
-        inner: state.model.clone(),
-        token_tx,
-        reasoning_tx,
-    });
+    // --- Build MessageEnvelope ---
+    let session_key = format!("agent:default:{}", conversation_id);
+    let mut envelope =
+        MessageEnvelope::webchat(request_id.clone(), session_key, content.clone(), conn_id);
 
-    let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
-    let checkpointer = Arc::new(state.sessions.checkpointer());
-    let overrides = load_session_overrides(conversation_id);
-    let show_reasoning = overrides
-        .as_ref()
-        .and_then(|o| o.thinking.as_deref())
-        .unwrap_or("off")
-        != "off";
-    let (approval_cb, mut approval_rx, approval_resp_tx) = WebSocketApprovalCallback::new();
-    let agent = match build_deep_agent_with_callback(
-        proxy_model,
-        &state.config,
-        &cwd,
-        checkpointer,
-        state.mcp_tools.clone(),
-        None,
-        Some(approval_cb),
-        None,
-        None,
-        overrides,
-        Some(state.cost_tracker.clone()),
-        "web",
-        None,
-        Some(state.event_bus.clone()),
-        Some(state.plugin_registry.clone()),
-        Some(state.channel_registry.clone()),
-    )
-    .await
-    {
-        Ok(a) => a,
-        Err(e) => {
-            tracing::error!(error = %e, "v3 agent build failed");
-            let err = ServerFrame::err(request_id_rpc, RpcError::internal(e.to_string()));
-            let _ = sender
-                .send(WsMessage::Text(serde_json::to_string(&err).unwrap().into()))
-                .await;
-            state.write_lock.release(conversation_id, conn_id).await;
-            return;
-        }
-    };
-
-    tracing::info!("v3 agent execution started");
-
-    let approval_resp_tx = Arc::new(tokio::sync::Mutex::new(Some(approval_resp_tx)));
-
-    // Build final content with attachment references
-    let final_content = if attachments.is_empty() {
-        content.clone()
-    } else {
+    // Convert ws attachments to envelope attachments
+    if !ws_attachments.is_empty() {
+        let mut env_attachments = Vec::new();
         let mut parts = vec![content.clone()];
-        for att in &attachments {
+        for att in &ws_attachments {
+            env_attachments.push(EnvelopeAttachment {
+                filename: att.filename.clone(),
+                url: att.url.clone(),
+                mime_type: Some(att.mime_type.clone()),
+            });
             parts.push(format!(
                 "\n[Attached: {} ({})]({}) ",
                 att.filename, att.mime_type, att.url
             ));
         }
-        parts.join("")
-    };
-
-    let mut messages = memory.load(conversation_id).await.unwrap_or_default();
-    if !messages.iter().any(|m| m.is_system()) {
-        if let Some(ref prompt) = state.config.base.agent.system_prompt {
-            messages.insert(0, Message::system(prompt));
-        }
+        envelope.attachments = env_attachments;
+        // Also embed attachment references in content for backwards compatibility
+        envelope.content = parts.join("");
     }
-    messages.push(
-        Message::human(&final_content)
-            .with_additional_kwarg("request_id", serde_json::Value::String(request_id.clone())),
-    );
 
-    let initial_state = MessageState::with_messages(messages);
-    let pre_snap = state.cost_tracker.snapshot().await;
-    let pre_tokens = pre_snap.total_input_tokens + pre_snap.total_output_tokens;
-    let mut stream = agent.stream(initial_state, StreamMode::Values);
+    // --- Create WsStreamingOutput + RunContext ---
+    let (frame_tx, mut frame_rx) = mpsc::unbounded_channel::<String>();
+    let ws_output = Arc::new(WsStreamingOutput::new(
+        frame_tx,
+        Arc::new(AtomicU64::new(seq.load(Ordering::Relaxed))),
+        request_id.clone(),
+    ));
+    let streaming_handle = StreamingOutputHandle::new(ws_output);
 
-    let mut displayed = 0usize;
-    let mut token_buffer = String::new();
-    let mut token_flush_interval: Option<std::pin::Pin<Box<tokio::time::Sleep>>> = None;
-    let execution_start = std::time::Instant::now();
-
-    // Create a cancel channel for this execution
-    let (cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
+    // Cancel token for this execution
+    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
     state
         .cancel_tokens
         .write()
         .await
         .insert(conversation_id.to_string(), cancel_tx);
 
+    let ctx = RunContext {
+        cancel_token: Some(cancel_rx.clone()),
+        streaming_output: Some(Arc::new(streaming_handle)),
+    };
+
+    // Record pre-execution token count for delta tracking
+    let pre_snap = state.cost_tracker.snapshot().await;
+    let pre_tokens = pre_snap.total_input_tokens + pre_snap.total_output_tokens;
+    let execution_start = std::time::Instant::now();
+
+    // --- Spawn agent execution task ---
+    let agent_session = state.agent_session.clone();
+    let mut agent_handle = tokio::spawn(async move {
+        agent_session
+            .handle_message_streaming_with_context(envelope, ctx)
+            .await
+    });
+
     // Drop span guard before async select loop
     drop(_req_guard);
 
     let mut final_content_text = String::new();
 
+    // --- Main forwarding loop ---
+    // Concurrently: forward WsStreamingOutput frames to WS sender,
+    // handle incoming WS messages (cancel, approval, ping), and wait
+    // for the agent task to finish.
     loop {
         tokio::select! {
-            Some(token) = token_rx.recv() => {
-                token_buffer.push_str(&token);
-                if token_flush_interval.is_none() {
-                    token_flush_interval = Some(Box::pin(tokio::time::sleep(
-                        std::time::Duration::from_millis(150),
-                    )));
-                }
-            }
-            Some(reasoning) = reasoning_rx.recv() => {
-                if show_reasoning {
-                    send_event!("agent.thinking.delta", serde_json::json!({
-                        "content": reasoning
-                    }));
-                }
-            }
-            _ = async { token_flush_interval.as_mut().unwrap().await }, if token_flush_interval.is_some() => {
-                if !token_buffer.is_empty() {
-                    let chunk = std::mem::take(&mut token_buffer);
-                    final_content_text.push_str(&chunk);
-                    send_event!("agent.message.delta", serde_json::json!({
-                        "type": "text",
-                        "content": chunk
-                    }));
-                }
-                token_flush_interval = None;
-            }
-            Some(req) = approval_rx.recv() => {
-                send_event!("approval.requested", serde_json::json!({
-                    "tool_name": req.tool_name,
-                    "args_preview": req.args_preview,
-                    "risk_level": req.risk_level,
-                }));
-            }
-            Some(Ok(ws_msg)) = receiver.next() => {
-                if let WsMessage::Text(ref text) = ws_msg {
-                    // Try v3 frame first, then fall back to legacy commands
-                    if let Ok(ClientFrame::Request { id, method, params }) =
-                        serde_json::from_str::<ClientFrame>(text)
-                    {
-                        match method.as_str() {
-                            "chat.stop" => {
-                                if let Some(tx) = state.cancel_tokens.read().await.get(conversation_id) {
-                                    let _ = tx.send(true);
+            // Forward serialized frames from WsStreamingOutput to the WebSocket
+            Some(frame_json) = frame_rx.recv() => {
+                // Track content from delta events for the final response
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&frame_json) {
+                    if let Some(event_name) = parsed.get("event").and_then(|v| v.as_str()) {
+                        if event_name == "agent.message.delta" {
+                            if let Some(payload) = parsed.get("payload") {
+                                if let Some(chunk) = payload.get("content").and_then(|v| v.as_str()) {
+                                    final_content_text.push_str(chunk);
                                 }
-                                let ok = ServerFrame::ok(&id, serde_json::json!({"stopped": true}));
-                                let _ = sender
-                                    .send(WsMessage::Text(
-                                        serde_json::to_string(&ok).unwrap().into(),
-                                    ))
-                                    .await;
-                            }
-                            "approval.approve" | "approval.deny" => {
-                                let approved = method == "approval.approve";
-                                let allow_all = params.get("allow_all")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false);
-                                if let Some(tx) = approval_resp_tx.lock().await.as_ref() {
-                                    let _ = tx.send(ApprovalResponse { approved, allow_all });
-                                }
-                                let ok = ServerFrame::ok(&id, serde_json::json!({"ok": true}));
-                                let _ = sender
-                                    .send(WsMessage::Text(
-                                        serde_json::to_string(&ok).unwrap().into(),
-                                    ))
-                                    .await;
-                            }
-                            "ping" => {
-                                let ok = ServerFrame::ok(&id, serde_json::json!({"pong": true}));
-                                let _ = sender
-                                    .send(WsMessage::Text(
-                                        serde_json::to_string(&ok).unwrap().into(),
-                                    ))
-                                    .await;
-                            }
-                            _ => {
-                                // Ignore other methods during agent execution
                             }
                         }
                     }
+                    // Update sequence counter
+                    if let Some(s) = parsed.get("seq").and_then(|v| v.as_u64()) {
+                        let _ = seq.fetch_max(s + 1, Ordering::Relaxed);
+                    }
                 }
+                let _ = sender
+                    .send(WsMessage::Text(frame_json.into()))
+                    .await;
             }
-            event = stream.next().instrument(req_span.clone()) => {
-                match event {
-                    Some(Ok(graph_event)) => {
-                        let msgs = &graph_event.state.messages;
-                        for msg in msgs.iter().skip(displayed) {
-                            if msg.is_ai() {
-                                let tool_calls = msg.tool_calls();
-                                if !tool_calls.is_empty() {
-                                    for tc in tool_calls {
-                                        tracing::debug!(tool = %tc.name, "tool call");
-                                        send_event!("agent.tool.start", serde_json::json!({
-                                            "name": tc.name,
-                                            "args": tc.arguments,
-                                        }));
+            // Handle incoming WS messages during execution
+            ws_result = receiver.next() => {
+                match ws_result {
+                    Some(Ok(WsMessage::Text(ref text))) => {
+                        if let Ok(ClientFrame::Request { id, method, params: _ }) =
+                            serde_json::from_str::<ClientFrame>(text)
+                        {
+                            match method.as_str() {
+                                "chat.stop" => {
+                                    if let Some(tx) = state.cancel_tokens.read().await.get(conversation_id) {
+                                        let _ = tx.send(true);
                                     }
-                                } else {
-                                    let content = msg.content();
-                                    for canvas_evt in extract_canvas_directives(content, &state.canvas_engine) {
-                                        let _ = sender.send(ws_json(&canvas_evt)).await;
-                                    }
+                                    let ok = ServerFrame::ok(&id, serde_json::json!({"stopped": true}));
+                                    let _ = sender
+                                        .send(WsMessage::Text(
+                                            serde_json::to_string(&ok).unwrap().into(),
+                                        ))
+                                        .await;
                                 }
-                            } else if msg.is_tool() {
-                                let tool_name = find_tool_name(msgs, displayed, msg);
-                                tracing::debug!(tool = %tool_name, "tool result");
-                                send_event!("agent.tool.result", serde_json::json!({
-                                    "name": tool_name,
-                                    "content": truncate(msg.content(), 500),
-                                }));
+                                "ping" => {
+                                    let ok = ServerFrame::ok(&id, serde_json::json!({"pong": true}));
+                                    let _ = sender
+                                        .send(WsMessage::Text(
+                                            serde_json::to_string(&ok).unwrap().into(),
+                                        ))
+                                        .await;
+                                }
+                                _ => {
+                                    // Ignore other methods during agent execution
+                                }
                             }
-                            displayed += 1;
-                        }
-                        let saved = memory.load(conversation_id).await.map(|m| m.len()).unwrap_or(0);
-                        let new_msgs: Vec<_> = msgs.iter().skip(saved).collect();
-                        let last_ai_idx = new_msgs.iter().rposition(|m| m.is_ai());
-                        for (i, msg) in new_msgs.iter().enumerate() {
-                            let msg = if last_ai_idx == Some(i) {
-                                (*msg).clone().with_additional_kwarg(
-                                    "request_id",
-                                    serde_json::Value::String(request_id.clone()),
-                                )
-                            } else {
-                                (*msg).clone()
-                            };
-                            memory.append(conversation_id, msg).await.ok();
                         }
                     }
-                    Some(Err(e)) => {
-                        let _g = req_span.enter();
-                        tracing::error!(error = %e, "v3 agent execution failed");
-                        if !token_buffer.is_empty() {
-                            let chunk = std::mem::take(&mut token_buffer);
-                            final_content_text.push_str(&chunk);
-                            send_event!("agent.message.delta", serde_json::json!({
-                                "type": "text",
-                                "content": chunk
-                            }));
-                        }
-                        send_event!("agent.error", serde_json::json!({
-                            "message": e.to_string(),
-                            "request_id": request_id,
-                        }));
+                    Some(Ok(WsMessage::Close(_))) | None => {
+                        // Client disconnected
                         break;
                     }
-                    None => {
-                        // Stream complete — drain remaining tokens
-                        token_rx.close();
-                        reasoning_rx.close();
-                        while let Some(token) = token_rx.recv().await {
-                            token_buffer.push_str(&token);
-                        }
-                        if !token_buffer.is_empty() {
-                            let chunk = std::mem::take(&mut token_buffer);
-                            final_content_text.push_str(&chunk);
-                            send_event!("agent.message.delta", serde_json::json!({
-                                "type": "text",
-                                "content": chunk
-                            }));
-                        }
-                        while let Some(r) = reasoning_rx.recv().await {
-                            if show_reasoning {
-                                send_event!("agent.thinking.delta", serde_json::json!({
-                                    "content": r
-                                }));
-                            }
-                        }
-                        // Update session token count
-                        {
-                            let snap = state.cost_tracker.snapshot().await;
-                            let post_tokens = snap.total_input_tokens + snap.total_output_tokens;
-                            let delta = post_tokens.saturating_sub(pre_tokens);
-                            if delta > 0 {
-                                if let Ok(Some(mut info)) = state.sessions.get_session(conversation_id).await {
-                                    info.total_tokens += delta;
-                                    let _ = state.sessions.update_session(&info).await;
+                    Some(Err(_)) => {
+                        // WebSocket error — disconnect
+                        break;
+                    }
+                    _ => {} // skip binary/ping/pong
+                }
+            }
+            // Agent task completed
+            result = &mut agent_handle => {
+                // Drain remaining frames from the channel
+                frame_rx.close();
+                while let Some(frame_json) = frame_rx.recv().await {
+                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&frame_json) {
+                        if let Some(event_name) = parsed.get("event").and_then(|v| v.as_str()) {
+                            if event_name == "agent.message.delta" {
+                                if let Some(payload) = parsed.get("payload") {
+                                    if let Some(chunk) = payload.get("content").and_then(|v| v.as_str()) {
+                                        final_content_text.push_str(chunk);
+                                    }
                                 }
                             }
                         }
-                        let elapsed = execution_start.elapsed().as_millis();
+                    }
+                    let _ = sender
+                        .send(WsMessage::Text(frame_json.into()))
+                        .await;
+                }
+
+                // Update session token count
+                {
+                    let snap = state.cost_tracker.snapshot().await;
+                    let post_tokens = snap.total_input_tokens + snap.total_output_tokens;
+                    let delta = post_tokens.saturating_sub(pre_tokens);
+                    if delta > 0 {
+                        if let Ok(Some(mut info)) = state.sessions.get_session(conversation_id).await {
+                            info.total_tokens += delta;
+                            let _ = state.sessions.update_session(&info).await;
+                        }
+                    }
+                }
+
+                let elapsed = execution_start.elapsed().as_millis();
+
+                match result {
+                    Ok(Ok(_reply)) => {
                         let _g = req_span.enter();
                         tracing::info!(duration_ms = %elapsed, "v3 turn completed");
-                        drop(_g);
-
-                        // Usage tracking is handled by CostTrackingSubscriber via EventBus.
-
-                        send_event!("agent.turn.complete", serde_json::json!({
-                            "request_id": request_id,
-                        }));
-
-                        // Emit MessageSent (fire-and-forget)
-                        {
-                            let event_bus = state.event_bus.clone();
-                            let req_id = request_id.clone();
-                            let conv_id = conversation_id.to_string();
-                            tokio::spawn(async move {
-                                let mut event = Event::new(
-                                    EventKind::MessageSent,
-                                    serde_json::json!({
-                                        "request_id": req_id,
-                                        "conversation_id": conv_id,
-                                        "channel": "web",
-                                        "protocol": "v3",
-                                    }),
-                                )
-                                .with_source("gateway/ws");
-                                let _ = event_bus.emit(&mut event).await;
-                            });
-                        }
-
-                        break;
+                    }
+                    Ok(Err(e)) => {
+                        let _g = req_span.enter();
+                        tracing::error!(error = %e, duration_ms = %elapsed, "v3 agent execution failed");
+                    }
+                    Err(e) => {
+                        let _g = req_span.enter();
+                        tracing::error!(error = %e, "v3 agent task panicked");
                     }
                 }
-            }
-            _ = cancel_rx.changed() => {
-                let _g = req_span.enter();
-                if *cancel_rx.borrow() {
-                    if !token_buffer.is_empty() {
-                        let chunk = std::mem::take(&mut token_buffer);
-                        final_content_text.push_str(&chunk);
-                        send_event!("agent.message.delta", serde_json::json!({
-                            "type": "text",
-                            "content": chunk
-                        }));
-                    }
-                    let elapsed = execution_start.elapsed().as_millis();
-                    tracing::info!(duration_ms = %elapsed, "v3 execution cancelled");
-                    send_event!("agent.message.complete", serde_json::json!({
-                        "request_id": request_id,
-                        "cancelled": true,
-                    }));
-                    break;
+
+                // Emit MessageSent (fire-and-forget)
+                {
+                    let event_bus = state.event_bus.clone();
+                    let req_id = request_id.clone();
+                    let conv_id = conversation_id.to_string();
+                    tokio::spawn(async move {
+                        let mut event = Event::new(
+                            EventKind::MessageSent,
+                            serde_json::json!({
+                                "request_id": req_id,
+                                "conversation_id": conv_id,
+                                "channel": "web",
+                                "protocol": "v3",
+                            }),
+                        )
+                        .with_source("gateway/ws");
+                        let _ = event_bus.emit(&mut event).await;
+                    });
                 }
+
+                break;
             }
         }
     }
 
-    // Cleanup after agent execution
-    drop(approval_resp_tx);
+    // --- Cleanup ---
     state.write_lock.release(conversation_id, conn_id).await;
 
     // Send the final RPC response for the agent/chat.send request

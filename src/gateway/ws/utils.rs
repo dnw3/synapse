@@ -5,6 +5,7 @@ use super::types::WsEvent;
 use crate::agent::SessionOverrides;
 use crate::gateway::state::AppState;
 
+#[allow(dead_code)]
 pub(crate) fn ws_json(event: &WsEvent) -> WsMessage {
     WsMessage::Text(serde_json::to_string(event).unwrap().into())
 }

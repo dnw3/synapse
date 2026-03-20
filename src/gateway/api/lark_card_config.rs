@@ -34,6 +34,9 @@ pub async fn update_lark_card_config(
 }
 
 /// POST /api/config/lark-card/preview — preview a card with sample text
+///
+/// Accepts an optional inline card config so the preview reflects unsaved changes.
+/// Falls back to the server's current config when fields are omitted.
 #[cfg(feature = "bot-lark")]
 pub async fn preview_lark_card(
     State(state): State<AppState>,
@@ -42,12 +45,15 @@ pub async fn preview_lark_card(
     use synaptic::core::message_ir::{parse_markdown, RenderOptions, RenderTarget};
     use synaptic::lark::card_elements::render_lark_card_elements;
 
-    let card_config = state
-        .config
-        .lark
-        .first()
-        .map(|lark| lark.card.clone())
-        .unwrap_or_default();
+    // Use inline config from request body, fall back to server config.
+    let card_config = body.config.unwrap_or_else(|| {
+        state
+            .config
+            .lark
+            .first()
+            .map(|lark| lark.card.clone())
+            .unwrap_or_default()
+    });
     let ir = parse_markdown(&body.sample_text);
     let options = RenderOptions::new(RenderTarget::LarkCard);
     let elements = render_lark_card_elements(&ir, &options);
@@ -68,6 +74,8 @@ pub async fn preview_lark_card(
 #[derive(serde::Deserialize)]
 pub struct PreviewRequest {
     pub sample_text: String,
+    /// Optional inline card config for previewing unsaved changes.
+    pub config: Option<LarkCardConfig>,
 }
 
 pub fn routes() -> Router<AppState> {

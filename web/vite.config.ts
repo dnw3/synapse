@@ -11,7 +11,15 @@ export default defineConfig({
         target: "ws://localhost:3000",
         ws: true,
         configure: (proxy) => {
-          proxy.on("error", () => {}); // Suppress EPIPE on backend restart
+          // Suppress EPIPE / ECONNRESET noise from both client and backend
+          // sockets when either side disconnects unexpectedly.
+          proxy.on("error", () => {});
+          proxy.on("proxyReqWs", (_proxyReq, _req, socket) => {
+            socket.on("error", () => {});
+          });
+          proxy.on("open", (proxySocket) => {
+            proxySocket.on("error", () => {});
+          });
         },
       },
     },

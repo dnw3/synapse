@@ -4,7 +4,6 @@ mod context;
 pub mod context_engine;
 pub mod discovery;
 mod mcp;
-pub mod message_ir;
 pub(crate) mod middleware;
 mod middleware_setup;
 pub(crate) mod model;

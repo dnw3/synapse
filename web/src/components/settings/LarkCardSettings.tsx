@@ -87,8 +87,8 @@ export default function LarkCardSettings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...config,
-          sample_markdown: "**Hello!** This is a preview of the Lark card styling.\n\n- Item 1\n- Item 2\n\n> A quote block",
+          sample_text: "**Hello!** This is a preview of the Lark card styling.\n\n- Item 1\n- Item 2\n\n> A quote block",
+          config,
         }),
       });
       if (res.ok) {

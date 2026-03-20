@@ -11,6 +11,7 @@ pub struct SendResult {
 
 /// Trait for sending outbound messages to a specific channel.
 #[async_trait]
+#[allow(dead_code)]
 pub trait ChannelSender: Send + Sync {
     /// Channel identifier this sender handles (e.g. "slack", "telegram").
     fn channel_id(&self) -> &str;

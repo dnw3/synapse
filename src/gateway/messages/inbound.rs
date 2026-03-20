@@ -301,6 +301,10 @@ impl InboundMessage {
     /// - `chat.chat_type` is never empty
     /// - `media.types` is padded to match `media.urls`/`media.paths` length
     pub fn finalize(&mut self) {
+        // Generate request_id if not set by caller (e.g. bot channel adapters).
+        if self.request_id.is_empty() {
+            self.request_id = synaptic::logging::generate_request_id();
+        }
         if self.command.authorized.is_none() {
             self.command.authorized = Some(false);
         }

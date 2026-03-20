@@ -21,7 +21,7 @@ use crate::gateway::messages::routing::{
 };
 use crate::gateway::messages::{
     AgentReply, Attachment, ChannelRegistry, MessageEnvelope, MessageReceivedEvent,
-    MessageSentEvent,
+    MessageSentEvent, OutboundPayload,
 };
 use crate::gateway::rpc::Broadcaster;
 use crate::memory::LongTermMemory;
@@ -469,6 +469,10 @@ impl AgentSession {
             .await;
 
         Ok(AgentReply {
+            payloads: vec![OutboundPayload {
+                text: Some(response.clone()),
+                ..Default::default()
+            }],
             content: response,
             delivery_target,
             turn_id: request_id,
@@ -628,6 +632,10 @@ impl AgentSession {
             .await;
 
         Ok(AgentReply {
+            payloads: vec![OutboundPayload {
+                text: Some(response.clone()),
+                ..Default::default()
+            }],
             content: response,
             delivery_target,
             turn_id: request_id,
@@ -798,6 +806,10 @@ impl AgentSession {
             .await;
 
         Ok(AgentReply {
+            payloads: vec![OutboundPayload {
+                text: Some(response.clone()),
+                ..Default::default()
+            }],
             content: response,
             delivery_target,
             turn_id: request_id,

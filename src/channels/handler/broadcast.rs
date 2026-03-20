@@ -146,6 +146,10 @@ impl AgentSession {
                 };
 
                 Ok(AgentReply {
+                    payloads: vec![OutboundPayload {
+                        text: Some(merged.clone()),
+                        ..Default::default()
+                    }],
                     content: merged,
                     delivery_target: envelope.delivery.clone(),
                     turn_id: request_id,
@@ -169,6 +173,10 @@ impl AgentSession {
                     }
                 }
                 Ok(AgentReply {
+                    payloads: vec![OutboundPayload {
+                        text: Some(last_response.clone()),
+                        ..Default::default()
+                    }],
                     content: last_response,
                     delivery_target: envelope.delivery.clone(),
                     turn_id: request_id,

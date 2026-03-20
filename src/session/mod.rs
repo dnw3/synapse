@@ -1,5 +1,6 @@
 pub mod archive;
 pub mod freshness;
+pub mod key;
 pub mod maintenance;
 pub mod manager;
 pub mod reset_service;

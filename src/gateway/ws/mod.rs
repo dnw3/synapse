@@ -1,8 +1,12 @@
 mod multiplexed;
 mod streaming;
+mod streaming_output;
 mod types;
 mod utils;
 mod v3;
+
+#[allow(unused_imports)]
+pub use streaming_output::WsStreamingOutput;
 
 use axum::{routing::get, Router};
 

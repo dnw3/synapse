@@ -21,14 +21,29 @@ pub(super) struct LarkStreamingOutput {
 impl StreamingOutput for LarkStreamingOutput {
     async fn on_token(&self, token: &str) {
         tracing::debug!(len = token.len(), "lark streaming: on_token");
+        // If transitioning from reasoning → answer, clear the card first
+        // so reasoning content is replaced by the clean answer.
+        {
+            let mut buf = self.reasoning_buffer.write().await;
+            if !buf.is_empty() {
+                buf.clear();
+                self.writer.clear().await.ok();
+            }
+        }
         self.writer.write(token).await.ok();
     }
 
     async fn on_reasoning(&self, content: &str) {
-        self.reasoning_buffer.write().await.push_str(content);
-        // Show reasoning as italic in streaming card
-        let display = format!("*{}*", content);
-        self.writer.write(&display).await.ok();
+        let mut buf = self.reasoning_buffer.write().await;
+        let first = buf.is_empty();
+        buf.push_str(content);
+        drop(buf);
+        // First reasoning token: prefix with thinking indicator.
+        // Subsequent tokens: append raw text (writer accumulates).
+        if first {
+            self.writer.write("\u{1f4ad} ").await.ok();
+        }
+        self.writer.write(content).await.ok();
     }
 
     async fn on_tool_call(&self, info: &ToolCallInfo) {
@@ -72,20 +87,9 @@ impl StreamingOutput for LarkStreamingOutput {
         let options = RenderOptions::new(RenderTarget::LarkCard);
         let mut elements = render_lark_card_elements(&ir, &options);
 
-        // Insert reasoning block at the beginning if present
-        let reasoning = self.reasoning_buffer.read().await.clone();
-        if !reasoning.is_empty() {
-            elements.insert(
-                0,
-                synaptic::lark::card_elements::LarkCardElement {
-                    tag: "markdown".into(),
-                    element_id: "reasoning".into(),
-                    properties: serde_json::json!({
-                        "content": format!("> \u{1f4ad} **Thinking**\n> {}", reasoning.replace('\n', "\n> "))
-                    }),
-                },
-            );
-        }
+        // Reasoning was shown during streaming (on_reasoning → italic text).
+        // The final card replaces streaming content with the clean answer only —
+        // reasoning is intentionally excluded from the final card.
 
         // Build footer info line from metadata + config
         if let Some(meta) = meta {

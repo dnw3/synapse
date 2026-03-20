@@ -1,8 +1,8 @@
-time="2026-03-20T20:52:25+08:00" level=info msg="mounted serverinfofs at /serverinfo"
-time="2026-03-20T20:52:25+08:00" level=info msg="[queuefs] Initialized with backend: memory"
-time="2026-03-20T20:52:25+08:00" level=info msg="mounted queuefs at /queue"
-time="2026-03-20T20:52:25+08:00" level=info msg="[localfs] Initialized with base path: /Users/bytedance/.openviking/data/viking"
-time="2026-03-20T20:52:25+08:00" level=info msg="mounted localfs at /local"
+time="2026-03-20T21:34:44+08:00" level=info msg="mounted serverinfofs at /serverinfo"
+time="2026-03-20T21:34:44+08:00" level=info msg="[queuefs] Initialized with backend: memory"
+time="2026-03-20T21:34:44+08:00" level=info msg="mounted queuefs at /queue"
+time="2026-03-20T21:34:44+08:00" level=info msg="[localfs] Initialized with base path: /Users/bytedance/.openviking/data/viking"
+time="2026-03-20T21:34:44+08:00" level=info msg="mounted localfs at /local"
 Loading config file: /Users/bytedance/.openviking/ov.conf
 OpenViking HTTP Server is running on 127.0.0.1:1933
-2026-03-20 20:52:25,828 - openviking.server.app - WARNING - Dev mode: no root_api_key configured, authentication disabled. This is allowed because the server is bound to localhost (127.0.0.1). Do NOT expose this server to the network without configuring server.root_api_key in ov.conf.
+2026-03-20 21:34:44,916 - openviking.server.app - WARNING - Dev mode: no root_api_key configured, authentication disabled. This is allowed because the server is bound to localhost (127.0.0.1). Do NOT expose this server to the network without configuring server.root_api_key in ov.conf.

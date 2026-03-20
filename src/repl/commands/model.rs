@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use colored::Colorize;
 use synaptic::callbacks::CostTrackingCallback;
-use synaptic::core::{ChatModel, Message, ThinkingConfig};
+use synaptic::core::{ChatModel, Message, ThinkingLevel};
 
 use super::CommandResult;
 use crate::agent;
@@ -143,7 +143,7 @@ pub fn cmd_verbose(verbose: &mut bool) -> CommandResult {
 
 pub fn cmd_think(
     arg: &str,
-    thinking: &mut Option<ThinkingConfig>,
+    thinking: &mut Option<ThinkingLevel>,
     messages: &mut Vec<Message>,
 ) -> CommandResult {
     let level = if arg.is_empty() { "medium" } else { arg };
@@ -154,44 +154,32 @@ pub fn cmd_think(
             eprintln!("{} Thinking mode disabled", "think:".green().bold());
         }
         "low" | "minimal" => {
-            *thinking = Some(ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(2000),
-            });
+            *thinking = Some(ThinkingLevel::Low);
             eprintln!(
-                "{} Thinking level set to '{}' (budget: 2000 tokens)",
+                "{} Thinking level set to '{}'",
                 "think:".green().bold(),
                 level
             );
         }
         "medium" => {
-            *thinking = Some(ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(10000),
-            });
+            *thinking = Some(ThinkingLevel::Medium);
             eprintln!(
-                "{} Thinking level set to '{}' (budget: 10000 tokens)",
+                "{} Thinking level set to '{}'",
                 "think:".green().bold(),
                 level
             );
         }
         "high" => {
-            *thinking = Some(ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(50000),
-            });
+            *thinking = Some(ThinkingLevel::High);
             eprintln!(
-                "{} Thinking level set to '{}' (budget: 50000 tokens)",
+                "{} Thinking level set to '{}'",
                 "think:".green().bold(),
                 level
             );
         }
         _ => {
             if let Ok(budget) = level.parse::<u32>() {
-                *thinking = Some(ThinkingConfig {
-                    enabled: true,
-                    budget_tokens: Some(budget),
-                });
+                *thinking = Some(ThinkingLevel::Budget(budget));
                 eprintln!(
                     "{} Thinking enabled with custom budget: {} tokens",
                     "think:".green().bold(),

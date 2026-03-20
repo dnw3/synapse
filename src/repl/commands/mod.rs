@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use colored::Colorize;
 use synaptic::callbacks::CostTrackingCallback;
-use synaptic::core::{ChatModel, Message, ThinkingConfig};
+use synaptic::core::{ChatModel, Message, ThinkingLevel};
 use synaptic::memory::ChatMessageHistory;
 use synaptic::session::SessionManager;
 
@@ -35,7 +35,7 @@ pub async fn handle_command(
     tracker: &Arc<CostTrackingCallback>,
     current_model_name: &mut String,
     verbose: &mut bool,
-    thinking: &mut Option<ThinkingConfig>,
+    thinking: &mut Option<ThinkingLevel>,
     ltm: &LongTermMemory,
 ) -> CommandResult {
     let (cmd, arg) = match input.split_once(' ') {

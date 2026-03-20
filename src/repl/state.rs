@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use synaptic::callbacks::CostTrackingCallback;
-use synaptic::core::{ChatModel, Message, ThinkingConfig};
+use synaptic::core::{ChatModel, Message, ThinkingLevel};
 
 use crate::memory::LongTermMemory;
 
@@ -15,5 +15,5 @@ pub struct ReplState {
     pub tracker: Arc<CostTrackingCallback>,
     pub ltm: Arc<LongTermMemory>,
     pub verbose: bool,
-    pub thinking: Option<ThinkingConfig>,
+    pub thinking: Option<ThinkingLevel>,
 }

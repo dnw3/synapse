@@ -1,24 +1,24 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic::core::{RunContext, SynapticError, ThinkingConfig};
+use synaptic::core::{RunContext, SynapticError, ThinkingLevel};
 use synaptic::middleware::{Interceptor, ModelCaller, ModelRequest, ModelResponse};
 use tokio::sync::RwLock;
 
-/// Interceptor that injects ThinkingConfig into every ModelRequest.
+/// Interceptor that injects ThinkingLevel into every ModelRequest.
 ///
 /// Supports both static thinking level and adaptive mode that adjusts
 /// based on conversation complexity.
 pub struct ThinkingMiddleware {
-    config: Arc<RwLock<Option<ThinkingConfig>>>,
+    level: Arc<RwLock<Option<ThinkingLevel>>>,
     adaptive: bool,
 }
 
 impl ThinkingMiddleware {
-    /// Create with a fixed thinking config.
-    pub fn new(config: Option<ThinkingConfig>) -> Self {
+    /// Create with a fixed thinking level.
+    pub fn new(level: Option<ThinkingLevel>) -> Self {
         Self {
-            config: Arc::new(RwLock::new(config)),
+            level: Arc::new(RwLock::new(level)),
             adaptive: false,
         }
     }
@@ -26,7 +26,7 @@ impl ThinkingMiddleware {
     /// Create in adaptive mode — adjusts thinking level based on complexity.
     pub fn adaptive() -> Self {
         Self {
-            config: Arc::new(RwLock::new(None)),
+            level: Arc::new(RwLock::new(None)),
             adaptive: true,
         }
     }
@@ -95,22 +95,13 @@ impl ThinkingMiddleware {
         score
     }
 
-    /// Map complexity score to ThinkingConfig.
-    fn complexity_to_config(score: u32) -> Option<ThinkingConfig> {
+    /// Map complexity score to ThinkingLevel.
+    fn complexity_to_level(score: u32) -> Option<ThinkingLevel> {
         match score {
             0..=2 => None, // simple — no thinking
-            3..=5 => Some(ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(2000),
-            }),
-            6..=8 => Some(ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(10000),
-            }),
-            _ => Some(ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(50000),
-            }),
+            3..=5 => Some(ThinkingLevel::Low),
+            6..=8 => Some(ThinkingLevel::Medium),
+            _ => Some(ThinkingLevel::High),
         }
     }
 }
@@ -125,13 +116,13 @@ impl Interceptor for ThinkingMiddleware {
     ) -> Result<ModelResponse, SynapticError> {
         let thinking = if self.adaptive {
             let score = Self::estimate_complexity(&request);
-            Self::complexity_to_config(score)
+            Self::complexity_to_level(score)
         } else {
-            self.config.read().await.clone()
+            self.level.read().await.clone()
         };
 
-        if let Some(tc) = thinking {
-            request.thinking = Some(tc);
+        if let Some(level) = thinking {
+            request.thinking = Some(level);
         }
 
         next.call(request, ctx).await
@@ -183,29 +174,15 @@ impl Interceptor for VerboseMiddleware {
     }
 }
 
-/// Parse a thinking level string into a ThinkingConfig.
-pub fn parse_thinking_level(level: &str) -> Option<ThinkingConfig> {
+/// Parse a thinking level string into a ThinkingLevel.
+pub fn parse_thinking_level(level: &str) -> Option<ThinkingLevel> {
     match level {
-        "off" | "none" | "" => None,
-        "low" | "minimal" => Some(ThinkingConfig {
-            enabled: true,
-            budget_tokens: Some(2000),
-        }),
-        "medium" => Some(ThinkingConfig {
-            enabled: true,
-            budget_tokens: Some(10000),
-        }),
-        "high" => Some(ThinkingConfig {
-            enabled: true,
-            budget_tokens: Some(50000),
-        }),
+        "off" => Some(ThinkingLevel::Off),
+        "none" | "" => None,
+        "low" | "minimal" => Some(ThinkingLevel::Low),
+        "medium" => Some(ThinkingLevel::Medium),
+        "high" => Some(ThinkingLevel::High),
         "adaptive" => None, // handled by AdaptiveThinkingMiddleware
-        _ => {
-            // Try parsing as a number (custom budget)
-            level.parse::<u32>().ok().map(|budget| ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(budget),
-            })
-        }
+        other => other.parse::<u32>().ok().map(ThinkingLevel::Budget),
     }
 }

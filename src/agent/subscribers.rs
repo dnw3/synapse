@@ -191,17 +191,17 @@ impl EventSubscriber for TracingSubscriber {
 /// Maps to: `BeforePromptBuild` (Sequential — can mutate the payload).
 #[allow(dead_code)]
 pub struct ThinkingSubscriber {
-    /// Static thinking config to inject.  `None` means adaptive mode.
-    config: Option<synaptic::core::ThinkingConfig>,
+    /// Static thinking level to inject.  `None` means adaptive mode.
+    level: Option<synaptic::core::ThinkingLevel>,
     adaptive: bool,
 }
 
 impl ThinkingSubscriber {
-    /// Create with a fixed thinking config.
+    /// Create with a fixed thinking level.
     #[allow(dead_code)]
-    pub fn new(config: Option<synaptic::core::ThinkingConfig>) -> Self {
+    pub fn new(level: Option<synaptic::core::ThinkingLevel>) -> Self {
         Self {
-            config,
+            level,
             adaptive: false,
         }
     }
@@ -210,7 +210,7 @@ impl ThinkingSubscriber {
     #[allow(dead_code)]
     pub fn adaptive() -> Self {
         Self {
-            config: None,
+            level: None,
             adaptive: true,
         }
     }
@@ -276,21 +276,12 @@ impl ThinkingSubscriber {
         score
     }
 
-    fn complexity_to_config(score: u32) -> Option<synaptic::core::ThinkingConfig> {
+    fn complexity_to_level(score: u32) -> Option<synaptic::core::ThinkingLevel> {
         match score {
             0..=2 => None,
-            3..=5 => Some(synaptic::core::ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(2000),
-            }),
-            6..=8 => Some(synaptic::core::ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(10000),
-            }),
-            _ => Some(synaptic::core::ThinkingConfig {
-                enabled: true,
-                budget_tokens: Some(50000),
-            }),
+            3..=5 => Some(synaptic::core::ThinkingLevel::Low),
+            6..=8 => Some(synaptic::core::ThinkingLevel::Medium),
+            _ => Some(synaptic::core::ThinkingLevel::High),
         }
     }
 }
@@ -304,16 +295,14 @@ impl EventSubscriber for ThinkingSubscriber {
     async fn handle(&self, event: &mut Event) -> Result<EventAction, SynapticError> {
         let thinking = if self.adaptive {
             let score = Self::estimate_complexity(&event.payload);
-            Self::complexity_to_config(score)
+            Self::complexity_to_level(score)
         } else {
-            self.config.clone()
+            self.level.clone()
         };
 
-        if let Some(tc) = thinking {
-            event.payload["thinking"] = serde_json::json!({
-                "enabled": tc.enabled,
-                "budget_tokens": tc.budget_tokens,
-            });
+        if let Some(level) = thinking {
+            event.payload["thinking"] =
+                serde_json::to_value(&level).unwrap_or(serde_json::Value::Null);
             return Ok(EventAction::Modify);
         }
 

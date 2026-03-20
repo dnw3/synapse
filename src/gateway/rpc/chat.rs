@@ -42,10 +42,27 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
     let items: Vec<Value> = messages
         .iter()
         .map(|m| {
-            json!({
+            let mut obj = json!({
                 "role": m.role(),
                 "content": m.content(),
-            })
+            });
+            // Include request_id if present (for LogID display)
+            if let Some(rid) = m
+                .additional_kwargs()
+                .get("request_id")
+                .and_then(|v| v.as_str())
+            {
+                obj["request_id"] = Value::String(rid.to_string());
+            }
+            // Include tool_calls if present
+            let tool_calls = m.tool_calls();
+            if !tool_calls.is_empty() {
+                obj["tool_calls"] = json!(tool_calls
+                    .iter()
+                    .map(|tc| json!({ "name": tc.name, "arguments": tc.arguments }))
+                    .collect::<Vec<_>>());
+            }
+            obj
         })
         .collect();
 

@@ -15,11 +15,15 @@ pub async fn list_sessions(mgr: &SessionManager) -> Result<(), Box<dyn std::erro
 
     println!("{}", "Sessions:".bold());
     for s in &sessions {
-        let count = memory.load(&s.id).await.map(|m| m.len()).unwrap_or(0);
-        let title = load_session_title(store, &s.id).await;
+        let count = memory
+            .load(&s.session_id)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0);
+        let title = load_session_title(store, &s.session_id).await;
         let title_display = title.as_deref().unwrap_or("(untitled)");
-        let token_info = if s.token_count > 0 {
-            format!(", ~{}tok", s.token_count)
+        let token_info = if s.total_tokens > 0 {
+            format!(", ~{}tok", s.total_tokens)
         } else {
             String::new()
         };
@@ -30,7 +34,7 @@ pub async fn list_sessions(mgr: &SessionManager) -> Result<(), Box<dyn std::erro
         };
         println!(
             "  {} {} {} ({} messages{}{})",
-            s.id.cyan(),
+            s.session_id.cyan(),
             title_display.bold(),
             s.created_at.dimmed(),
             count,
@@ -59,7 +63,7 @@ pub async fn prune_sessions(
     let mut removed = 0;
     for s in &sessions {
         if let Some(timestamp) = parse_iso_timestamp(&s.created_at) {
-            if timestamp < cutoff && mgr.delete_session(&s.id).await.is_ok() {
+            if timestamp < cutoff && mgr.delete_session(&s.session_id).await.is_ok() {
                 removed += 1;
             }
         }

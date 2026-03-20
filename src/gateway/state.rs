@@ -43,27 +43,43 @@ pub struct RequestMetrics {
 /// Shared application state.
 #[derive(Clone)]
 pub struct AppState {
+    // ── Core config & auth ──────────────────────────────────────────────
     pub config: SynapseConfig,
-    pub model: Arc<dyn ChatModel>,
-    pub sessions: Arc<SessionManager>,
-    /// Active agent cancel tokens, keyed by conversation_id.
-    pub cancel_tokens: Arc<RwLock<HashMap<String, tokio::sync::watch::Sender<bool>>>>,
     /// Authentication state (None if auth is not configured).
     pub auth: Option<Arc<AuthState>>,
     /// Server start time for health/uptime reporting.
     pub started_at: std::time::Instant,
+
+    // ── Agent & model ───────────────────────────────────────────────────
+    pub model: Arc<dyn ChatModel>,
+    /// Pre-loaded MCP tools (loaded once at startup, shared across requests).
+    pub mcp_tools: Vec<Arc<dyn Tool>>,
     /// Cost and token usage tracking across all requests.
     pub cost_tracker: Arc<CostTrackingCallback>,
     /// Multi-dimensional usage tracker with persistence.
     pub usage_tracker: Arc<UsageTracker>,
-    /// HTTP request metrics (counters, durations).
-    pub request_metrics: RequestMetrics,
+    /// Memory provider (native LTM or Viking), built from config at startup.
+    #[allow(dead_code)]
+    pub memory_provider: Arc<dyn MemoryProvider>,
+    /// Per-request context scopes (TTL: 30 min).  Used for variable passing
+    /// across multi-step agent pipelines and sub-agent spawning.
+    #[allow(dead_code)]
+    pub context_engine: SharedContextEngine,
+
+    // ── Session management ──────────────────────────────────────────────
+    pub sessions: Arc<SessionManager>,
+    /// Active agent cancel tokens, keyed by conversation_id.
+    pub cancel_tokens: Arc<RwLock<HashMap<String, tokio::sync::watch::Sender<bool>>>>,
     /// Per-session write locks to prevent concurrent modifications.
     pub write_lock: Arc<SessionWriteLock>,
-    /// In-memory log buffer for the /api/logs endpoint.
-    pub log_buffer: LogBuffer,
-    /// Pre-loaded MCP tools (loaded once at startup, shared across requests).
-    pub mcp_tools: Vec<Arc<dyn Tool>>,
+    /// Per-session run queue to serialize concurrent agent executions.
+    pub run_queue: Arc<AgentRunQueue>,
+    /// Connection IDs subscribed to session change events.
+    pub session_subscribers: Arc<RwLock<HashSet<String>>>,
+    /// Active wizard sessions keyed by session UUID.
+    pub wizard_sessions: Arc<RwLock<HashMap<String, WizardSession>>>,
+
+    // ── RPC & networking ────────────────────────────────────────────────
     /// RPC event broadcaster for connected clients.
     pub broadcaster: Arc<Broadcaster>,
     /// RPC method router.
@@ -74,16 +90,23 @@ pub struct AppState {
     pub node_registry: Arc<RwLock<crate::gateway::nodes::NodeRegistry>>,
     /// Node pairing store (persisted).
     pub pairing_store: Arc<RwLock<crate::gateway::nodes::PairingStore>>,
+    /// Bootstrap token store for device pairing QR codes.
+    pub bootstrap_store: Arc<RwLock<crate::gateway::nodes::BootstrapStore>>,
+    /// Global idempotency cache: key → insertion time.
+    ///
+    /// Used to deduplicate messages across connections (e.g. reconnects after
+    /// network failures).  Entries expire after 5 minutes and are periodically
+    /// cleaned up by a background task spawned in `new()`.
+    #[allow(dead_code)]
+    pub idempotency_cache: Arc<DashMap<String, Instant>>,
+
+    // ── Exec approvals ──────────────────────────────────────────────────
     /// Exec approval manager (in-memory pending requests).
     pub exec_approval_manager: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalManager>>,
     /// Exec approvals config (persisted).
     pub exec_approvals_config: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalsConfig>>,
-    /// Connection IDs subscribed to session change events.
-    pub session_subscribers: Arc<RwLock<HashSet<String>>>,
-    /// Active wizard sessions keyed by session UUID.
-    pub wizard_sessions: Arc<RwLock<HashMap<String, WizardSession>>>,
-    /// Bootstrap token store for device pairing QR codes.
-    pub bootstrap_store: Arc<RwLock<crate::gateway::nodes::BootstrapStore>>,
+
+    // ── Channel adapters ────────────────────────────────────────────────
     /// Registry of active channel senders for outbound delivery.
     #[allow(dead_code)]
     pub channel_registry: Arc<RwLock<ChannelRegistry>>,
@@ -93,8 +116,12 @@ pub struct AppState {
     pub dm_enforcer: Arc<crate::channels::dm::FileDmPolicyEnforcer>,
     /// Registry of per-channel approval notifiers.
     pub approve_notifiers: Arc<crate::channels::dm::ApproveNotifierRegistry>,
-    /// Per-session run queue to serialize concurrent agent executions.
-    pub run_queue: Arc<AgentRunQueue>,
+
+    // ── Infrastructure & observability ──────────────────────────────────
+    /// HTTP request metrics (counters, durations).
+    pub request_metrics: RequestMetrics,
+    /// In-memory log buffer for the /api/logs endpoint.
+    pub log_buffer: LogBuffer,
     /// Central event bus for agent lifecycle and gateway events.
     #[allow(dead_code)]
     pub event_bus: Arc<EventBus>,
@@ -102,21 +129,160 @@ pub struct AppState {
     pub canvas_engine: Arc<CanvasEngine>,
     /// Plugin registry — loaded once at startup, shared across all agent builds.
     pub plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
-    /// Memory provider (native LTM or Viking), built from config at startup.
-    #[allow(dead_code)]
-    pub memory_provider: Arc<dyn MemoryProvider>,
-    /// Per-request context scopes (TTL: 30 min).  Used for variable passing
-    /// across multi-step agent pipelines and sub-agent spawning.
-    #[allow(dead_code)]
-    pub context_engine: SharedContextEngine,
-    /// Global idempotency cache: key → insertion time.
-    ///
-    /// Used to deduplicate messages across connections (e.g. reconnects after
-    /// network failures).  Entries expire after 5 minutes and are periodically
-    /// cleaned up by a background task spawned in `new()`.
-    #[allow(dead_code)]
-    pub idempotency_cache: Arc<DashMap<String, Instant>>,
 }
+
+// ── Builder helpers ─────────────────────────────────────────────────────────
+//
+// These free functions break up the large `AppState::new()` constructor into
+// focused initialization steps. Each returns a small bundle of related state.
+
+/// Agent model, MCP tools, cost/usage tracking, and memory.
+struct AgentBundle {
+    model: Arc<dyn ChatModel>,
+    mcp_tools: Vec<Arc<dyn Tool>>,
+    cost_tracker: Arc<CostTrackingCallback>,
+    usage_tracker: Arc<UsageTracker>,
+    memory_provider: Arc<dyn MemoryProvider>,
+    context_engine: SharedContextEngine,
+}
+
+async fn build_agent_bundle(
+    config: &SynapseConfig,
+) -> Result<AgentBundle, Box<dyn std::error::Error>> {
+    let model = agent::build_model(config, None)?;
+    let mcp_tools = agent::load_mcp_tools(config).await;
+
+    let cost_tracker = Arc::new(CostTrackingCallback::new(default_pricing()));
+
+    // Multi-dimensional usage tracker with JSONL persistence
+    let usage_path = super::usage::default_usage_path();
+    let usage_tracker = Arc::new(UsageTracker::with_persistence(
+        Arc::clone(&cost_tracker),
+        usage_path,
+    ));
+    if let Err(e) = usage_tracker.load().await {
+        tracing::warn!(error = %e, "failed to load usage records from disk");
+    }
+    usage_tracker.spawn_periodic_flush(std::time::Duration::from_secs(60));
+
+    let memory_provider = crate::memory::build_memory_provider(config, None);
+    let context_engine = Arc::new(ContextEngine::new(std::time::Duration::from_secs(1800)));
+
+    Ok(AgentBundle {
+        model,
+        mcp_tools,
+        cost_tracker,
+        usage_tracker,
+        memory_provider,
+        context_engine,
+    })
+}
+
+/// RPC router, broadcaster, presence, node registry, pairing, bootstrap, and
+/// idempotency cache (including background cleanup task).
+struct RpcBundle {
+    broadcaster: Arc<Broadcaster>,
+    rpc_router: Arc<RpcRouter>,
+    presence: Arc<RwLock<crate::gateway::presence::PresenceStore>>,
+    node_registry: Arc<RwLock<crate::gateway::nodes::NodeRegistry>>,
+    pairing_store: Arc<RwLock<crate::gateway::nodes::PairingStore>>,
+    bootstrap_store: Arc<RwLock<crate::gateway::nodes::BootstrapStore>>,
+    idempotency_cache: Arc<DashMap<String, Instant>>,
+}
+
+fn build_rpc_bundle() -> RpcBundle {
+    let broadcaster = Arc::new(Broadcaster::new());
+    let mut rpc_router = RpcRouter::new();
+    super::rpc::register_all(&mut rpc_router);
+    let rpc_router = Arc::new(rpc_router);
+
+    let idempotency_cache: Arc<DashMap<String, Instant>> = Arc::new(DashMap::new());
+
+    // Background cleanup: remove idempotency entries older than 5 minutes every 60 seconds.
+    {
+        let cache = Arc::clone(&idempotency_cache);
+        tokio::spawn(async move {
+            let ttl = std::time::Duration::from_secs(300);
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                interval.tick().await;
+                let now = Instant::now();
+                cache.retain(|_, inserted| now.duration_since(*inserted) < ttl);
+                tracing::debug!(
+                    remaining = cache.len(),
+                    "idempotency cache cleanup complete"
+                );
+            }
+        });
+    }
+
+    RpcBundle {
+        broadcaster,
+        rpc_router,
+        presence: Arc::new(RwLock::new(crate::gateway::presence::PresenceStore::new())),
+        node_registry: Arc::new(RwLock::new(crate::gateway::nodes::NodeRegistry::new())),
+        pairing_store: Arc::new(RwLock::new(crate::gateway::nodes::PairingStore::new())),
+        bootstrap_store: Arc::new(RwLock::new(crate::gateway::nodes::BootstrapStore::new())),
+        idempotency_cache,
+    }
+}
+
+/// Channel adapters: registry, manager, DM enforcer, approval notifiers.
+struct ChannelBundle {
+    channel_registry: Arc<RwLock<ChannelRegistry>>,
+    channel_manager: Arc<super::channel_manager::ChannelAdapterManager>,
+    dm_enforcer: Arc<crate::channels::dm::FileDmPolicyEnforcer>,
+    approve_notifiers: Arc<crate::channels::dm::ApproveNotifierRegistry>,
+}
+
+fn build_channel_bundle() -> ChannelBundle {
+    let pairing_dir = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".synapse")
+        .join("pairing");
+
+    ChannelBundle {
+        channel_registry: Arc::new(RwLock::new(ChannelRegistry::new())),
+        channel_manager: Arc::new(super::channel_manager::ChannelAdapterManager::new()),
+        dm_enforcer: Arc::new(crate::channels::dm::FileDmPolicyEnforcer::new(
+            pairing_dir,
+            crate::channels::dm::DmPolicy::Pairing,
+            None,
+        )),
+        approve_notifiers: Arc::new(crate::channels::dm::ApproveNotifierRegistry::default()),
+    }
+}
+
+/// Event bus and plugin registry (plugins are wired into the event bus).
+struct InfraBundle {
+    event_bus: Arc<EventBus>,
+    plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
+}
+
+fn build_infra_bundle(
+    cost_tracker: &Arc<CostTrackingCallback>,
+    usage_tracker: &Arc<UsageTracker>,
+) -> InfraBundle {
+    let event_bus = Arc::new(EventBus::new());
+
+    let mut plugin_registry = synaptic::plugin::PluginRegistry::new(event_bus.clone());
+    if let Err(e) = crate::plugin::register_builtin_plugins(
+        &mut plugin_registry,
+        Arc::clone(cost_tracker),
+        Arc::clone(usage_tracker),
+    ) {
+        tracing::warn!(error = %e, "failed to register builtin plugins");
+    }
+    let plugin_registry = Arc::new(StdRwLock::new(plugin_registry));
+
+    InfraBundle {
+        event_bus,
+        plugin_registry,
+    }
+}
+
+// ── AppState impl ───────────────────────────────────────────────────────────
 
 impl AppState {
     /// Apply a hot-reload diff to the running state.
@@ -128,8 +294,6 @@ impl AppState {
     pub fn reload_config(&mut self, new_config: SynapseConfig, diff: &crate::config::ConfigDiff) {
         if diff.agents_changed {
             tracing::info!("hot-reload: agents configuration changed — updating agent definitions");
-            // Update the stored config so new agent builds use the new definitions.
-            // Running sessions are not interrupted.
             self.config.agents = new_config.agents.clone();
             self.config.bindings = new_config.bindings.clone();
         }
@@ -202,49 +366,29 @@ impl AppState {
     }
 
     pub async fn new(config: &SynapseConfig) -> Result<Self, Box<dyn std::error::Error>> {
-        let model = agent::build_model(config, None)?;
-        let session_mgr = crate::build_session_manager(config);
+        // ── Agent & model ───────────────────────────────────────────────
+        let agent = build_agent_bundle(config).await?;
 
-        // Set up auth if configured
+        // ── Infrastructure (event bus, plugins) ─────────────────────────
+        let infra = build_infra_bundle(&agent.cost_tracker, &agent.usage_tracker);
+
+        // ── RPC & networking ────────────────────────────────────────────
+        let rpc = build_rpc_bundle();
+
+        // ── Channel adapters ────────────────────────────────────────────
+        let channels = build_channel_bundle();
+
+        // ── Session management ──────────────────────────────────────────
+        let session_mgr = crate::build_session_manager(config);
+        let write_lock = Arc::new(SessionWriteLock::new(std::time::Duration::from_secs(300)));
+
+        // ── Auth ────────────────────────────────────────────────────────
         let auth = config
             .auth
             .as_ref()
             .map(|auth_config| Arc::new(AuthState::new(auth_config.clone())));
 
-        let cost_tracker = Arc::new(CostTrackingCallback::new(default_pricing()));
-
-        // Multi-dimensional usage tracker with JSONL persistence
-        let usage_path = super::usage::default_usage_path();
-        let usage_tracker = Arc::new(UsageTracker::with_persistence(
-            Arc::clone(&cost_tracker),
-            usage_path,
-        ));
-        // Load historical records from disk
-        if let Err(e) = usage_tracker.load().await {
-            tracing::warn!(error = %e, "failed to load usage records from disk");
-        }
-        // Periodic flush every 60 seconds
-        usage_tracker.spawn_periodic_flush(std::time::Duration::from_secs(60));
-
-        // Default write-lock timeout: 5 minutes
-        let write_lock = Arc::new(SessionWriteLock::new(std::time::Duration::from_secs(300)));
-
-        // In-memory log buffer (capacity from config)
-        let log_buffer = LogBuffer::new(config.logging.memory.capacity);
-
-        // Load MCP tools once at startup
-        let mcp_tools = agent::load_mcp_tools(config).await;
-
-        // RPC infrastructure
-        let broadcaster = Arc::new(Broadcaster::new());
-        let mut rpc_router = RpcRouter::new();
-        super::rpc::register_all(&mut rpc_router);
-        let rpc_router = Arc::new(rpc_router);
-
-        // Presence, nodes, exec approvals
-        let presence = Arc::new(RwLock::new(crate::gateway::presence::PresenceStore::new()));
-        let node_registry = Arc::new(RwLock::new(crate::gateway::nodes::NodeRegistry::new()));
-        let pairing_store = Arc::new(RwLock::new(crate::gateway::nodes::PairingStore::new()));
+        // ── Exec approvals ──────────────────────────────────────────────
         let exec_approval_manager = Arc::new(RwLock::new(
             crate::gateway::exec_approvals::ExecApprovalManager::new(),
         ));
@@ -252,88 +396,53 @@ impl AppState {
             crate::gateway::exec_approvals::ExecApprovalsConfig::load(),
         ));
 
-        let event_bus = Arc::new(EventBus::new());
-
-        // Register builtin plugins so their event subscribers are wired into the
-        // event bus and their manifests are visible via the plugin registry.
-        let mut plugin_registry = synaptic::plugin::PluginRegistry::new(event_bus.clone());
-        if let Err(e) = crate::plugin::register_builtin_plugins(
-            &mut plugin_registry,
-            Arc::clone(&cost_tracker),
-            Arc::clone(&usage_tracker),
-        ) {
-            tracing::warn!(error = %e, "failed to register builtin plugins");
-        }
-        let plugin_registry = Arc::new(StdRwLock::new(plugin_registry));
-
-        // Build memory provider from config (native LTM or Viking)
-        let memory_provider = crate::memory::build_memory_provider(config, None);
-
-        let idempotency_cache: Arc<DashMap<String, Instant>> = Arc::new(DashMap::new());
-
-        // Background cleanup: remove idempotency entries older than 5 minutes every 60 seconds.
-        {
-            let cache = Arc::clone(&idempotency_cache);
-            tokio::spawn(async move {
-                let ttl = std::time::Duration::from_secs(300); // 5 minutes
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
-                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-                loop {
-                    interval.tick().await;
-                    let now = Instant::now();
-                    cache.retain(|_, inserted| now.duration_since(*inserted) < ttl);
-                    tracing::debug!(
-                        remaining = cache.len(),
-                        "idempotency cache cleanup complete"
-                    );
-                }
-            });
-        }
-
         let state = Self {
+            // Core config & auth
             config: config.clone(),
-            model,
-            sessions: Arc::new(session_mgr),
-            cancel_tokens: Arc::new(RwLock::new(HashMap::new())),
             auth,
             started_at: std::time::Instant::now(),
-            cost_tracker,
-            usage_tracker,
-            request_metrics: RequestMetrics::default(),
+
+            // Agent & model
+            model: agent.model,
+            mcp_tools: agent.mcp_tools,
+            cost_tracker: agent.cost_tracker,
+            usage_tracker: agent.usage_tracker,
+            memory_provider: agent.memory_provider,
+            context_engine: agent.context_engine,
+
+            // Session management
+            sessions: Arc::new(session_mgr),
+            cancel_tokens: Arc::new(RwLock::new(HashMap::new())),
             write_lock,
-            log_buffer,
-            mcp_tools,
-            broadcaster,
-            rpc_router,
-            presence,
-            node_registry,
-            pairing_store,
-            exec_approval_manager,
-            exec_approvals_config,
+            run_queue: Arc::new(AgentRunQueue::new()),
             session_subscribers: Arc::new(RwLock::new(HashSet::new())),
             wizard_sessions: Arc::new(RwLock::new(HashMap::new())),
-            bootstrap_store: Arc::new(RwLock::new(crate::gateway::nodes::BootstrapStore::new())),
-            channel_registry: Arc::new(RwLock::new(ChannelRegistry::new())),
-            channel_manager: Arc::new(super::channel_manager::ChannelAdapterManager::new()),
-            dm_enforcer: {
-                let pairing_dir = dirs::home_dir()
-                    .unwrap_or_else(|| std::path::PathBuf::from("."))
-                    .join(".synapse")
-                    .join("pairing");
-                Arc::new(crate::channels::dm::FileDmPolicyEnforcer::new(
-                    pairing_dir,
-                    synaptic::DmPolicy::Pairing,
-                    None,
-                ))
-            },
-            approve_notifiers: Arc::new(crate::channels::dm::ApproveNotifierRegistry::default()),
-            run_queue: Arc::new(AgentRunQueue::new()),
-            event_bus,
+
+            // RPC & networking
+            broadcaster: rpc.broadcaster,
+            rpc_router: rpc.rpc_router,
+            presence: rpc.presence,
+            node_registry: rpc.node_registry,
+            pairing_store: rpc.pairing_store,
+            bootstrap_store: rpc.bootstrap_store,
+            idempotency_cache: rpc.idempotency_cache,
+
+            // Exec approvals
+            exec_approval_manager,
+            exec_approvals_config,
+
+            // Channel adapters
+            channel_registry: channels.channel_registry,
+            channel_manager: channels.channel_manager,
+            dm_enforcer: channels.dm_enforcer,
+            approve_notifiers: channels.approve_notifiers,
+
+            // Infrastructure & observability
+            request_metrics: RequestMetrics::default(),
+            log_buffer: LogBuffer::new(config.logging.memory.capacity),
+            event_bus: infra.event_bus,
             canvas_engine: Arc::new(CanvasEngine::new()),
-            plugin_registry,
-            memory_provider,
-            context_engine: Arc::new(ContextEngine::new(std::time::Duration::from_secs(1800))),
-            idempotency_cache,
+            plugin_registry: infra.plugin_registry,
         };
 
         Ok(state)

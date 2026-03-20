@@ -52,10 +52,14 @@ impl Tool for SessionsListTool {
         let memory = self.mgr.memory();
         let mut lines = Vec::new();
         for s in &sessions {
-            let count = memory.load(&s.id).await.map(|m| m.len()).unwrap_or(0);
+            let count = memory
+                .load(&s.session_id)
+                .await
+                .map(|m| m.len())
+                .unwrap_or(0);
             lines.push(format!(
                 "- {} (created: {}, messages: {})",
-                s.id, s.created_at, count
+                s.session_id, s.created_at, count
             ));
         }
         Ok(json!(lines.join("\n")))

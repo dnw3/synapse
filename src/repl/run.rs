@@ -300,7 +300,7 @@ pub async fn repl(
                 let turn_tokens = (prompt_chars + full_response.len()) / 4;
                 if turn_tokens > 0 {
                     if let Ok(Some(mut info)) = session_mgr.get_session(&current_session_id).await {
-                        info.token_count += turn_tokens as u64;
+                        info.total_tokens += turn_tokens as u64;
                         session_mgr.update_session(&info).await.ok();
                     }
                 }

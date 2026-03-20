@@ -18,7 +18,7 @@ use synaptic::DeliveryContext;
 use crate::agent;
 use crate::channels::formatter;
 use crate::channels::handler::AgentSession;
-use crate::config::bot::resolve_secret;
+use crate::config::bots::resolve_secret;
 use crate::config::{BotAllowlist, SynapseConfig};
 use crate::gateway::messages::MessageEnvelope;
 

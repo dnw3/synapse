@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic::core::SynapticError;
-use synaptic::middleware::{AgentMiddleware, ModelRequest, ModelResponse};
+use synaptic::core::{RunContext, SynapticError};
+use synaptic::middleware::{Interceptor, ModelCaller, ModelRequest, ModelResponse};
 
 use crate::config::ToolPolicyConfig;
 
@@ -114,10 +114,10 @@ fn tool_matches(pattern: &str, name: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Middleware
+// Interceptor
 // ---------------------------------------------------------------------------
 
-/// Middleware that enforces tool-level policies:
+/// Interceptor that enforces tool-level policies:
 ///
 /// 1. **Owner-only tools** — after the model responds, if any tool call targets
 ///    an owner-only tool and the conversation doesn't belong to the owner, the
@@ -165,47 +165,43 @@ impl ToolPolicyMiddleware {
 }
 
 #[async_trait]
-impl AgentMiddleware for ToolPolicyMiddleware {
-    /// Filter tool definitions before sending to the model.
-    async fn before_model(&self, request: &mut ModelRequest) -> Result<(), SynapticError> {
+impl Interceptor for ToolPolicyMiddleware {
+    async fn wrap_model_call(
+        &self,
+        mut request: ModelRequest,
+        ctx: &RunContext,
+        next: &dyn ModelCaller,
+    ) -> Result<ModelResponse, SynapticError> {
+        // Before: filter tool definitions
         let has_filters = !self.config.tool_allow.is_empty() || !self.config.tool_deny.is_empty();
         if has_filters {
             request.tools.retain(|td| self.is_tool_allowed(&td.name));
         }
-        Ok(())
-    }
 
-    /// After the model responds, check for owner-only tool violations.
-    async fn after_model(
-        &self,
-        _request: &ModelRequest,
-        response: &mut ModelResponse,
-    ) -> Result<(), SynapticError> {
-        if self.config.owner_only_tools.is_empty() {
-            return Ok(());
+        let mut response = next.call(request, ctx).await?;
+
+        // After: check for owner-only tool violations
+        if !self.config.owner_only_tools.is_empty() {
+            let tool_calls = response.message.tool_calls();
+            if !tool_calls.is_empty() {
+                let violations: Vec<&str> = tool_calls
+                    .iter()
+                    .filter(|tc| self.is_owner_only(&tc.name))
+                    .map(|tc| tc.name.as_str())
+                    .collect();
+
+                if !violations.is_empty() {
+                    use synaptic::core::Message;
+                    response.message = Message::ai(format!(
+                        "I cannot execute the following owner-only tool(s): {}. \
+                         This operation requires owner privileges.",
+                        violations.join(", ")
+                    ));
+                }
+            }
         }
 
-        let tool_calls = response.message.tool_calls();
-        if tool_calls.is_empty() {
-            return Ok(());
-        }
-
-        let violations: Vec<&str> = tool_calls
-            .iter()
-            .filter(|tc| self.is_owner_only(&tc.name))
-            .map(|tc| tc.name.as_str())
-            .collect();
-
-        if !violations.is_empty() {
-            use synaptic::core::Message;
-            response.message = Message::ai(format!(
-                "I cannot execute the following owner-only tool(s): {}. \
-                 This operation requires owner privileges.",
-                violations.join(", ")
-            ));
-        }
-
-        Ok(())
+        Ok(response)
     }
 }
 

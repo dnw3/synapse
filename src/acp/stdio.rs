@@ -7,10 +7,10 @@ use std::sync::Arc;
 
 use colored::Colorize;
 use synaptic::core::{ChatModel, MemoryStore, Message};
+use synaptic::deep::acp::handler::AcpHandler;
+use synaptic::deep::acp::types::*;
 use synaptic::graph::MessageState;
 use synaptic::session::SessionManager;
-use synaptic_deep::acp::handler::AcpHandler;
-use synaptic_deep::acp::types::*;
 
 use crate::agent;
 use crate::config::SynapseConfig;

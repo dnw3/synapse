@@ -115,7 +115,9 @@
     "pong": "Ready",
     "none": "none",
     "wsConnected": "WS Connected",
-    "wsDisconnected": "WS Disconnected"
+    "wsDisconnected": "WS Disconnected",
+    "connected": "Gateway connected",
+    "disconnected": "Gateway disconnected"
   },
   "approval": {
     "title": "Tool Approval Required",

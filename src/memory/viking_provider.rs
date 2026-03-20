@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use synaptic::core::SynapticError;
@@ -68,11 +66,6 @@ impl VikingMemoryProvider {
             client: builder.build().unwrap_or_default(),
             config,
         }
-    }
-
-    /// Return a reference to the current configuration.
-    pub fn config(&self) -> &VikingConfig {
-        &self.config
     }
 
     /// Build the full URL for the given API path.

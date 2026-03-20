@@ -143,13 +143,16 @@ fn detect_mime(path: &Path) -> &'static str {
 pub struct TranscribeAudioTool {
     work_dir: PathBuf,
     #[cfg(feature = "voice")]
-    stt: Arc<dyn synaptic_voice::SttProvider>,
+    stt: Arc<dyn synaptic_integrations::voice::SttProvider>,
 }
 
 impl TranscribeAudioTool {
     /// Create the tool backed by a real STT provider (voice feature).
     #[cfg(feature = "voice")]
-    pub fn new(work_dir: &Path, stt: Arc<dyn synaptic_voice::SttProvider>) -> Arc<dyn Tool> {
+    pub fn new(
+        work_dir: &Path,
+        stt: Arc<dyn synaptic_integrations::voice::SttProvider>,
+    ) -> Arc<dyn Tool> {
         Arc::new(Self {
             work_dir: work_dir.to_path_buf(),
             stt,
@@ -241,7 +244,7 @@ impl Tool for TranscribeAudioTool {
             .await
             .map_err(|e| SynapticError::Tool(format!("Audio task failed: {}", e)))??;
 
-            let opts = synaptic_voice::SttOptions {
+            let opts = synaptic_integrations::voice::SttOptions {
                 language,
                 format,
                 prompt: None,
@@ -261,7 +264,7 @@ impl Tool for TranscribeAudioTool {
 
 /// Detect audio format from file extension.
 #[cfg(feature = "voice")]
-fn detect_audio_format(path: &Path) -> synaptic_voice::AudioFormat {
+fn detect_audio_format(path: &Path) -> synaptic_integrations::voice::AudioFormat {
     match path
         .extension()
         .and_then(|e| e.to_str())
@@ -269,11 +272,11 @@ fn detect_audio_format(path: &Path) -> synaptic_voice::AudioFormat {
         .to_lowercase()
         .as_str()
     {
-        "wav" => synaptic_voice::AudioFormat::Wav,
-        "mp3" => synaptic_voice::AudioFormat::Mp3,
-        "ogg" | "oga" => synaptic_voice::AudioFormat::Ogg,
-        "flac" => synaptic_voice::AudioFormat::Flac,
-        "pcm" | "raw" => synaptic_voice::AudioFormat::Pcm,
-        _ => synaptic_voice::AudioFormat::Wav,
+        "wav" => synaptic_integrations::voice::AudioFormat::Wav,
+        "mp3" => synaptic_integrations::voice::AudioFormat::Mp3,
+        "ogg" | "oga" => synaptic_integrations::voice::AudioFormat::Ogg,
+        "flac" => synaptic_integrations::voice::AudioFormat::Flac,
+        "pcm" | "raw" => synaptic_integrations::voice::AudioFormat::Pcm,
+        _ => synaptic_integrations::voice::AudioFormat::Wav,
     }
 }

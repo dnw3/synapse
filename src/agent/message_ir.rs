@@ -8,10 +8,7 @@
 //! use `synaptic::core::message_ir` directly. This module delegates to it
 //! internally so behaviour is consistent with the `channels::formatter` pipeline.
 
-// Public API surface — not all items are called from within the binary today,
-// but they form part of the module's stable interface.
 #![allow(dead_code)]
-
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,3 @@
-// Framework middleware deprecated → EventSubscriber migration in progress
-#![allow(deprecated)]
-
 #[cfg(feature = "web")]
 mod acp;
 mod agent;

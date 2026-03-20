@@ -9,6 +9,8 @@ interface SidebarFooterProps {
   themeMode: string;
   onCycleTheme: () => void;
   onToggleLanguage: () => void;
+  /** WebSocket connection status — shows as a status dot next to the brand name. */
+  connected?: boolean;
   /** @deprecated Mode switch is no longer needed with unified sidebar */
   sidebarMode?: "chat" | "dashboard";
   /** @deprecated Mode switch is no longer needed with unified sidebar */
@@ -20,6 +22,7 @@ export default function SidebarFooter({
   themeMode,
   onCycleTheme,
   onToggleLanguage,
+  connected,
   sidebarMode,
   onSwitchMode,
 }: SidebarFooterProps) {
@@ -42,6 +45,25 @@ export default function SidebarFooter({
         <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">
           {identity?.name || t("sidebar.brand")}
         </span>
+        {/* Connection status dot */}
+        {connected !== undefined && (
+          <span
+            className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors ${
+              connected
+                ? "bg-[var(--status-ok,#34c759)]"
+                : "bg-[var(--status-danger,#ff3b30)]"
+            }`}
+            style={{
+              boxShadow: connected
+                ? "0 0 0 3px color-mix(in srgb, var(--status-ok, #34c759) 14%, transparent)"
+                : "0 0 0 3px color-mix(in srgb, var(--status-danger, #ff3b30) 14%, transparent)",
+            }}
+            role="img"
+            aria-live="polite"
+            aria-label={connected ? t("status.connected") : t("status.disconnected")}
+            title={connected ? t("status.connected") : t("status.disconnected")}
+          />
+        )}
       </div>
       {/* Right: mode switch (legacy) + theme + language */}
       <div className="flex items-center gap-0.5 flex-shrink-0">

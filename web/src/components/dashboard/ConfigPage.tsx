@@ -36,6 +36,7 @@ interface ConfigSectionSchema {
 interface ConfigSchemaData {
   sections: ConfigSectionSchema[];
   sensitive_patterns: string[];
+  provider_defaults?: Record<string, string>;
 }
 
 // TOML parsing types
@@ -655,6 +656,17 @@ export default function ConfigPage({ filterSection }: { filterSection?: string }
     const onChangeNew = (v: string) => handleAddField(activeMerged!.schema.key, fieldSchema.key, v, fieldSchema.type);
     const onChange = hasValue ? onChangeExisting : onChangeNew;
 
+    // Dynamic placeholder for base_url: use provider_defaults map from schema
+    let effectivePlaceholder = fieldSchema.placeholder ?? fieldSchema.default_value;
+    if (fieldSchema.key === "base_url" && schema?.provider_defaults) {
+      const providerField = activeMerged?.toml?.fields.find((f) => f.key === "provider");
+      const currentProvider = providerField ? unquote(providerField.value) : "";
+      const providerUrl = currentProvider ? schema.provider_defaults[currentProvider] : undefined;
+      if (providerUrl) {
+        effectivePlaceholder = `${t("config.default")}: ${providerUrl}`;
+      }
+    }
+
     return (
       <div key={fieldSchema.key} className="group py-3 first:pt-0 border-b border-[var(--border-subtle)]/50 last:border-b-0">
         <div className="flex items-start gap-3">
@@ -696,9 +708,9 @@ export default function ConfigPage({ filterSection }: { filterSection?: string }
         ) : fieldSchema.type === "enum" && fieldSchema.options ? (
           <EnumField value={rawValue} options={fieldSchema.options} onChange={onChange} />
         ) : fieldSchema.type === "number" ? (
-          <NumberField value={rawValue} onChange={onChange} placeholder={fieldSchema.placeholder ?? fieldSchema.default_value} />
+          <NumberField value={rawValue} onChange={onChange} placeholder={effectivePlaceholder} />
         ) : (
-          <TextField value={rawValue} onChange={onChange} placeholder={fieldSchema.placeholder ?? fieldSchema.default_value} />
+          <TextField value={rawValue} onChange={onChange} placeholder={effectivePlaceholder} />
         )}
       </div>
     );

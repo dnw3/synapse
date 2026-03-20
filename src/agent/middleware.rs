@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic::core::{ChatModel, Message, SynapticError};
-use synaptic::middleware::{AgentMiddleware, ModelFallbackMiddleware, ModelRequest, ModelResponse};
+use synaptic::core::{ChatModel, Message, RunContext, SynapticError};
+use synaptic::middleware::{
+    BaseChatModelCaller, Interceptor, ModelCaller, ModelRequest, ModelResponse,
+};
 use tokio::sync::Mutex;
 
 use crate::config::SynapseConfig;
@@ -42,12 +44,15 @@ impl LoopDetectionMiddleware {
 }
 
 #[async_trait]
-impl AgentMiddleware for LoopDetectionMiddleware {
-    async fn after_model(
+impl Interceptor for LoopDetectionMiddleware {
+    async fn wrap_model_call(
         &self,
-        _request: &ModelRequest,
-        response: &mut ModelResponse,
-    ) -> Result<(), SynapticError> {
+        request: ModelRequest,
+        ctx: &RunContext,
+        next: &dyn ModelCaller,
+    ) -> Result<ModelResponse, SynapticError> {
+        let mut response = next.call(request, ctx).await?;
+
         let is_loop = if let Some(hash) = Self::hash_tool_calls(&response.message) {
             let mut history = self.history.lock().await;
 
@@ -78,17 +83,17 @@ impl AgentMiddleware for LoopDetectionMiddleware {
                 "I notice I've been repeating the same action. Let me try a different approach.",
             );
         }
-        Ok(())
+        Ok(response)
     }
 }
 
-/// Build ModelFallbackMiddleware from the fallback_models config.
+/// Build a fallback interceptor from the fallback_models config.
 ///
 /// Enhanced with registry support:
 /// 1. If the primary model's provider has multi-key rotation, extra fallback instances
 ///    are built using different API keys (round-robin on 429/error).
 /// 2. Fallback model names are resolved via the registry (supporting aliases).
-pub fn build_fallback_middleware(config: &SynapseConfig) -> Option<ModelFallbackMiddleware> {
+pub fn build_fallback_interceptor(config: &SynapseConfig) -> Option<FallbackInterceptor> {
     let registry = ModelRegistry::from_config(config);
     let mut fallbacks: Vec<Arc<dyn ChatModel>> = Vec::new();
 
@@ -119,5 +124,49 @@ pub fn build_fallback_middleware(config: &SynapseConfig) -> Option<ModelFallback
     }
 
     tracing::info!(count = fallbacks.len(), "Fallback model(s) configured");
-    Some(ModelFallbackMiddleware::new(fallbacks))
+    Some(FallbackInterceptor::new(fallbacks))
+}
+
+/// Interceptor that tries fallback models when the primary model fails.
+pub struct FallbackInterceptor {
+    fallbacks: Vec<Arc<dyn ChatModel>>,
+}
+
+impl FallbackInterceptor {
+    pub fn new(fallbacks: Vec<Arc<dyn ChatModel>>) -> Self {
+        Self { fallbacks }
+    }
+}
+
+#[async_trait]
+impl Interceptor for FallbackInterceptor {
+    async fn wrap_model_call(
+        &self,
+        request: ModelRequest,
+        ctx: &RunContext,
+        next: &dyn ModelCaller,
+    ) -> Result<ModelResponse, SynapticError> {
+        // Try primary model first
+        match next.call(request.clone(), ctx).await {
+            Ok(resp) => Ok(resp),
+            Err(primary_err) => {
+                tracing::warn!(error = %primary_err, "Primary model failed, trying fallbacks");
+                // Try each fallback using BaseChatModelCaller
+                for (i, fallback) in self.fallbacks.iter().enumerate() {
+                    let caller = BaseChatModelCaller::new(fallback.clone());
+                    match caller.call(request.clone(), ctx).await {
+                        Ok(resp) => {
+                            tracing::info!(fallback_index = i, "Fallback model succeeded");
+                            return Ok(resp);
+                        }
+                        Err(e) => {
+                            tracing::warn!(fallback_index = i, error = %e, "Fallback model also failed");
+                        }
+                    }
+                }
+                // All fallbacks failed — return the original error
+                Err(primary_err)
+            }
+        }
+    }
 }

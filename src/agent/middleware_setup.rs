@@ -6,7 +6,7 @@ use synaptic::condenser::CondenserMiddleware;
 use synaptic::condenser::{
     ChunkedSummarizingCondenser, Condenser, LlmSummarizingCondenser, TokenBudgetCondenser,
 };
-use synaptic::core::{ChatModel, SynapticError, TokenCounter};
+use synaptic::core::{ChatModel, RunContext, SynapticError, TokenCounter};
 use synaptic::deep::backend::Backend;
 use synaptic::deep::DeepAgentOptions;
 use synaptic::middleware::{
@@ -33,9 +33,10 @@ impl Interceptor for CostTrackingInterceptor {
     async fn wrap_model_call(
         &self,
         request: ModelRequest,
+        ctx: &RunContext,
         next: &dyn ModelCaller,
     ) -> Result<ModelResponse, SynapticError> {
-        let response = next.call(request).await?;
+        let response = next.call(request, ctx).await?;
         match response.usage {
             Some(ref usage) => {
                 tracing::debug!(

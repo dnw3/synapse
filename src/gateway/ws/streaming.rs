@@ -26,6 +26,13 @@ impl ChatModel for StreamingProxy {
         use futures::StreamExt;
         use synaptic::core::Message;
 
+        let tool_names_req: Vec<&str> = request.tools.iter().map(|t| t.name.as_str()).collect();
+        tracing::info!(
+            message_count = request.messages.len(),
+            tool_count = request.tools.len(),
+            tool_names = ?tool_names_req,
+            "StreamingProxy: starting model stream"
+        );
         let mut stream = self.inner.stream_chat(request);
         let mut content = String::new();
         // Accumulate tool call chunks by index — streaming sends partial data:
@@ -33,9 +40,21 @@ impl ChatModel for StreamingProxy {
         let mut tc_map: std::collections::BTreeMap<usize, (String, String, String)> =
             std::collections::BTreeMap::new(); // index -> (id, name, args_buffer)
         let mut usage = None;
+        let mut chunk_idx = 0usize;
 
+        tracing::debug!("StreamingProxy: entering stream loop");
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
+            tracing::debug!(
+                chunk_idx,
+                content_len = chunk.content.len(),
+                content_preview = %if chunk.content.len() > 100 { &chunk.content[..100] } else { &chunk.content },
+                reasoning_len = chunk.reasoning.len(),
+                tool_call_chunks = chunk.tool_call_chunks.len(),
+                has_usage = chunk.usage.is_some(),
+                "StreamingProxy: chunk received"
+            );
+            chunk_idx += 1;
             if !chunk.content.is_empty() {
                 let _ = self.token_tx.send(chunk.content.clone());
                 content.push_str(&chunk.content);
@@ -63,6 +82,10 @@ impl ChatModel for StreamingProxy {
                 usage = chunk.usage;
             }
         }
+        tracing::debug!(
+            chunk_idx,
+            "StreamingProxy: stream loop exited (stream returned None)"
+        );
 
         // Build final tool calls from accumulated chunks
         let tool_calls: Vec<ToolCall> = tc_map
@@ -82,6 +105,16 @@ impl ChatModel for StreamingProxy {
                 }
             })
             .collect();
+
+        let tc_names: Vec<&str> = tool_calls.iter().map(|tc| tc.name.as_str()).collect();
+        tracing::info!(
+            content_len = content.len(),
+            content_preview = %if content.len() > 200 { &content[..200] } else { &content },
+            tool_call_count = tool_calls.len(),
+            tool_names = ?tc_names,
+            has_usage = usage.is_some(),
+            "StreamingProxy: model stream completed"
+        );
 
         Ok(ChatResponse {
             message: Message::ai_with_tool_calls(content, tool_calls),

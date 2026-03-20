@@ -115,7 +115,9 @@
     "pong": "就绪",
     "none": "无",
     "wsConnected": "WebSocket 已连接",
-    "wsDisconnected": "WebSocket 未连接"
+    "wsDisconnected": "WebSocket 未连接",
+    "connected": "网关已连接",
+    "disconnected": "网关未连接"
   },
   "approval": {
     "title": "工具调用需要审批",

@@ -18,7 +18,7 @@ pub async fn resolve_skill_slash_command(
     args: &str,
     cwd: &std::path::Path,
 ) -> Option<SkillSlashResult> {
-    use synaptic_deep::middleware::skills::substitute_arguments;
+    use synaptic::deep::middleware::skills::substitute_arguments;
 
     // Search order: synapse personal > claude personal > project > legacy commands
     let search_dirs = {

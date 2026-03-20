@@ -12,7 +12,7 @@ use synaptic::core::{
 
 use crate::agent;
 use crate::channels::handler::AgentSession;
-use crate::config::bot::resolve_secret;
+use crate::config::bots::resolve_secret;
 use crate::config::{SynapseConfig, TlonBotConfig};
 
 /// Run the Tlon (Urbit) bot adapter using HTTP SSE polling.

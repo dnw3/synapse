@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -54,10 +52,6 @@ impl CanvasEngine {
 
     pub fn render(&self, canvas_type: &str, data: &Value) -> Option<CanvasOutput> {
         self.renderers.get(canvas_type)?.render(data).ok()
-    }
-
-    pub fn available_types(&self) -> Vec<String> {
-        self.renderers.keys().cloned().collect()
     }
 }
 
@@ -600,19 +594,6 @@ mod tests {
         assert!(output.html.contains("data-recharts"));
         assert!(output.html.contains("bar"));
         assert!(output.html.contains("Sales"));
-    }
-
-    #[test]
-    fn engine_available_types_includes_builtins() {
-        let engine = CanvasEngine::new();
-        let types = engine.available_types();
-        for expected in &["diagram", "form", "table", "plot", "card"] {
-            assert!(
-                types.contains(&expected.to_string()),
-                "missing type: {expected}"
-            );
-        }
-        assert_eq!(types.len(), 5);
     }
 
     #[test]

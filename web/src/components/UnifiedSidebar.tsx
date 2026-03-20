@@ -29,6 +29,8 @@ interface UnifiedSidebarProps {
   themeMode: string;
   onCycleTheme: () => void;
   onToggleLanguage: () => void;
+  // Connection
+  connected?: boolean;
   // Mobile
   isOpen: boolean;
   onClose: () => void;
@@ -41,6 +43,7 @@ export default function UnifiedSidebar({
   themeMode,
   onCycleTheme,
   onToggleLanguage,
+  connected,
   isOpen,
   onClose,
 }: UnifiedSidebarProps) {
@@ -192,6 +195,7 @@ export default function UnifiedSidebar({
         themeMode={themeMode}
         onCycleTheme={onCycleTheme}
         onToggleLanguage={onToggleLanguage}
+        connected={connected}
       />
     </aside>
   );

@@ -352,11 +352,11 @@ pub async fn run_voice_loop(
 
     // TTS/STT setup (voice feature only)
     #[cfg(feature = "voice")]
-    let voice_provider: Option<Arc<synaptic_voice::openai::OpenAiVoice>> = {
+    let voice_provider: Option<Arc<synaptic_integrations::voice::openai::OpenAiVoice>> = {
         let api_key_env = voice_config
             .and_then(|vc| vc.api_key_env.as_deref())
             .unwrap_or("OPENAI_API_KEY");
-        match synaptic_voice::openai::OpenAiVoice::new(api_key_env) {
+        match synaptic_integrations::voice::openai::OpenAiVoice::new(api_key_env) {
             Ok(provider) => {
                 eprintln!(
                     "  {} OpenAI TTS/STT enabled (wake word: \"{}\")",
@@ -425,9 +425,9 @@ pub async fn run_voice_loop(
                         eprintln!("({} bytes recorded)", pcm_bytes.len());
                         // Step 2: Transcribe
                         if let Some(ref provider) = voice_provider {
-                            use synaptic_voice::SttProvider as _;
-                            let opts = synaptic_voice::SttOptions {
-                                format: synaptic_voice::AudioFormat::Pcm,
+                            use synaptic_integrations::voice::SttProvider as _;
+                            let opts = synaptic_integrations::voice::SttOptions {
+                                format: synaptic_integrations::voice::AudioFormat::Pcm,
                                 ..Default::default()
                             };
                             match provider.transcribe(&pcm_bytes, &opts).await {
@@ -519,10 +519,10 @@ pub async fn run_voice_loop(
                 // --- Step 5: TTS + playback -----------------------------------
                 #[cfg(feature = "voice")]
                 if let Some(ref provider) = voice_provider {
-                    use synaptic_voice::TtsProvider as _;
-                    let tts_opts = synaptic_voice::TtsOptions {
+                    use synaptic_integrations::voice::TtsProvider as _;
+                    let tts_opts = synaptic_integrations::voice::TtsOptions {
                         voice: voice_name.to_string(),
-                        format: synaptic_voice::AudioFormat::Pcm,
+                        format: synaptic_integrations::voice::AudioFormat::Pcm,
                         ..Default::default()
                     };
                     match provider.synthesize(reply, &tts_opts).await {

@@ -11,46 +11,66 @@
 // IR-based formatting (message-ir feature)
 // ---------------------------------------------------------------------------
 
+use synaptic::core::message_ir::{
+    format_with_renderer, IRRenderer, MarkdownRenderer, PlainTextRenderer, RenderOptions,
+    RenderTarget, TableMode,
+};
+
+use super::platform_renderers::{SlackRenderer, TelegramRenderer};
+
+/// Get the appropriate renderer for a channel name.
+fn renderer_for_channel(channel: &str) -> &'static dyn IRRenderer {
+    match channel {
+        "lark" | "feishu" => &MarkdownRenderer,
+        "slack" => &SlackRenderer,
+        "telegram" => &TelegramRenderer,
+        "discord" => &MarkdownRenderer,
+        "signal" => &PlainTextRenderer,
+        "whatsapp" => &PlainTextRenderer,
+        "imessage" => &PlainTextRenderer,
+        "mattermost" => &MarkdownRenderer,
+        "matrix" => &MarkdownRenderer,
+        "teams" => &MarkdownRenderer,
+        "dingtalk" => &MarkdownRenderer,
+        "googlechat" => &PlainTextRenderer,
+        "line" => &PlainTextRenderer,
+        "wechat" => &PlainTextRenderer,
+        "irc" => &PlainTextRenderer,
+        "twitch" => &PlainTextRenderer,
+        _ => &PlainTextRenderer,
+    }
+}
+
+/// Default table mode for a channel.
+fn table_mode_for_channel(channel: &str) -> TableMode {
+    match channel {
+        "signal" | "whatsapp" | "imessage" | "googlechat" | "line" | "wechat" | "irc"
+        | "twitch" => TableMode::Bullets,
+        _ => TableMode::Code,
+    }
+}
+
 /// Format a message for a specific channel using the Message IR system.
 ///
 /// Parses Markdown into a structured IR, renders for the target platform,
 /// and chunks to respect character limits.
 pub fn format_for_channel(text: &str, channel: &str, chunk_limit: usize) -> Vec<String> {
-    use synaptic::core::message_ir::{
-        format_for_channel as ir_format, RenderOptions, RenderTarget,
-    };
-
-    let target = match channel {
-        "lark" | "feishu" => RenderTarget::Markdown,
-        "slack" => RenderTarget::SlackMrkdwn,
-        "telegram" => RenderTarget::TelegramHtml,
-        "discord" => RenderTarget::Markdown,
-        "signal" => RenderTarget::PlainText,
-        "whatsapp" => RenderTarget::PlainText,
-        "imessage" => RenderTarget::PlainText,
-        "mattermost" => RenderTarget::Markdown,
-        "matrix" => RenderTarget::Markdown,
-        "teams" => RenderTarget::Markdown,
-        "dingtalk" => RenderTarget::Markdown,
-        "googlechat" => RenderTarget::PlainText,
-        "line" => RenderTarget::PlainText,
-        "wechat" => RenderTarget::PlainText,
-        "irc" => RenderTarget::PlainText,
-        "twitch" => RenderTarget::PlainText,
-        _ => RenderTarget::PlainText,
-    };
-
-    let options = RenderOptions::new(target).with_chunk_limit(chunk_limit);
-    ir_format(text, &options)
+    let renderer = renderer_for_channel(channel);
+    let options = RenderOptions::new(RenderTarget::PlainText)
+        .with_chunk_limit(chunk_limit)
+        .with_table_mode(table_mode_for_channel(channel));
+    format_with_renderer(text, renderer, &options)
 }
 
 /// Format for Lark card rendering (returns rendered card content string).
 #[allow(dead_code)]
 pub fn format_for_lark_card(text: &str) -> String {
-    use synaptic::core::message_ir::{parse_markdown, RenderOptions, RenderTarget};
+    use synaptic::core::message_ir::{parse_markdown, RenderTarget};
+    use synaptic::lark::LarkCardIRRenderer;
 
     let ir = parse_markdown(text);
-    ir.render(&RenderOptions::new(RenderTarget::LarkCard))
+    let options = RenderOptions::new(RenderTarget::LarkCard).with_chunk_limit(30000);
+    LarkCardIRRenderer.render(&ir, &options)
 }
 
 // ---------------------------------------------------------------------------

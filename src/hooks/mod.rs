@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use colored::Colorize;
 use synaptic::core::SynapticError;
-use synaptic_deep::{SkillHookEvent, SkillHooksExecutor};
+use synaptic::deep::{SkillHookEvent, SkillHooksExecutor};
 
 use crate::config::SynapseConfig;
 

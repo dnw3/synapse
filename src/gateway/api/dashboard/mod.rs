@@ -1,10 +1,14 @@
+mod agents;
 mod channels;
 mod config;
-mod infrastructure;
+mod debug;
+mod monitoring;
+mod nodes;
 mod schedules;
 mod sessions;
 mod skills;
 mod stats;
+mod workspace;
 
 use std::path::Path;
 
@@ -26,7 +30,11 @@ pub fn routes() -> Router<AppState> {
         .merge(config::routes())
         .merge(channels::routes())
         .merge(skills::routes())
-        .merge(infrastructure::routes())
+        .merge(agents::routes())
+        .merge(workspace::routes())
+        .merge(nodes::routes())
+        .merge(monitoring::routes())
+        .merge(debug::routes())
 }
 
 // ---------------------------------------------------------------------------

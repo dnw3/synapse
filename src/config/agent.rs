@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use super::bot::GroupSessionScope;
+use super::bots::GroupSessionScope;
 use super::memory::default_true;
 
 // ---------------------------------------------------------------------------

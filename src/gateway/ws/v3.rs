@@ -740,6 +740,7 @@ async fn handle_v3_agent(
                         }
                     }
                     Some(Err(e)) => {
+                        let _g = req_span.enter();
                         tracing::error!(error = %e, "v3 agent execution failed");
                         if !token_buffer.is_empty() {
                             let chunk = std::mem::take(&mut token_buffer);
@@ -790,7 +791,9 @@ async fn handle_v3_agent(
                             }
                         }
                         let elapsed = execution_start.elapsed().as_millis();
+                        let _g = req_span.enter();
                         tracing::info!(duration_ms = %elapsed, "v3 turn completed");
+                        drop(_g);
 
                         // Usage tracking is handled by CostTrackingSubscriber via EventBus.
 

@@ -148,7 +148,11 @@ async fn metrics_handler(
         let sessions = state.sessions.list_sessions().await.unwrap_or_default();
         let mut total = 0usize;
         for s in &sessions {
-            total += memory.load(&s.id).await.map(|m| m.len()).unwrap_or(0);
+            total += memory
+                .load(&s.session_id)
+                .await
+                .map(|m| m.len())
+                .unwrap_or(0);
         }
         total
     };

@@ -3,7 +3,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde_json::Value;
 
-use crate::config::bot::LarkCardConfig;
+use crate::config::bots::LarkCardConfig;
 use crate::gateway::state::AppState;
 
 /// GET /api/config/lark-card — returns current card config
@@ -39,7 +39,6 @@ pub async fn preview_lark_card(
     State(state): State<AppState>,
     Json(body): Json<PreviewRequest>,
 ) -> Json<Value> {
-    use crate::channels::card_builder::assemble_final_card;
     use synaptic::core::message_ir::{parse_markdown, RenderOptions, RenderTarget};
     use synaptic::lark::card_elements::render_lark_card_elements;
 
@@ -52,12 +51,17 @@ pub async fn preview_lark_card(
     let ir = parse_markdown(&body.sample_text);
     let options = RenderOptions::new(RenderTarget::LarkCard);
     let elements = render_lark_card_elements(&ir, &options);
-    let bot_name = if card_config.header_title.is_empty() {
+    let title = if card_config.header_title.is_empty() {
         "Synapse"
     } else {
         &card_config.header_title
     };
-    let card = assemble_final_card(elements, &card_config, bot_name);
+    let framework_config = synaptic::lark::CardConfig {
+        header_title: title.to_string(),
+        template: card_config.template.clone(),
+        header_icon: card_config.header_icon.clone(),
+    };
+    let card = synaptic::lark::assemble_card(elements, &framework_config);
     Json(card)
 }
 

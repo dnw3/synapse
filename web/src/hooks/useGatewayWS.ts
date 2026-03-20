@@ -305,8 +305,9 @@ export function useGatewayWS(conversationId: string | null): UseGatewayWSReturn 
           const frameId = data.id as string;
 
           // Check if this is the connect handshake response (hello-ok)
-          if (!v3ReadyRef.current && data.result) {
-            // This is likely the hello-ok response to our connect request
+          // v3 ServerFrame uses `payload` (not `result`) and `ok` boolean
+          if (!v3ReadyRef.current && (data.ok || data.payload)) {
+            // This is the hello-ok response to our connect request
             v3ReadyRef.current = true;
             setConnected(true);
             reconnectAttemptsRef.current = 0;
@@ -325,16 +326,19 @@ export function useGatewayWS(conversationId: string | null): UseGatewayWSReturn 
           if (pending) {
             clearTimeout(pending.timer);
             pendingRpcsRef.current.delete(frameId);
-            if (data.error) {
-              pending.reject(new Error(typeof data.error === "string" ? data.error : data.error.message ?? "RPC error"));
+            if (data.error || data.ok === false) {
+              const errMsg = typeof data.error === "string" ? data.error : data.error?.message ?? "RPC error";
+              pending.reject(new Error(errMsg));
             } else {
-              pending.resolve(data.result);
+              pending.resolve(data.payload ?? data.result);
             }
             return;
           }
 
           // chat.send final response — treat as "done" event
-          if (data.result && typeof data.result === "object" && "request_id" in data.result) {
+          const resultPayload = data.payload ?? data.result;
+          if (resultPayload && typeof resultPayload === "object" && "request_id" in resultPayload) {
+            setStatus("idle");
             setEvents((prev) => [
               ...prev,
               {
@@ -375,6 +379,8 @@ export function useGatewayWS(conversationId: string | null): UseGatewayWSReturn 
           if (translated) {
             if (translated.type === "status") {
               setStatus(translated.state);
+            } else if (translated.type === "done" || translated.type === "error") {
+              setStatus("idle");
             }
             setEvents((prev) => [...prev, translated]);
           }

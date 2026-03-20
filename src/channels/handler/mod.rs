@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use async_trait::async_trait;
 use futures::StreamExt;
 use synaptic::core::{
     ChatModel, ChatRequest, ContentBlock, HeuristicTokenCounter, MemoryStore, Message, TokenCounter,
@@ -62,21 +61,8 @@ enum ResolvedRoute {
     },
 }
 
-/// Callback for streaming token output to bot adapters.
-///
-/// Implementors receive incremental updates as the agent generates a response,
-/// enabling real-time message editing in chat platforms (e.g. Lark, Telegram).
-#[async_trait]
-pub trait StreamingOutput: Send + Sync {
-    /// Called when new text content is generated (incremental delta).
-    async fn on_token(&self, token: &str);
-    /// Called when the agent invokes a tool.
-    async fn on_tool_call(&self, tool_name: &str);
-    /// Called when the agent finishes successfully.
-    async fn on_complete(&self, full_response: &str);
-    /// Called on error.
-    async fn on_error(&self, error: &str);
-}
+// Re-export streaming types from the framework layer.
+pub use synaptic::graph::streaming::{CompletionMeta, StreamingOutput, ToolCallInfo};
 
 /// Shared agent session handler for all bot adapters.
 ///
@@ -565,42 +551,46 @@ impl AgentSession {
 
         // Usage tracking is handled by CostTrackingSubscriber via EventBus.
 
-        let result = if self.deep_agent {
-            self.handle_deep_agent_streaming(
-                &sid,
-                &envelope.content,
-                &content_blocks,
-                output.clone(),
-                &agent_info,
-            )
-            .await
-        } else {
-            // Simple chat doesn't support streaming, fall back and emit via callbacks
-            let res = self
-                .handle_simple_chat(&sid, &envelope.content, &content_blocks)
-                .await;
-            if let Ok(ref response) = res {
-                output.on_token(response).await;
-            }
-            res
-        };
+        let result: Result<(String, u32, u32), Box<dyn std::error::Error + Send + Sync>> =
+            if self.deep_agent {
+                self.handle_deep_agent_streaming(
+                    &sid,
+                    &envelope.content,
+                    &content_blocks,
+                    output.clone(),
+                    &agent_info,
+                )
+                .await
+            } else {
+                // Simple chat doesn't support streaming, fall back and emit via callbacks
+                let res = self
+                    .handle_simple_chat(&sid, &envelope.content, &content_blocks)
+                    .await;
+                if let Ok(ref response) = res {
+                    output.on_token(response).await;
+                }
+                res.map(|r| (r, 0u32, 0u32))
+            };
 
-        let duration_ms = start.elapsed().as_millis();
+        let duration_ms = start.elapsed().as_millis() as u64;
         match &result {
-            Ok(response) => {
-                output.on_complete(response).await;
-                tracing::info!(
-                    duration_ms = duration_ms as u64,
-                    "streaming message processed"
-                );
+            Ok((response, input_tokens, output_tokens)) => {
+                let meta = CompletionMeta {
+                    input_tokens: *input_tokens,
+                    output_tokens: *output_tokens,
+                    duration_ms,
+                    request_id: Some(envelope.request_id.clone()),
+                };
+                output.on_complete(response, Some(&meta)).await;
+                tracing::info!(duration_ms, "streaming message processed");
             }
             Err(e) => {
                 output.on_error(&e.to_string()).await;
-                tracing::error!(duration_ms = duration_ms as u64, error = %e, "streaming message failed");
+                tracing::error!(duration_ms = duration_ms, error = %e, "streaming message failed");
             }
         }
 
-        let response = result?;
+        let (response, _, _) = result?;
 
         // Resolve delivery target via priority chain
         let delivery_target =

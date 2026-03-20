@@ -1,16 +1,13 @@
-pub mod auto_reply;
 mod builder;
 pub mod callbacks;
 mod context;
 pub mod context_engine;
-pub mod copilot_proxy;
 pub mod discovery;
-pub mod link_understanding;
 mod mcp;
-pub mod media_understanding;
 pub mod message_ir;
 pub(crate) mod middleware;
-mod model;
+mod middleware_setup;
+pub(crate) mod model;
 pub mod prose_vm;
 pub mod registry;
 pub mod runtime;
@@ -19,7 +16,7 @@ pub mod subscribers;
 pub mod templates;
 pub mod thinking;
 pub mod tool_policy;
-pub mod tracing_mw;
+mod tools_setup;
 pub mod workspace;
 
 // Re-export public API to maintain backward-compatible import paths.

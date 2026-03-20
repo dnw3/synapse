@@ -6,8 +6,8 @@ use axum::response::Json;
 use axum::routing::post;
 use axum::Router;
 use synaptic::core::MemoryStore;
-use synaptic_deep::acp::handler::AcpHandler;
-use synaptic_deep::acp::types::*;
+use synaptic::deep::acp::handler::AcpHandler;
+use synaptic::deep::acp::types::*;
 
 use crate::gateway::state::AppState;
 

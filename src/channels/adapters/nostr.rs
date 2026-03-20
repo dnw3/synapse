@@ -11,7 +11,7 @@ use synaptic::core::{
 
 use crate::agent;
 use crate::channels::handler::AgentSession;
-use crate::config::bot::resolve_secret;
+use crate::config::bots::resolve_secret;
 use crate::config::{NostrBotConfig, SynapseConfig};
 
 /// Run the Nostr bot adapter.

@@ -193,6 +193,8 @@ struct ConfigSectionSchema {
 struct ConfigSchemaResponse {
     sections: Vec<ConfigSectionSchema>,
     sensitive_patterns: Vec<String>,
+    /// Map of provider name → default base URL for auto-detection.
+    provider_defaults: std::collections::HashMap<String, String>,
 }
 
 fn field(key: &str, label: &str, ft: &str) -> ConfigFieldSchema {
@@ -266,7 +268,7 @@ fn build_config_schema() -> Vec<ConfigSectionSchema> {
                 {
                     let mut f = field("base_url", "Base URL", "string");
                     f.description = Some("Custom API endpoint URL".into());
-                    f.placeholder = Some("https://api.openai.com/v1".into());
+                    f.placeholder = Some("Auto-detected from provider".into());
                     f
                 },
                 {
@@ -936,6 +938,12 @@ fn build_config_schema() -> Vec<ConfigSectionSchema> {
 }
 
 async fn get_config_schema(State(_state): State<AppState>) -> Json<ConfigSchemaResponse> {
+    let provider_defaults: std::collections::HashMap<String, String> =
+        crate::agent::model::provider_base_url_defaults()
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+
     Json(ConfigSchemaResponse {
         sections: build_config_schema(),
         sensitive_patterns: vec![
@@ -948,5 +956,6 @@ async fn get_config_schema(State(_state): State<AppState>) -> Json<ConfigSchemaR
             "bot_token".into(),
             "webhook_secret".into(),
         ],
+        provider_defaults,
     })
 }

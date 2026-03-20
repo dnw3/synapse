@@ -137,7 +137,7 @@ impl AgentSession {
         content_blocks: &[ContentBlock],
         output: Arc<dyn StreamingOutput>,
         agent_info: &ResolvedAgentInfo,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<(String, u32, u32), Box<dyn std::error::Error + Send + Sync>> {
         let memory = self.session_mgr.memory();
 
         // Load existing messages
@@ -197,27 +197,83 @@ impl AgentSession {
         .await
         .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;
 
-        // Stream agent execution
+        // Stream agent execution — show thinking indicator
+        output.on_token("💭 *Thinking...*\n").await;
+
         let initial_state = MessageState::with_messages(messages);
         let mut stream = agent.stream(initial_state, StreamMode::Values);
 
         let mut last_content_len = 0;
         let mut final_state = None;
+        let mut seen_tool_calls: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        let mut total_input_tokens: u32 = 0;
+        let mut total_output_tokens: u32 = 0;
+        let mut counted_ai_messages: usize = 0; // track how many AI messages we've counted usage for
 
         while let Some(event_result) = stream.next().await {
             match event_result {
                 Ok(event) => {
-                    // Check if there's new AI content in this state snapshot
-                    let current_content = extract_final_response(&event.state.messages);
-                    if current_content.len() > last_content_len {
-                        let new_text = &current_content[last_content_len..];
-                        output.on_token(new_text).await;
-                        last_content_len = current_content.len();
-                    }
+                    match event.node.as_str() {
+                        "agent" => {
+                            // Agent node: model call completed
+                            // Accumulate token usage from ALL new AI messages (not just the last)
+                            let ai_messages: Vec<_> =
+                                event.state.messages.iter().filter(|m| m.is_ai()).collect();
+                            for ai_msg in ai_messages.iter().skip(counted_ai_messages) {
+                                if let Some(usage) = ai_msg.response_metadata().get("usage") {
+                                    total_input_tokens +=
+                                        usage["input_tokens"].as_u64().unwrap_or(0) as u32;
+                                    total_output_tokens +=
+                                        usage["output_tokens"].as_u64().unwrap_or(0) as u32;
+                                }
+                            }
+                            counted_ai_messages = ai_messages.len();
 
-                    // Detect tool call nodes (heuristic: node name contains "tool")
-                    if event.node.contains("tool") {
-                        output.on_tool_call(&event.node).await;
+                            // Check for tool calls first (intermediate turns)
+                            if let Some(last_ai) =
+                                event.state.messages.iter().rev().find(|m| m.is_ai())
+                            {
+                                for tc in last_ai.tool_calls() {
+                                    if seen_tool_calls.insert(tc.id.clone()) {
+                                        output
+                                            .on_tool_call(&super::ToolCallInfo {
+                                                name: tc.name.clone(),
+                                                id: tc.id.clone(),
+                                                args: tc.arguments.to_string(),
+                                            })
+                                            .await;
+                                    }
+                                }
+                            }
+
+                            // Check for new text content (final turn)
+                            let current_content = extract_final_response(&event.state.messages);
+                            if current_content.len() > last_content_len {
+                                let new_text = &current_content[last_content_len..];
+                                output.on_token(new_text).await;
+                                last_content_len = current_content.len();
+                            }
+                        }
+                        "tools" => {
+                            // Tools node: extract subagent token usage from tool results
+                            for msg in event.state.messages.iter().rev() {
+                                if !msg.is_tool() {
+                                    break;
+                                }
+                                // TaskTool results contain {"stats": {"input_tokens": N, ...}}
+                                let content = msg.content();
+                                if let Ok(v) = serde_json::from_str::<serde_json::Value>(content) {
+                                    if let Some(stats) = v.get("stats") {
+                                        total_input_tokens +=
+                                            stats["input_tokens"].as_u64().unwrap_or(0) as u32;
+                                        total_output_tokens +=
+                                            stats["output_tokens"].as_u64().unwrap_or(0) as u32;
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
                     }
 
                     final_state = Some(event.state);
@@ -278,7 +334,7 @@ impl AgentSession {
             }
         }
 
-        Ok(response)
+        Ok((response, total_input_tokens, total_output_tokens))
     }
 
     /// Simple chat mode: direct model.chat() call without tools.
@@ -360,7 +416,7 @@ pub(super) fn extract_final_response(messages: &[Message]) -> String {
             }
         }
     }
-    "I processed your request but have no text response.".to_string()
+    String::new()
 }
 
 /// Detect MIME type from a filename extension. Returns `None` for unknown types.

@@ -3,7 +3,7 @@ pub mod manager;
 use async_trait::async_trait;
 use std::time::Duration;
 use synaptic::core::SynapticError;
-use synaptic_deep::backend::{Backend, DirEntry, ExecResult, GrepOutputMode};
+use synaptic::deep::backend::{Backend, DirEntry, ExecResult, GrepOutputMode};
 
 /// Docker-backed workspace for sandboxed agent execution.
 ///

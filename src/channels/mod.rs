@@ -1,13 +1,11 @@
 pub mod adapters;
-#[cfg(feature = "bot-lark")]
-pub mod card_builder;
 pub mod dedup;
 pub mod dm;
 pub mod formatter;
 pub mod handler;
+pub mod platform_renderers;
 pub mod reactions;
 pub mod session_key;
-pub mod thread_ownership;
 
 use crate::config::SynapseConfig;
 

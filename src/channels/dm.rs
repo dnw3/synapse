@@ -5,7 +5,74 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use synaptic::{DmAccessDenied, DmPolicy, DmPolicyEnforcer, PairingChallenge, PairingError};
+// DM policy types — defined locally because the framework only has stubs.
+
+/// DM access policy.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub enum DmPolicy {
+    /// Allow all DMs.
+    #[default]
+    Open,
+    /// Deny all DMs.
+    Disabled,
+    /// Require a pre-configured allowlist.
+    Allowlist,
+    /// Require pairing challenge before accepting DMs.
+    Pairing,
+}
+
+/// DM access denied reason.
+#[derive(Debug, Clone)]
+pub enum DmAccessDenied {
+    /// DMs are disabled.
+    DmDisabled,
+    /// Sender is not on the allowlist.
+    NotAllowed,
+    /// Sender needs to complete the pairing challenge.
+    NeedsPairing(PairingChallenge),
+}
+
+/// A pending pairing challenge.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PairingChallenge {
+    pub code: String,
+    pub sender_id: String,
+    pub channel: String,
+    pub created_at: u64,
+    pub ttl_ms: u64,
+}
+
+impl PairingChallenge {
+    pub fn is_expired(&self) -> bool {
+        now_ms().saturating_sub(self.created_at) > self.ttl_ms
+    }
+}
+
+/// Error during pairing operations.
+#[derive(Debug, Clone)]
+pub enum PairingError {
+    CodeNotFound,
+    CodeExpired,
+}
+
+impl std::fmt::Display for PairingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PairingError::CodeNotFound => write!(f, "pairing code not found"),
+            PairingError::CodeExpired => write!(f, "pairing code expired"),
+        }
+    }
+}
+
+impl std::error::Error for PairingError {}
+
+/// Trait for DM access policy enforcement.
+#[async_trait]
+pub trait DmPolicyEnforcer: Send + Sync {
+    async fn check_access(&self, sender_id: &str, channel: &str) -> Result<(), DmAccessDenied>;
+    async fn approve_code(&self, channel: &str, code: &str) -> Result<String, PairingError>;
+    async fn list_pending(&self, channel: &str) -> Vec<PairingChallenge>;
+}
 
 const MAX_PENDING_PER_CHANNEL: usize = 3;
 const DEFAULT_PAIRING_TTL_MS: u64 = 3_600_000; // 1 hour

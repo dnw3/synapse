@@ -8,6 +8,68 @@ use crate::config::SynapseConfig;
 
 use super::registry::ModelRegistry;
 
+// Re-use BASE_URL constants from the framework's compat providers (canonical source).
+use synaptic::openai::compat::{
+    ark, baichuan, cohere, deepseek, fireworks, groq, huggingface, minimax, mistral, moonshot,
+    openrouter, perplexity, qwen, together, xai, zhipu,
+};
+
+/// Auto-detect the base URL for a known provider name.
+///
+/// Returns `None` for unknown providers (falls back to the OpenAI default).
+pub fn auto_detect_base_url(provider: &str) -> Option<&'static str> {
+    match provider {
+        "moonshot" | "kimi" => Some(moonshot::BASE_URL),
+        "qwen" | "dashscope" | "tongyi" => Some(qwen::BASE_URL),
+        "zhipu" | "glm" | "chatglm" => Some(zhipu::BASE_URL),
+        "doubao" | "ark" => Some(ark::BASE_URL),
+        "minimax" => Some(minimax::BASE_URL),
+        "baichuan" => Some(baichuan::BASE_URL),
+        "deepseek" => Some(deepseek::BASE_URL),
+        "groq" => Some(groq::BASE_URL),
+        "together" => Some(together::BASE_URL),
+        "fireworks" => Some(fireworks::BASE_URL),
+        "xai" | "grok" => Some(xai::BASE_URL),
+        "perplexity" => Some(perplexity::BASE_URL),
+        "mistral" => Some(mistral::BASE_URL),
+        "cohere" => Some(cohere::BASE_URL),
+        "openrouter" => Some(openrouter::BASE_URL),
+        "huggingface" => Some(huggingface::BASE_URL),
+        "openai" => Some("https://api.openai.com/v1"),
+        "anthropic" => Some("https://api.anthropic.com/v1"),
+        "gemini" => Some("https://generativelanguage.googleapis.com/v1beta"),
+        "ollama" => Some("http://localhost:11434/v1"),
+        _ => None,
+    }
+}
+
+/// Return a map of provider name → default base URL for all known providers.
+pub fn provider_base_url_defaults() -> Vec<(&'static str, &'static str)> {
+    vec![
+        ("openai", "https://api.openai.com/v1"),
+        ("anthropic", "https://api.anthropic.com/v1"),
+        ("gemini", "https://generativelanguage.googleapis.com/v1beta"),
+        ("ollama", "http://localhost:11434/v1"),
+        ("moonshot", moonshot::BASE_URL),
+        ("qwen", qwen::BASE_URL),
+        ("zhipu", zhipu::BASE_URL),
+        ("ark", ark::BASE_URL),
+        ("doubao", ark::BASE_URL),
+        ("minimax", minimax::BASE_URL),
+        ("baichuan", baichuan::BASE_URL),
+        ("deepseek", deepseek::BASE_URL),
+        ("groq", groq::BASE_URL),
+        ("together", together::BASE_URL),
+        ("fireworks", fireworks::BASE_URL),
+        ("xai", xai::BASE_URL),
+        ("perplexity", perplexity::BASE_URL),
+        ("mistral", mistral::BASE_URL),
+        ("cohere", cohere::BASE_URL),
+        ("openrouter", openrouter::BASE_URL),
+        ("huggingface", huggingface::BASE_URL),
+    ]
+}
+
 /// Build a ChatModel from the resolved configuration.
 ///
 /// If `rate_limit` is configured, the model is wrapped with `TokenBucketChatModel`.
@@ -77,23 +139,8 @@ pub(crate) fn build_model_by_name_raw(
     };
 
     // Auto-detect base_url for known providers
-    let auto_base_url = match provider_prefix.unwrap_or(&config.base.model.provider) {
-        "moonshot" | "kimi" => Some("https://api.moonshot.cn/v1"),
-        "qwen" | "dashscope" | "tongyi" => {
-            Some("https://dashscope.aliyuncs.com/compatible-mode/v1")
-        }
-        "zhipu" | "glm" | "chatglm" => Some("https://open.bigmodel.cn/api/paas/v4"),
-        "doubao" | "ark" => Some("https://ark.cn-beijing.volces.com/api/v3"),
-        "minimax" => Some("https://api.minimax.chat/v1"),
-        "baichuan" => Some("https://api.baichuan-ai.com/v1"),
-        "deepseek" => Some("https://api.deepseek.com/v1"),
-        "groq" => Some("https://api.groq.com/openai/v1"),
-        "together" => Some("https://api.together.xyz/v1"),
-        "fireworks" => Some("https://api.fireworks.ai/inference/v1"),
-        "xai" | "grok" => Some("https://api.x.ai/v1"),
-        "perplexity" => Some("https://api.perplexity.ai"),
-        _ => None,
-    };
+    let auto_base_url =
+        auto_detect_base_url(provider_prefix.unwrap_or(&config.base.model.provider));
 
     let mut oai_config = OpenAiConfig::new(&api_key, actual_model);
 

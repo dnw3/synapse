@@ -16,8 +16,6 @@ pub mod channel_manager;
 #[cfg(feature = "web")]
 pub mod client;
 #[cfg(feature = "web")]
-pub mod discovery;
-#[cfg(feature = "web")]
 pub mod error;
 #[cfg(feature = "web")]
 pub mod exec_approvals;
@@ -27,8 +25,6 @@ pub mod messages;
 mod metrics;
 #[cfg(feature = "web")]
 pub mod nodes;
-#[cfg(feature = "web")]
-pub mod pairing;
 #[cfg(feature = "web")]
 pub mod presence;
 #[cfg(feature = "web")]
@@ -41,8 +37,6 @@ pub mod run_queue;
 pub mod state;
 #[cfg(feature = "web")]
 mod terminal;
-#[cfg(feature = "web")]
-pub mod voice_ws;
 #[cfg(feature = "web")]
 pub mod webhooks;
 #[cfg(feature = "web")]
@@ -411,7 +405,7 @@ fn spawn_channel_adapters(
         }
 
         // Register Lark approve notifier (for DM pairing approval notifications)
-        if let Ok(secret) = crate::config::bot::resolve_secret(
+        if let Ok(secret) = crate::config::bots::resolve_secret(
             account.app_secret.as_deref(),
             account.app_secret_env.as_deref(),
             "Lark app secret (notifier)",

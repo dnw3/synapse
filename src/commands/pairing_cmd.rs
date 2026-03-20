@@ -1,7 +1,4 @@
-use synaptic::DmPolicy;
-use synaptic::DmPolicyEnforcer;
-
-use crate::channels::dm::FileDmPolicyEnforcer;
+use crate::channels::dm::{DmPolicy, DmPolicyEnforcer, FileDmPolicyEnforcer};
 
 pub async fn run(action: &str, channel: &str, value: Option<&str>) {
     let pairing_dir = dirs::home_dir()

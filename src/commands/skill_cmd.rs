@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use colored::Colorize;
-use synaptic_deep::skill::load_manifest;
+use synaptic::deep::skill::load_manifest;
 
 /// Run skill subcommand.
 pub fn run_skill_command(

@@ -23,7 +23,11 @@ pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
     let memory = ctx.state.sessions.memory();
     let mut total_messages = 0usize;
     for s in &sessions {
-        total_messages += memory.load(&s.id).await.map(|m| m.len()).unwrap_or(0);
+        total_messages += memory
+            .load(&s.session_id)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0);
     }
 
     let snapshot = ctx.state.cost_tracker.snapshot().await;

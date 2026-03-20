@@ -451,6 +451,7 @@ export default function App() {
             themeMode={theme.mode}
             onCycleTheme={theme.cycleMode}
             onToggleLanguage={toggleLanguage}
+            connected={ws.connected}
             isOpen={mobileMenuOpen}
             onClose={() => setMobileMenuOpen(false)}
           />

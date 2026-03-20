@@ -639,7 +639,7 @@ export default function ChatPanel({
         {/* System message toggle */}
         <button
           onClick={() => setShowSystem((prev) => !prev)}
-          className={`p-1 rounded-[var(--radius-sm)] transition-colors ${showSystem ? "text-[var(--accent)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"}`}
+          className={`p-1.5 rounded-[var(--radius-sm)] transition-colors ${showSystem ? "text-[var(--accent)] hover:bg-[var(--bg-hover)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"}`}
           title={showSystem ? t("chat.hideSystem") : t("chat.showSystem")}
         >
           {showSystem ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
@@ -653,7 +653,7 @@ export default function ChatPanel({
               return next;
             });
           }}
-          className={`p-1 rounded-[var(--radius-sm)] transition-colors ${showToolOutput ? "text-[var(--accent)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"}`}
+          className={`p-1.5 rounded-[var(--radius-sm)] transition-colors ${showToolOutput ? "text-[var(--accent)] hover:bg-[var(--bg-hover)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"}`}
           title={t("chat.toggleToolOutput")}
         >
           <Brain className="w-3.5 h-3.5" />
@@ -661,14 +661,14 @@ export default function ChatPanel({
         {/* Focus mode toggle */}
         <button
           onClick={() => onToggleFocus?.()}
-          className={`p-1 rounded-[var(--radius-sm)] transition-colors ${focusMode ? "text-[var(--accent)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"}`}
+          className={`p-1.5 rounded-[var(--radius-sm)] transition-colors ${focusMode ? "text-[var(--accent)] hover:bg-[var(--bg-hover)]" : "text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"}`}
           title={t("chat.focusMode")}
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => onRefreshMessages?.()}
-          className="p-1 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           title={t("chat.refresh")}
         >
           <RefreshCw className="w-3.5 h-3.5" />

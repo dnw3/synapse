@@ -1,10 +1,9 @@
 mod agent;
-pub(crate) mod bot;
+pub(crate) mod bots;
 pub(crate) mod memory;
 mod misc;
 mod models;
 pub mod reset_policy;
-pub mod secrets_vault;
 mod security;
 mod server;
 pub mod watcher;
@@ -20,7 +19,7 @@ use crate::heartbeat::HeartbeatConfig;
 
 // Re-export all config types so external imports remain unchanged.
 pub use self::agent::*;
-pub use self::bot::*;
+pub use self::bots::*;
 pub use self::memory::{ContextConfig, MemoryConfig, ReflectionSynapseConfig, SessionConfig};
 pub use self::misc::*;
 pub use self::models::*;

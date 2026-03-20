@@ -4,8 +4,8 @@
 
 use std::sync::Arc;
 
+use crate::channels::dm::DmPolicyEnforcer;
 use serde_json::{json, Value};
-use synaptic::DmPolicyEnforcer;
 
 use super::router::RpcContext;
 use super::types::RpcError;

@@ -8,7 +8,7 @@
 //! 2. `~/.claude/agents/` (personal/global)
 
 use std::path::Path;
-use synaptic_deep::SubAgentDef;
+use synaptic::deep::SubAgentDef;
 
 /// Discover agent definitions from `.claude/agents/` directories.
 ///

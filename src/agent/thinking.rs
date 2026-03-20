@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use synaptic::core::{SynapticError, ThinkingConfig};
-use synaptic::middleware::{AgentMiddleware, ModelRequest};
+use synaptic::core::{RunContext, SynapticError, ThinkingConfig};
+use synaptic::middleware::{Interceptor, ModelCaller, ModelRequest, ModelResponse};
 use tokio::sync::RwLock;
 
-/// Middleware that injects ThinkingConfig into every ModelRequest.
+/// Interceptor that injects ThinkingConfig into every ModelRequest.
 ///
 /// Supports both static thinking level and adaptive mode that adjusts
 /// based on conversation complexity.
@@ -116,10 +116,15 @@ impl ThinkingMiddleware {
 }
 
 #[async_trait]
-impl AgentMiddleware for ThinkingMiddleware {
-    async fn before_model(&self, request: &mut ModelRequest) -> Result<(), SynapticError> {
+impl Interceptor for ThinkingMiddleware {
+    async fn wrap_model_call(
+        &self,
+        mut request: ModelRequest,
+        ctx: &RunContext,
+        next: &dyn ModelCaller,
+    ) -> Result<ModelResponse, SynapticError> {
         let thinking = if self.adaptive {
-            let score = Self::estimate_complexity(request);
+            let score = Self::estimate_complexity(&request);
             Self::complexity_to_config(score)
         } else {
             self.config.read().await.clone()
@@ -129,11 +134,11 @@ impl AgentMiddleware for ThinkingMiddleware {
             request.thinking = Some(tc);
         }
 
-        Ok(())
+        next.call(request, ctx).await
     }
 }
 
-/// Middleware that injects verbose/concise instructions into the system prompt.
+/// Interceptor that injects verbose/concise instructions into the system prompt.
 pub struct VerboseMiddleware {
     level: String, // "off", "on", "full", "inherit"
 }
@@ -147,8 +152,13 @@ impl VerboseMiddleware {
 }
 
 #[async_trait]
-impl AgentMiddleware for VerboseMiddleware {
-    async fn before_model(&self, request: &mut ModelRequest) -> Result<(), SynapticError> {
+impl Interceptor for VerboseMiddleware {
+    async fn wrap_model_call(
+        &self,
+        mut request: ModelRequest,
+        ctx: &RunContext,
+        next: &dyn ModelCaller,
+    ) -> Result<ModelResponse, SynapticError> {
         let suffix = match self.level.as_str() {
             "off" => Some(
                 "\n\n[INSTRUCTION: Be extremely concise. Answer directly without explanation. \
@@ -169,7 +179,7 @@ impl AgentMiddleware for VerboseMiddleware {
             }
         }
 
-        Ok(())
+        next.call(request, ctx).await
     }
 }
 

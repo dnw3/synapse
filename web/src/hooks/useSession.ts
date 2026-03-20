@@ -128,7 +128,12 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
 
   // Select default session when sessions load and no active key
   useEffect(() => {
-    if (activeKey || sessions.length === 0) return;
+    if (activeKey) return;
+    if (sessions.length === 0) {
+      // No sessions yet — set default key so first chat.send can create one implicitly
+      setActiveKey("main");
+      return;
+    }
     const webSession = sessions.find(s => s.channel === "web" || s.channel === "webchat");
     const defaultKey = webSession?.sessionKey ?? sessions[0]?.sessionKey ?? "main";
     setActiveKey(defaultKey);

@@ -1,5 +1,6 @@
 use super::*;
 use crate::gateway::messages::InboundMessage;
+use synaptic::core::RunContext;
 
 impl AgentSession {
     /// Handle broadcast: fan out to multiple agents in parallel.
@@ -165,10 +166,16 @@ impl AgentSession {
                 for agent_info in agents {
                     let sid = self.resolve_session(&session_key, msg).await?;
                     match self
-                        .handle_deep_agent(&sid, &msg.content, &content_blocks, agent_info)
+                        .handle_deep_agent(
+                            &sid,
+                            &msg.content,
+                            &content_blocks,
+                            RunContext::default(),
+                            agent_info,
+                        )
                         .await
                     {
-                        Ok(response) => {
+                        Ok((response, _, _)) => {
                             last_response = response;
                         }
                         Err(e) => {

@@ -804,6 +804,47 @@ impl AgentSession {
         })
     }
 
+    /// Handle an inbound message (new API using `InboundMessage`).
+    ///
+    /// Converts to `MessageEnvelope` internally and delegates to `handle_message`.
+    /// This will become the primary entry point once all adapters migrate.
+    #[allow(dead_code)]
+    pub async fn handle_inbound(
+        &self,
+        msg: crate::gateway::messages::InboundMessage,
+    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
+        let envelope = msg.to_envelope();
+        self.handle_message(envelope).await
+    }
+
+    /// Handle an inbound message with streaming (new API using `InboundMessage`).
+    ///
+    /// Converts to `MessageEnvelope` internally and delegates to `handle_message_streaming`.
+    #[allow(dead_code)]
+    pub async fn handle_inbound_streaming(
+        &self,
+        msg: crate::gateway::messages::InboundMessage,
+        output: Arc<dyn StreamingOutput>,
+    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
+        let envelope = msg.to_envelope();
+        self.handle_message_streaming(envelope, output).await
+    }
+
+    /// Handle an inbound message with streaming + `RunContext` (new API using `InboundMessage`).
+    ///
+    /// Converts to `MessageEnvelope` internally and delegates to
+    /// `handle_message_streaming_with_context`.
+    #[allow(dead_code)]
+    pub async fn handle_inbound_streaming_with_context(
+        &self,
+        msg: crate::gateway::messages::InboundMessage,
+        ctx: synaptic::core::RunContext,
+    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
+        let envelope = msg.to_envelope();
+        self.handle_message_streaming_with_context(envelope, ctx)
+            .await
+    }
+
     /// Download attachments and convert to ContentBlocks.
     /// Images and audio become multimodal blocks; other files become text references.
     pub(super) async fn download_attachments(

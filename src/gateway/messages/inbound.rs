@@ -269,6 +269,61 @@ impl InboundMessage {
         }
     }
 
+    /// Convert to legacy `MessageEnvelope` for backward compatibility.
+    ///
+    /// Used during migration — will be removed when all consumers use `InboundMessage` directly.
+    /// The conversion is intentionally lossy: fields unique to `InboundMessage` (media, command,
+    /// content_variants, message info, etc.) are not carried over.
+    pub fn to_envelope(&self) -> super::envelope::MessageEnvelope {
+        use super::envelope::RoutingMeta;
+        use synaptic::{DeliveryContext, InputProvenance, ProvenanceKind};
+
+        let delivery = DeliveryContext {
+            channel: self.channel.platform.clone(),
+            to: self
+                .sender
+                .id
+                .clone()
+                .map(|id| format!("{}:{}", self.chat.chat_type, id)),
+            account_id: self.channel.account_id.clone(),
+            thread_id: self.thread.thread_id.clone(),
+            ..Default::default()
+        };
+
+        let provenance = InputProvenance {
+            kind: ProvenanceKind::ExternalUser,
+            source_channel: Some(self.channel.platform.clone()),
+            ..Default::default()
+        };
+
+        let routing = RoutingMeta {
+            guild_id: self.channel.guild_id.clone(),
+            team_id: self.channel.team_id.clone(),
+            roles: self.chat.roles.clone(),
+            peer_kind: if self.chat.chat_type == "direct" {
+                Some(crate::config::PeerKind::Direct)
+            } else if self.chat.chat_type == "group" {
+                Some(crate::config::PeerKind::Group)
+            } else {
+                None
+            },
+            peer_id: self.sender.id.clone(),
+        };
+
+        super::envelope::MessageEnvelope {
+            request_id: self.request_id.clone(),
+            session_key: self.session_key.clone(),
+            content: self.content.clone(),
+            attachments: self.attachments.clone(),
+            delivery,
+            provenance,
+            idempotency_key: self.idempotency_key.clone(),
+            timestamp_ms: self.timestamp_ms,
+            sender_id: self.sender.id.clone(),
+            routing,
+        }
+    }
+
     /// Finalize the inbound message with default-deny semantics and fallback values.
     ///
     /// After `finalize()`:

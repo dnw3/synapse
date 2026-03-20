@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use super::streaming_output::WsStreamingOutput;
 use super::types::Attachment;
-use crate::gateway::messages::{Attachment as EnvelopeAttachment, MessageEnvelope};
+use crate::gateway::messages::{Attachment as EnvelopeAttachment, InboundMessage};
 use crate::gateway::rpc::{
     AuthResult, ClientFrame, ConnectParams, FeatureInfo, HelloOk, Role, RpcContext, RpcError,
     ServerFrame, ServerInfo, SnapshotInfo, StateVersion, GATEWAY_EVENTS, PROTOCOL_VERSION,
@@ -498,15 +498,15 @@ async fn handle_v3_agent(
     // Session creation/resolution is handled by AgentSession.resolve_session()
     // inside handle_message_streaming_with_context(). No need to pre-create here.
 
-    // --- Build MessageEnvelope ---
-    let mut envelope = MessageEnvelope::webchat(
+    // --- Build InboundMessage ---
+    let mut msg = InboundMessage::web(
         request_id.clone(),
         store_key.clone(),
         content.clone(),
         conn_id,
     );
 
-    // Convert ws attachments to envelope attachments
+    // Convert ws attachments to inbound message attachments
     if !ws_attachments.is_empty() {
         let mut env_attachments = Vec::new();
         let mut parts = vec![content.clone()];
@@ -521,10 +521,12 @@ async fn handle_v3_agent(
                 att.filename, att.mime_type, att.url
             ));
         }
-        envelope.attachments = env_attachments;
+        msg.attachments = env_attachments;
         // Also embed attachment references in content for backwards compatibility
-        envelope.content = parts.join("");
+        msg.content = parts.join("");
     }
+
+    msg.finalize();
 
     // --- Create WsStreamingOutput + RunContext ---
     let (frame_tx, mut frame_rx) = mpsc::unbounded_channel::<String>();
@@ -558,7 +560,7 @@ async fn handle_v3_agent(
     let agent_session = state.agent_session.clone();
     let mut agent_handle = tokio::spawn(async move {
         agent_session
-            .handle_message_streaming_with_context(envelope, ctx)
+            .handle_inbound_streaming_with_context(msg, ctx)
             .await
     });
 

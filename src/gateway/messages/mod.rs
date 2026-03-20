@@ -1,13 +1,20 @@
+pub mod adapter;
+pub mod dedup;
 pub mod delivery;
 pub mod envelope;
 pub mod events;
 pub mod inbound;
+pub mod normalize;
 pub mod outbound;
 pub mod registry;
 pub mod reply;
 pub mod routing;
 pub mod sender;
 
+#[allow(unused_imports)]
+pub use adapter::{ChannelOutboundAdapter, OutboundContext};
+#[allow(unused_imports)]
+pub use dedup::InboundDeduplicator;
 #[allow(unused_imports)]
 pub use delivery::{DeliveryMirror, DeliveryQueue, QueuedDelivery};
 #[allow(unused_imports)]
@@ -18,6 +25,8 @@ pub use inbound::{
     ChannelInfo, ChatInfo, CommandInfo, ContentVariants, ForwardInfo, InboundMessage, MediaInfo,
     MediaUnderstanding, MessageInfo, ReplyInfo, SenderInfo, StickerInfo, ThreadInfo,
 };
+#[allow(unused_imports)]
+pub use normalize::normalize_for_delivery;
 #[allow(unused_imports)]
 pub use outbound::{OutboundDeliveryResult, OutboundPayload};
 pub use registry::ChannelRegistry;

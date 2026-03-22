@@ -11,8 +11,6 @@ use synaptic::plugin::{
 
 use crate::memory::{VikingConfig, VikingMemoryProvider};
 
-use super::viking_service::VikingService;
-
 /// Built-in plugin that registers the Viking memory backend.
 pub struct VikingMemoryPlugin {
     config: VikingConfig,
@@ -43,18 +41,52 @@ impl Plugin for VikingMemoryPlugin {
     }
 
     async fn register(&self, api: &mut PluginApi<'_>) -> Result<(), SynapticError> {
-        let provider: Arc<dyn synaptic::memory::MemoryProvider> =
-            Arc::new(VikingMemoryProvider::new(self.config.clone()));
+        // Keep concrete type for Viking-specific tools
+        let concrete_provider = Arc::new(VikingMemoryProvider::new(self.config.clone()));
+        // Trait object for shared components
+        let provider: Arc<dyn synaptic::memory::MemoryProvider> = concrete_provider.clone();
 
-        // Register the memory slot (exclusive — replaces any previous provider).
+        // 1. Memory slot
         api.register_memory(provider.clone());
 
-        // Register the memory_search tool backed by this provider.
-        api.register_tool(crate::tools::MemorySearchTool::new(provider));
+        // 2. Shared tool: memory_search
+        api.register_tool(crate::tools::MemorySearchTool::new(provider.clone()));
 
-        // Register the managed VikingService so the process is started/stopped
-        // with the plugin lifecycle.
-        api.register_service(Box::new(VikingService::new(self.config.clone())));
+        // 3. Viking-specific tools
+        api.register_tool(super::viking_tools::VikingContentTool::new(
+            concrete_provider.clone(),
+        ));
+        api.register_tool(super::viking_tools::VikingCommitMemoryTool::new(
+            concrete_provider.clone(),
+        ));
+
+        // 4. Auto-recall interceptor (shared, faces dyn MemoryProvider)
+        if self.config.auto_recall {
+            api.register_interceptor(Arc::new(
+                super::memory_recall::MemoryRecallInterceptor::new(
+                    provider.clone(),
+                    self.config.recall_limit,
+                    self.config.recall_score_threshold,
+                ),
+            ));
+            tracing::info!("memory-viking: auto-recall enabled");
+        }
+
+        // 5. Auto-capture subscriber (shared, faces dyn MemoryProvider)
+        if self.config.auto_capture {
+            api.register_event_subscriber(
+                Arc::new(super::memory_capture::MemoryCaptureSubscriber::new(
+                    provider.clone(),
+                )),
+                0, // default priority
+            );
+            tracing::info!("memory-viking: auto-capture enabled");
+        }
+
+        // 6. Managed service (VikingService)
+        api.register_service(Box::new(super::viking_service::VikingService::new(
+            self.config.clone(),
+        )));
 
         Ok(())
     }

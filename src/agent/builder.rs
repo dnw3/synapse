@@ -143,6 +143,9 @@ pub async fn build_deep_agent_with_callback(
     let backend: Arc<dyn synaptic::deep::backend::Backend> = Arc::new(FilesystemBackend::new(cwd));
 
     let mut options = DeepAgentOptions::new(backend.clone());
+    options.path_guard = Some(Arc::new(synaptic::deep::tools::path_guard::PathGuard::new(
+        cwd.to_path_buf(),
+    )));
 
     // --- System prompt + project context ---
     let mut system_prompt = system_prompt_override

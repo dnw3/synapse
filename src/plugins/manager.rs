@@ -15,6 +15,12 @@ pub struct PluginManager {
     builtins: Vec<Box<dyn Plugin>>,
     disabled: Vec<String>,
     data_root: PathBuf,
+    /// Skills dirs contributed by bundle plugins.
+    pub bundle_skills_dirs: Vec<PathBuf>,
+    /// Agent dirs contributed by bundle plugins.
+    pub bundle_agent_dirs: Vec<PathBuf>,
+    /// Active external plugin bridges (kept alive for tool calls).
+    bridges: Vec<Arc<super::bridge::ExternalPluginBridge>>,
 }
 
 #[allow(dead_code)]
@@ -30,6 +36,9 @@ impl PluginManager {
             builtins: Vec::new(),
             disabled: Vec::new(),
             data_root,
+            bundle_skills_dirs: Vec::new(),
+            bundle_agent_dirs: Vec::new(),
+            bridges: Vec::new(),
         }
     }
 
@@ -99,6 +108,100 @@ impl PluginManager {
         Ok(())
     }
 
+    /// Discover and load filesystem plugins from default paths.
+    pub async fn discover_and_load(&mut self) -> Result<(), synaptic::core::SynapticError> {
+        let paths = super::discovery::default_plugin_paths();
+
+        for dir in &paths {
+            let discovered = super::discovery::discover_plugins(dir);
+            for plugin in discovered {
+                let plugin_id = plugin
+                    .path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+
+                if !self.is_allowed(&plugin_id) {
+                    tracing::info!(plugin = %plugin_id, "plugin skipped (deny/allow list)");
+                    continue;
+                }
+
+                match plugin.format {
+                    super::discovery::PluginFormat::SynapseNative => {
+                        tracing::info!(path = %plugin.path.display(), "native plugin found (compiled-in only)");
+                        // Native plugins must be compiled in. Filesystem discovery is
+                        // informational only until dylib support is added.
+                    }
+                    super::discovery::PluginFormat::OpenClaw => {
+                        let config = self
+                            .config
+                            .entries
+                            .get(&plugin_id)
+                            .map(|e| e.config.clone())
+                            .unwrap_or(serde_json::Value::Null);
+
+                        match super::bridge::ExternalPluginBridge::spawn(&plugin.path, &config)
+                            .await
+                        {
+                            Ok(bridge) => {
+                                let tool_count = bridge.tool_defs.len();
+                                // Register tools from bridge
+                                {
+                                    let mut registry = self.registry.write().await;
+                                    for tool in bridge.tools() {
+                                        registry.register_tool(tool);
+                                    }
+                                    registry.record_plugin(synaptic::plugin::PluginManifest {
+                                        name: bridge.id.clone(),
+                                        version: "0.0.0".into(),
+                                        description: format!("OpenClaw plugin: {}", bridge.id),
+                                        author: None,
+                                        license: None,
+                                        capabilities: vec![
+                                            synaptic::plugin::PluginCapability::Tools,
+                                        ],
+                                        slot: None,
+                                    });
+                                }
+                                self.bridges.push(bridge);
+                                tracing::info!(
+                                    plugin = %plugin_id,
+                                    tools = tool_count,
+                                    "OpenClaw plugin loaded"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    plugin = %plugin_id,
+                                    error = %e,
+                                    "failed to load OpenClaw plugin"
+                                );
+                            }
+                        }
+                    }
+                    ref fmt @ (super::discovery::PluginFormat::ClaudeBundle
+                    | super::discovery::PluginFormat::CodexBundle
+                    | super::discovery::PluginFormat::CursorBundle) => {
+                        if let Some(content) = super::bundle::load_bundle(&plugin.path, fmt) {
+                            let skills = content.skills_dirs.len();
+                            let agents = content.agent_dirs.len();
+                            self.bundle_skills_dirs.extend(content.skills_dirs);
+                            self.bundle_agent_dirs.extend(content.agent_dirs);
+                            tracing::info!(
+                                plugin = %content.id,
+                                skills_dirs = skills,
+                                agent_dirs = agents,
+                                "bundle loaded"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     fn is_allowed(&self, name: &str) -> bool {
         if let Some(ref deny) = self.config.deny {
             if deny.iter().any(|d| d == name) {
@@ -148,9 +251,10 @@ impl PluginManager {
 
     /// Stop all plugins (reverse order).
     pub async fn stop_all(&self) {
-        // Stop services first
         self.stop_services().await;
-        // Then stop plugins
+        for bridge in &self.bridges {
+            bridge.shutdown().await;
+        }
         for plugin in self.builtins.iter().rev() {
             plugin.stop().await.ok();
         }

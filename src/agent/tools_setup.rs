@@ -4,7 +4,6 @@ use std::sync::RwLock;
 
 use synaptic::core::Tool;
 use synaptic::deep::DeepAgentOptions;
-use synaptic::memory::MemoryProvider;
 use synaptic::session::SessionManager;
 
 /// Register all built-in tools, MCP tools, plugin tools, and session tools on
@@ -14,8 +13,6 @@ pub(crate) fn register_tools(
     options: &mut DeepAgentOptions,
     cwd: &Path,
     mcp_tools: Vec<Arc<dyn Tool>>,
-    memory_provider: Arc<dyn MemoryProvider>,
-    ltm: Option<&Arc<crate::memory::LongTermMemory>>,
     session_mgr: Option<&Arc<SessionManager>>,
     plugin_registry: Option<&Arc<RwLock<synaptic::plugin::PluginRegistry>>>,
     channel_registry: Option<&Arc<tokio::sync::RwLock<crate::gateway::messages::ChannelRegistry>>>,
@@ -58,26 +55,8 @@ pub(crate) fn register_tools(
         }
     }
 
-    // Add memory tools — memory_search uses the configured MemoryProvider,
-    // memory_get/save/forget use LTM directly.
-    {
-        options
-            .tools
-            .push(crate::tools::MemorySearchTool::new(memory_provider));
-        tracing::info!("memory_search tool registered");
-    }
-    if let Some(ltm) = ltm {
-        options
-            .tools
-            .push(crate::tools::MemoryGetTool::new(ltm.clone()));
-        options
-            .tools
-            .push(crate::tools::MemorySaveTool::new(ltm.clone()));
-        options
-            .tools
-            .push(crate::tools::MemoryForgetTool::new(ltm.clone()));
-        tracing::info!("memory_get/save/forget tools registered");
-    }
+    // Memory tools (memory_search, memory_get, memory_save, memory_forget) are now
+    // registered by the memory plugin via PluginApi — no direct registration here.
 
     // Add session tools if SessionManager is available
     if let Some(mgr) = session_mgr {

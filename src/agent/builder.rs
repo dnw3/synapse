@@ -175,7 +175,22 @@ pub async fn build_deep_agent_with_callback(
     options.system_prompt = Some(system_prompt);
 
     // --- Memory provider + user profile ---
-    let memory_provider_arc = crate::memory::build_memory_provider(config, ltm.clone());
+    // Get memory provider from plugin registry (set by memory plugin in build_infra_bundle)
+    let memory_provider_arc: Arc<dyn synaptic::memory::MemoryProvider> = {
+        if let Some(ref registry) = plugin_registry {
+            let reg = registry.read().unwrap();
+            if let Some(provider) = reg.memory_slot() {
+                provider.clone()
+            } else {
+                // Fallback: no memory plugin registered
+                tracing::warn!("no memory plugin registered, using noop provider");
+                Arc::new(crate::memory::NativeMemoryProvider::new_noop())
+            }
+        } else {
+            // No plugin registry — fallback to factory (e.g., REPL without gateway)
+            crate::memory::build_memory_provider(config, ltm.clone())
+        }
+    };
 
     // Inject user profile from memory provider (if available)
     {
@@ -259,8 +274,6 @@ pub async fn build_deep_agent_with_callback(
         &mut options,
         cwd,
         mcp_tools,
-        memory_provider_arc,
-        ltm.as_ref(),
         session_mgr.as_ref(),
         plugin_registry.as_ref(),
         channel_registry.as_ref(),

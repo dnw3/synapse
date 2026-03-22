@@ -350,6 +350,7 @@ pub async fn discover_and_load(
                                     author: None,
                                     license: None,
                                     capabilities: vec![],
+                                    slot: None,
                                 });
                             }
 

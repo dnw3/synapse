@@ -462,6 +462,7 @@ pub fn register_builtin_plugins(
         author: Some("synapse".into()),
         license: None,
         capabilities: vec![PluginCapability::Hooks],
+        slot: None,
     });
 
     // --- 2. Thinking subscriber (no fixed config — adaptive is set separately
@@ -478,6 +479,7 @@ pub fn register_builtin_plugins(
         author: Some("synapse".into()),
         license: None,
         capabilities: vec![PluginCapability::Hooks],
+        slot: None,
     });
 
     // --- 3. Loop detection subscriber (max 3 consecutive identical tool-call hashes) ---
@@ -493,6 +495,7 @@ pub fn register_builtin_plugins(
         author: Some("synapse".into()),
         license: None,
         capabilities: vec![PluginCapability::Hooks],
+        slot: None,
     });
 
     // --- 4. Cost tracking subscriber (records usage to UsageTracker via EventBus) ---
@@ -511,6 +514,7 @@ pub fn register_builtin_plugins(
         author: Some("synapse".into()),
         license: None,
         capabilities: vec![PluginCapability::Hooks],
+        slot: None,
     });
 
     tracing::info!(

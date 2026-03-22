@@ -177,6 +177,10 @@ pub struct SynapseConfig {
     #[serde(default)]
     pub skills: SkillsConfig,
 
+    /// Plugin system configuration (slots, per-plugin settings, allow/deny lists).
+    #[serde(default)]
+    pub plugins: crate::plugins::config::PluginsConfig,
+
     /// Heartbeat configuration for periodic proactive agent runs.
     #[serde(default)]
     pub heartbeat: HeartbeatConfig,

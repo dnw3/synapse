@@ -133,6 +133,7 @@ impl AgentSession {
                                                             name: tc.name.clone(),
                                                             id: tc.id.clone(),
                                                             args: tc.arguments.to_string(),
+                                                            display: None,
                                                         })
                                                         .await;
                                                 }

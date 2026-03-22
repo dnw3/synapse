@@ -170,6 +170,14 @@ pub fn register_all(router: &mut RpcRouter) {
         "plugins.marketplace",
         Box::new(|ctx, params| Box::pin(plugins_rpc::handle_marketplace(ctx, params))),
     );
+    router.register(
+        "plugins.toggle",
+        Box::new(|ctx, params| Box::pin(plugins_rpc::handle_toggle(ctx, params))),
+    );
+    router.register(
+        "plugins.service_control",
+        Box::new(|ctx, params| Box::pin(plugins_rpc::handle_service_control(ctx, params))),
+    );
 
     // Channels
     router.register(

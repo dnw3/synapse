@@ -26,112 +26,189 @@ fn global_plugins_dir() -> PathBuf {
         .join("plugins")
 }
 
+/// Load disabled plugin names from persistent state file.
+fn load_disabled_plugins() -> Vec<String> {
+    let path = dirs::home_dir()
+        .unwrap_or_default()
+        .join(".synapse/plugins/state.json");
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|data| serde_json::from_str::<Value>(&data).ok())
+        .and_then(|v| v["disabled"].as_array().cloned())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 // ---------------------------------------------------------------------------
 // plugins.list
 // ---------------------------------------------------------------------------
 
-/// Return a list of all installed plugins: builtin manifests + external
-/// (workspace + global) discovered from filesystem.
-pub async fn handle_list(_ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
+/// Return a list of all registered plugins from the runtime PluginRegistry.
+///
+/// Each entry includes manifest metadata, registration details (tools,
+/// interceptors, subscribers, services), and enabled/disabled state.
+pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let mut plugins: Vec<Value> = Vec::new();
+    let disabled = load_disabled_plugins();
 
-    // 1. Builtin plugins (hardcoded, always present)
-    let version = env!("CARGO_PKG_VERSION");
-    for (name, description) in [
-        ("builtin-tracing", "Agent tracing and latency measurement"),
-        ("builtin-thinking", "Extended thinking configuration"),
-        (
-            "builtin-loop-detection",
-            "Detect and break agent execution loops",
-        ),
-    ] {
+    // Collect all data from the registry under a single, brief std::sync::RwLock
+    // read guard.  We must NOT hold this guard across .await points.
+    struct PluginInfo {
+        name: String,
+        version: String,
+        description: String,
+        author: Option<String>,
+        license: Option<String>,
+        capabilities: Vec<String>,
+        slot: Option<String>,
+        tools: Vec<String>,
+        interceptors: Vec<String>,
+        subscribers: Vec<String>,
+        service_ids: Vec<String>,
+    }
+
+    let plugin_data: Vec<PluginInfo> = {
+        let registry = ctx.state.plugin_registry.read().unwrap();
+        registry
+            .plugins()
+            .iter()
+            .map(|m| {
+                let regs = registry.plugin_registrations(&m.name);
+                let caps: Vec<String> = m
+                    .capabilities
+                    .iter()
+                    .map(|c| format!("{:?}", c).to_lowercase())
+                    .collect();
+                let slot = m.slot.as_ref().map(|s| format!("{:?}", s).to_lowercase());
+                PluginInfo {
+                    name: m.name.clone(),
+                    version: m.version.clone(),
+                    description: m.description.clone(),
+                    author: m.author.clone(),
+                    license: m.license.clone(),
+                    capabilities: caps,
+                    slot,
+                    tools: regs.map(|r| r.tools.clone()).unwrap_or_default(),
+                    interceptors: regs.map(|r| r.interceptors.clone()).unwrap_or_default(),
+                    subscribers: regs.map(|r| r.subscribers.clone()).unwrap_or_default(),
+                    service_ids: regs.map(|r| r.services.clone()).unwrap_or_default(),
+                }
+            })
+            .collect()
+    };
+    // Lock is dropped here.
+
+    for info in &plugin_data {
+        // TODO: Runtime health check requires migrating plugin_registry to
+        // tokio::RwLock so we can call async `service.health_check()` without
+        // holding a std::sync guard across .await.  For now, report "unknown".
+        let health = "unknown";
+
+        let services_info: Vec<Value> = info
+            .service_ids
+            .iter()
+            .map(|id| json!({ "id": id, "status": "unknown" }))
+            .collect();
+
+        let enabled = !disabled.contains(&info.name);
+        let source = if info.name.starts_with("builtin-") || info.name.starts_with("memory-") {
+            "builtin"
+        } else {
+            "external"
+        };
+
         plugins.push(json!({
-            "name": name,
-            "version": version,
-            "description": description,
-            "author": "synapse",
-            "source": "builtin",
-            "enabled": true,
+            "name": info.name,
+            "version": info.version,
+            "description": info.description,
+            "author": info.author,
+            "license": info.license,
+            "source": source,
+            "enabled": enabled,
+            "slot": info.slot,
+            "capabilities": info.capabilities,
+            "health": health,
+            "tools": info.tools,
+            "interceptors": info.interceptors,
+            "subscribers": info.subscribers,
+            "services": services_info,
         }));
     }
 
-    // 2. External plugins (workspace + global)
-    let dirs_with_scope: Vec<(PathBuf, &str)> = vec![
-        (workspace_plugins_dir(), "workspace"),
-        (global_plugins_dir(), "global"),
-    ];
+    Ok(json!({ "plugins": plugins }))
+}
 
-    for (dir, scope) in dirs_with_scope {
-        if !dir.exists() {
-            continue;
-        }
-        let mut entries = match tokio::fs::read_dir(&dir).await {
-            Ok(e) => e,
-            Err(err) => {
-                tracing::warn!(dir = %dir.display(), error = %err, "plugins.list: failed to read dir");
-                continue;
-            }
-        };
-        while let Ok(Some(entry)) = entries.next_entry().await {
-            let sub = entry.path();
-            if !sub.is_dir() {
-                continue;
-            }
-            let manifest_path = sub.join("plugin.toml");
-            if !manifest_path.exists() {
-                continue;
-            }
-            let contents = match tokio::fs::read_to_string(&manifest_path).await {
-                Ok(s) => s,
-                Err(err) => {
-                    tracing::warn!(path = %manifest_path.display(), error = %err, "plugins.list: failed to read manifest");
-                    continue;
-                }
-            };
-            // Parse just the [plugin] section we need.
-            #[derive(serde::Deserialize, Default)]
-            struct PluginSection {
-                #[serde(default)]
-                name: String,
-                #[serde(default)]
-                version: String,
-                #[serde(default)]
-                description: String,
-                #[serde(default)]
-                author: Option<String>,
-            }
-            #[derive(serde::Deserialize)]
-            struct Manifest {
-                #[serde(default)]
-                plugin: PluginSection,
-            }
-            let manifest: Manifest = match toml::from_str(&contents) {
-                Ok(m) => m,
-                Err(err) => {
-                    tracing::warn!(path = %manifest_path.display(), error = %err, "plugins.list: invalid manifest");
-                    continue;
-                }
-            };
-            let name = if manifest.plugin.name.is_empty() {
-                sub.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("unknown")
-                    .to_string()
-            } else {
-                manifest.plugin.name
-            };
-            plugins.push(json!({
-                "name": name,
-                "version": manifest.plugin.version,
-                "description": manifest.plugin.description,
-                "author": manifest.plugin.author,
-                "source": scope,
-                "enabled": true,
-            }));
-        }
+// ---------------------------------------------------------------------------
+// plugins.toggle
+// ---------------------------------------------------------------------------
+
+/// Toggle a plugin's enabled/disabled state.
+///
+/// Persists the state to `~/.synapse/plugins/state.json`.
+/// The change takes effect after restart.
+pub async fn handle_toggle(_ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+    let name = params["name"]
+        .as_str()
+        .ok_or_else(|| RpcError::invalid_request("missing 'name'"))?;
+    let enabled = params["enabled"]
+        .as_bool()
+        .ok_or_else(|| RpcError::invalid_request("missing 'enabled'"))?;
+
+    let state_path = dirs::home_dir()
+        .unwrap_or_default()
+        .join(".synapse/plugins/state.json");
+
+    let mut disabled = load_disabled_plugins();
+    if enabled {
+        disabled.retain(|d| d != name);
+    } else if !disabled.contains(&name.to_string()) {
+        disabled.push(name.to_string());
     }
 
-    Ok(json!(plugins))
+    let state = json!({ "disabled": disabled });
+    if let Some(parent) = state_path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    std::fs::write(&state_path, serde_json::to_string_pretty(&state).unwrap())
+        .map_err(|e| RpcError::internal(format!("failed to save state: {e}")))?;
+
+    Ok(json!({
+        "ok": true,
+        "name": name,
+        "enabled": enabled,
+        "message": "Takes effect after restart",
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// plugins.service_control
+// ---------------------------------------------------------------------------
+
+/// Start or stop a plugin-managed service by ID.
+///
+/// Currently returns an error because `Service::start()`/`stop()` are async
+/// and our `plugin_registry` uses `std::sync::RwLock`.
+pub async fn handle_service_control(
+    _ctx: Arc<RpcContext>,
+    params: Value,
+) -> Result<Value, RpcError> {
+    let service_id = params["service"]
+        .as_str()
+        .ok_or_else(|| RpcError::invalid_request("missing 'service'"))?;
+    let action = params["action"]
+        .as_str()
+        .ok_or_else(|| RpcError::invalid_request("missing 'action'"))?;
+
+    // TODO: Requires migrating plugin_registry to tokio::RwLock to hold across
+    // async service start/stop calls.
+    Err(RpcError::internal(format!(
+        "Service control not yet available (requires async registry migration). \
+         Action: {action} on {service_id}"
+    )))
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ mod config;
 mod debug;
 mod monitoring;
 mod nodes;
+mod plugins;
 mod schedules;
 mod sessions;
 mod skills;
@@ -34,6 +35,7 @@ pub fn routes() -> Router<AppState> {
         .merge(workspace::routes())
         .merge(nodes::routes())
         .merge(monitoring::routes())
+        .merge(plugins::routes())
         .merge(debug::routes())
 }
 

@@ -14,6 +14,8 @@ pub mod self_awareness;
 pub mod subscribers;
 pub mod templates;
 pub mod thinking;
+#[allow(dead_code)]
+pub mod tool_display;
 pub mod tool_policy;
 mod tools_setup;
 pub mod workspace;

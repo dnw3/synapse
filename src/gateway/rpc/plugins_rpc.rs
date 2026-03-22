@@ -150,7 +150,7 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
 ///
 /// Persists the state to `~/.synapse/plugins/state.json`.
 /// The change takes effect after restart.
-pub async fn handle_toggle(_ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
+pub async fn handle_toggle(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     let name = params["name"]
         .as_str()
         .ok_or_else(|| RpcError::invalid_request("missing 'name'"))?;
@@ -158,6 +158,7 @@ pub async fn handle_toggle(_ctx: Arc<RpcContext>, params: Value) -> Result<Value
         .as_bool()
         .ok_or_else(|| RpcError::invalid_request("missing 'enabled'"))?;
 
+    // 1. Persist state
     let state_path = dirs::home_dir()
         .unwrap_or_default()
         .join(".synapse/plugins/state.json");
@@ -176,11 +177,36 @@ pub async fn handle_toggle(_ctx: Arc<RpcContext>, params: Value) -> Result<Value
     std::fs::write(&state_path, serde_json::to_string_pretty(&state).unwrap())
         .map_err(|e| RpcError::internal(format!("failed to save state: {e}")))?;
 
+    // 2. Hot unregister: immediately remove plugin's tools/interceptors/subscribers
+    if !enabled {
+        let service_ids = {
+            let mut registry = ctx.state.plugin_registry.write().unwrap();
+            registry.unregister_plugin(name)
+        };
+        // Stop services that were removed (lock is dropped, safe to await)
+        if !service_ids.is_empty() {
+            tracing::info!(plugin = name, services = ?service_ids, "stopping services for disabled plugin");
+            // Services were already removed from registry, but we need references to stop them.
+            // Since unregister_plugin drops them, they'll be stopped via Drop if they implement it.
+            // VikingService has Drop → kill_on_drop. So services are cleaned up automatically.
+        }
+        tracing::info!(plugin = name, "plugin hot-disabled");
+    }
+
+    // Note: hot re-enable requires re-calling Plugin::register() which needs
+    // the Plugin instance. Currently plugins are consumed during startup.
+    // Re-enable takes effect after restart.
+    let message = if enabled {
+        "Enabled (takes effect after restart)"
+    } else {
+        "Disabled (effective immediately)"
+    };
+
     Ok(json!({
         "ok": true,
         "name": name,
         "enabled": enabled,
-        "message": "Takes effect after restart",
+        "message": message,
     }))
 }
 

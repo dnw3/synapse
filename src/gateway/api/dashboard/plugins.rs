@@ -56,7 +56,12 @@ fn load_disabled_plugins() -> Vec<String> {
         .unwrap_or_default()
 }
 
-async fn get_plugins(State(state): State<AppState>) -> Json<Vec<PluginResponse>> {
+#[derive(Serialize)]
+struct PluginsListResponse {
+    plugins: Vec<PluginResponse>,
+}
+
+async fn get_plugins(State(state): State<AppState>) -> Json<PluginsListResponse> {
     let disabled = load_disabled_plugins();
 
     let plugins: Vec<PluginResponse> = {
@@ -107,5 +112,5 @@ async fn get_plugins(State(state): State<AppState>) -> Json<Vec<PluginResponse>>
             .collect()
     };
 
-    Json(plugins)
+    Json(PluginsListResponse { plugins })
 }

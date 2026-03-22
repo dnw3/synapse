@@ -78,6 +78,7 @@ impl AgentSession {
             self.plugin_registry.clone(),
             None, // no channel registry in bot mode
             crate::agent::SessionKind::Full,
+            &[], // TODO: pass bundle_skills_dirs from gateway
         )
         .await
         .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;

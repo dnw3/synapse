@@ -98,6 +98,7 @@ impl AgentSession {
                                 None, // no plugin registry in broadcast mode
                                 None, // no channel registry in broadcast mode
                                 crate::agent::SessionKind::Full,
+                                &[], // no bundle skills in broadcast mode
                             )
                             .await
                             .map_err(|e| AgentError(format!("agent build: {}", e)))?;

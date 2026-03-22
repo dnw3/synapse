@@ -83,6 +83,7 @@ pub async fn build_deep_agent(
         None,
         None,
         session_kind,
+        &[],
     )
     .await
 }
@@ -107,6 +108,7 @@ pub async fn build_deep_agent_with_callback(
     plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
     channel_registry: Option<Arc<tokio::sync::RwLock<crate::gateway::messages::ChannelRegistry>>>,
     session_kind: SessionKind,
+    extra_skills_dirs: &[std::path::PathBuf],
 ) -> Result<CompiledGraph<MessageState>, SynapticError> {
     // --- Backend selection ---
     #[cfg(feature = "docker")]
@@ -243,6 +245,10 @@ pub async fn build_deep_agent_with_callback(
 
     // --- Skills directories ---
     setup_skills_dirs(&mut options, config, cwd, agent_name);
+    // Append bundle-contributed skills dirs (from plugin ecosystem)
+    for dir in extra_skills_dirs {
+        options.skills_dirs.push(dir.to_string_lossy().to_string());
+    }
 
     options.skill_description_budget = config.skills.max_skills_prompt_chars;
     options.command_executor = Some(Arc::new(ShellCommandExecutor::new(cwd)));

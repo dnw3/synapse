@@ -131,6 +131,12 @@ pub struct AppState {
     pub canvas_engine: Arc<CanvasEngine>,
     /// Plugin registry — loaded once at startup, shared across all agent builds.
     pub plugin_registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
+    /// Skills dirs contributed by plugin bundles (Claude/Codex/Cursor).
+    #[allow(dead_code)]
+    pub bundle_skills_dirs: Vec<std::path::PathBuf>,
+    /// Agent dirs contributed by plugin bundles.
+    #[allow(dead_code)]
+    pub bundle_agent_dirs: Vec<std::path::PathBuf>,
     /// Shared AgentSession for unified message processing pipeline.
     pub agent_session: Arc<AgentSession>,
 }
@@ -265,91 +271,104 @@ fn build_channel_bundle() -> ChannelBundle {
 struct InfraBundle {
     event_bus: Arc<EventBus>,
     plugin_registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
+    /// Skills dirs contributed by plugin bundles (Claude/Codex/Cursor).
+    bundle_skills_dirs: Vec<std::path::PathBuf>,
+    /// Agent dirs contributed by plugin bundles.
+    bundle_agent_dirs: Vec<std::path::PathBuf>,
 }
 
-// TODO(P2): Replace register_builtin_plugins with PluginManager for full lifecycle management.
-// PluginManager is available at crate::plugins::manager::PluginManager.
 async fn build_infra_bundle(
     config: &SynapseConfig,
     cost_tracker: &Arc<CostTrackingCallback>,
     usage_tracker: &Arc<UsageTracker>,
 ) -> InfraBundle {
     let event_bus = Arc::new(EventBus::new());
+    let plugin_registry = Arc::new(tokio::sync::RwLock::new(
+        synaptic::plugin::PluginRegistry::new(event_bus.clone()),
+    ));
 
-    let mut plugin_registry = synaptic::plugin::PluginRegistry::new(event_bus.clone());
-    if let Err(e) = crate::plugin::register_builtin_plugins(
-        &mut plugin_registry,
-        Arc::clone(cost_tracker),
-        Arc::clone(usage_tracker),
-    ) {
-        tracing::warn!(error = %e, "failed to register builtin plugins");
-    }
-
-    // Register plugins from [plugins].slots via the builtin plugin registry.
-    // No hardcoded match — each plugin registers a factory function.
+    // --- Phase 1: Register builtin event subscribers (tracing, thinking, etc.) ---
     {
-        let factory_registry = crate::plugins::registry::default_registry();
+        let mut reg = plugin_registry.write().await;
+        if let Err(e) = crate::plugin::register_builtin_plugins(
+            &mut reg,
+            Arc::clone(cost_tracker),
+            Arc::clone(usage_tracker),
+        ) {
+            tracing::warn!(error = %e, "failed to register builtin plugins");
+        }
+    }
 
-        // Load slot-assigned plugins (e.g., slots.memory = "memory-viking")
-        for (slot, plugin_name) in &config.plugins.slots {
-            let plugin_config = config
-                .plugins
-                .entries
-                .get(plugin_name)
-                .map(|e| e.config.clone())
-                .unwrap_or_default();
+    // --- Phase 2: Use PluginManager for all plugin lifecycle ---
+    let mut plugin_manager = crate::plugins::manager::PluginManager::new(
+        config.plugins.clone(),
+        plugin_registry.clone(),
+        dirs::home_dir()
+            .unwrap_or_default()
+            .join(".synapse/plugins"),
+    );
 
-            let enabled = config
-                .plugins
-                .entries
-                .get(plugin_name)
-                .map(|e| e.enabled)
-                .unwrap_or(true);
+    // Register slot-assigned plugins via factory registry (e.g., memory-viking)
+    let factory_registry = crate::plugins::registry::default_registry();
+    for (slot, plugin_name) in &config.plugins.slots {
+        let plugin_config = config
+            .plugins
+            .entries
+            .get(plugin_name)
+            .map(|e| e.config.clone())
+            .unwrap_or_default();
 
-            if !enabled {
-                tracing::info!(plugin = %plugin_name, slot = %slot, "plugin disabled in config");
-                continue;
+        let enabled = config
+            .plugins
+            .entries
+            .get(plugin_name)
+            .map(|e| e.enabled)
+            .unwrap_or(true);
+
+        if !enabled {
+            tracing::info!(plugin = %plugin_name, slot = %slot, "plugin disabled in config");
+            continue;
+        }
+
+        match factory_registry.create(plugin_name, plugin_config) {
+            Some(plugin) => {
+                plugin_manager.add_builtin(plugin);
+                tracing::debug!(plugin = %plugin_name, slot = %slot, "queued slot plugin");
             }
-
-            match factory_registry.create(plugin_name, plugin_config) {
-                Some(plugin) => {
-                    let manifest = plugin.manifest();
-                    let name = manifest.name.clone();
-                    {
-                        let mut api = synaptic::plugin::PluginApi::new(&mut plugin_registry, &name);
-                        if let Err(e) = plugin.register(&mut api).await {
-                            tracing::warn!(plugin = %name, error = %e, "failed to register plugin");
-                            continue;
-                        }
-                    }
-                    plugin_registry.record_plugin(manifest);
-                    tracing::info!(plugin = %name, slot = %slot, "plugin loaded");
-                }
-                None => {
-                    tracing::warn!(
-                        plugin = %plugin_name,
-                        slot = %slot,
-                        available = ?factory_registry.names(),
-                        "unknown plugin — not found in builtin registry"
-                    );
-                }
+            None => {
+                tracing::warn!(
+                    plugin = %plugin_name,
+                    slot = %slot,
+                    available = ?factory_registry.names(),
+                    "unknown plugin — not found in builtin registry"
+                );
             }
         }
     }
 
-    // Start all plugin-managed services (e.g., VikingService)
-    for service in plugin_registry.services() {
-        tracing::info!(service = service.id(), "starting plugin service");
-        if let Err(e) = service.start().await {
-            tracing::warn!(service = service.id(), error = %e, "failed to start plugin service");
-        }
+    // Load state (disabled plugins) and register all builtins
+    plugin_manager.load_state();
+    if let Err(e) = plugin_manager.load_all().await {
+        tracing::warn!(error = %e, "failed to load builtin plugins");
     }
 
-    let plugin_registry = Arc::new(tokio::sync::RwLock::new(plugin_registry));
+    // Discover and load external plugins + bundles from filesystem
+    if let Err(e) = plugin_manager.discover_and_load().await {
+        tracing::warn!(error = %e, "failed to discover external plugins");
+    }
+
+    // --- Phase 3: Start all plugin-managed services ---
+    plugin_manager.start_services().await;
+
+    // Collect bundle dirs before dropping plugin_manager
+    let bundle_skills_dirs = plugin_manager.bundle_skills_dirs.clone();
+    let bundle_agent_dirs = plugin_manager.bundle_agent_dirs.clone();
 
     InfraBundle {
         event_bus,
         plugin_registry,
+        bundle_skills_dirs,
+        bundle_agent_dirs,
     }
 }
 
@@ -534,6 +553,8 @@ impl AppState {
             event_bus: infra.event_bus,
             canvas_engine: Arc::new(CanvasEngine::new()),
             plugin_registry: infra.plugin_registry,
+            bundle_skills_dirs: infra.bundle_skills_dirs,
+            bundle_agent_dirs: infra.bundle_agent_dirs,
 
             // Unified agent session
             agent_session,

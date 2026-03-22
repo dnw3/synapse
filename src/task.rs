@@ -86,6 +86,7 @@ pub async fn run_task(
         None, // no plugin registry in task/repl mode
         None, // no channel registry in task/repl mode
         agent::SessionKind::Full,
+        &[], // no bundle skills in task/repl mode
     )
     .await?;
 

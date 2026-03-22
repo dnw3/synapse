@@ -52,19 +52,12 @@ impl StreamingOutput for LarkStreamingOutput {
             return;
         }
 
-        let display = if info.name == "task" {
-            // Extract description from task args for user-friendly display
-            let desc = serde_json::from_str::<serde_json::Value>(&info.args)
-                .ok()
-                .and_then(|v| v["description"].as_str().map(|s| s.to_string()))
-                .unwrap_or_else(|| "sub-task".to_string());
-            // Truncate long descriptions
-            let desc = if desc.len() > 60 {
-                format!("{}...", &desc[..57])
+        let display = if let Some(ref d) = info.display {
+            if d.detail.is_empty() {
+                format!("\n{} {}\n", d.emoji, d.label)
             } else {
-                desc
-            };
-            format!("\n\u{1f916} {}\n", desc)
+                format!("\n{} {}\n", d.emoji, d.detail)
+            }
         } else {
             format!("\n\u{1f527} {}\n", info.name)
         };

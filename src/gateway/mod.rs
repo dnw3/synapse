@@ -257,8 +257,7 @@ pub async fn run_server_with_log_buffer(
     // Graceful shutdown: broadcast shutdown event, then stop accepting connections
     let broadcaster = shutdown_broadcaster;
     let event_bus_shutdown = app_state.event_bus.clone();
-    // P2: will be used by PluginManager.stop_all() for service shutdown
-    let _plugin_registry_shutdown = app_state.plugin_registry.clone();
+    let plugin_registry_shutdown = app_state.plugin_registry.clone();
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             let _ = tokio::signal::ctrl_c().await;
@@ -269,10 +268,14 @@ pub async fn run_server_with_log_buffer(
                     .with_source("gateway");
                 let _ = event_bus_shutdown.emit(&mut event).await;
             }
-            // TODO(P2): Stop plugin-managed services via PluginManager.stop_all().
-            // Currently no services are registered (P2 adds VikingService).
-            // PluginManager will own the service lifecycle and handle async
-            // shutdown without the std::sync::RwLock/Send constraint.
+            // Stop plugin-managed services (take ownership to avoid holding lock across await)
+            {
+                let services = plugin_registry_shutdown.write().unwrap().take_services();
+                for service in services.iter().rev() {
+                    tracing::info!(service = service.id(), "stopping plugin service");
+                    service.stop().await;
+                }
+            }
             // Broadcast shutdown event to all connected clients
             broadcaster
                 .broadcast("shutdown", serde_json::json!({"reason": "server_shutdown"}))

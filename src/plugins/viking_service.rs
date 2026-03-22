@@ -28,7 +28,7 @@ impl VikingService {
 
     /// Build the health-check URL from the configured base URL.
     fn health_url(&self) -> String {
-        format!("{}/api/v1/health", self.config.url.trim_end_matches('/'))
+        format!("{}/health", self.config.url.trim_end_matches('/'))
     }
 }
 
@@ -91,10 +91,10 @@ impl Service for VikingService {
             *guard = Some(child);
         }
 
-        tracing::info!("openviking-server spawned, waiting for health check (up to 10s)");
+        tracing::info!("openviking-server spawned, waiting for health check (up to 30s)");
 
-        // Wait up to 10 s for the server to become ready.
-        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        // Wait up to 30s for the server to become ready (Viking can be slow to initialize).
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
         loop {
             if self.health_check().await {
                 tracing::info!("openviking-server is healthy");
@@ -102,7 +102,7 @@ impl Service for VikingService {
             }
             if std::time::Instant::now() >= deadline {
                 return Err(SynapticError::Tool(
-                    "openviking-server did not become healthy within 10s".into(),
+                    "openviking-server did not become healthy within 30s".into(),
                 ));
             }
             tokio::time::sleep(Duration::from_millis(500)).await;

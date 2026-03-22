@@ -311,6 +311,14 @@ async fn build_infra_bundle(
         plugin_registry.record_plugin(manifest);
     }
 
+    // Start all plugin-managed services (e.g., VikingService)
+    for service in plugin_registry.services() {
+        tracing::info!(service = service.id(), "starting plugin service");
+        if let Err(e) = service.start().await {
+            tracing::warn!(service = service.id(), error = %e, "failed to start plugin service");
+        }
+    }
+
     let plugin_registry = Arc::new(StdRwLock::new(plugin_registry));
 
     InfraBundle {

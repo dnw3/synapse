@@ -105,14 +105,8 @@ pub struct MemoryConfig {
     /// Ollama embedding model name (default: "nomic-embed-text").
     #[serde(default = "default_ollama_embedding_model")]
     pub ollama_embedding_model: String,
-
-    /// Memory provider backend: "native" (local LTM) or "viking" (OpenViking REST API).
-    #[serde(default = "default_memory_provider")]
-    pub memory_provider: String,
-
-    /// Viking memory provider configuration (only used when `memory_provider = "viking"`).
-    #[serde(default)]
-    pub viking: Option<crate::memory::VikingConfig>,
+    // Memory provider selection moved to [plugins].slots.memory in synapse.toml.
+    // Viking config moved to [plugins.entries.memory-viking].config.
 }
 
 fn default_auto_compact_threshold() -> usize {
@@ -166,10 +160,6 @@ fn default_ollama_embedding_url() -> String {
 fn default_ollama_embedding_model() -> String {
     "nomic-embed-text".to_string()
 }
-fn default_memory_provider() -> String {
-    "native".to_string()
-}
-
 pub(crate) fn default_true() -> bool {
     true
 }
@@ -204,8 +194,6 @@ impl Default for MemoryConfig {
             embedding_provider: default_embedding_provider(),
             ollama_embedding_url: default_ollama_embedding_url(),
             ollama_embedding_model: default_ollama_embedding_model(),
-            memory_provider: default_memory_provider(),
-            viking: None,
         }
     }
 }

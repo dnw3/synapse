@@ -5,27 +5,35 @@ use synaptic::memory::MemoryProvider;
 use crate::config::SynapseConfig;
 use crate::memory::LongTermMemory;
 
-/// Build the configured [`MemoryProvider`] based on [`SynapseConfig::memory`].
+/// Build a [`MemoryProvider`] based on `[plugins].slots.memory` config.
 ///
-/// - `"viking"` → [`VikingMemoryProvider`](crate::memory::VikingMemoryProvider) backed by
-///   the OpenViking REST API.
-/// - `"native"` (default) → [`NativeMemoryProvider`](crate::memory::NativeMemoryProvider)
-///   backed by the local [`LongTermMemory`] store.  If `ltm` is `None`, a no-op
-///   provider is returned that yields empty results.
+/// Used as fallback for REPL/CLI paths where the full plugin system isn't active.
+/// The gateway uses `PluginRegistry.memory_slot` instead.
 pub fn build_memory_provider(
     config: &SynapseConfig,
     ltm: Option<Arc<LongTermMemory>>,
 ) -> Arc<dyn MemoryProvider> {
-    let provider_name = &config.memory.memory_provider;
+    let memory_slot = config
+        .plugins
+        .slots
+        .get("memory")
+        .map(|s| s.as_str())
+        .unwrap_or("memory-native");
 
-    match provider_name.as_str() {
-        "viking" => {
-            let viking_config = config.memory.viking.clone().unwrap_or_default();
+    match memory_slot {
+        "memory-viking" => {
+            let plugin_config = config
+                .plugins
+                .entries
+                .get("memory-viking")
+                .map(|e| e.config.clone())
+                .unwrap_or_default();
+            let viking_config: crate::memory::VikingConfig =
+                serde_json::from_value(plugin_config).unwrap_or_default();
             tracing::info!(url = %viking_config.url, "using Viking memory provider");
             Arc::new(crate::memory::VikingMemoryProvider::new(viking_config))
         }
         _ => {
-            // Default: native
             if let Some(ltm) = ltm {
                 tracing::info!("using Native memory provider (LTM)");
                 Arc::new(crate::memory::NativeMemoryProvider::new(ltm))

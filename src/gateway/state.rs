@@ -286,18 +286,31 @@ async fn build_infra_bundle(
         tracing::warn!(error = %e, "failed to register builtin plugins");
     }
 
-    // Register memory plugin based on config
+    // Register memory plugin based on [plugins].slots.memory config
     {
-        let memory_plugin: Box<dyn synaptic::plugin::Plugin> = {
-            let provider_name = &config.memory.memory_provider;
-            if provider_name == "viking" {
-                let viking_config = config.memory.viking.clone().unwrap_or_default();
+        let memory_slot = config
+            .plugins
+            .slots
+            .get("memory")
+            .map(|s| s.as_str())
+            .unwrap_or("memory-native");
+
+        let plugin_config = config
+            .plugins
+            .entries
+            .get(memory_slot)
+            .map(|e| e.config.clone())
+            .unwrap_or_default();
+
+        let memory_plugin: Box<dyn synaptic::plugin::Plugin> = match memory_slot {
+            "memory-viking" => {
+                let viking_config: crate::memory::VikingConfig =
+                    serde_json::from_value(plugin_config).unwrap_or_default();
                 Box::new(crate::plugins::memory_viking::VikingMemoryPlugin::new(
                     viking_config,
                 ))
-            } else {
-                Box::new(crate::plugins::memory_native::NativeMemoryPlugin::new(None))
             }
+            _ => Box::new(crate::plugins::memory_native::NativeMemoryPlugin::new(None)),
         };
 
         let manifest = memory_plugin.manifest();
@@ -309,6 +322,7 @@ async fn build_infra_bundle(
             }
         }
         plugin_registry.record_plugin(manifest);
+        tracing::info!(memory_slot = memory_slot, "memory plugin loaded");
     }
 
     // Start all plugin-managed services (e.g., VikingService)

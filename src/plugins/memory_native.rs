@@ -9,11 +9,16 @@ use crate::memory::{LongTermMemory, NativeMemoryProvider};
 
 pub struct NativeMemoryPlugin {
     ltm: Option<Arc<LongTermMemory>>,
+    has_embeddings: bool,
 }
 
 impl NativeMemoryPlugin {
     pub fn new(ltm: Option<Arc<LongTermMemory>>) -> Self {
-        Self { ltm }
+        let has_embeddings = ltm.as_ref().map(|l| l.uses_embeddings()).unwrap_or(false);
+        Self {
+            ltm,
+            has_embeddings,
+        }
     }
 }
 
@@ -39,12 +44,25 @@ impl synaptic::plugin::Plugin for NativeMemoryPlugin {
         });
 
         api.register_memory(provider.clone());
-        api.register_tool(crate::tools::MemorySearchTool::new(provider));
+        api.register_tool(crate::tools::MemorySearchTool::new(provider.clone()));
         if let Some(ref ltm) = self.ltm {
             api.register_tool(crate::tools::MemoryGetTool::new(ltm.clone()));
             api.register_tool(crate::tools::MemorySaveTool::new(ltm.clone()));
             api.register_tool(crate::tools::MemoryForgetTool::new(ltm.clone()));
         }
+
+        // Auto-recall: only when real embeddings available (keyword-only is too noisy)
+        if self.has_embeddings {
+            api.register_interceptor(Arc::new(
+                super::memory_recall::MemoryRecallInterceptor::new(
+                    provider.clone(),
+                    5,   // recall_limit
+                    0.3, // score_threshold
+                ),
+            ));
+            tracing::info!("memory-native: auto-recall enabled (embeddings available)");
+        }
+        // No auto-capture for native — NativeMemoryProvider.add_message() is no-op
 
         Ok(())
     }

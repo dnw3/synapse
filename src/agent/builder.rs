@@ -242,7 +242,7 @@ pub async fn build_deep_agent_with_callback(
     options.memory_file = Some(config.base.paths.memory_file.clone());
 
     // --- Skills directories ---
-    setup_skills_dirs(&mut options, config, cwd);
+    setup_skills_dirs(&mut options, config, cwd, agent_name);
 
     options.skill_description_budget = config.skills.max_skills_prompt_chars;
     options.command_executor = Some(Arc::new(ShellCommandExecutor::new(cwd)));
@@ -326,22 +326,31 @@ pub async fn build_deep_agent_with_callback(
     create_deep_agent(model, options)
 }
 
-/// Build skills_dirs: synapse personal > claude personal > project > legacy > custom config.
-fn setup_skills_dirs(options: &mut DeepAgentOptions, config: &SynapseConfig, cwd: &Path) {
+/// Build skills_dirs with OpenClaw-aligned precedence:
+///   1. <workspace>/skills/   — per-agent (highest priority)
+///   2. ~/.synapse/skills/    — global shared
+///   3. config extra_dirs     — custom paths
+///
+/// Bundle-contributed skills dirs are added separately by PluginManager.
+fn setup_skills_dirs(
+    options: &mut DeepAgentOptions,
+    config: &SynapseConfig,
+    cwd: &Path,
+    agent_name: Option<&str>,
+) {
     let mut skills_dirs = Vec::new();
+
+    // 1. Per-agent workspace skills (highest priority)
+    let workspace_dir = config.workspace_dir_for_agent(agent_name);
+    let agent_skills = workspace_dir.join("skills");
+    skills_dirs.push(agent_skills.to_string_lossy().to_string());
+
+    // 2. Global shared skills
     if let Some(home) = dirs::home_dir() {
         skills_dirs.push(home.join(".synapse/skills").to_string_lossy().to_string());
-        skills_dirs.push(home.join(".claude/skills").to_string_lossy().to_string());
     }
-    skills_dirs.push(cwd.join(".claude/skills").to_string_lossy().to_string());
-    skills_dirs.push(cwd.join(".claude/commands").to_string_lossy().to_string());
-    if config.base.paths.skills_dir != ".claude/skills" {
-        skills_dirs.push(
-            cwd.join(&config.base.paths.skills_dir)
-                .to_string_lossy()
-                .to_string(),
-        );
-    }
+
+    // 3. Custom extra dirs from config
     for extra in &config.skills.extra_dirs {
         let expanded = if extra.starts_with("~/") {
             dirs::home_dir()
@@ -349,11 +358,14 @@ fn setup_skills_dirs(options: &mut DeepAgentOptions, config: &SynapseConfig, cwd
                 .join(extra.trim_start_matches("~/"))
                 .to_string_lossy()
                 .to_string()
-        } else {
+        } else if std::path::Path::new(extra).is_absolute() {
             extra.clone()
+        } else {
+            cwd.join(extra).to_string_lossy().to_string()
         };
         skills_dirs.push(expanded);
     }
+
     options.skills_dirs = skills_dirs;
 }
 

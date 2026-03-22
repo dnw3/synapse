@@ -8,3 +8,4 @@ pub mod memory_native;
 pub mod memory_recall;
 pub mod memory_viking;
 pub mod viking_service;
+pub mod viking_tools;

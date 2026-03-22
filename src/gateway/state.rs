@@ -265,6 +265,8 @@ struct InfraBundle {
     plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
 }
 
+// TODO(P2): Replace register_builtin_plugins with PluginManager for full lifecycle management.
+// PluginManager is available at crate::plugins::manager::PluginManager.
 fn build_infra_bundle(
     cost_tracker: &Arc<CostTrackingCallback>,
     usage_tracker: &Arc<UsageTracker>,

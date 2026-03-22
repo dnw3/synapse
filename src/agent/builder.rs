@@ -293,6 +293,23 @@ pub async fn build_deep_agent_with_callback(
     options.channel = Some(channel.to_string());
     options.agent_id = agent_name.map(|s| s.to_string());
 
+    // Plugin hook interceptor — bridges EventBus lifecycle events to plugin subscribers
+    if let Some(ref bus) = options.event_bus {
+        options
+            .interceptors
+            .push(Arc::new(synaptic::middleware::PluginHookInterceptor::new(
+                bus.clone(),
+            )));
+    }
+
+    // Inject plugin-registered interceptors
+    if let Some(ref registry) = plugin_registry {
+        let reg = registry.read().unwrap();
+        for interceptor in reg.interceptors() {
+            options.interceptors.push(Arc::clone(interceptor));
+        }
+    }
+
     create_deep_agent(model, options)
 }
 

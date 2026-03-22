@@ -218,7 +218,7 @@ pub async fn update_skill(
 fn global_skills_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".claude")
+        .join(".synapse")
         .join("skills")
 }
 

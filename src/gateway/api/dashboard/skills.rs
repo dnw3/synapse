@@ -58,17 +58,22 @@ async fn get_skills(
 ) -> Result<Json<Vec<SkillResponse>>, (StatusCode, String)> {
     let mut skills = Vec::new();
 
+    // Skill discovery paths — aligned with agent builder's OpenClaw model:
+    //   1. workspace/skills (per-agent) — handled by agent builder
+    //   2. ~/.synapse/skills (global shared)
     let dirs: Vec<(&str, String)> = {
-        let mut v = vec![("project", ".claude/skills".to_string())];
+        let mut v = Vec::new();
         if let Some(home) = dirs::home_dir() {
             v.push((
                 "personal",
                 home.join(".synapse/skills").to_string_lossy().to_string(),
             ));
-            v.push((
-                "personal",
-                home.join(".claude/skills").to_string_lossy().to_string(),
-            ));
+        }
+        // Per-agent workspace skills
+        let workspace = state.config.workspace_dir();
+        let ws_skills = workspace.join("skills");
+        if ws_skills.is_dir() {
+            v.push(("workspace", ws_skills.to_string_lossy().to_string()));
         }
         v
     };

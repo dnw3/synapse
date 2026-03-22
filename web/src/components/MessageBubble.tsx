@@ -280,7 +280,7 @@ export default function MessageBubble({ message, turn, onDelete, onToolResultCli
               {hasToolCalls && (
                 <div className="flex flex-col gap-1.5">
                   {msg.tool_calls.map((tc, j) => (
-                    <ToolCallCard key={j} name={tc.name} args={tc.arguments} />
+                    <ToolCallCard key={j} name={tc.name} args={tc.arguments} display={tc.display} />
                   ))}
                 </div>
               )}

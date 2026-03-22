@@ -11,9 +11,17 @@ export interface Session {
 /** @deprecated Use Session instead */
 export type Conversation = Session;
 
+export interface ToolDisplay {
+  emoji: string;
+  label: string;
+  verb: string;
+  detail: string;
+}
+
 export interface ToolCall {
   name: string;
   arguments: Record<string, unknown>;
+  display?: ToolDisplay;
 }
 
 export interface MessageUsage {

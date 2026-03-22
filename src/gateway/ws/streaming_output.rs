@@ -165,6 +165,7 @@ impl StreamingOutput for WsStreamingOutput {
                 "name": info.name,
                 "id":   info.id,
                 "args": info.args,
+                "display": info.display,
                 "sessionKey": self.session_key,
             }),
         );

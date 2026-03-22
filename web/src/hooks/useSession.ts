@@ -246,7 +246,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
                 {
                   role: "assistant" as const,
                   content: "",
-                  tool_calls: [{ name: (payload.name as string) ?? "", arguments: (payload.args as Record<string, unknown>) ?? {} }],
+                  tool_calls: [{ name: (payload.name as string) ?? "", arguments: (payload.args as Record<string, unknown>) ?? {}, display: payload.display as Message["tool_calls"][number]["display"] }],
                 },
               ];
             });
@@ -256,7 +256,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
               {
                 role: "assistant" as const,
                 content: "",
-                tool_calls: [{ name: (payload.name as string) ?? "", arguments: (payload.args as Record<string, unknown>) ?? {} }],
+                tool_calls: [{ name: (payload.name as string) ?? "", arguments: (payload.args as Record<string, unknown>) ?? {}, display: payload.display as Message["tool_calls"][number]["display"] }],
               },
             ]);
           }

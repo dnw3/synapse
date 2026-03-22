@@ -3,6 +3,7 @@ pub mod files;
 pub mod lark_callback;
 pub mod lark_card_config;
 pub mod logs;
+pub mod traces;
 pub mod upload;
 
 use axum::Router;
@@ -19,6 +20,7 @@ fn api_routes() -> Router<AppState> {
         .merge(files::routes())
         .merge(dashboard::routes())
         .merge(logs::routes())
+        .merge(traces::routes())
         .merge(upload::routes())
         .merge(lark_callback::routes())
         .merge(lark_card_config::routes())

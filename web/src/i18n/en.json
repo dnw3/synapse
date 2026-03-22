@@ -202,6 +202,115 @@
     "allChannels": "All Channels",
     "messageFrom": "from"
   },
+  "traces": {
+    "title": "Traces",
+    "tracesTab": "Traces",
+    "search": "Search by request ID, keyword...",
+    "noTraces": "No traces found",
+    "empty": "No traces captured yet. Send a message to generate a trace.",
+    "loading": "Loading traces...",
+    "refresh": "Refresh",
+    "status": {
+      "running": "Running",
+      "success": "Success",
+      "error": "Error"
+    },
+    "error": {
+      "notFound": "Trace not found"
+    },
+    "detail": {
+      "overview": "Overview",
+      "timeline": "Timeline",
+      "steps": "Steps",
+      "backToList": "Back to traces"
+    },
+    "summary": {
+      "duration": "Duration",
+      "tokens": "Total Tokens",
+      "modelCalls": "Model Calls",
+      "toolCalls": "Tool Calls"
+    },
+    "span": {
+      "systemPrompt": "System Prompt",
+      "userMessage": "User Message",
+      "response": "Response",
+      "args": "Arguments",
+      "result": "Result",
+      "error": "Error",
+      "duration": "Duration",
+      "model": "Model",
+      "thinking": "Thinking",
+      "cacheTokens": "Cache Tokens",
+      "copy": "Copy",
+      "showFull": "Show full",
+      "collapse": "Collapse",
+      "context": "Context",
+      "messages": "Messages",
+      "toolsTriggered": "Tools triggered"
+    },
+    "timeline": {
+      "timeBreakdown": "Time Breakdown",
+      "model": "Model",
+      "tools": "Tools",
+      "idle": "Idle",
+      "span": "Span",
+      "tokens": "Tokens"
+    },
+    "token": {
+      "input": "Input",
+      "output": "Output",
+      "distribution": "Token Distribution",
+      "cache": "Cache",
+      "cacheCreation": "Cache Creation",
+      "cacheRead": "Cache Read"
+    },
+    "subAgent": {
+      "label": "Sub-Agent",
+      "openTrace": "Open full trace",
+      "spawnedBy": "Spawned by",
+      "backToParent": "Back to parent trace",
+      "subAgents": "{{count}} sub-agent(s)"
+    },
+    "filter": {
+      "status": "Status",
+      "timeRange": "Time Range",
+      "model": "Model",
+      "channel": "Channel",
+      "tool": "Tool",
+      "minTokens": "Min Tokens",
+      "minDuration": "Min Duration",
+      "keyword": "Keyword",
+      "allStatuses": "All Statuses",
+      "allChannels": "All Channels"
+    },
+    "breadcrumb": {
+      "allTraces": "All Traces",
+      "parent": "parent",
+      "task": "task"
+    },
+    "overview": {
+      "tokenDistribution": "Token Distribution",
+      "modelN": "Model #{{n}}",
+      "selectSpan": "Click a span to view details",
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "thinkingOn": "Thinking: On",
+      "thinkingOff": "Thinking: Off",
+      "noSpans": "No spans recorded"
+    },
+    "steps": {
+      "modelCallN": "Model Call #{{n}}",
+      "taskLabel": "task",
+      "loading": "Loading sub-trace...",
+      "openFullTrace": "Open full trace",
+      "noSteps": "No steps recorded"
+    },
+    "placeholder": {
+      "overviewView": "Overview View",
+      "timelineView": "Timeline View",
+      "stepsView": "Steps View"
+    }
+  },
   "agents": {
     "createAgent": "Create Agent",
     "editAgent": "Edit Agent",

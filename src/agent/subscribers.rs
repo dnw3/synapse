@@ -11,6 +11,17 @@ use synaptic::core::SynapticError;
 use synaptic::events::{Event, EventAction, EventFilter, EventKind, EventSubscriber};
 
 // ---------------------------------------------------------------------------
+// Log message constants — shared with TraceAggregator for compile-time consistency.
+// ---------------------------------------------------------------------------
+
+pub const LOG_MODEL_CALL_STARTING: &str = "model call starting";
+pub const LOG_MODEL_CALL_COMPLETED: &str = "model call completed";
+pub const LOG_MODEL_CALL_COMPLETED_NO_USAGE: &str = "model call completed (no usage)";
+pub const LOG_TOOL_CALL_STARTING: &str = "tool call starting";
+pub const LOG_TOOL_CALL_COMPLETED: &str = "tool call completed";
+pub const LOG_TOOL_CALL_FAILED: &str = "tool call failed";
+
+// ---------------------------------------------------------------------------
 // 1. TracingSubscriber — replaces AgentTracingMiddleware
 // ---------------------------------------------------------------------------
 
@@ -30,6 +41,10 @@ use synaptic::events::{Event, EventAction, EventFilter, EventKind, EventSubscrib
 pub struct TracingSubscriber {
     /// request_id → call start Instant
     timers: dashmap::DashMap<String, std::time::Instant>,
+    /// Fallback trace_id for agent runs that don't have event metadata request_id.
+    /// Generated once per BeforeModelCall when no request_id is present.
+    /// Key: timer_key ("default") → generated trace_id
+    fallback_trace_ids: dashmap::DashMap<String, String>,
 }
 
 impl TracingSubscriber {
@@ -37,6 +52,7 @@ impl TracingSubscriber {
     pub fn new() -> Self {
         Self {
             timers: dashmap::DashMap::new(),
+            fallback_trace_ids: dashmap::DashMap::new(),
         }
     }
 
@@ -63,6 +79,40 @@ impl EventSubscriber for TracingSubscriber {
     }
 
     async fn handle(&self, event: &mut Event) -> Result<EventAction, SynapticError> {
+        // Resolve trace_id: prefer event metadata request_id, fall back to a
+        // generated ID that persists across a model-call cycle (BeforeModelCall →
+        // LlmOutput → tool calls). This ensures log entries can be grouped by
+        // TraceAggregator even for WebSocket-initiated agent runs.
+        let timer_key = Self::timer_key(event);
+        let trace_id = if timer_key != "default" {
+            timer_key.clone()
+        } else {
+            // Generate a new trace_id for BeforeModelCall, reuse for subsequent events.
+            if event.kind == EventKind::BeforeModelCall {
+                let id = synaptic::logging::generate_request_id();
+                self.fallback_trace_ids
+                    .insert("default".to_string(), id.clone());
+                id
+            } else {
+                self.fallback_trace_ids
+                    .get("default")
+                    .map(|v| v.clone())
+                    .unwrap_or_else(|| {
+                        let id = synaptic::logging::generate_request_id();
+                        self.fallback_trace_ids
+                            .insert("default".to_string(), id.clone());
+                        id
+                    })
+            }
+        };
+
+        // Create an instrumentation span with request_id so that MemoryLogLayer
+        // captures it on log entries. This is needed because the caller's tracing
+        // span (from ws_v3_request or agent_message) uses span.enter() which doesn't
+        // propagate across async boundaries.
+        let span = tracing::info_span!("trace", request_id = %trace_id);
+        let _trace_span = span.entered();
+
         match event.kind {
             EventKind::BeforeModelCall => {
                 // Extract request metadata from the payload for logging.
@@ -78,14 +128,24 @@ impl EventSubscriber for TracingSubscriber {
                     .as_str()
                     .unwrap_or("")
                     .to_string();
+                // Full conversation messages for trace detail (role + content).
+                // Stored as a structured JSON field so the aggregator can parse it.
+                let conversation = event
+                    .payload
+                    .get("messages")
+                    .filter(|v| v.is_array())
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "[]".to_string());
 
                 tracing::info!(
+                    trace_id = %trace_id,
                     message_count,
                     tool_count,
                     has_thinking,
                     system_prompt_len,
                     system_prompt = %system_prompt,
                     user_message = %user_message,
+                    conversation = %conversation,
                     "model call starting"
                 );
 
@@ -114,6 +174,7 @@ impl EventSubscriber for TracingSubscriber {
                     let output_tokens = event.payload["output_tokens"].as_u64().unwrap_or(0);
                     let total_tokens = event.payload["total_tokens"].as_u64().unwrap_or(0);
                     tracing::info!(
+                        trace_id = %trace_id,
                         duration_ms,
                         input_tokens,
                         output_tokens,
@@ -125,6 +186,7 @@ impl EventSubscriber for TracingSubscriber {
                     );
                 } else {
                     tracing::info!(
+                        trace_id = %trace_id,
                         duration_ms,
                         tool_calls = tool_calls_count,
                         tools = %tools_summary,
@@ -135,16 +197,28 @@ impl EventSubscriber for TracingSubscriber {
             }
 
             EventKind::BeforeToolCall => {
-                let tool_name = event.payload["tool"].as_str().unwrap_or("?").to_string();
-                let args = event.payload["args"].to_string();
-                tracing::info!(tool = %tool_name, args = %args, "tool call starting");
+                let tool_name = event.payload["tool_name"]
+                    .as_str()
+                    .or_else(|| event.payload["tool"].as_str())
+                    .unwrap_or("?")
+                    .to_string();
+                let args = if event.payload["arguments"].is_null() {
+                    event.payload["args"].to_string()
+                } else {
+                    event.payload["arguments"].to_string()
+                };
+                tracing::info!(trace_id = %trace_id, tool = %tool_name, args = %args, "tool call starting");
                 // Record timer keyed by "tool:<request_id>:<tool_name>"
                 let key = format!("tool:{}:{}", Self::timer_key(event), tool_name);
                 self.timers.insert(key, std::time::Instant::now());
             }
 
             EventKind::AfterToolCall => {
-                let tool_name = event.payload["tool"].as_str().unwrap_or("?").to_string();
+                let tool_name = event.payload["tool_name"]
+                    .as_str()
+                    .or_else(|| event.payload["tool"].as_str())
+                    .unwrap_or("?")
+                    .to_string();
                 let key = format!("tool:{}:{}", Self::timer_key(event), tool_name);
                 let duration_ms = self
                     .timers
@@ -155,6 +229,7 @@ impl EventSubscriber for TracingSubscriber {
                 if event.payload["error"].is_string() {
                     let error = event.payload["error"].as_str().unwrap_or("").to_string();
                     tracing::error!(
+                        trace_id = %trace_id,
                         tool = %tool_name,
                         duration_ms,
                         error = %error,
@@ -163,6 +238,7 @@ impl EventSubscriber for TracingSubscriber {
                 } else {
                     let result_str = event.payload["result"].to_string();
                     tracing::info!(
+                        trace_id = %trace_id,
                         tool = %tool_name,
                         duration_ms,
                         result = %result_str,

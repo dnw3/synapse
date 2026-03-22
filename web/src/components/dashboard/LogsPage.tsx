@@ -4,9 +4,10 @@ import {
   ScrollText, Search, Download, Play, Pause, RefreshCw,
   ChevronDown, ChevronRight, X, Link2, Clock, Timer,
   AlertTriangle, AlertCircle, Info, Bug, Radio,
-  ArrowDownLeft, ArrowUpRight, MessageSquare, Filter,
+  ArrowDownLeft, ArrowUpRight, MessageSquare, Filter, Activity,
 } from "lucide-react";
 import { EmptyState, LoadingSpinner } from "./shared";
+import { TracesPage } from "./traces/TracesPage";
 import { cn } from "../../lib/cn";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -422,7 +423,7 @@ function MessagesTab() {
 
 // ─── Tab type ─────────────────────────────────────────────────────────────────
 
-type LogsViewTab = "logs" | "messages";
+type LogsViewTab = "logs" | "traces";
 
 const LOG_LEVELS: LogLevel[] = ["ALL", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"];
 
@@ -955,14 +956,17 @@ export default function LogsPage() {
         <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--separator)]">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--accent)]/10">
-              <ScrollText className="h-4 w-4 text-[var(--accent-light)]" />
+              {activeTab === "traces"
+                ? <Activity className="h-4 w-4 text-[var(--accent-light)]" />
+                : <ScrollText className="h-4 w-4 text-[var(--accent-light)]" />
+              }
             </div>
             <div>
               <h3 className="text-[14px] font-semibold text-[var(--text-primary)] tracking-[-0.01em]">
-                {t("dashboard.logs", "Log Explorer")}
+                {activeTab === "traces" ? t("traces.title") : t("dashboard.logs", "Log Explorer")}
               </h3>
               <span className="text-[11px] font-mono tabular-nums text-[var(--text-tertiary)]">
-                {activeTab === "logs" ? (
+                {activeTab === "logs" && (
                   <>
                     {entries.length} entries
                     {isTracing && logidDecodedTime && (
@@ -971,8 +975,6 @@ export default function LogsPage() {
                       </span>
                     )}
                   </>
-                ) : (
-                  t("logs.messagesTab")
                 )}
               </span>
             </div>
@@ -994,16 +996,16 @@ export default function LogsPage() {
                 {t("logs.logsTab")}
               </button>
               <button
-                onClick={() => setActiveTab("messages")}
+                onClick={() => setActiveTab("traces")}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-[5px] rounded-md text-[11px] font-semibold transition-all cursor-pointer",
-                  activeTab === "messages"
+                  activeTab === "traces"
                     ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm"
                     : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                 )}
               >
-                <MessageSquare className="h-3 w-3" />
-                {t("logs.messagesTab")}
+                <Activity className="h-3 w-3" />
+                {t("traces.tracesTab")}
               </button>
             </div>
 
@@ -1058,8 +1060,12 @@ export default function LogsPage() {
           </div>
         </div>
 
-        {/* ── Messages tab view ── */}
-        {activeTab === "messages" && <MessagesTab />}
+        {/* ── Traces tab view ── */}
+        {activeTab === "traces" && (
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <TracesPage />
+          </div>
+        )}
 
         {/* ── Logs tab view ── */}
         {activeTab === "logs" && <>

@@ -38,6 +38,8 @@ pub mod state;
 #[cfg(feature = "web")]
 mod terminal;
 #[cfg(feature = "web")]
+pub mod trace_aggregator;
+#[cfg(feature = "web")]
 pub mod webhooks;
 #[cfg(feature = "web")]
 mod ws;

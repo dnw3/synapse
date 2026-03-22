@@ -189,6 +189,10 @@ pub struct SynapseConfig {
     #[serde(default)]
     pub tool_policy: ToolPolicyConfig,
 
+    /// Optional tool display overrides (emoji, label, detail_keys per tool).
+    #[serde(default)]
+    pub tool_display: crate::agent::tool_display::ToolDisplayConfig,
+
     /// Post-session reflection for agent self-evolution.
     #[serde(default)]
     pub reflection: ReflectionSynapseConfig,

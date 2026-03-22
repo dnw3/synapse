@@ -100,6 +100,8 @@ pub struct AgentSession {
     event_bus: Option<Arc<synaptic::events::EventBus>>,
     /// Optional PluginRegistry for plugin-registered tools.
     plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
+    /// Resolver for tool display metadata (emoji, label, detail).
+    display_resolver: Arc<crate::agent::tool_display::ToolDisplayResolver>,
 }
 
 impl AgentSession {
@@ -108,6 +110,9 @@ impl AgentSession {
         let sessions_dir = PathBuf::from(&config.base.paths.sessions_dir);
         let store = Arc::new(FileStore::new(sessions_dir));
         let session_mgr = SessionManager::new(store);
+        let display_resolver = Arc::new(crate::agent::tool_display::ToolDisplayResolver::new(
+            config.tool_display.clone(),
+        ));
 
         Self {
             model,
@@ -125,6 +130,7 @@ impl AgentSession {
             outbound: None,
             event_bus: None,
             plugin_registry: None,
+            display_resolver,
         }
     }
 
@@ -156,6 +162,10 @@ impl AgentSession {
         let store = Arc::new(FileStore::new(sessions_dir));
         let session_mgr = SessionManager::new(store);
 
+        let display_resolver2 = Arc::new(crate::agent::tool_display::ToolDisplayResolver::new(
+            config.tool_display.clone(),
+        ));
+
         Self {
             model,
             config,
@@ -172,6 +182,7 @@ impl AgentSession {
             outbound: None,
             event_bus: None,
             plugin_registry: None,
+            display_resolver: display_resolver2,
         }
     }
 

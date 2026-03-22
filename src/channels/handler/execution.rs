@@ -128,12 +128,16 @@ impl AgentSession {
                                         {
                                             for tc in last_ai.tool_calls() {
                                                 if seen_tool_calls.insert(tc.id.clone()) {
+                                                    let display = self.display_resolver.resolve(
+                                                        &tc.name,
+                                                        &tc.arguments,
+                                                    );
                                                     handle.0
                                                         .on_tool_call(&super::ToolCallInfo {
                                                             name: tc.name.clone(),
                                                             id: tc.id.clone(),
                                                             args: tc.arguments.to_string(),
-                                                            display: None,
+                                                            display: Some(display),
                                                         })
                                                         .await;
                                                 }

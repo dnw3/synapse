@@ -4584,7 +4584,9 @@ dependencies = [
  "serde",
  "serde_json",
  "synaptic-core",
+ "synaptic-events",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

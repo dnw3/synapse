@@ -421,8 +421,7 @@ async fn run_chat(
 
     let mut messages = memory.load(&sid).await.unwrap_or_default();
 
-    // Prepend system prompt with project context
-    let cwd = std::env::current_dir().unwrap_or_default();
+    // Prepend system prompt with bootstrap context
     let mut system_prompt = config
         .base
         .agent
@@ -431,10 +430,12 @@ async fn run_chat(
         .unwrap_or_else(|| "You are Synapse, a helpful AI assistant.".to_string());
 
     let workspace_dir = config.workspace_dir();
-    let project_context = agent::load_project_context(&workspace_dir, &cwd, &config.context);
-    if !project_context.is_empty() {
-        system_prompt.push_str("\n\n# Project Context\n\n");
-        system_prompt.push_str(&project_context);
+    let loader = agent::BootstrapLoader::new(workspace_dir, config.context.clone());
+    let bootstrap_files = loader.load(agent::SessionKind::Full);
+    let bootstrap_context = agent::BootstrapLoader::format_for_prompt(&bootstrap_files);
+    if !bootstrap_context.is_empty() {
+        system_prompt.push_str("\n\n");
+        system_prompt.push_str(&bootstrap_context);
     }
 
     if messages.is_empty() || !messages[0].is_system() {

@@ -4331,6 +4331,7 @@ dependencies = [
  "dirs",
  "dotenvy",
  "futures",
+ "glob",
  "hmac",
  "libloading",
  "lru 0.16.3",

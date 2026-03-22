@@ -14,7 +14,7 @@ use synaptic::middleware::SecurityConfirmationCallback;
 
 use crate::config::SynapseConfig;
 
-use super::context::load_project_context;
+use super::bootstrap::{BootstrapLoader, SessionKind};
 use super::discovery::discover_agents;
 use super::middleware_setup;
 use super::tools_setup;
@@ -64,6 +64,7 @@ pub async fn build_deep_agent(
     checkpointer: Arc<dyn Checkpointer>,
     mcp_tools: Vec<Arc<dyn Tool>>,
     system_prompt_override: Option<&str>,
+    session_kind: SessionKind,
 ) -> Result<CompiledGraph<MessageState>, SynapticError> {
     build_deep_agent_with_callback(
         model,
@@ -82,6 +83,7 @@ pub async fn build_deep_agent(
         None,
         None,
         None,
+        session_kind,
     )
     .await
 }
@@ -105,6 +107,7 @@ pub async fn build_deep_agent_with_callback(
     event_bus: Option<Arc<EventBus>>,
     plugin_registry: Option<Arc<RwLock<synaptic::plugin::PluginRegistry>>>,
     channel_registry: Option<Arc<tokio::sync::RwLock<crate::gateway::messages::ChannelRegistry>>>,
+    session_kind: SessionKind,
 ) -> Result<CompiledGraph<MessageState>, SynapticError> {
     // --- Backend selection ---
     #[cfg(feature = "docker")]
@@ -149,10 +152,24 @@ pub async fn build_deep_agent_with_callback(
         });
 
     let workspace_dir = config.workspace_dir_for_agent(agent_name);
-    let project_context = load_project_context(&workspace_dir, cwd, &config.context);
-    if !project_context.is_empty() {
-        system_prompt.push_str("\n\n# Project Context\n\n");
-        system_prompt.push_str(&project_context);
+    let loader = BootstrapLoader::new(workspace_dir, config.context.clone());
+    let bootstrap_files = loader.load(session_kind);
+    let bootstrap_context = BootstrapLoader::format_for_prompt(&bootstrap_files);
+    if !bootstrap_context.is_empty() {
+        system_prompt.push_str("\n\n");
+        system_prompt.push_str(&bootstrap_context);
+    }
+
+    // Migration: warn if CWD has CLAUDE.md but it's not configured as extra_file
+    if config.context.extra_files.is_empty() && config.context.extra_patterns.is_empty() {
+        let claude_md = cwd.join("CLAUDE.md");
+        if claude_md.exists() {
+            tracing::warn!(
+                path = %claude_md.display(),
+                "CLAUDE.md found in CWD but not loaded. \
+                 Add it to [context].extra_files in synapse.toml if needed."
+            );
+        }
     }
 
     options.system_prompt = Some(system_prompt);
@@ -204,6 +221,10 @@ pub async fn build_deep_agent_with_callback(
     }
 
     options.enable_filesystem = config.base.agent.tools.filesystem;
+    // Disable DeepMemoryMiddleware — bootstrap context (AGENTS.md etc.) is already
+    // injected once at startup via BootstrapLoader. Re-reading on every model call
+    // would cause double injection. Memory access at runtime goes through tools instead.
+    options.enable_memory = false;
     options.memory_file = Some(config.base.paths.memory_file.clone());
 
     // --- Skills directories ---

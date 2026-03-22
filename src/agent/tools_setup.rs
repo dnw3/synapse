@@ -59,7 +59,7 @@ pub(crate) fn register_tools(
     }
 
     // Add memory tools — memory_search uses the configured MemoryProvider,
-    // memory_get uses LTM directly (count/list are LTM-specific).
+    // memory_get/save/forget use LTM directly.
     {
         options
             .tools
@@ -70,7 +70,13 @@ pub(crate) fn register_tools(
         options
             .tools
             .push(crate::tools::MemoryGetTool::new(ltm.clone()));
-        tracing::info!("memory_get tool registered");
+        options
+            .tools
+            .push(crate::tools::MemorySaveTool::new(ltm.clone()));
+        options
+            .tools
+            .push(crate::tools::MemoryForgetTool::new(ltm.clone()));
+        tracing::info!("memory_get/save/forget tools registered");
     }
 
     // Add session tools if SessionManager is available

@@ -81,10 +81,12 @@ pub async fn run_tui(
         .unwrap_or_else(|| "You are Synapse, a helpful AI assistant.".to_string());
 
     let workspace_dir = config.workspace_dir();
-    let project_context = crate::agent::load_project_context(&workspace_dir, &cwd, &config.context);
-    if !project_context.is_empty() {
-        system_prompt.push_str("\n\n# Project Context\n\n");
-        system_prompt.push_str(&project_context);
+    let loader = crate::agent::BootstrapLoader::new(workspace_dir, config.context.clone());
+    let bootstrap_files = loader.load(crate::agent::SessionKind::Full);
+    let bootstrap_context = crate::agent::BootstrapLoader::format_for_prompt(&bootstrap_files);
+    if !bootstrap_context.is_empty() {
+        system_prompt.push_str("\n\n");
+        system_prompt.push_str(&bootstrap_context);
     }
 
     let messages = vec![Message::system(&system_prompt)];

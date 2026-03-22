@@ -84,6 +84,121 @@ impl Tool for MemorySearchTool {
     }
 }
 
+/// Tool that allows the agent to save a memory to long-term storage.
+///
+/// When the user says "remember this" or the agent wants to persist important
+/// information across sessions, this tool writes to LTM.
+pub struct MemorySaveTool {
+    ltm: Arc<LongTermMemory>,
+}
+
+#[allow(clippy::new_ret_no_self)]
+impl MemorySaveTool {
+    pub fn new(ltm: Arc<LongTermMemory>) -> Arc<dyn Tool> {
+        Arc::new(Self { ltm })
+    }
+}
+
+#[async_trait]
+impl Tool for MemorySaveTool {
+    fn name(&self) -> &'static str {
+        "memory_save"
+    }
+
+    fn description(&self) -> &'static str {
+        "Save information to long-term memory so it persists across sessions. Use this when the user asks you to remember something, or when you learn important facts, decisions, preferences, or context that should be retained."
+    }
+
+    fn parameters(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "The information to remember. Be concise and factual."
+                },
+                "evergreen": {
+                    "type": "boolean",
+                    "description": "If true, this memory is protected from automatic pruning. Use for critical facts like user preferences or important decisions. Default: false.",
+                    "default": false
+                }
+            },
+            "required": ["content"]
+        }))
+    }
+
+    async fn call(&self, args: Value) -> Result<Value, SynapticError> {
+        let content = args
+            .get("content")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| SynapticError::Tool("missing required parameter 'content'".into()))?;
+
+        let evergreen = args
+            .get("evergreen")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        if evergreen {
+            self.ltm.remember_evergreen(content).await?;
+        } else {
+            self.ltm.remember(content).await?;
+        }
+
+        tracing::info!(evergreen, "memory saved via tool");
+        Ok(json!(format!(
+            "Memory saved{}.",
+            if evergreen { " (evergreen)" } else { "" }
+        )))
+    }
+}
+
+/// Tool that allows the agent to forget/delete memories by keyword.
+pub struct MemoryForgetTool {
+    ltm: Arc<LongTermMemory>,
+}
+
+#[allow(clippy::new_ret_no_self)]
+impl MemoryForgetTool {
+    pub fn new(ltm: Arc<LongTermMemory>) -> Arc<dyn Tool> {
+        Arc::new(Self { ltm })
+    }
+}
+
+#[async_trait]
+impl Tool for MemoryForgetTool {
+    fn name(&self) -> &'static str {
+        "memory_forget"
+    }
+
+    fn description(&self) -> &'static str {
+        "Delete memories containing a specific keyword. Use when the user asks you to forget something or when stored information is no longer relevant."
+    }
+
+    fn parameters(&self) -> Option<Value> {
+        Some(json!({
+            "type": "object",
+            "properties": {
+                "keyword": {
+                    "type": "string",
+                    "description": "Delete all memories containing this keyword (case-insensitive)"
+                }
+            },
+            "required": ["keyword"]
+        }))
+    }
+
+    async fn call(&self, args: Value) -> Result<Value, SynapticError> {
+        let keyword = args
+            .get("keyword")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| SynapticError::Tool("missing required parameter 'keyword'".into()))?;
+
+        let deleted = self.ltm.forget(keyword).await?;
+        tracing::info!(keyword, deleted, "memories forgotten via tool");
+        Ok(json!(format!("{} memories deleted.", deleted)))
+    }
+}
+
 /// Tool that allows the agent to list or count memories.
 pub struct MemoryGetTool {
     ltm: Arc<LongTermMemory>,

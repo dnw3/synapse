@@ -10,7 +10,7 @@ mod session_tool;
 pub use self::firecrawl::FirecrawlTool;
 #[allow(unused_imports)]
 pub use self::media_tool::{AnalyzeImageTool, TranscribeAudioTool};
-pub use self::memory_tool::{MemoryGetTool, MemorySearchTool};
+pub use self::memory_tool::{MemoryForgetTool, MemoryGetTool, MemorySaveTool, MemorySearchTool};
 pub use self::patch::ApplyPatchTool;
 pub use self::pdf::ReadPdfTool;
 #[allow(unused_imports)]

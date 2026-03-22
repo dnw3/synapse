@@ -148,6 +148,7 @@ async fn handle_agent_run(
         checkpointer,
         vec![],
         None,
+        agent::SessionKind::Full,
     )
     .await
     {

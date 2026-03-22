@@ -77,6 +77,7 @@ impl AgentSession {
             self.event_bus.clone(),
             self.plugin_registry.clone(),
             None, // no channel registry in bot mode
+            crate::agent::SessionKind::Full,
         )
         .await
         .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;

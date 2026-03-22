@@ -58,6 +58,7 @@ async fn handle_acp(
                 checkpointer,
                 vec![],
                 None,
+                crate::agent::SessionKind::Full,
             )
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

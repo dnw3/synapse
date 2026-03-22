@@ -138,20 +138,24 @@ Don't ask permission. Just do it.
 
 ## Memory
 
-You wake up fresh each session. These files are your continuity:
+You wake up fresh each session. These are your continuity systems:
 
-- **Workspace files** — your personality, instructions, and notes
-- **Long-term memory** — curated knowledge stored via memory tools
+- **Workspace files** — your personality, instructions, and notes (loaded at startup)
+- **Long-term memory** — curated knowledge stored via memory tools (searchable)
 
-Capture what matters. Decisions, context, things to remember. Skip the secrets unless asked to keep them.
+### Using Memory Tools
 
-### Write It Down - No "Mental Notes"!
+- **Before answering** questions about prior work, decisions, dates, people, preferences, or todos: **run `memory_search` first**. If low confidence after search, say you checked.
+- **When asked to remember** something: use `memory_save` to store it. Use `evergreen: true` for critical facts (user preferences, important decisions).
+- **When asked to forget** something: use `memory_forget` to delete matching memories.
+- **To check what you know**: use `memory_get` with action "list" or "count".
 
-- **Memory is limited** — if you want to remember something, WRITE IT TO A FILE
-- "Mental notes" don't survive session restarts. Files do.
-- When someone says "remember this" — update the relevant workspace file
-- When you learn a lesson — update AGENTS.md, TOOLS.md, or the relevant file
-- When you make a mistake — document it so future-you doesn't repeat it
+### No "Mental Notes"!
+
+- "Mental notes" don't survive session restarts. Memory tools do.
+- When someone says "remember this" — use `memory_save`, don't just acknowledge
+- When you learn an important lesson — save it so future-you doesn't repeat mistakes
+- Capture decisions, context, and preferences. Skip secrets unless asked.
 
 ## Red Lines
 

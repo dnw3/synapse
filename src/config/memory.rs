@@ -219,6 +219,12 @@ pub struct ContextConfig {
     /// Total maximum characters for all injected files combined (0 = unlimited). Default: 100000.
     #[serde(default = "default_total_max_chars")]
     pub total_max_chars: usize,
+    /// Extra bootstrap file paths to load (e.g. ["~/projects/myapp/CLAUDE.md"]).
+    #[serde(default)]
+    pub extra_files: Vec<String>,
+    /// Glob patterns for extra bootstrap files (e.g. ["~/projects/*/AGENTS.md"]).
+    #[serde(default)]
+    pub extra_patterns: Vec<String>,
 }
 
 fn default_max_chars_per_file() -> usize {
@@ -233,6 +239,8 @@ impl Default for ContextConfig {
         Self {
             max_chars_per_file: default_max_chars_per_file(),
             total_max_chars: default_total_max_chars(),
+            extra_files: Vec::new(),
+            extra_patterns: Vec::new(),
         }
     }
 }

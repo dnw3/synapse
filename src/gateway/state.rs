@@ -267,7 +267,8 @@ struct InfraBundle {
 
 // TODO(P2): Replace register_builtin_plugins with PluginManager for full lifecycle management.
 // PluginManager is available at crate::plugins::manager::PluginManager.
-fn build_infra_bundle(
+async fn build_infra_bundle(
+    config: &SynapseConfig,
     cost_tracker: &Arc<CostTrackingCallback>,
     usage_tracker: &Arc<UsageTracker>,
 ) -> InfraBundle {
@@ -281,6 +282,32 @@ fn build_infra_bundle(
     ) {
         tracing::warn!(error = %e, "failed to register builtin plugins");
     }
+
+    // Register memory plugin based on config
+    {
+        let memory_plugin: Box<dyn synaptic::plugin::Plugin> = {
+            let provider_name = &config.memory.memory_provider;
+            if provider_name == "viking" {
+                let viking_config = config.memory.viking.clone().unwrap_or_default();
+                Box::new(crate::plugins::memory_viking::VikingMemoryPlugin::new(
+                    viking_config,
+                ))
+            } else {
+                Box::new(crate::plugins::memory_native::NativeMemoryPlugin::new(None))
+            }
+        };
+
+        let manifest = memory_plugin.manifest();
+        let plugin_name = manifest.name.clone();
+        {
+            let mut api = synaptic::plugin::PluginApi::new(&mut plugin_registry, &plugin_name);
+            if let Err(e) = memory_plugin.register(&mut api).await {
+                tracing::warn!(error = %e, "failed to register memory plugin");
+            }
+        }
+        plugin_registry.record_plugin(manifest);
+    }
+
     let plugin_registry = Arc::new(StdRwLock::new(plugin_registry));
 
     InfraBundle {
@@ -377,7 +404,7 @@ impl AppState {
         let agent = build_agent_bundle(config).await?;
 
         // ── Infrastructure (event bus, plugins) ─────────────────────────
-        let infra = build_infra_bundle(&agent.cost_tracker, &agent.usage_tracker);
+        let infra = build_infra_bundle(config, &agent.cost_tracker, &agent.usage_tracker).await;
 
         // ── RPC & networking ────────────────────────────────────────────
         let rpc = build_rpc_bundle();

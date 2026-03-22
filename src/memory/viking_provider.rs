@@ -99,6 +99,32 @@ impl VikingMemoryProvider {
             )))
         }
     }
+
+    /// Read content from Viking at a specific detail level (L0/L1/L2).
+    ///
+    /// Maps to Viking API:
+    /// - `"abstract"` → `GET /api/v1/content/abstract?uri=...` (L0, ~100 tokens)
+    /// - `"overview"` → `GET /api/v1/content/overview?uri=...` (L1, ~2k tokens)
+    /// - `"full"`     → `GET /api/v1/content/read?uri=...`     (L2, complete)
+    pub async fn read_content(
+        &self,
+        uri: &str,
+        level: &str,
+    ) -> Result<serde_json::Value, SynapticError> {
+        let endpoint = match level {
+            "abstract" => "/api/v1/content/abstract",
+            "overview" => "/api/v1/content/overview",
+            _ => "/api/v1/content/read",
+        };
+        let url = self.url(endpoint);
+        let resp = self
+            .auth(self.client.get(&url).query(&[("uri", uri)]))
+            .send()
+            .await
+            .map_err(Self::map_err)?;
+        let resp = Self::check_status(resp).await?;
+        resp.json().await.map_err(Self::map_err)
+    }
 }
 
 // ── Viking API response types ──────────────────────────────────────────────

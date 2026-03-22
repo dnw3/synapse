@@ -19,46 +19,12 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 # ── Features ────────────────────────────────────────────────────────────
 FEATURES="web,plugins,bot-telegram,bot-discord,bot-slack,bot-lark"
 
-# ── OpenViking Helper ──────────────────────────────────────────────────
-VIKING_PORT=1933
-
-is_viking_configured() {
-  grep -q 'memory_provider.*=.*"viking"' "$ROOT/synapse.toml" 2>/dev/null
-}
-
-is_viking_running() {
-  curl -sf "http://127.0.0.1:$VIKING_PORT/api/v1/health" >/dev/null 2>&1
-}
-
-ensure_viking() {
-  if ! is_viking_configured; then
-    return 0
-  fi
-  if is_viking_running; then
-    echo "  OpenViking: already running on :$VIKING_PORT"
-    return 0
-  fi
-  if ! command -v openviking-server >/dev/null 2>&1; then
-    echo "⚠  memory_provider=viking but 'openviking-server' not found."
-    echo "   Install: pip install openviking --upgrade"
-    echo "   Falling back to native memory provider."
-    return 0
-  fi
-  echo "  Starting OpenViking server on :$VIKING_PORT ..."
-  nohup openviking-server > "$ROOT/.synapse-viking.log" 2>&1 &
-  VIKING_PID=$!
-  # Wait up to 10s for server to be ready
-  for i in $(seq 1 20); do
-    if is_viking_running; then
-      echo "  OpenViking: ready (PID $VIKING_PID)"
-      return 0
-    fi
-    sleep 0.5
-  done
-  echo "⚠  OpenViking failed to start. Check .synapse-viking.log"
-}
+# ── OpenViking ─────────────────────────────────────────────────────────
+# Note: OpenViking lifecycle is now managed by VikingService (in-process).
+# Shell-level management removed — see src/plugins/viking_service.rs.
 
 stop_viking() {
+  # Legacy cleanup: kill any leftover openviking-server processes
   pids=$(pgrep -f "openviking-server" 2>/dev/null || true)
   if [ -n "$pids" ]; then
     echo "$pids" | xargs kill 2>/dev/null || true
@@ -100,7 +66,7 @@ case "$MODE" in
   serve)
     PORT="${1:-3000}"
     build_backend release
-    ensure_viking
+
     exec "$ROOT/target/release/synapse" serve --port "$PORT"
     ;;
 
@@ -180,7 +146,7 @@ case "$MODE" in
     echo "  Press Ctrl-C to stop all."
     echo ""
 
-    ensure_viking
+
 
     cleanup() {
       echo ""
@@ -217,9 +183,9 @@ case "$MODE" in
     ;;
 
   stop)
-    echo "Stopping synapse, vite, and OpenViking processes..."
+    echo "Stopping synapse and vite processes..."
     count=0
-    # Kill OpenViking
+    # Kill any leftover OpenViking processes (legacy cleanup)
     stop_viking
     # Kill synapse processes
     pids=$(pgrep -f "target/(debug|release)/synapse" 2>/dev/null || true)
@@ -280,7 +246,7 @@ case "$MODE" in
     echo "  build                 Build frontend + backend for production"
     echo "  bot <platform>        Start bot adapter (telegram, lark, etc.)"
     echo "  coverage              Run coverage reports (Rust + TS)"
-    echo "  stop                  Stop all local synapse/vite/openviking processes"
+    echo "  stop                  Stop all local synapse/vite processes"
     echo "  connect <ws-url>      Connect to remote gateway"
     exit 1
     ;;

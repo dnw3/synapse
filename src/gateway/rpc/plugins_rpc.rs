@@ -55,86 +55,70 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
     let mut plugins: Vec<Value> = Vec::new();
     let disabled = load_disabled_plugins();
 
-    // Collect all data from the registry under a single, brief std::sync::RwLock
-    // read guard.  We must NOT hold this guard across .await points.
-    struct PluginInfo {
-        name: String,
-        version: String,
-        description: String,
-        author: Option<String>,
-        license: Option<String>,
-        capabilities: Vec<String>,
-        slot: Option<String>,
-        tools: Vec<String>,
-        interceptors: Vec<String>,
-        subscribers: Vec<String>,
-        service_ids: Vec<String>,
-    }
+    let registry = ctx.state.plugin_registry.read().await;
 
-    let plugin_data: Vec<PluginInfo> = {
-        let registry = ctx.state.plugin_registry.read().unwrap();
-        registry
-            .plugins()
+    for m in registry.plugins() {
+        let regs = registry.plugin_registrations(&m.name);
+        let caps: Vec<String> = m
+            .capabilities
             .iter()
-            .map(|m| {
-                let regs = registry.plugin_registrations(&m.name);
-                let caps: Vec<String> = m
-                    .capabilities
-                    .iter()
-                    .map(|c| format!("{:?}", c).to_lowercase())
-                    .collect();
-                let slot = m.slot.as_ref().map(|s| format!("{:?}", s).to_lowercase());
-                PluginInfo {
-                    name: m.name.clone(),
-                    version: m.version.clone(),
-                    description: m.description.clone(),
-                    author: m.author.clone(),
-                    license: m.license.clone(),
-                    capabilities: caps,
-                    slot,
-                    tools: regs.map(|r| r.tools.clone()).unwrap_or_default(),
-                    interceptors: regs.map(|r| r.interceptors.clone()).unwrap_or_default(),
-                    subscribers: regs.map(|r| r.subscribers.clone()).unwrap_or_default(),
-                    service_ids: regs.map(|r| r.services.clone()).unwrap_or_default(),
-                }
-            })
-            .collect()
-    };
-    // Lock is dropped here.
-
-    for info in &plugin_data {
-        // TODO: Runtime health check requires migrating plugin_registry to
-        // tokio::RwLock so we can call async `service.health_check()` without
-        // holding a std::sync guard across .await.  For now, report "unknown".
-        let health = "unknown";
-
-        let services_info: Vec<Value> = info
-            .service_ids
-            .iter()
-            .map(|id| json!({ "id": id, "status": "unknown" }))
+            .map(|c| format!("{:?}", c).to_lowercase())
             .collect();
+        let slot = m.slot.as_ref().map(|s| format!("{:?}", s).to_lowercase());
+        let tools: Vec<String> = regs.map(|r| r.tools.clone()).unwrap_or_default();
+        let interceptors: Vec<String> = regs.map(|r| r.interceptors.clone()).unwrap_or_default();
+        let subscribers: Vec<String> = regs.map(|r| r.subscribers.clone()).unwrap_or_default();
+        let service_ids: Vec<String> = regs.map(|r| r.services.clone()).unwrap_or_default();
 
-        let enabled = !disabled.contains(&info.name);
-        let source = if info.name.starts_with("builtin-") || info.name.starts_with("memory-") {
+        // Async health checks — now possible with tokio::RwLock
+        let mut services_info: Vec<Value> = Vec::new();
+        let mut all_healthy = true;
+        let mut has_services = false;
+        for svc_id in &service_ids {
+            if let Some(svc) = registry.services().iter().find(|s| s.id() == svc_id) {
+                has_services = true;
+                let healthy = svc.health_check().await;
+                if !healthy {
+                    all_healthy = false;
+                }
+                services_info.push(json!({
+                    "id": svc_id,
+                    "status": if healthy { "running" } else { "stopped" },
+                }));
+            } else {
+                services_info.push(json!({ "id": svc_id, "status": "unknown" }));
+            }
+        }
+
+        let health = if !has_services {
+            "unknown"
+        } else if all_healthy {
+            "healthy"
+        } else {
+            "error"
+        };
+
+        let enabled = !disabled.contains(&m.name);
+        let source = if m.name.starts_with("builtin-") || m.name.starts_with("memory-") {
             "builtin"
         } else {
             "external"
         };
 
         plugins.push(json!({
-            "name": info.name,
-            "version": info.version,
-            "description": info.description,
-            "author": info.author,
-            "license": info.license,
+            "name": m.name,
+            "version": m.version,
+            "description": m.description,
+            "author": m.author,
+            "license": m.license,
             "source": source,
             "enabled": enabled,
-            "slot": info.slot,
-            "capabilities": info.capabilities,
+            "slot": slot,
+            "capabilities": caps,
             "health": health,
-            "tools": info.tools,
-            "interceptors": info.interceptors,
-            "subscribers": info.subscribers,
+            "tools": tools,
+            "interceptors": interceptors,
+            "subscribers": subscribers,
             "services": services_info,
         }));
     }
@@ -180,7 +164,7 @@ pub async fn handle_toggle(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
     // 2. Hot unregister: immediately remove plugin's tools/interceptors/subscribers
     if !enabled {
         let service_ids = {
-            let mut registry = ctx.state.plugin_registry.write().unwrap();
+            let mut registry = ctx.state.plugin_registry.write().await;
             registry.unregister_plugin(name)
         };
         // Stop services that were removed (lock is dropped, safe to await)
@@ -215,11 +199,8 @@ pub async fn handle_toggle(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 // ---------------------------------------------------------------------------
 
 /// Start or stop a plugin-managed service by ID.
-///
-/// Currently returns an error because `Service::start()`/`stop()` are async
-/// and our `plugin_registry` uses `std::sync::RwLock`.
 pub async fn handle_service_control(
-    _ctx: Arc<RpcContext>,
+    ctx: Arc<RpcContext>,
     params: Value,
 ) -> Result<Value, RpcError> {
     let service_id = params["service"]
@@ -229,12 +210,39 @@ pub async fn handle_service_control(
         .as_str()
         .ok_or_else(|| RpcError::invalid_request("missing 'action'"))?;
 
-    // TODO: Requires migrating plugin_registry to tokio::RwLock to hold across
-    // async service start/stop calls.
-    Err(RpcError::internal(format!(
-        "Service control not yet available (requires async registry migration). \
-         Action: {action} on {service_id}"
-    )))
+    let registry = ctx.state.plugin_registry.read().await;
+    let service = registry
+        .services()
+        .iter()
+        .find(|s| s.id() == service_id)
+        .ok_or_else(|| RpcError::not_found(format!("service '{}' not found", service_id)))?;
+
+    match action {
+        "start" => {
+            service.start().await.map_err(|e| {
+                RpcError::internal(format!("failed to start service '{}': {}", service_id, e))
+            })?;
+            Ok(json!({
+                "ok": true,
+                "service": service_id,
+                "action": "start",
+                "message": format!("Service '{}' started", service_id),
+            }))
+        }
+        "stop" => {
+            service.stop().await;
+            Ok(json!({
+                "ok": true,
+                "service": service_id,
+                "action": "stop",
+                "message": format!("Service '{}' stopped", service_id),
+            }))
+        }
+        other => Err(RpcError::invalid_request(format!(
+            "unknown action '{}', expected 'start' or 'stop'",
+            other
+        ))),
+    }
 }
 
 // ---------------------------------------------------------------------------

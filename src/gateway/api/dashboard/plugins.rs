@@ -64,53 +64,74 @@ struct PluginsListResponse {
 async fn get_plugins(State(state): State<AppState>) -> Json<PluginsListResponse> {
     let disabled = load_disabled_plugins();
 
-    let plugins: Vec<PluginResponse> = {
-        let registry = state.plugin_registry.read().unwrap();
-        registry
-            .plugins()
+    let registry = state.plugin_registry.read().await;
+    let mut plugins = Vec::new();
+
+    for m in registry.plugins() {
+        let regs = registry.plugin_registrations(&m.name);
+        let caps: Vec<String> = m
+            .capabilities
             .iter()
-            .map(|m| {
-                let regs = registry.plugin_registrations(&m.name);
-                let caps: Vec<String> = m
-                    .capabilities
-                    .iter()
-                    .map(|c| format!("{:?}", c).to_lowercase())
-                    .collect();
-                let slot = m.slot.as_ref().map(|s| format!("{:?}", s).to_lowercase());
-                let service_ids = regs.map(|r| r.services.clone()).unwrap_or_default();
+            .map(|c| format!("{:?}", c).to_lowercase())
+            .collect();
+        let slot = m.slot.as_ref().map(|s| format!("{:?}", s).to_lowercase());
+        let service_ids = regs.map(|r| r.services.clone()).unwrap_or_default();
 
-                let enabled = !disabled.contains(&m.name);
-                let source = if m.name.starts_with("builtin-") || m.name.starts_with("memory-") {
-                    "builtin"
-                } else {
-                    "external"
-                };
+        let enabled = !disabled.contains(&m.name);
+        let source = if m.name.starts_with("builtin-") || m.name.starts_with("memory-") {
+            "builtin"
+        } else {
+            "external"
+        };
 
-                PluginResponse {
-                    name: m.name.clone(),
-                    version: m.version.clone(),
-                    description: m.description.clone(),
-                    author: m.author.clone(),
-                    license: m.license.clone(),
-                    source: source.to_string(),
-                    enabled,
-                    slot,
-                    capabilities: caps,
-                    health: "unknown".to_string(),
-                    tools: regs.map(|r| r.tools.clone()).unwrap_or_default(),
-                    interceptors: regs.map(|r| r.interceptors.clone()).unwrap_or_default(),
-                    subscribers: regs.map(|r| r.subscribers.clone()).unwrap_or_default(),
-                    services: service_ids
-                        .iter()
-                        .map(|id| ServiceInfo {
-                            id: id.clone(),
-                            status: "unknown".to_string(),
-                        })
-                        .collect(),
+        // Async health checks — now possible with tokio::RwLock
+        let mut services_info = Vec::new();
+        let mut all_healthy = true;
+        let mut has_services = false;
+        for svc_id in &service_ids {
+            if let Some(svc) = registry.services().iter().find(|s| s.id() == svc_id) {
+                has_services = true;
+                let healthy = svc.health_check().await;
+                if !healthy {
+                    all_healthy = false;
                 }
-            })
-            .collect()
-    };
+                services_info.push(ServiceInfo {
+                    id: svc_id.clone(),
+                    status: if healthy { "running" } else { "stopped" }.to_string(),
+                });
+            } else {
+                services_info.push(ServiceInfo {
+                    id: svc_id.clone(),
+                    status: "unknown".to_string(),
+                });
+            }
+        }
+
+        let health = if !has_services {
+            "unknown"
+        } else if all_healthy {
+            "healthy"
+        } else {
+            "error"
+        };
+
+        plugins.push(PluginResponse {
+            name: m.name.clone(),
+            version: m.version.clone(),
+            description: m.description.clone(),
+            author: m.author.clone(),
+            license: m.license.clone(),
+            source: source.to_string(),
+            enabled,
+            slot,
+            capabilities: caps,
+            health: health.to_string(),
+            tools: regs.map(|r| r.tools.clone()).unwrap_or_default(),
+            interceptors: regs.map(|r| r.interceptors.clone()).unwrap_or_default(),
+            subscribers: regs.map(|r| r.subscribers.clone()).unwrap_or_default(),
+            services: services_info,
+        });
+    }
 
     Json(PluginsListResponse { plugins })
 }

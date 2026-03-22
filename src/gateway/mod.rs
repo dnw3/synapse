@@ -270,7 +270,7 @@ pub async fn run_server_with_log_buffer(
             }
             // Stop plugin-managed services (take ownership to avoid holding lock across await)
             {
-                let services = plugin_registry_shutdown.write().unwrap().take_services();
+                let services = plugin_registry_shutdown.write().await.take_services();
                 for service in services.iter().rev() {
                     tracing::info!(service = service.id(), "stopping plugin service");
                     service.stop().await;

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 /// Instructions that can appear in a Prose skill body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,12 +47,14 @@ pub struct ProseState {
 /// The VM that interprets prose instructions.
 #[allow(dead_code)]
 pub struct ProseVm {
-    plugin_registry: Option<Arc<RwLock<synaptic::plugin::PluginRegistry>>>,
+    plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
 }
 
 #[allow(dead_code)]
 impl ProseVm {
-    pub fn new(plugin_registry: Option<Arc<RwLock<synaptic::plugin::PluginRegistry>>>) -> Self {
+    pub fn new(
+        plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
+    ) -> Self {
         Self { plugin_registry }
     }
 
@@ -78,9 +80,7 @@ impl ProseVm {
                 ProseInstruction::CallTool { name, args } => {
                     if let Some(ref registry) = self.plugin_registry {
                         let tool = {
-                            let reg = registry
-                                .read()
-                                .map_err(|e| format!("PluginRegistry lock poisoned: {e}"))?;
+                            let reg = registry.read().await;
                             reg.tools()
                                 .iter()
                                 .find(|t| t.name() == name.as_str())
@@ -269,7 +269,7 @@ mod tests {
         let event_bus = Arc::new(synaptic::events::EventBus::new());
         let mut registry = PluginRegistry::new(event_bus);
         registry.register_tool(Arc::new(EchoTool));
-        let registry = Arc::new(std::sync::RwLock::new(registry));
+        let registry = Arc::new(tokio::sync::RwLock::new(registry));
 
         let vm = ProseVm::new(Some(registry));
         let mut state = ProseState::default();

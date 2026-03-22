@@ -1,6 +1,5 @@
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 use synaptic::core::Tool;
 use synaptic::deep::DeepAgentOptions;
@@ -9,12 +8,12 @@ use synaptic::session::SessionManager;
 /// Register all built-in tools, MCP tools, plugin tools, and session tools on
 /// the `DeepAgentOptions`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn register_tools(
+pub(crate) async fn register_tools(
     options: &mut DeepAgentOptions,
     cwd: &Path,
     mcp_tools: Vec<Arc<dyn Tool>>,
     session_mgr: Option<&Arc<SessionManager>>,
-    plugin_registry: Option<&Arc<RwLock<synaptic::plugin::PluginRegistry>>>,
+    plugin_registry: Option<&Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
     channel_registry: Option<&Arc<tokio::sync::RwLock<crate::gateway::messages::ChannelRegistry>>>,
 ) {
     // Add MCP tools
@@ -22,7 +21,7 @@ pub(crate) fn register_tools(
 
     // Add plugin-registered tools
     if let Some(registry) = plugin_registry {
-        let reg = registry.read().unwrap();
+        let reg = registry.read().await;
         for tool in reg.tools() {
             options.tools.push(tool.clone());
         }

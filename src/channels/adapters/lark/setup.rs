@@ -21,7 +21,7 @@ pub async fn run(
     model_override: Option<&str>,
     status_handle: Option<Arc<dyn synaptic::ChannelStatusHandle>>,
     event_bus: Option<Arc<synaptic::events::EventBus>>,
-    plugin_registry: Option<Arc<std::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
+    plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let lark_config = config
         .lark

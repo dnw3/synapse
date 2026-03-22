@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::sync::RwLock as StdRwLock;
 use std::time::Instant;
 
 use dashmap::DashMap;
@@ -131,7 +130,7 @@ pub struct AppState {
     #[allow(dead_code)]
     pub canvas_engine: Arc<CanvasEngine>,
     /// Plugin registry — loaded once at startup, shared across all agent builds.
-    pub plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
+    pub plugin_registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
     /// Shared AgentSession for unified message processing pipeline.
     pub agent_session: Arc<AgentSession>,
 }
@@ -265,7 +264,7 @@ fn build_channel_bundle() -> ChannelBundle {
 /// Event bus and plugin registry (plugins are wired into the event bus).
 struct InfraBundle {
     event_bus: Arc<EventBus>,
-    plugin_registry: Arc<StdRwLock<synaptic::plugin::PluginRegistry>>,
+    plugin_registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
 }
 
 // TODO(P2): Replace register_builtin_plugins with PluginManager for full lifecycle management.
@@ -346,7 +345,7 @@ async fn build_infra_bundle(
         }
     }
 
-    let plugin_registry = Arc::new(StdRwLock::new(plugin_registry));
+    let plugin_registry = Arc::new(tokio::sync::RwLock::new(plugin_registry));
 
     InfraBundle {
         event_bus,
@@ -497,7 +496,7 @@ impl AppState {
             usage_tracker: agent.usage_tracker,
             // Get actual memory provider from plugin registry (set by memory plugin)
             memory_provider: {
-                let reg = infra.plugin_registry.read().unwrap();
+                let reg = infra.plugin_registry.read().await;
                 reg.memory_slot().cloned().unwrap_or(agent.memory_provider)
             },
             context_engine: agent.context_engine,

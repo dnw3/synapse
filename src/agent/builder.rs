@@ -1,6 +1,5 @@
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 use async_trait::async_trait;
 use synaptic::callbacks::CostTrackingCallback;
@@ -105,7 +104,7 @@ pub async fn build_deep_agent_with_callback(
     channel: &str,
     agent_name: Option<&str>,
     event_bus: Option<Arc<EventBus>>,
-    plugin_registry: Option<Arc<RwLock<synaptic::plugin::PluginRegistry>>>,
+    plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
     channel_registry: Option<Arc<tokio::sync::RwLock<crate::gateway::messages::ChannelRegistry>>>,
     session_kind: SessionKind,
 ) -> Result<CompiledGraph<MessageState>, SynapticError> {
@@ -178,7 +177,7 @@ pub async fn build_deep_agent_with_callback(
     // Get memory provider from plugin registry (set by memory plugin in build_infra_bundle)
     let memory_provider_arc: Arc<dyn synaptic::memory::MemoryProvider> = {
         if let Some(ref registry) = plugin_registry {
-            let reg = registry.read().unwrap();
+            let reg = registry.read().await;
             if let Some(provider) = reg.memory_slot() {
                 provider.clone()
             } else {
@@ -277,7 +276,8 @@ pub async fn build_deep_agent_with_callback(
         session_mgr.as_ref(),
         plugin_registry.as_ref(),
         channel_registry.as_ref(),
-    );
+    )
+    .await;
 
     // --- Middleware stack ---
     middleware_setup::setup_middleware(
@@ -317,7 +317,7 @@ pub async fn build_deep_agent_with_callback(
 
     // Inject plugin-registered interceptors
     if let Some(ref registry) = plugin_registry {
-        let reg = registry.read().unwrap();
+        let reg = registry.read().await;
         for interceptor in reg.interceptors() {
             options.interceptors.push(Arc::clone(interceptor));
         }

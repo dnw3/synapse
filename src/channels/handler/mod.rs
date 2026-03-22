@@ -99,7 +99,7 @@ pub struct AgentSession {
     /// Optional EventBus for event-driven usage tracking and subscriber notifications.
     event_bus: Option<Arc<synaptic::events::EventBus>>,
     /// Optional PluginRegistry for plugin-registered tools.
-    plugin_registry: Option<Arc<std::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
+    plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
 }
 
 impl AgentSession {
@@ -184,7 +184,7 @@ impl AgentSession {
     /// Set the PluginRegistry for plugin tools in bot mode.
     pub fn with_plugin_registry(
         mut self,
-        registry: Arc<std::sync::RwLock<synaptic::plugin::PluginRegistry>>,
+        registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
     ) -> Self {
         self.plugin_registry = Some(registry);
         self

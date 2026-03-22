@@ -470,13 +470,11 @@ function PluginDrawer({ plugin, onClose, onToggle, onServiceControl, onUninstall
       {/* Health + Toggle */}
       <div className="flex items-center justify-between mb-4 py-2 border-y border-[var(--separator)]">
         <div className="flex items-center gap-2">
-          <StatusDot status={healthToStatus(plugin.health, plugin.enabled)} />
+          <StatusDot status={plugin.enabled ? "online" : "offline"} />
           <span className="text-xs text-[var(--text-secondary)]">
-            {!plugin.enabled
-              ? t("dashboard.plugins.status.disabled")
-              : plugin.health === "unknown"
-                ? t("dashboard.plugins.status.active")
-                : t(`dashboard.plugins.status.${plugin.health}`)}
+            {plugin.enabled
+              ? t("dashboard.plugins.status.active")
+              : t("dashboard.plugins.status.disabled")}
           </span>
         </div>
         <div className="flex items-center gap-2">

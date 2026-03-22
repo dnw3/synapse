@@ -15,6 +15,7 @@ pub enum BootstrapCategory {
 
 /// Which kind of session is requesting bootstrap context.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum SessionKind {
     /// Normal interactive session (web, bot, REPL, CLI).
     Full,
@@ -34,6 +35,7 @@ pub struct BootstrapFile {
     /// File content (after truncation).
     pub content: String,
     /// Category for session filtering.
+    #[allow(dead_code)]
     pub category: BootstrapCategory,
 }
 
@@ -262,8 +264,8 @@ fn validated_bootstrap_name(path: &Path) -> Option<String> {
 
 /// Expand `~` to home directory.
 fn expand_tilde(raw: &str, home: &Path) -> PathBuf {
-    if raw.starts_with("~/") {
-        home.join(&raw[2..])
+    if let Some(rest) = raw.strip_prefix("~/") {
+        home.join(rest)
     } else {
         PathBuf::from(raw)
     }

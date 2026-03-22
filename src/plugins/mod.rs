@@ -1,3 +1,4 @@
+pub mod bridge;
 pub mod bundle;
 pub mod config;
 pub mod discovery;

@@ -170,7 +170,10 @@ async fn build_agent_bundle(
     }
     usage_tracker.spawn_periodic_flush(std::time::Duration::from_secs(60));
 
-    let memory_provider = crate::memory::build_memory_provider(config, None);
+    // Memory provider will be set by memory plugin via PluginRegistry.memory_slot.
+    // Use noop provider here — actual provider comes from infra bundle after plugin registration.
+    let memory_provider: Arc<dyn MemoryProvider> =
+        Arc::new(crate::memory::NativeMemoryProvider::new_noop());
     let context_engine = Arc::new(ContextEngine::new(std::time::Duration::from_secs(1800)));
 
     Ok(AgentBundle {
@@ -457,7 +460,11 @@ impl AppState {
             mcp_tools: agent.mcp_tools,
             cost_tracker: agent.cost_tracker,
             usage_tracker: agent.usage_tracker,
-            memory_provider: agent.memory_provider,
+            // Get actual memory provider from plugin registry (set by memory plugin)
+            memory_provider: {
+                let reg = infra.plugin_registry.read().unwrap();
+                reg.memory_slot().cloned().unwrap_or(agent.memory_provider)
+            },
             context_engine: agent.context_engine,
 
             // Session management

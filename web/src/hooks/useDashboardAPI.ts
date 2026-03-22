@@ -28,6 +28,7 @@ import type {
   StoreSkillItem,
   StoreSkillDetail,
   StoreStatus,
+  PluginInfo,
 } from "../types/dashboard";
 
 export function useDashboardAPI() {
@@ -274,6 +275,36 @@ export function useDashboardAPI() {
   const storeStatus = useCallback(() =>
     fetchJSON<StoreStatus>("/store/status"), [fetchJSON]);
 
+  // Plugins (Phase 10)
+  const fetchPlugins = useCallback(
+    () => fetchJSON<{ plugins: PluginInfo[] }>("/plugins"),
+    [fetchJSON]
+  );
+
+  const togglePlugin = useCallback(
+    (name: string, enabled: boolean) =>
+      postJSON<{ ok: boolean; name: string; enabled: boolean; message?: string }>("/plugins/toggle", { name, enabled }),
+    [postJSON]
+  );
+
+  const controlService = useCallback(
+    (plugin: string, service: string, action: "start" | "stop") =>
+      postJSON<{ ok: boolean; service: string; status: string }>("/plugins/service-control", { plugin, service, action }),
+    [postJSON]
+  );
+
+  const installPlugin = useCallback(
+    (path: string) =>
+      postJSON<{ ok: boolean; name?: string; message?: string }>("/plugins/install", { name: path }),
+    [postJSON]
+  );
+
+  const removePlugin = useCallback(
+    (name: string) =>
+      deleteJSON(`/plugins/${encodeURIComponent(name)}`),
+    [deleteJSON]
+  );
+
   // Logs export (Phase 9)
   const exportLogs = useCallback(async (): Promise<Blob | null> => {
     try {
@@ -315,6 +346,8 @@ export function useDashboardAPI() {
     fetchWorkspaceFiles, fetchWorkspaceFile, saveWorkspaceFile,
     createWorkspaceFile, deleteWorkspaceFile, resetWorkspaceFile,
     fetchIdentity,
+    // Plugins
+    fetchPlugins, togglePlugin, controlService, installPlugin, removePlugin,
   }), [
     fetchStats, fetchUsage, fetchProviders, fetchHealth,
     fetchSessions, fetchSchedules, fetchConfig, fetchChannels,
@@ -333,5 +366,6 @@ export function useDashboardAPI() {
     fetchWorkspaceFiles, fetchWorkspaceFile, saveWorkspaceFile,
     createWorkspaceFile, deleteWorkspaceFile, resetWorkspaceFile,
     fetchIdentity,
+    fetchPlugins, togglePlugin, controlService, installPlugin, removePlugin,
   ]);
 }

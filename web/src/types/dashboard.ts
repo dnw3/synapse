@@ -1,5 +1,26 @@
 // Dashboard types shared across all dashboard page components
 
+export interface ServiceInfo {
+  id: string;
+  status: "running" | "stopped" | "error" | "unknown";
+}
+
+export interface PluginInfo {
+  name: string;
+  version: string;
+  description: string;
+  author?: string;
+  source: "builtin" | "workspace" | "global";
+  enabled: boolean;
+  slot?: string;
+  capabilities: string[];
+  health: "healthy" | "degraded" | "error" | "unknown";
+  tools: string[];
+  interceptors: string[];
+  subscribers: string[];
+  services: ServiceInfo[];
+}
+
 export interface StatsCardProps {
   icon: React.ReactNode;
   label: string;

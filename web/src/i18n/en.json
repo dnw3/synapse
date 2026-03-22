@@ -531,7 +531,62 @@
     "allOperational": "All Systems Operational",
     "gatewayDisconnected": "Gateway Disconnected",
     "lastRefresh": "Last refresh",
-    "poweredBy": "Synapse · Powered by Synaptic Framework"
+    "poweredBy": "Synapse · Powered by Synaptic Framework",
+    "plugins": {
+      "title": "Plugins",
+      "install": "Install Plugin",
+      "viewGrid": "Grid View",
+      "viewList": "List View",
+      "installDialog": {
+        "title": "Install Plugin",
+        "pathLabel": "Local Path",
+        "pathPlaceholder": "/path/to/plugin/directory",
+        "confirm": "Install",
+        "cancel": "Cancel"
+      },
+      "status": {
+        "healthy": "Healthy",
+        "degraded": "Degraded",
+        "error": "Error",
+        "unknown": "Unknown",
+        "disabled": "Disabled",
+        "active": "Active"
+      },
+      "detail": {
+        "slot": "Slot",
+        "capabilities": "Capabilities",
+        "source": "Source",
+        "tools": "Registered Tools",
+        "services": "Services",
+        "interceptors": "Interceptors",
+        "subscribers": "Event Subscribers",
+        "noTools": "No tools registered",
+        "noServices": "No services",
+        "start": "Start",
+        "stop": "Stop",
+        "stopConfirm": "Stop service \"{{name}}\"? This may affect active operations.",
+        "enable": "Enable",
+        "disable": "Disable",
+        "uninstall": "Uninstall",
+        "uninstallConfirm": "Uninstall plugin \"{{name}}\"?",
+        "restartRequired": "Takes effect after restart"
+      },
+      "source": {
+        "builtin": "Built-in",
+        "workspace": "Workspace",
+        "global": "Global"
+      },
+      "empty": "No plugins installed",
+      "builtinNote": "Built-in plugins are always available.",
+      "fetchError": "Failed to load plugins",
+      "toast": {
+        "installed": "Plugin installed successfully",
+        "removed": "Plugin uninstalled",
+        "toggled": "Plugin {{action}}",
+        "serviceControlled": "Service {{action}}",
+        "error": "Operation failed: {{message}}"
+      }
+    }
   },
   "debug": {
     "status": "Status",

@@ -275,6 +275,7 @@ export type TabKey =
   | "agents"
   | "instances"
   | "nodes"
+  | "plugins"
   | "communications"
   | "automation"
   | "infrastructure"

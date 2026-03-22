@@ -15,6 +15,7 @@ import {
   Workflow,
   Server,
   Brain,
+  Puzzle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -36,6 +37,7 @@ import AgentsPage from "./dashboard/AgentsPage";
 import DebugPage from "./dashboard/DebugPage";
 import InstancesPage from "./dashboard/InstancesPage";
 import NodesPage from "./dashboard/NodesPage";
+import PluginsPage from "./dashboard/PluginsPage";
 
 // Tabs that need full-height flex layout (editors, log viewers, scrollable tables)
 // Pages that manage their own scroll (have internal scroll areas, editors, etc.)
@@ -58,6 +60,7 @@ export const TABS: (TabDef & { i18nKey: string })[] = [
   { key: "usage", labelZh: "用量", labelEn: "Usage", i18nKey: "dashboard.usage", icon: <TrendingUp className="h-4 w-4" /> },
   { key: "schedules", labelZh: "定时任务", labelEn: "Schedules", i18nKey: "dashboard.schedules", icon: <CalendarClock className="h-4 w-4" /> },
   { key: "nodes", labelZh: "节点", labelEn: "Nodes", i18nKey: "dashboard.nodes", icon: <Network className="h-4 w-4" /> },
+  { key: "plugins", labelZh: "插件", labelEn: "Plugins", i18nKey: "dashboard.plugins.title", icon: <Puzzle className="h-4 w-4" /> },
   // Agent
   { key: "agents", labelZh: "代理", labelEn: "Agents", i18nKey: "dashboard.agents", icon: <Bot className="h-4 w-4" /> },
   { key: "skills", labelZh: "Skills", labelEn: "Skills", i18nKey: "dashboard.skills", icon: <Sparkles className="h-4 w-4" /> },
@@ -72,7 +75,7 @@ export const TABS: (TabDef & { i18nKey: string })[] = [
 ];
 
 export const SIDEBAR_SECTIONS: (SidebarSection & { i18nKey: string })[] = [
-  { labelZh: "控制", labelEn: "Control", i18nKey: "dashboard.control", keys: ["overview", "channels", "instances", "sessions", "usage", "schedules", "nodes"] },
+  { labelZh: "控制", labelEn: "Control", i18nKey: "dashboard.control", keys: ["overview", "channels", "instances", "sessions", "usage", "schedules", "nodes", "plugins"] },
   { labelZh: "代理", labelEn: "Agent", i18nKey: "dashboard.agent", keys: ["agents", "skills"] },
   { labelZh: "设置", labelEn: "Settings", i18nKey: "dashboard.settings", keys: ["config", "communications", "automation", "infrastructure", "ai-agents", "logs", "debug"] },
 ];
@@ -156,6 +159,7 @@ export default function Dashboard({ connected: wsConnected, sessionCount, messag
         {activeTab === "agents" && <AgentsPage />}
         {activeTab === "instances" && <InstancesPage />}
         {activeTab === "nodes" && <NodesPage />}
+        {activeTab === "plugins" && <PluginsPage />}
         {activeTab === "communications" && <ConfigPage filterSection="communications" />}
         {activeTab === "automation" && <ConfigPage filterSection="automation" />}
         {activeTab === "infrastructure" && <ConfigPage filterSection="infrastructure" />}

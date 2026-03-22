@@ -28,6 +28,7 @@ function healthToStatus(health: string, enabled: boolean): "online" | "offline" 
   if (!enabled) return "offline";
   if (health === "healthy") return "online";
   if (health === "error") return "offline";
+  if (health === "unknown") return "online"; // No services to check — normal
   return "degraded";
 }
 

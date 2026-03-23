@@ -35,10 +35,10 @@ struct StatusParams {
 
 pub async fn handle_status(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     let params: StatusParams = serde_json::from_value(params).unwrap_or_default();
-    let config = &ctx.state.config;
+    let config = &ctx.state.core.config;
 
     // Collect live snapshots from the channel manager
-    let snapshots = ctx.state.channel_manager.snapshot_all().await;
+    let snapshots = ctx.state.channel.channel_manager.snapshot_all().await;
 
     // Group snapshots by channel name
     let mut by_channel: HashMap<String, Vec<Value>> = HashMap::new();
@@ -72,31 +72,12 @@ pub async fn handle_status(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
             .push(entry);
     }
 
-    // All known channel names and their configured account counts
-    let configured_channels: Vec<(&str, usize)> = vec![
-        ("lark", config.lark.len()),
-        ("slack", config.slack.len()),
-        ("telegram", config.telegram.len()),
-        ("discord", config.discord.len()),
-        ("dingtalk", config.dingtalk.len()),
-        ("mattermost", config.mattermost.len()),
-        ("matrix", config.matrix.len()),
-        ("whatsapp", config.whatsapp.len()),
-        ("teams", config.teams.len()),
-        ("signal", config.signal.len()),
-        ("wechat", config.wechat.len()),
-        ("imessage", config.imessage.len()),
-        ("line", config.line.len()),
-        ("googlechat", config.googlechat.len()),
-        ("irc", config.irc.len()),
-        ("webchat", config.webchat.len()),
-        ("twitch", config.twitch.len()),
-        ("nostr", config.nostr.len()),
-        ("nextcloud", config.nextcloud.len()),
-        ("synology", config.synology.len()),
-        ("tlon", config.tlon.len()),
-        ("zalo", config.zalo.len()),
-    ];
+    // All configured channel names and their account counts
+    let configured_channels: Vec<(&str, usize)> = config
+        .channels
+        .iter()
+        .map(|(name, accounts)| (name.as_str(), accounts.len()))
+        .collect();
 
     // Build the channels map: include all channels that are either configured or running
     let mut channels: HashMap<String, Value> = HashMap::new();
@@ -126,7 +107,7 @@ pub async fn handle_status(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 
     // Optionally run probes
     let probe_results = if params.probe {
-        let probes = ctx.state.channel_manager.run_probes().await;
+        let probes = ctx.state.channel.channel_manager.run_probes().await;
         let results: Vec<Value> = probes
             .into_iter()
             .map(|(channel, account_id, result)| {

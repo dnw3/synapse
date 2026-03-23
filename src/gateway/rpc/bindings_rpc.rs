@@ -11,7 +11,7 @@ use super::types::RpcError;
 
 /// List all effective bindings (new format + migrated legacy routes).
 pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let bindings = ctx.state.config.effective_bindings();
+    let bindings = ctx.state.core.config.effective_bindings();
     let items: Vec<Value> = bindings
         .iter()
         .map(|b| {

@@ -23,10 +23,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let signal_config = config
-        .signal
+    let signal_configs: Vec<crate::config::SignalBotConfig> = config.channel_configs("signal");
+    let signal_config = signal_configs
         .first()
-        .ok_or("missing [[signal]] section in config")?;
+        .ok_or("missing [[channels.signal]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

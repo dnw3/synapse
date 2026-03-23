@@ -124,7 +124,7 @@ async fn handle_v3_connection(
     };
 
     // --- Auth validation ---
-    let (role, scopes) = match &state.auth {
+    let (role, scopes) = match &state.core.auth {
         Some(auth_state) if auth_state.config.enabled => {
             // Auth is enabled — validate token or password
             let authenticated = if let Some(ref auth_params) = connect_params.auth {
@@ -179,7 +179,7 @@ async fn handle_v3_connection(
     };
 
     // --- Register connection in broadcaster ---
-    let mut event_rx = state.broadcaster.register(conn_id.clone()).await;
+    let mut event_rx = state.network.broadcaster.register(conn_id.clone()).await;
 
     // --- Build RpcContext ---
     let rpc_ctx = Arc::new(RpcContext {
@@ -188,7 +188,7 @@ async fn handle_v3_connection(
         client: connect_params.client.clone(),
         role,
         scopes: scopes.clone(),
-        broadcaster: state.broadcaster.clone(),
+        broadcaster: state.network.broadcaster.clone(),
     });
 
     // --- Build and send hello-ok response ---
@@ -199,11 +199,11 @@ async fn handle_v3_connection(
             conn_id: conn_id.clone(),
         },
         features: FeatureInfo {
-            methods: state.rpc_router.method_names(),
+            methods: state.network.rpc_router.method_names(),
             events: GATEWAY_EVENTS.iter().map(|s| s.to_string()).collect(),
         },
         snapshot: {
-            let mut pstore = state.presence.write().await;
+            let mut pstore = state.network.presence.write().await;
             let pver = pstore.version();
             let psnap = pstore.snapshot_json();
             drop(pstore);
@@ -342,7 +342,7 @@ async fn handle_v3_connection(
                         } else {
                             // Standard RPC dispatch via rpc_router
                             let response = state
-                                .rpc_router
+                                .network.rpc_router
                                 .dispatch(rpc_ctx.clone(), id, &method, params)
                                 .await;
                             let _ = sender
@@ -366,12 +366,12 @@ async fn handle_v3_connection(
     }
 
     // --- Cleanup ---
-    state.broadcaster.unregister(&conn_id).await;
+    state.network.broadcaster.unregister(&conn_id).await;
     // Release write locks and cancel tokens for all session keys used by this connection
     for sk in &active_session_keys {
         let store_key = session_key::to_store_key("default", sk);
-        state.cancel_tokens.write().await.remove(&store_key);
-        state.write_lock.release(&store_key, &conn_id).await;
+        state.session.cancel_tokens.write().await.remove(&store_key);
+        state.session.write_lock.release(&store_key, &conn_id).await;
     }
     tracing::info!(%conn_id, "v3 connection closed");
 }
@@ -441,7 +441,7 @@ async fn handle_v3_agent(
 
     // --- Emit MessageReceived event (fire-and-forget) ---
     {
-        let event_bus = state.event_bus.clone();
+        let event_bus = state.infra.event_bus.clone();
         let req_id = request_id.clone();
         let sk = session_key_str.to_string();
         tokio::spawn(async move {
@@ -473,10 +473,10 @@ async fn handle_v3_agent(
     }
 
     // --- Serialize concurrent executions ---
-    let _run_guard = state.run_queue.acquire(&store_key).await;
+    let _run_guard = state.session.run_queue.acquire(&store_key).await;
 
     // --- Acquire session write lock ---
-    if let Err(lock_err) = state.write_lock.try_acquire(&store_key, conn_id).await {
+    if let Err(lock_err) = state.session.write_lock.try_acquire(&store_key, conn_id).await {
         let err = ServerFrame::err(
             request_id_rpc,
             RpcError::invalid_request(format!("Session busy: {lock_err}")),
@@ -541,7 +541,7 @@ async fn handle_v3_agent(
     // Cancel token for this execution
     let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
     state
-        .cancel_tokens
+        .session.cancel_tokens
         .write()
         .await
         .insert(store_key.clone(), cancel_tx);
@@ -554,7 +554,7 @@ async fn handle_v3_agent(
     let execution_start = std::time::Instant::now();
 
     // --- Spawn agent execution task ---
-    let agent_session = state.agent_session.clone();
+    let agent_session = state.agent.agent_session.clone();
     let mut agent_handle =
         tokio::spawn(async move { agent_session.handle_message(msg, ctx).await });
 
@@ -600,7 +600,7 @@ async fn handle_v3_agent(
                         {
                             match method.as_str() {
                                 "chat.stop" => {
-                                    if let Some(tx) = state.cancel_tokens.read().await.get(&store_key) {
+                                    if let Some(tx) = state.session.cancel_tokens.read().await.get(&store_key) {
                                         let _ = tx.send(true);
                                     }
                                     let ok = ServerFrame::ok(&id, serde_json::json!({"stopped": true}));
@@ -678,7 +678,7 @@ async fn handle_v3_agent(
 
                 // Emit MessageSent (fire-and-forget)
                 {
-                    let event_bus = state.event_bus.clone();
+                    let event_bus = state.infra.event_bus.clone();
                     let req_id = request_id.clone();
                     let sk = session_key_str.to_string();
                     tokio::spawn(async move {
@@ -702,7 +702,7 @@ async fn handle_v3_agent(
     }
 
     // --- Cleanup ---
-    state.write_lock.release(&store_key, conn_id).await;
+    state.session.write_lock.release(&store_key, conn_id).await;
 
     // Send the final RPC response for the agent/chat.send request
     let response = ServerFrame::ok(

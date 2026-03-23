@@ -28,8 +28,39 @@ struct ChannelResponse {
     config: HashMap<String, String>,
 }
 
+/// Known channel platform names (for validation and listing).
+const KNOWN_CHANNELS: &[&str] = &[
+    "lark",
+    "slack",
+    "telegram",
+    "discord",
+    "dingtalk",
+    "mattermost",
+    "matrix",
+    "whatsapp",
+    "teams",
+    "signal",
+    "wechat",
+    "imessage",
+    "line",
+    "googlechat",
+    "irc",
+    "webchat",
+    "twitch",
+    "nostr",
+    "nextcloud",
+    "synology",
+    "tlon",
+    "zalo",
+];
+
 fn extract_channel_config(toml_val: &toml::Value, channel_name: &str) -> HashMap<String, String> {
-    let entry = toml_val.as_table().and_then(|root| root.get(channel_name));
+    // Try new format: channels.PLATFORM
+    let entry = toml_val
+        .as_table()
+        .and_then(|root| root.get("channels"))
+        .and_then(|ch| ch.get(channel_name))
+        .or_else(|| toml_val.as_table().and_then(|root| root.get(channel_name)));
     let table = entry.and_then(|v| match v {
         toml::Value::Table(t) => Some(t),
         toml::Value::Array(arr) => arr.first().and_then(|item| item.as_table()),
@@ -54,7 +85,7 @@ fn extract_channel_config(toml_val: &toml::Value, channel_name: &str) -> HashMap
 }
 
 async fn get_channels(State(state): State<AppState>) -> Json<Vec<ChannelResponse>> {
-    let config = &state.config;
+    let config = &state.core.config;
 
     let toml_val: toml::Value = read_config_file()
         .await
@@ -71,38 +102,31 @@ async fn get_channels(State(state): State<AppState>) -> Json<Vec<ChannelResponse
             .unwrap_or(startup_exists)
     };
 
-    let channels = vec![
-        ("lark", !config.lark.is_empty()),
-        ("slack", !config.slack.is_empty()),
-        ("telegram", !config.telegram.is_empty()),
-        ("discord", !config.discord.is_empty()),
-        ("dingtalk", !config.dingtalk.is_empty()),
-        ("mattermost", !config.mattermost.is_empty()),
-        ("matrix", !config.matrix.is_empty()),
-        ("whatsapp", !config.whatsapp.is_empty()),
-        ("teams", !config.teams.is_empty()),
-        ("signal", !config.signal.is_empty()),
-        ("wechat", !config.wechat.is_empty()),
-        ("imessage", !config.imessage.is_empty()),
-        ("line", !config.line.is_empty()),
-        ("googlechat", !config.googlechat.is_empty()),
-        ("irc", !config.irc.is_empty()),
-        ("webchat", !config.webchat.is_empty()),
-        ("twitch", !config.twitch.is_empty()),
-        ("nostr", !config.nostr.is_empty()),
-        ("nextcloud", !config.nextcloud.is_empty()),
-        ("synology", !config.synology.is_empty()),
-        ("tlon", !config.tlon.is_empty()),
-        ("zalo", !config.zalo.is_empty()),
-    ];
+    // Collect all known channels + any dynamically configured ones
+    let mut seen = std::collections::HashSet::new();
+    let mut channels: Vec<(String, bool)> = Vec::new();
+    for &name in KNOWN_CHANNELS {
+        seen.insert(name.to_string());
+        let has_accounts = config
+            .channels
+            .get(name)
+            .is_some_and(|v| !v.is_empty());
+        channels.push((name.to_string(), has_accounts));
+    }
+    // Include any extra platforms configured but not in KNOWN_CHANNELS
+    for (name, accounts) in &config.channels {
+        if !seen.contains(name.as_str()) {
+            channels.push((name.clone(), !accounts.is_empty()));
+        }
+    }
 
     Json(
         channels
             .into_iter()
             .map(|(name, startup_exists)| ChannelResponse {
-                config: extract_channel_config(&toml_val, name),
-                enabled: resolve_enabled(name, startup_exists),
-                name: name.to_string(),
+                config: extract_channel_config(&toml_val, &name),
+                enabled: resolve_enabled(&name, startup_exists),
+                name,
             })
             .collect(),
     )
@@ -124,31 +148,7 @@ async fn toggle_channel(
         )
     })?;
 
-    let known_channels = [
-        "lark",
-        "slack",
-        "telegram",
-        "discord",
-        "dingtalk",
-        "mattermost",
-        "matrix",
-        "whatsapp",
-        "teams",
-        "signal",
-        "wechat",
-        "imessage",
-        "line",
-        "googlechat",
-        "irc",
-        "webchat",
-        "twitch",
-        "nostr",
-        "nextcloud",
-        "synology",
-        "tlon",
-        "zalo",
-    ];
-    if !known_channels.contains(&name.as_str()) {
+    if !KNOWN_CHANNELS.contains(&name.as_str()) {
         return Err((StatusCode::NOT_FOUND, format!("unknown channel '{}'", name)));
     }
     let section_exists = doc

@@ -333,10 +333,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let line_config = config
-        .line
+    let line_configs: Vec<crate::config::LineBotConfig> = config.channel_configs("line");
+    let line_config = line_configs
         .first()
-        .ok_or("missing [[line]] section in config")?;
+        .ok_or("missing [[channels.line]] section in config")?;
 
     let channel_secret = resolve_secret(
         line_config.channel_secret.as_deref(),

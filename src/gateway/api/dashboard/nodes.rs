@@ -33,11 +33,11 @@ struct NodesResponse {
 
 async fn get_nodes(State(state): State<AppState>) -> Json<NodesResponse> {
     let paired = {
-        let pairing = state.pairing_store.read().await;
+        let pairing = state.network.pairing_store.read().await;
         pairing.list_paired()
     };
 
-    let registry = state.node_registry.read().await;
+    let registry = state.network.node_registry.read().await;
     let nodes: Vec<serde_json::Value> = paired
         .iter()
         .map(|n| {
@@ -63,7 +63,7 @@ async fn get_nodes(State(state): State<AppState>) -> Json<NodesResponse> {
         .collect();
     drop(registry);
 
-    let mut pairing_w = state.pairing_store.write().await;
+    let mut pairing_w = state.network.pairing_store.write().await;
     let pending_list = pairing_w.list_pending();
     let pending: Vec<serde_json::Value> = pending_list
         .iter()
@@ -104,7 +104,7 @@ async fn approve_node(
         .as_deref()
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing request_id".to_string()))?;
     let paired = state
-        .pairing_store
+        .network.pairing_store
         .write()
         .await
         .approve(request_id)
@@ -129,7 +129,7 @@ async fn reject_node(
         .request_id
         .as_deref()
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing request_id".to_string()))?;
-    let removed = state.pairing_store.write().await.reject(request_id);
+    let removed = state.network.pairing_store.write().await.reject(request_id);
     if removed {
         Ok(Json(serde_json::json!({"ok": true})))
     } else {
@@ -152,9 +152,9 @@ async fn remove_node(
         .node_id
         .as_deref()
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing node_id".to_string()))?;
-    let removed = state.pairing_store.write().await.remove_paired(node_id);
+    let removed = state.network.pairing_store.write().await.remove_paired(node_id);
     if removed {
-        state.node_registry.write().await.unregister(node_id);
+        state.network.node_registry.write().await.unregister(node_id);
         Ok(Json(serde_json::json!({"ok": true})))
     } else {
         Err((StatusCode::NOT_FOUND, "paired device not found".to_string()))
@@ -176,13 +176,13 @@ async fn rename_node(
     Json(body): Json<RenameRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let renamed = state
-        .pairing_store
+        .network.pairing_store
         .write()
         .await
         .rename(&body.node_id, &body.name);
     if renamed {
         state
-            .node_registry
+            .network.node_registry
             .write()
             .await
             .rename(&body.node_id, &body.name);
@@ -211,7 +211,7 @@ async fn rotate_node_token(
     let token_hash = format!("{:x}", sha2::Sha256::digest(new_token.as_bytes()));
 
     let updated = state
-        .pairing_store
+        .network.pairing_store
         .write()
         .await
         .update_token_hash(node_id, &token_hash);
@@ -239,7 +239,7 @@ async fn revoke_node_token(
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing node_id".to_string()))?;
 
     let updated = state
-        .pairing_store
+        .network.pairing_store
         .write()
         .await
         .update_token_hash(node_id, "");
@@ -265,11 +265,11 @@ async fn generate_qr(
 ) -> Json<serde_json::Value> {
     use crate::gateway::nodes::bootstrap;
 
-    let token = state.bootstrap_store.write().await.issue();
+    let token = state.network.bootstrap_store.write().await.issue();
 
     let gateway_url = body.url.unwrap_or_else(|| {
         let port = state
-            .config
+            .core.config
             .serve
             .as_ref()
             .and_then(|s| s.port)
@@ -295,7 +295,7 @@ async fn generate_qr(
 // ---------------------------------------------------------------------------
 
 async fn get_exec_approvals(State(state): State<AppState>) -> Json<serde_json::Value> {
-    let config = state.exec_approvals_config.read().await;
+    let config = state.channel.exec_approvals_config.read().await;
     Json(serde_json::json!({
         "security_mode": config.mode,
         "ask_policy": config.ask,

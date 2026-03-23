@@ -143,7 +143,7 @@ pub async fn login_handler(
     State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
 ) -> impl IntoResponse {
-    let auth = match &state.auth {
+    let auth = match &state.core.auth {
         Some(auth) => auth,
         None => {
             return (
@@ -186,7 +186,7 @@ pub async fn status_handler(State(state): State<AppState>) -> impl IntoResponse 
     }
 
     let auth_enabled = state
-        .auth
+        .core.auth
         .as_ref()
         .map(|a| a.config.enabled)
         .unwrap_or(false);
@@ -210,7 +210,7 @@ pub async fn require_auth(
     request: axum::http::Request<axum::body::Body>,
     next: middleware::Next,
 ) -> impl IntoResponse {
-    let auth = match &state.auth {
+    let auth = match &state.core.auth {
         Some(auth) if auth.config.enabled => auth,
         _ => return next.run(request).await.into_response(), // Auth disabled, pass through
     };

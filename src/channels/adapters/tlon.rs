@@ -20,10 +20,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let tlon_config = config
-        .tlon
+    let tlon_configs: Vec<crate::config::TlonBotConfig> = config.channel_configs("tlon");
+    let tlon_config = tlon_configs
         .first()
-        .ok_or("missing [[tlon]] section in config")?;
+        .ok_or("missing [[channels.tlon]] section in config")?;
 
     let api_key = resolve_secret(
         tlon_config.api_key.as_deref(),

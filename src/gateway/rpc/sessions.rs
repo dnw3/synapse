@@ -155,13 +155,13 @@ fn parse_session_key(id: &str) -> SessionKeyMeta {
 pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let sessions = ctx
         .state
-        .sessions
+        .session.sessions
         .list_sessions()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
 
     let overrides = load_overrides();
-    let memory = ctx.state.sessions.memory();
+    let memory = ctx.state.session.sessions.memory();
     let mut result = Vec::new();
 
     for s in sessions {
@@ -224,7 +224,7 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
 
     let sessions = ctx
         .state
-        .sessions
+        .session.sessions
         .list_sessions()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -234,7 +234,7 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
         .find(|s| s.session_id == id)
         .ok_or_else(|| RpcError::not_found(format!("session '{}' not found", id)))?;
 
-    let memory = ctx.state.sessions.memory();
+    let memory = ctx.state.session.sessions.memory();
     let messages = memory.load(&session.session_id).await.unwrap_or_default();
     let count = messages.len();
     let title = messages.iter().find(|m| m.is_human()).map(|m| {
@@ -326,7 +326,7 @@ pub async fn handle_patch(_ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 pub async fn handle_create(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     let session_id = ctx
         .state
-        .sessions
+        .session.sessions
         .create_session()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -372,7 +372,7 @@ pub async fn handle_delete(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         .ok_or_else(|| RpcError::invalid_request("missing 'id' parameter"))?;
 
     ctx.state
-        .sessions
+        .session.sessions
         .delete_session(id)
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -390,7 +390,7 @@ pub async fn handle_delete(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 
     // Emit SessionEnd (fire-and-forget)
     {
-        let event_bus = ctx.state.event_bus.clone();
+        let event_bus = ctx.state.infra.event_bus.clone();
         let session_id = id.to_string();
         tokio::spawn(async move {
             let mut event = Event::new(
@@ -449,12 +449,12 @@ pub async fn handle_compact(ctx: Arc<RpcContext>, params: Value) -> Result<Value
 pub async fn handle_usage(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let sessions = ctx
         .state
-        .sessions
+        .session.sessions
         .list_sessions()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
 
-    let memory = ctx.state.sessions.memory();
+    let memory = ctx.state.session.sessions.memory();
     let mut result = Vec::new();
 
     for s in sessions {
@@ -487,7 +487,7 @@ pub async fn handle_usage_timeseries(
     ctx: Arc<RpcContext>,
     _params: Value,
 ) -> Result<Value, RpcError> {
-    let snapshot = ctx.state.cost_tracker.snapshot().await;
+    let snapshot = ctx.state.agent.cost_tracker.snapshot().await;
     let now = chrono::Utc::now();
 
     let entries = if snapshot.total_requests > 0 {
@@ -524,7 +524,7 @@ pub async fn handle_abort(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
         crate::session::key::to_store_key("default", raw_key)
     };
 
-    let tokens = ctx.state.cancel_tokens.read().await;
+    let tokens = ctx.state.session.cancel_tokens.read().await;
     let aborted = if let Some(sender) = tokens.get(&store_key) {
         let _ = sender.send(true);
         true
@@ -540,13 +540,13 @@ pub async fn handle_abort(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
 // ---------------------------------------------------------------------------
 
 pub async fn handle_subscribe(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let mut subs = ctx.state.session_subscribers.write().await;
+    let mut subs = ctx.state.session.session_subscribers.write().await;
     subs.insert(ctx.conn_id.clone());
     Ok(json!({ "ok": true }))
 }
 
 pub async fn handle_unsubscribe(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let mut subs = ctx.state.session_subscribers.write().await;
+    let mut subs = ctx.state.session.session_subscribers.write().await;
     subs.remove(&ctx.conn_id);
     Ok(json!({ "ok": true }))
 }
@@ -566,7 +566,7 @@ pub async fn handle_preview(ctx: Arc<RpcContext>, params: Value) -> Result<Value
         .and_then(|v| v.as_u64())
         .unwrap_or(200) as usize;
 
-    let memory = ctx.state.sessions.memory();
+    let memory = ctx.state.session.sessions.memory();
     let mut previews = Vec::new();
 
     for sid in &session_ids {
@@ -607,7 +607,7 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
     // If so: delete the old session entirely, create a fresh one with the same key.
     let existing_info = ctx
         .state
-        .sessions
+        .session.sessions
         .get_session(session_id)
         .await
         .ok()
@@ -620,7 +620,7 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
     {
         // Delete the old session (messages + metadata + checkpoints)
         ctx.state
-            .sessions
+            .session.sessions
             .delete_session(session_id)
             .await
             .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -628,23 +628,23 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
         // Create a new session and tag it with the main session key
         let new_id = ctx
             .state
-            .sessions
+            .session.sessions
             .create_session()
             .await
             .map_err(|e| RpcError::internal(e.to_string()))?;
 
-        if let Ok(Some(mut info)) = ctx.state.sessions.get_session(&new_id).await {
+        if let Ok(Some(mut info)) = ctx.state.session.sessions.get_session(&new_id).await {
             info.session_key = Some("agent:default:main".to_string());
             info.channel = Some("web".to_string());
             info.chat_type = Some("direct".to_string());
             info.display_name = Some("main".to_string());
-            let _ = ctx.state.sessions.update_session(&info).await;
+            let _ = ctx.state.session.sessions.update_session(&info).await;
         }
 
         Some(new_id)
     } else {
         // Non-main session: just clear messages
-        let memory = ctx.state.sessions.memory();
+        let memory = ctx.state.session.sessions.memory();
         memory
             .clear(session_id)
             .await
@@ -675,7 +675,7 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
 // ---------------------------------------------------------------------------
 
 pub async fn handle_usage_logs(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let snapshot = ctx.state.cost_tracker.snapshot().await;
+    let snapshot = ctx.state.agent.cost_tracker.snapshot().await;
 
     let mut per_model: Vec<Value> = snapshot
         .per_model

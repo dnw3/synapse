@@ -77,31 +77,7 @@ pub(super) async fn read_config_file() -> Result<(String, String), (StatusCode, 
 }
 
 pub(super) fn count_bot_channels(config: &crate::config::SynapseConfig) -> usize {
-    let checks: &[bool] = &[
-        !config.lark.is_empty(),
-        !config.slack.is_empty(),
-        !config.telegram.is_empty(),
-        !config.discord.is_empty(),
-        !config.dingtalk.is_empty(),
-        !config.mattermost.is_empty(),
-        !config.matrix.is_empty(),
-        !config.whatsapp.is_empty(),
-        !config.teams.is_empty(),
-        !config.signal.is_empty(),
-        !config.wechat.is_empty(),
-        !config.imessage.is_empty(),
-        !config.line.is_empty(),
-        !config.googlechat.is_empty(),
-        !config.irc.is_empty(),
-        !config.webchat.is_empty(),
-        !config.twitch.is_empty(),
-        !config.nostr.is_empty(),
-        !config.nextcloud.is_empty(),
-        !config.synology.is_empty(),
-        !config.tlon.is_empty(),
-        !config.zalo.is_empty(),
-    ];
-    checks.iter().filter(|&&v| v).count()
+    config.channels.values().filter(|v| !v.is_empty()).count()
 }
 
 pub(super) fn parse_system_time_string(s: &str) -> String {

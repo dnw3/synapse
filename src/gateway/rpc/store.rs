@@ -18,7 +18,7 @@ pub async fn handle_search(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         .ok_or_else(|| RpcError::invalid_request("missing 'query' parameter"))?;
     let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as usize;
 
-    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.core.config);
     let results = hub
         .search(query, limit)
         .await
@@ -36,7 +36,7 @@ pub async fn handle_list(ctx: Arc<RpcContext>, params: Value) -> Result<Value, R
     let sort = params.get("sort").and_then(|v| v.as_str());
     let cursor = params.get("cursor").and_then(|v| v.as_str());
 
-    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.core.config);
     let items = hub
         .list(limit, sort, cursor)
         .await
@@ -55,7 +55,7 @@ pub async fn handle_detail(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing 'slug' parameter"))?;
 
-    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.core.config);
     let detail = hub
         .detail(slug)
         .await
@@ -75,7 +75,7 @@ pub async fn handle_install(ctx: Arc<RpcContext>, params: Value) -> Result<Value
         .ok_or_else(|| RpcError::invalid_request("missing 'slug' parameter"))?;
     let version = params.get("version").and_then(|v| v.as_str());
 
-    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.core.config);
     crate::hub::install::install_from_hub(&hub, slug, version, false)
         .await
         .map_err(|e| RpcError::internal(format!("install: {}", e)))?;
@@ -88,7 +88,7 @@ pub async fn handle_install(ctx: Arc<RpcContext>, params: Value) -> Result<Value
 // ---------------------------------------------------------------------------
 
 pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.core.config);
     let configured = hub.is_configured();
     let lock = crate::hub::install::read_lock_file();
     let installed_count = lock.skills.len();

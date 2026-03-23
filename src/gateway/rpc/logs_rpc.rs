@@ -18,7 +18,7 @@ pub async fn handle_tail(ctx: Arc<RpcContext>, params: Value) -> Result<Value, R
 
     let entries = ctx
         .state
-        .log_buffer
+        .infra.log_buffer
         .query(limit, None, request_id, from, None, None)
         .await;
 

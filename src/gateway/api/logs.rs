@@ -34,7 +34,7 @@ pub async fn query_logs(
 ) -> Json<LogsResponse> {
     let limit = params.limit.unwrap_or(100).min(1000);
     let entries = state
-        .log_buffer
+        .infra.log_buffer
         .query(
             limit,
             params.level.as_deref(),

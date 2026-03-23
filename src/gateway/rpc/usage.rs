@@ -15,12 +15,12 @@ use super::types::RpcError;
 pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let sessions = ctx
         .state
-        .sessions
+        .session.sessions
         .list_sessions()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
 
-    let memory = ctx.state.sessions.memory();
+    let memory = ctx.state.session.sessions.memory();
     let mut total_messages = 0usize;
     for s in &sessions {
         total_messages += memory
@@ -30,8 +30,8 @@ pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
             .unwrap_or(0);
     }
 
-    let snapshot = ctx.state.cost_tracker.snapshot().await;
-    let active_ws = ctx.state.cancel_tokens.read().await.len();
+    let snapshot = ctx.state.agent.cost_tracker.snapshot().await;
+    let active_ws = ctx.state.session.cancel_tokens.read().await.len();
 
     Ok(json!({
         "session_count": sessions.len(),
@@ -40,7 +40,7 @@ pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
         "total_output_tokens": snapshot.total_output_tokens,
         "total_cost_usd": snapshot.estimated_cost_usd,
         "total_requests": snapshot.total_requests,
-        "uptime_secs": ctx.state.started_at.elapsed().as_secs(),
+        "uptime_secs": ctx.state.core.started_at.elapsed().as_secs(),
         "active_ws_sessions": active_ws,
     }))
 }
@@ -50,7 +50,7 @@ pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
 // ---------------------------------------------------------------------------
 
 pub async fn handle_cost(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let snapshot = ctx.state.cost_tracker.snapshot().await;
+    let snapshot = ctx.state.agent.cost_tracker.snapshot().await;
 
     let mut per_model: Vec<Value> = snapshot
         .per_model
@@ -93,7 +93,7 @@ pub async fn handle_aggregates(ctx: Arc<RpcContext>, params: Value) -> Result<Va
     let now_ms = crate::gateway::presence::now_ms();
     let since_ms = now_ms.saturating_sub(since_days * 24 * 60 * 60 * 1000);
 
-    let snapshot = ctx.state.usage_tracker.snapshot_since(since_ms).await;
+    let snapshot = ctx.state.agent.usage_tracker.snapshot_since(since_ms).await;
     serde_json::to_value(&snapshot).map_err(|e| RpcError::internal(e.to_string()))
 }
 
@@ -111,7 +111,7 @@ pub async fn handle_records(ctx: Arc<RpcContext>, params: Value) -> Result<Value
     let now_ms = crate::gateway::presence::now_ms();
     let since_ms = now_ms.saturating_sub(since_days * 24 * 60 * 60 * 1000);
 
-    let mut records = ctx.state.usage_tracker.records_since(since_ms).await;
+    let mut records = ctx.state.agent.usage_tracker.records_since(since_ms).await;
     // Most recent first
     records.reverse();
     records.truncate(limit);

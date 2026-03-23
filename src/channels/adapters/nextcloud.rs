@@ -20,10 +20,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let nc_config = config
-        .nextcloud
+    let nc_configs: Vec<crate::config::NextcloudBotConfig> = config.channel_configs("nextcloud");
+    let nc_config = nc_configs
         .first()
-        .ok_or("missing [[nextcloud]] section in config")?;
+        .ok_or("missing [[channels.nextcloud]] section in config")?;
 
     let password = resolve_secret(
         nc_config.password.as_deref(),

@@ -41,12 +41,12 @@ async fn get_stats(
     State(state): State<AppState>,
 ) -> Result<Json<StatsResponse>, (StatusCode, String)> {
     let sessions = state
-        .sessions
+        .session.sessions
         .list_sessions()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let memory = state.sessions.memory();
+    let memory = state.session.sessions.memory();
     let mut total_messages = 0usize;
     for s in &sessions {
         total_messages += memory
@@ -56,8 +56,8 @@ async fn get_stats(
             .unwrap_or(0);
     }
 
-    let usage_snap = state.usage_tracker.snapshot().await;
-    let active_ws = state.cancel_tokens.read().await.len();
+    let usage_snap = state.agent.usage_tracker.snapshot().await;
+    let active_ws = state.session.cancel_tokens.read().await.len();
 
     Ok(Json(StatsResponse {
         session_count: sessions.len(),
@@ -65,7 +65,7 @@ async fn get_stats(
         total_input_tokens: usage_snap.totals.input_tokens,
         total_output_tokens: usage_snap.totals.output_tokens,
         total_cost_usd: usage_snap.totals.total_cost,
-        uptime_secs: state.started_at.elapsed().as_secs(),
+        uptime_secs: state.core.started_at.elapsed().as_secs(),
         active_ws_sessions: active_ws,
     }))
 }
@@ -93,7 +93,7 @@ struct ModelUsageEntry {
 }
 
 async fn get_usage(State(state): State<AppState>) -> Json<UsageResponse> {
-    let snap = state.usage_tracker.snapshot().await;
+    let snap = state.agent.usage_tracker.snapshot().await;
 
     let per_model: Vec<ModelUsageEntry> = snap
         .by_model
@@ -143,7 +143,7 @@ async fn get_usage_timeseries(
     State(state): State<AppState>,
     Query(_query): Query<TimeseriesQuery>,
 ) -> Json<Vec<TimeseriesEntry>> {
-    let snap = state.usage_tracker.snapshot().await;
+    let snap = state.agent.usage_tracker.snapshot().await;
 
     let entries: Vec<TimeseriesEntry> = snap
         .daily
@@ -192,12 +192,12 @@ async fn get_usage_sessions(
     Query(_query): Query<UsageSessionsQuery>,
 ) -> Result<Json<Vec<UsageSessionEntry>>, (StatusCode, String)> {
     let sessions = state
-        .sessions
+        .session.sessions
         .list_sessions()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let memory = state.sessions.memory();
+    let memory = state.session.sessions.memory();
     let mut result = Vec::with_capacity(sessions.len());
 
     for s in sessions {
@@ -234,7 +234,7 @@ struct ProviderResponse {
 }
 
 async fn get_providers(State(state): State<AppState>) -> Json<Vec<ProviderResponse>> {
-    let config = &state.config;
+    let config = &state.core.config;
 
     let mut provider_models: HashMap<String, Vec<String>> = HashMap::new();
     if let Some(models) = &config.model_catalog {
@@ -260,13 +260,13 @@ async fn get_providers(State(state): State<AppState>) -> Json<Vec<ProviderRespon
     }
 
     if !providers.iter().any(|p| p.name == "default") {
-        let base_model = state.config.base.model.model.clone();
-        let base_provider = state.config.base.model.provider.clone();
+        let base_model = state.core.config.base.model.model.clone();
+        let base_provider = state.core.config.base.model.provider.clone();
         providers.insert(
             0,
             ProviderResponse {
                 name: base_provider,
-                base_url: state.config.base.model.base_url.clone().unwrap_or_default(),
+                base_url: state.core.config.base.model.base_url.clone().unwrap_or_default(),
                 models: vec![base_model],
             },
         );
@@ -303,12 +303,12 @@ async fn get_health(
     State(state): State<AppState>,
 ) -> Result<Json<HealthResponse>, (StatusCode, String)> {
     let sessions = state
-        .sessions
+        .session.sessions
         .list_sessions()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let memory = state.sessions.memory();
+    let memory = state.session.sessions.memory();
     let mut memory_entries = 0usize;
     for s in &sessions {
         memory_entries += memory
@@ -318,28 +318,28 @@ async fn get_health(
             .unwrap_or(0);
     }
 
-    let active = state.cancel_tokens.read().await.len();
+    let active = state.session.cancel_tokens.read().await.len();
     let auth_enabled = state
-        .auth
+        .core.auth
         .as_ref()
         .map(|a| a.config.enabled)
         .unwrap_or(false);
 
-    let bot_channels = count_bot_channels(&state.config);
+    let bot_channels = count_bot_channels(&state.core.config);
 
     Ok(Json(HealthResponse {
         status: "ok".to_string(),
-        uptime_secs: state.started_at.elapsed().as_secs(),
+        uptime_secs: state.core.started_at.elapsed().as_secs(),
         auth_enabled,
         memory_entries,
         active_sessions: active,
         session_count: sessions.len(),
         config_summary: ConfigSummary {
-            model: state.config.base.model.model.clone(),
-            provider: state.config.base.model.provider.clone(),
-            mcp_servers: state.config.base.mcp.as_ref().map(|m| m.len()).unwrap_or(0),
+            model: state.core.config.base.model.model.clone(),
+            provider: state.core.config.base.model.provider.clone(),
+            mcp_servers: state.core.config.base.mcp.as_ref().map(|m| m.len()).unwrap_or(0),
             scheduled_jobs: state
-                .config
+                .core.config
                 .schedules
                 .as_ref()
                 .map(|s| s.len())
@@ -363,9 +363,9 @@ struct DebugHealthResponse {
 }
 
 async fn debug_health(State(state): State<AppState>) -> Json<DebugHealthResponse> {
-    let active = state.cancel_tokens.read().await.len();
+    let active = state.session.cancel_tokens.read().await.len();
     let sessions = state
-        .sessions
+        .session.sessions
         .list_sessions()
         .await
         .map(|s| s.len())
@@ -387,7 +387,7 @@ async fn debug_health(State(state): State<AppState>) -> Json<DebugHealthResponse
 
     Json(DebugHealthResponse {
         status: "ok".to_string(),
-        uptime_secs: state.started_at.elapsed().as_secs(),
+        uptime_secs: state.core.started_at.elapsed().as_secs(),
         memory_rss_mb,
         active_connections: active,
         active_sessions: sessions,

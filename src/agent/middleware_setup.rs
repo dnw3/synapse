@@ -190,7 +190,7 @@ pub(crate) async fn setup_middleware(
         if std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").is_ok() {
             use synaptic::callbacks::OpenTelemetryCallback;
             let otel = Arc::new(OpenTelemetryCallback::new("synapse"));
-            if let Some(ref bus) = options.event_bus {
+            if let Some(ref bus) = options.observability.event_bus {
                 bus.subscribe(otel, 100, "otel");
                 tracing::info!("OTel subscriber registered on EventBus");
             } else {
@@ -347,8 +347,8 @@ pub(crate) fn setup_reflection(
                         memory_file: config.base.paths.memory_file.clone(),
                         ..Default::default()
                     };
-                    options.reflection_model = Some(m);
-                    options.reflection_config = Some(rcfg);
+                    options.observability.reflection_model = Some(m);
+                    options.observability.reflection_config = Some(rcfg);
                     tracing::info!(model = name, "Reflection middleware enabled");
                 }
                 Err(e) => {
@@ -362,8 +362,8 @@ pub(crate) fn setup_reflection(
                     memory_file: config.base.paths.memory_file.clone(),
                     ..Default::default()
                 };
-                options.reflection_model = Some(model.clone());
-                options.reflection_config = Some(rcfg);
+                options.observability.reflection_model = Some(model.clone());
+                options.observability.reflection_config = Some(rcfg);
                 tracing::info!("Reflection middleware enabled (using main model)");
             }
         }

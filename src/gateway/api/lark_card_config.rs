@@ -8,9 +8,8 @@ use crate::gateway::state::AppState;
 
 /// GET /api/config/lark-card — returns current card config
 pub async fn get_lark_card_config(State(state): State<AppState>) -> Json<LarkCardConfig> {
-    let card_config = state
-        .config
-        .lark
+    let lark_configs: Vec<crate::config::LarkBotConfig> = state.core.config.channel_configs("lark");
+    let card_config = lark_configs
         .first()
         .map(|lark| lark.card.clone())
         .unwrap_or_default();
@@ -47,9 +46,8 @@ pub async fn preview_lark_card(
 
     // Use inline config from request body, fall back to server config.
     let card_config = body.config.unwrap_or_else(|| {
-        state
-            .config
-            .lark
+        let lark_configs: Vec<crate::config::LarkBotConfig> = state.core.config.channel_configs("lark");
+        lark_configs
             .first()
             .map(|lark| lark.card.clone())
             .unwrap_or_default()

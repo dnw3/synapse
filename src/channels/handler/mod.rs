@@ -65,6 +65,32 @@ enum ResolvedRoute {
 // Re-export streaming types from the framework layer.
 pub use synaptic::graph::streaming::{CompletionMeta, StreamingOutput, ToolCallInfo};
 
+/// Gateway-mode capabilities (web gateway has these, REPL doesn't).
+#[derive(Clone)]
+pub struct GatewayCapability {
+    pub broadcaster: Arc<Broadcaster>,
+    #[allow(dead_code)]
+    pub channel_registry: Arc<RwLock<ChannelRegistry>>,
+    pub router: Option<Arc<BindingRouter>>,
+    #[allow(dead_code)]
+    pub outbound: Option<Arc<dyn synaptic::core::Outbound>>,
+}
+
+/// Cost and usage tracking capabilities.
+#[derive(Clone)]
+pub struct TrackingCapability {
+    pub cost_tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
+    #[allow(dead_code)]
+    pub usage_tracker: Arc<crate::gateway::usage::UsageTracker>,
+}
+
+/// Plugin system capabilities.
+#[derive(Clone)]
+pub struct PluginCapability {
+    pub event_bus: Arc<synaptic::events::EventBus>,
+    pub plugin_registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
+}
+
 /// Shared agent session handler for all bot adapters.
 ///
 /// Supports two modes:
@@ -74,6 +100,7 @@ pub use synaptic::graph::streaming::{CompletionMeta, StreamingOutput, ToolCallIn
 ///
 /// All sessions are persisted to disk via `FileStore` and survive restarts.
 pub struct AgentSession {
+    // Required (all channels)
     model: Arc<dyn ChatModel>,
     config: Arc<SynapseConfig>,
     session_mgr: SessionManager,
@@ -82,26 +109,18 @@ pub struct AgentSession {
     channel: String,
     /// Tracks which session key maps to which session ID.
     session_map: RwLock<std::collections::HashMap<String, String>>,
-    /// Optional channel registry for outbound dispatch (available in gateway mode).
-    channel_registry: Option<Arc<RwLock<ChannelRegistry>>>,
-    /// Optional broadcaster for message events (available in gateway mode).
-    broadcaster: Option<Arc<Broadcaster>>,
-    /// Optional binding router for multi-agent dispatch.
-    router: Option<Arc<BindingRouter>>,
-    /// Optional cost tracker for usage statistics.
-    cost_tracker: Option<Arc<synaptic::callbacks::CostTrackingCallback>>,
-    /// Optional multi-dimensional usage tracker.
-    usage_tracker: Option<Arc<crate::gateway::usage::UsageTracker>>,
     /// Per-session run queue to serialize concurrent agent executions.
     run_queue: Arc<crate::gateway::run_queue::AgentRunQueue>,
-    /// Optional Outbound trait impl for the new channel trait interface.
-    outbound: Option<Arc<dyn synaptic::core::Outbound>>,
-    /// Optional EventBus for event-driven usage tracking and subscriber notifications.
-    event_bus: Option<Arc<synaptic::events::EventBus>>,
-    /// Optional PluginRegistry for plugin-registered tools.
-    plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
     /// Resolver for tool display metadata (emoji, label, detail).
     display_resolver: Arc<crate::agent::tool_display::ToolDisplayResolver>,
+
+    // Optional capabilities
+    /// Gateway-mode capabilities (broadcaster, channel registry, router, outbound).
+    gateway: Option<GatewayCapability>,
+    /// Cost and usage tracking capabilities.
+    tracking: Option<TrackingCapability>,
+    /// Plugin system capabilities (event bus, plugin registry).
+    plugins: Option<PluginCapability>,
 }
 
 impl AgentSession {
@@ -121,16 +140,11 @@ impl AgentSession {
             deep_agent,
             channel: "unknown".to_string(),
             session_map: RwLock::new(std::collections::HashMap::new()),
-            channel_registry: None,
-            broadcaster: None,
-            router: None,
-            cost_tracker: None,
-            usage_tracker: None,
             run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
-            outbound: None,
-            event_bus: None,
-            plugin_registry: None,
             display_resolver,
+            gateway: None,
+            tracking: None,
+            plugins: None,
         }
     }
 
@@ -173,55 +187,62 @@ impl AgentSession {
             deep_agent,
             channel: "unknown".to_string(),
             session_map: RwLock::new(std::collections::HashMap::new()),
-            channel_registry: None,
-            broadcaster: None,
-            router: None,
-            cost_tracker: None,
-            usage_tracker: None,
             run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
-            outbound: None,
-            event_bus: None,
-            plugin_registry: None,
             display_resolver: display_resolver2,
+            gateway: None,
+            tracking: None,
+            plugins: None,
         }
     }
 
-    /// Set the EventBus for event-driven tracking in bot mode.
-    pub fn with_event_bus(mut self, event_bus: Arc<synaptic::events::EventBus>) -> Self {
-        self.event_bus = Some(event_bus);
-        self
-    }
-
-    /// Set the PluginRegistry for plugin tools in bot mode.
-    pub fn with_plugin_registry(
-        mut self,
-        registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
-    ) -> Self {
-        self.plugin_registry = Some(registry);
-        self
-    }
-
-    /// Set the cost tracker for usage statistics.
+    /// Set gateway-mode capabilities (broadcaster, channel registry).
     #[allow(dead_code)]
-    pub fn with_cost_tracker(
+    pub fn with_gateway(
         mut self,
-        tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
+        channel_registry: Arc<RwLock<ChannelRegistry>>,
+        broadcaster: Arc<Broadcaster>,
     ) -> Self {
-        self.cost_tracker = Some(tracker);
+        self.gateway = Some(GatewayCapability {
+            broadcaster,
+            channel_registry,
+            router: None,
+            outbound: None,
+        });
         self
     }
 
-    /// Set the multi-dimensional usage tracker.
-    #[allow(dead_code)]
-    pub fn with_usage_tracker(mut self, tracker: Arc<crate::gateway::usage::UsageTracker>) -> Self {
-        self.usage_tracker = Some(tracker);
+    /// Set cost and usage tracking capabilities.
+    pub fn with_tracking(
+        mut self,
+        cost_tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
+        usage_tracker: Arc<crate::gateway::usage::UsageTracker>,
+    ) -> Self {
+        self.tracking = Some(TrackingCapability {
+            cost_tracker,
+            usage_tracker,
+        });
+        self
+    }
+
+    /// Set plugin system capabilities (event bus, plugin registry).
+    pub fn with_plugins(
+        mut self,
+        event_bus: Arc<synaptic::events::EventBus>,
+        plugin_registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
+    ) -> Self {
+        self.plugins = Some(PluginCapability {
+            event_bus,
+            plugin_registry,
+        });
         self
     }
 
     /// Set the binding router for multi-agent dispatch.
     #[allow(dead_code)]
     pub fn with_router(mut self, router: Arc<BindingRouter>) -> Self {
-        self.router = Some(router);
+        if let Some(ref mut gw) = self.gateway {
+            gw.router = Some(router);
+        }
         self
     }
 
@@ -231,22 +252,12 @@ impl AgentSession {
         self
     }
 
-    /// Set channel registry and broadcaster for gateway mode.
-    #[allow(dead_code)]
-    pub fn with_gateway(
-        mut self,
-        channel_registry: Arc<RwLock<ChannelRegistry>>,
-        broadcaster: Arc<Broadcaster>,
-    ) -> Self {
-        self.channel_registry = Some(channel_registry);
-        self.broadcaster = Some(broadcaster);
-        self
-    }
-
     /// Set the Outbound trait impl for the new channel trait interface.
     #[allow(dead_code)]
     pub fn with_outbound(mut self, outbound: Arc<dyn synaptic::core::Outbound>) -> Self {
-        self.outbound = Some(outbound);
+        if let Some(ref mut gw) = self.gateway {
+            gw.outbound = Some(outbound);
+        }
         self
     }
 
@@ -343,10 +354,10 @@ impl AgentSession {
             .await;
 
         // Broadcast message.received
-        if let Some(ref broadcaster) = self.broadcaster {
+        if let Some(ref gw) = self.gateway {
             let event = MessageReceivedEvent::from_inbound(&msg);
             if let Ok(payload) = serde_json::to_value(&event) {
-                broadcaster.broadcast("message.received", payload).await;
+                gw.broadcaster.broadcast("message.received", payload).await;
             }
         }
 
@@ -426,7 +437,7 @@ impl AgentSession {
                 .unwrap_or(fallback_delivery);
 
         // Broadcast message.sent
-        if let Some(ref broadcaster) = self.broadcaster {
+        if let Some(ref gw) = self.gateway {
             let now_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
@@ -439,7 +450,7 @@ impl AgentSession {
                 message_id: None,
             };
             if let Ok(payload) = serde_json::to_value(&sent_event) {
-                broadcaster.broadcast("message.sent", payload).await;
+                gw.broadcaster.broadcast("message.sent", payload).await;
             }
         }
 

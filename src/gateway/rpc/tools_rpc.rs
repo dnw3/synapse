@@ -54,7 +54,7 @@ pub async fn handle_catalog(ctx: Arc<RpcContext>, _params: Value) -> Result<Valu
     }));
 
     // 4. Memory tools
-    if ctx.state.config.memory.ltm_enabled {
+    if ctx.state.core.config.memory.ltm_enabled {
         groups.push(json!({
             "id": "memory",
             "label": "Memory",
@@ -78,7 +78,7 @@ pub async fn handle_catalog(ctx: Arc<RpcContext>, _params: Value) -> Result<Valu
     }));
 
     // 6. MCP tools
-    if let Some(ref mcp_servers) = ctx.state.config.base.mcp {
+    if let Some(ref mcp_servers) = ctx.state.core.config.base.mcp {
         let mcp_tools: Vec<Value> = mcp_servers
             .iter()
             .map(|server| {

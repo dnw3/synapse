@@ -40,7 +40,7 @@ pub async fn handle_pair_request(ctx: Arc<RpcContext>, params: Value) -> Result<
         ip: params.get("ip").and_then(|v| v.as_str()).map(String::from),
         created_at: now_ms(),
     };
-    ctx.state.pairing_store.write().await.request(req);
+    ctx.state.network.pairing_store.write().await.request(req);
 
     // Notify operators of the new pairing request
     ctx.broadcaster
@@ -64,7 +64,7 @@ pub async fn handle_pair_approve(ctx: Arc<RpcContext>, params: Value) -> Result<
         .ok_or_else(|| RpcError::invalid_request("missing request_id"))?;
     let paired = ctx
         .state
-        .pairing_store
+        .network.pairing_store
         .write()
         .await
         .approve(request_id)
@@ -77,7 +77,7 @@ pub async fn handle_pair_reject(ctx: Arc<RpcContext>, params: Value) -> Result<V
         .get("request_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing request_id"))?;
-    let removed = ctx.state.pairing_store.write().await.reject(request_id);
+    let removed = ctx.state.network.pairing_store.write().await.reject(request_id);
     if removed {
         Ok(json!({"ok": true}))
     } else {
@@ -90,13 +90,13 @@ pub async fn handle_pair_verify(ctx: Arc<RpcContext>, params: Value) -> Result<V
         .get("node_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing node_id"))?;
-    let valid = ctx.state.pairing_store.read().await.verify(node_id);
+    let valid = ctx.state.network.pairing_store.read().await.verify(node_id);
     Ok(json!({"valid": valid}))
 }
 
 pub async fn handle_pair_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let pending = ctx.state.pairing_store.write().await.list_pending();
-    let paired = ctx.state.pairing_store.read().await.list_paired();
+    let pending = ctx.state.network.pairing_store.write().await.list_pending();
+    let paired = ctx.state.network.pairing_store.read().await.list_paired();
     Ok(json!({
         "pending": pending,
         "paired": paired,
@@ -108,7 +108,7 @@ pub async fn handle_pair_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Va
 // ---------------------------------------------------------------------------
 
 pub async fn handle_node_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let nodes = ctx.state.node_registry.read().await.list();
+    let nodes = ctx.state.network.node_registry.read().await.list();
     Ok(serde_json::to_value(&nodes).unwrap_or_default())
 }
 
@@ -117,7 +117,7 @@ pub async fn handle_node_describe(ctx: Arc<RpcContext>, params: Value) -> Result
         .get("node_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing node_id"))?;
-    let registry = ctx.state.node_registry.read().await;
+    let registry = ctx.state.network.node_registry.read().await;
     let node = registry
         .get(node_id)
         .ok_or_else(|| RpcError::not_found("node not found"))?;
@@ -135,8 +135,8 @@ pub async fn handle_node_rename(ctx: Arc<RpcContext>, params: Value) -> Result<V
         .ok_or_else(|| RpcError::invalid_request("missing name"))?;
 
     // Rename in both registry and pairing store
-    ctx.state.node_registry.write().await.rename(node_id, name);
-    ctx.state.pairing_store.write().await.rename(node_id, name);
+    ctx.state.network.node_registry.write().await.rename(node_id, name);
+    ctx.state.network.pairing_store.write().await.rename(node_id, name);
 
     Ok(json!({"ok": true}))
 }
@@ -165,13 +165,13 @@ pub async fn handle_node_invoke(ctx: Arc<RpcContext>, params: Value) -> Result<V
 
     // Verify node is connected
     {
-        let registry = ctx.state.node_registry.read().await;
+        let registry = ctx.state.network.node_registry.read().await;
         if registry.get(&node_id).is_none() {
             return Err(RpcError::not_found("node not connected"));
         }
     }
 
-    let rx = ctx.state.node_registry.write().await.add_invoke(
+    let rx = ctx.state.network.node_registry.write().await.add_invoke(
         invoke_id.clone(),
         node_id.clone(),
         method.clone(),
@@ -213,7 +213,7 @@ pub async fn handle_invoke_result(ctx: Arc<RpcContext>, params: Value) -> Result
     let result = params.get("result").cloned().unwrap_or(Value::Null);
     let resolved = ctx
         .state
-        .node_registry
+        .network.node_registry
         .write()
         .await
         .resolve_invoke(invoke_id, result);
@@ -229,7 +229,7 @@ pub async fn handle_pending_pull(ctx: Arc<RpcContext>, params: Value) -> Result<
         .get("node_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing node_id"))?;
-    let registry = ctx.state.node_registry.read().await;
+    let registry = ctx.state.network.node_registry.read().await;
     let pending: Vec<Value> = registry
         .pending_for_node(node_id)
         .iter()
@@ -309,7 +309,7 @@ pub async fn handle_node_register(ctx: Arc<RpcContext>, params: Value) -> Result
         .to_string();
 
     // Verify the node is paired
-    if !ctx.state.pairing_store.read().await.verify(&node_id) {
+    if !ctx.state.network.pairing_store.read().await.verify(&node_id) {
         return Err(RpcError::forbidden("node not paired"));
     }
 
@@ -328,7 +328,7 @@ pub async fn handle_node_register(ctx: Arc<RpcContext>, params: Value) -> Result
         connected_at: now_ms(),
     };
 
-    ctx.state.node_registry.write().await.register(session);
+    ctx.state.network.node_registry.write().await.register(session);
     ctx.broadcaster
         .broadcast("node.connected", json!({"node_id": node_id}))
         .await;

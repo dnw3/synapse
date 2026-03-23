@@ -15,7 +15,7 @@ use super::types::RpcError;
 pub async fn handle_list(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     let channel = params["channel"].as_str().unwrap_or("lark");
 
-    let pending = ctx.state.dm_enforcer.list_pending(channel).await;
+    let pending = ctx.state.channel.dm_enforcer.list_pending(channel).await;
     let items: Vec<Value> = pending
         .iter()
         .map(|p| {
@@ -42,11 +42,11 @@ pub async fn handle_approve(ctx: Arc<RpcContext>, params: Value) -> Result<Value
         .as_str()
         .ok_or_else(|| RpcError::invalid_request("missing 'code'"))?;
 
-    match ctx.state.dm_enforcer.approve_code(channel, code).await {
+    match ctx.state.channel.dm_enforcer.approve_code(channel, code).await {
         Ok(sender_id) => {
             // Notify the user that they've been approved
             ctx.state
-                .approve_notifiers
+                .channel.approve_notifiers
                 .notify(channel, &sender_id)
                 .await;
             Ok(json!({ "approved": true, "sender_id": sender_id }))
@@ -60,14 +60,14 @@ pub async fn handle_approve(ctx: Arc<RpcContext>, params: Value) -> Result<Value
 pub async fn handle_allowlist(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     let channel = params["channel"].as_str().unwrap_or("lark");
 
-    let list = ctx.state.dm_enforcer.get_allowlist(channel);
+    let list = ctx.state.channel.dm_enforcer.get_allowlist(channel);
     Ok(json!({ "allowlist": list }))
 }
 
 /// List all channels that have pairing data (pending or allowlist files).
 /// Params: {} (none)
 pub async fn handle_channels(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let channels = ctx.state.dm_enforcer.list_channels();
+    let channels = ctx.state.channel.dm_enforcer.list_channels();
     Ok(json!({ "channels": channels }))
 }
 
@@ -83,7 +83,7 @@ pub async fn handle_remove(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 
     let removed = ctx
         .state
-        .dm_enforcer
+        .channel.dm_enforcer
         .remove_from_allowlist(channel, sender_id);
     Ok(json!({ "removed": removed }))
 }

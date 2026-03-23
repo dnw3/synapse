@@ -70,7 +70,7 @@ async fn get_skills(
             ));
         }
         // Per-agent workspace skills
-        let workspace = state.config.workspace_dir();
+        let workspace = state.core.config.workspace_dir();
         let ws_skills = workspace.join("skills");
         if ws_skills.is_dir() {
             v.push(("workspace", ws_skills.to_string_lossy().to_string()));
@@ -115,7 +115,7 @@ async fn get_skills(
                     ) = parse_skill_full_info(&path).await;
 
                     let enabled = !state
-                        .config
+                        .core.config
                         .skill_overrides
                         .get(&name)
                         .map(|o| !o.enabled)
@@ -174,7 +174,7 @@ async fn get_skills(
                     ) = parse_skill_full_info(&skill_md).await;
 
                     let enabled = !state
-                        .config
+                        .core.config
                         .skill_overrides
                         .get(&name)
                         .map(|o| !o.enabled)
@@ -220,7 +220,7 @@ async fn toggle_skill(
     })?;
 
     let current_enabled = !state
-        .config
+        .core.config
         .skill_overrides
         .get(&name)
         .map(|o| !o.enabled)
@@ -673,7 +673,7 @@ async fn store_search(
     State(state): State<AppState>,
     Query(query): Query<HubSearchQuery>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let hub = crate::hub::ClawHubClient::from_config(&state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&state.core.config);
     let results = hub
         .search(&query.q, query.limit)
         .await
@@ -687,7 +687,7 @@ async fn store_list(
     State(state): State<AppState>,
     Query(query): Query<HubListQuery>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let hub = crate::hub::ClawHubClient::from_config(&state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&state.core.config);
     let items = hub
         .list(query.limit, query.sort.as_deref(), query.cursor.as_deref())
         .await
@@ -701,7 +701,7 @@ async fn store_detail(
     State(state): State<AppState>,
     extract::Path(slug): extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let hub = crate::hub::ClawHubClient::from_config(&state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&state.core.config);
     let detail = hub
         .detail(&slug)
         .await
@@ -713,7 +713,7 @@ async fn store_skill_files(
     State(state): State<AppState>,
     extract::Path(slug): extract::Path<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let hub = crate::hub::ClawHubClient::from_config(&state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&state.core.config);
     let files_resp = hub
         .skill_files(&slug)
         .await
@@ -728,7 +728,7 @@ async fn store_skill_file_content(
     State(state): State<AppState>,
     extract::Path((slug, path)): extract::Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    let hub = crate::hub::ClawHubClient::from_config(&state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&state.core.config);
     let content = hub.skill_file_content(&slug, &path).await.map_err(|e| {
         (
             StatusCode::BAD_GATEWAY,
@@ -744,7 +744,7 @@ async fn store_install(
     State(state): State<AppState>,
     Json(body): Json<HubInstallBody>,
 ) -> Result<Json<OkResponse>, (StatusCode, String)> {
-    let hub = crate::hub::ClawHubClient::from_config(&state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&state.core.config);
     crate::hub::install::install_from_hub(&hub, &body.slug, body.version.as_deref(), false)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("install: {}", e)))?;
@@ -752,7 +752,7 @@ async fn store_install(
 }
 
 async fn store_status(State(state): State<AppState>) -> Json<serde_json::Value> {
-    let hub = crate::hub::ClawHubClient::from_config(&state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&state.core.config);
     let configured = hub.is_configured();
     let lock = crate::hub::install::read_lock_file();
     let installed_count = lock.skills.len();

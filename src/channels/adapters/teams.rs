@@ -326,10 +326,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let teams_config = config
-        .teams
+    let teams_configs: Vec<crate::config::TeamsBotConfig> = config.channel_configs("teams");
+    let teams_config = teams_configs
         .first()
-        .ok_or("missing [[teams]] section in config")?;
+        .ok_or("missing [[channels.teams]] section in config")?;
 
     let app_password = resolve_secret(
         teams_config.app_password.as_deref(),

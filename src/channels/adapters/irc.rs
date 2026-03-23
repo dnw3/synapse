@@ -22,10 +22,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let irc_config = config
-        .irc
+    let irc_configs: Vec<crate::config::IrcBotConfig> = config.channel_configs("irc");
+    let irc_config = irc_configs
         .first()
-        .ok_or("missing [[irc]] section in config")?;
+        .ok_or("missing [[channels.irc]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

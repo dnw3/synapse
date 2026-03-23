@@ -40,110 +40,96 @@ pub struct RequestMetrics {
     pub llm_durations: Arc<RwLock<HashMap<String, DurationEntry>>>,
 }
 
+// ── Sub-state structs ────────────────────────────────────────────────────────
+
+/// Named struct replacing the (McpServerConfig, Vec<Arc<dyn Tool>>) tuple.
+#[derive(Clone)]
+pub struct TransientMcpServer {
+    pub config: synaptic::config::McpServerConfig,
+    pub tools: Vec<Arc<dyn Tool>>,
+}
+
+#[derive(Clone)]
+pub struct CoreState {
+    pub config: SynapseConfig,
+    pub auth: Option<Arc<AuthState>>,
+    pub started_at: Instant,
+}
+
+#[derive(Clone)]
+pub struct AgentSubState {
+    pub model: Arc<dyn ChatModel>,
+    #[allow(dead_code)]
+    pub mcp_tools: Vec<Arc<dyn Tool>>,
+    pub transient_mcp: Arc<RwLock<HashMap<String, TransientMcpServer>>>,
+    pub cost_tracker: Arc<CostTrackingCallback>,
+    pub usage_tracker: Arc<UsageTracker>,
+    #[allow(dead_code)]
+    pub memory_provider: Arc<dyn MemoryProvider>,
+    #[allow(dead_code)]
+    pub context_engine: SharedContextEngine,
+    pub agent_session: Arc<AgentSession>,
+}
+
+#[derive(Clone)]
+pub struct SessionSubState {
+    pub sessions: Arc<SessionManager>,
+    pub cancel_tokens: Arc<RwLock<HashMap<String, tokio::sync::watch::Sender<bool>>>>,
+    pub write_lock: Arc<SessionWriteLock>,
+    pub run_queue: Arc<AgentRunQueue>,
+    pub session_subscribers: Arc<RwLock<HashSet<String>>>,
+    pub wizard_sessions: Arc<RwLock<HashMap<String, WizardSession>>>,
+}
+
+#[derive(Clone)]
+pub struct NetworkState {
+    pub broadcaster: Arc<Broadcaster>,
+    pub rpc_router: Arc<RpcRouter>,
+    pub presence: Arc<RwLock<crate::gateway::presence::PresenceStore>>,
+    pub node_registry: Arc<RwLock<crate::gateway::nodes::NodeRegistry>>,
+    pub pairing_store: Arc<RwLock<crate::gateway::nodes::PairingStore>>,
+    pub bootstrap_store: Arc<RwLock<crate::gateway::nodes::BootstrapStore>>,
+    #[allow(dead_code)]
+    pub idempotency_cache: Arc<DashMap<String, Instant>>,
+}
+
+#[derive(Clone)]
+pub struct ChannelSubState {
+    #[allow(dead_code)]
+    pub channel_registry: Arc<RwLock<ChannelRegistry>>,
+    pub channel_manager: Arc<super::channel_manager::ChannelAdapterManager>,
+    pub dm_enforcer: Arc<crate::channels::dm::FileDmPolicyEnforcer>,
+    pub approve_notifiers: Arc<crate::channels::dm::ApproveNotifierRegistry>,
+    pub exec_approval_manager: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalManager>>,
+    pub exec_approvals_config: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalsConfig>>,
+}
+
+#[derive(Clone)]
+pub struct InfraState {
+    pub request_metrics: RequestMetrics,
+    pub log_buffer: LogBuffer,
+    #[allow(dead_code)]
+    pub event_bus: Arc<EventBus>,
+    #[allow(dead_code)]
+    pub canvas_engine: Arc<CanvasEngine>,
+    pub plugin_registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
+    #[allow(dead_code)]
+    pub bundle_skills_dirs: Vec<std::path::PathBuf>,
+    #[allow(dead_code)]
+    pub bundle_agent_dirs: Vec<std::path::PathBuf>,
+}
+
+// ── AppState ─────────────────────────────────────────────────────────────────
+
 /// Shared application state.
 #[derive(Clone)]
 pub struct AppState {
-    // ── Core config & auth ──────────────────────────────────────────────
-    pub config: SynapseConfig,
-    /// Authentication state (None if auth is not configured).
-    pub auth: Option<Arc<AuthState>>,
-    /// Server start time for health/uptime reporting.
-    pub started_at: std::time::Instant,
-
-    // ── Agent & model ───────────────────────────────────────────────────
-    pub model: Arc<dyn ChatModel>,
-    /// Pre-loaded MCP tools (loaded once at startup, shared across requests).
-    #[allow(dead_code)]
-    pub mcp_tools: Vec<Arc<dyn Tool>>,
-    /// Cost and token usage tracking across all requests.
-    pub cost_tracker: Arc<CostTrackingCallback>,
-    /// Multi-dimensional usage tracker with persistence.
-    pub usage_tracker: Arc<UsageTracker>,
-    /// Memory provider (native LTM or Viking), built from config at startup.
-    #[allow(dead_code)]
-    pub memory_provider: Arc<dyn MemoryProvider>,
-    /// Per-request context scopes (TTL: 30 min).  Used for variable passing
-    /// across multi-step agent pipelines and sub-agent spawning.
-    #[allow(dead_code)]
-    pub context_engine: SharedContextEngine,
-
-    // ── Session management ──────────────────────────────────────────────
-    pub sessions: Arc<SessionManager>,
-    /// Active agent cancel tokens, keyed by store_key (e.g. "agent:default:main").
-    pub cancel_tokens: Arc<RwLock<HashMap<String, tokio::sync::watch::Sender<bool>>>>,
-    /// Per-session write locks to prevent concurrent modifications.
-    pub write_lock: Arc<SessionWriteLock>,
-    /// Per-session run queue to serialize concurrent agent executions.
-    pub run_queue: Arc<AgentRunQueue>,
-    /// Connection IDs subscribed to session change events.
-    pub session_subscribers: Arc<RwLock<HashSet<String>>>,
-    /// Active wizard sessions keyed by session UUID.
-    pub wizard_sessions: Arc<RwLock<HashMap<String, WizardSession>>>,
-
-    // ── RPC & networking ────────────────────────────────────────────────
-    /// RPC event broadcaster for connected clients.
-    pub broadcaster: Arc<Broadcaster>,
-    /// RPC method router.
-    pub rpc_router: Arc<RpcRouter>,
-    /// Presence tracking for connected clients.
-    pub presence: Arc<RwLock<crate::gateway::presence::PresenceStore>>,
-    /// Live node registry.
-    pub node_registry: Arc<RwLock<crate::gateway::nodes::NodeRegistry>>,
-    /// Node pairing store (persisted).
-    pub pairing_store: Arc<RwLock<crate::gateway::nodes::PairingStore>>,
-    /// Bootstrap token store for device pairing QR codes.
-    pub bootstrap_store: Arc<RwLock<crate::gateway::nodes::BootstrapStore>>,
-    /// Global idempotency cache: key → insertion time.
-    ///
-    /// Used to deduplicate messages across connections (e.g. reconnects after
-    /// network failures).  Entries expire after 5 minutes and are periodically
-    /// cleaned up by a background task spawned in `new()`.
-    #[allow(dead_code)]
-    pub idempotency_cache: Arc<DashMap<String, Instant>>,
-
-    // ── Exec approvals ──────────────────────────────────────────────────
-    /// Exec approval manager (in-memory pending requests).
-    pub exec_approval_manager: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalManager>>,
-    /// Exec approvals config (persisted).
-    pub exec_approvals_config: Arc<RwLock<crate::gateway::exec_approvals::ExecApprovalsConfig>>,
-
-    // ── Channel adapters ────────────────────────────────────────────────
-    /// Registry of active channel senders for outbound delivery.
-    #[allow(dead_code)]
-    pub channel_registry: Arc<RwLock<ChannelRegistry>>,
-    /// Channel adapter lifecycle manager.
-    pub channel_manager: Arc<super::channel_manager::ChannelAdapterManager>,
-    /// DM pairing policy enforcer (shared with channel adapters).
-    pub dm_enforcer: Arc<crate::channels::dm::FileDmPolicyEnforcer>,
-    /// Registry of per-channel approval notifiers.
-    pub approve_notifiers: Arc<crate::channels::dm::ApproveNotifierRegistry>,
-
-    // ── Infrastructure & observability ──────────────────────────────────
-    /// HTTP request metrics (counters, durations).
-    pub request_metrics: RequestMetrics,
-    /// In-memory log buffer for the /api/logs endpoint.
-    pub log_buffer: LogBuffer,
-    /// Central event bus for agent lifecycle and gateway events.
-    #[allow(dead_code)]
-    pub event_bus: Arc<EventBus>,
-    /// Canvas rendering engine for WebSocket canvas_update pipeline.
-    #[allow(dead_code)]
-    pub canvas_engine: Arc<CanvasEngine>,
-    /// Plugin registry — loaded once at startup, shared across all agent builds.
-    pub plugin_registry: Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>,
-    /// Skills dirs contributed by plugin bundles (Claude/Codex/Cursor).
-    #[allow(dead_code)]
-    pub bundle_skills_dirs: Vec<std::path::PathBuf>,
-    /// Agent dirs contributed by plugin bundles.
-    #[allow(dead_code)]
-    pub bundle_agent_dirs: Vec<std::path::PathBuf>,
-    /// Shared AgentSession for unified message processing pipeline.
-    pub agent_session: Arc<AgentSession>,
-
-    /// Transient MCP servers (runtime-only, not persisted to TOML).
-    #[allow(clippy::type_complexity)]
-    pub transient_mcp:
-        Arc<RwLock<HashMap<String, (synaptic::config::McpServerConfig, Vec<Arc<dyn Tool>>)>>>,
+    pub core: CoreState,
+    pub agent: AgentSubState,
+    pub session: SessionSubState,
+    pub network: NetworkState,
+    pub channel: ChannelSubState,
+    pub infra: InfraState,
 }
 
 // ── Builder helpers ─────────────────────────────────────────────────────────
@@ -389,39 +375,39 @@ impl AppState {
     pub fn reload_config(&mut self, new_config: SynapseConfig, diff: &crate::config::ConfigDiff) {
         if diff.agents_changed {
             tracing::info!("hot-reload: agents configuration changed — updating agent definitions");
-            self.config.agents = new_config.agents.clone();
-            self.config.bindings = new_config.bindings.clone();
+            self.core.config.agents = new_config.agents.clone();
+            self.core.config.bindings = new_config.bindings.clone();
         }
 
         if diff.bindings_changed && !diff.agents_changed {
             tracing::info!("hot-reload: bindings changed — updating routing rules");
-            self.config.bindings = new_config.bindings.clone();
+            self.core.config.bindings = new_config.bindings.clone();
         }
 
         if diff.tools_changed {
             tracing::info!("hot-reload: tool_policy changed — updating tool policy");
-            self.config.tool_policy = new_config.tool_policy.clone();
+            self.core.config.tool_policy = new_config.tool_policy.clone();
         }
 
         if diff.memory_changed {
             tracing::info!("hot-reload: memory configuration changed");
-            self.config.memory = new_config.memory.clone();
+            self.core.config.memory = new_config.memory.clone();
         }
 
         if diff.schedules_changed {
             tracing::info!(
                 "hot-reload: schedule definitions changed — restart required for full effect"
             );
-            self.config.schedules = new_config.schedules.clone();
+            self.core.config.schedules = new_config.schedules.clone();
         }
 
         if diff.auth_changed {
             tracing::info!("hot-reload: auth configuration changed — rebuilding auth state");
-            self.auth = new_config
+            self.core.auth = new_config
                 .auth
                 .as_ref()
                 .map(|auth_config| Arc::new(super::auth::AuthState::new(auth_config.clone())));
-            self.config.auth = new_config.auth.clone();
+            self.core.config.auth = new_config.auth.clone();
         }
 
         if diff.serve_changed {
@@ -456,16 +442,21 @@ impl AppState {
         log_buffer: LogBuffer,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut state = Self::new(config).await?;
-        state.log_buffer = log_buffer;
+        state.infra.log_buffer = log_buffer;
         Ok(state)
     }
 
     pub async fn new(config: &SynapseConfig) -> Result<Self, Box<dyn std::error::Error>> {
         // ── Agent & model ───────────────────────────────────────────────
-        let agent = build_agent_bundle(config).await?;
+        let agent_bundle = build_agent_bundle(config).await?;
 
         // ── Infrastructure (event bus, plugins) ─────────────────────────
-        let infra = build_infra_bundle(config, &agent.cost_tracker, &agent.usage_tracker).await;
+        let infra_bundle = build_infra_bundle(
+            config,
+            &agent_bundle.cost_tracker,
+            &agent_bundle.usage_tracker,
+        )
+        .await;
 
         // ── RPC & networking ────────────────────────────────────────────
         let rpc = build_rpc_bundle();
@@ -494,78 +485,81 @@ impl AppState {
         // ── AgentSession for unified pipeline ──────────────────────────
         let agent_session = {
             let session = AgentSession::new(
-                agent.model.clone(),
+                agent_bundle.model.clone(),
                 Arc::new(config.clone()),
                 true, // deep_agent
             )
             .with_channel("web")
             .with_gateway(channels.channel_registry.clone(), rpc.broadcaster.clone())
-            .with_cost_tracker(agent.cost_tracker.clone())
-            .with_usage_tracker(agent.usage_tracker.clone())
-            .with_event_bus(infra.event_bus.clone())
-            .with_plugin_registry(infra.plugin_registry.clone());
+            .with_tracking(
+                agent_bundle.cost_tracker.clone(),
+                agent_bundle.usage_tracker.clone(),
+            )
+            .with_plugins(
+                infra_bundle.event_bus.clone(),
+                infra_bundle.plugin_registry.clone(),
+            );
             Arc::new(session)
         };
 
+        // Get actual memory provider from plugin registry (set by memory plugin)
+        let memory_provider = {
+            let reg = infra_bundle.plugin_registry.read().await;
+            reg.memory_slot()
+                .cloned()
+                .unwrap_or(agent_bundle.memory_provider)
+        };
+
         let state = Self {
-            // Core config & auth
-            config: config.clone(),
-            auth,
-            started_at: std::time::Instant::now(),
-
-            // Agent & model
-            model: agent.model,
-            mcp_tools: agent.mcp_tools,
-            cost_tracker: agent.cost_tracker,
-            usage_tracker: agent.usage_tracker,
-            // Get actual memory provider from plugin registry (set by memory plugin)
-            memory_provider: {
-                let reg = infra.plugin_registry.read().await;
-                reg.memory_slot().cloned().unwrap_or(agent.memory_provider)
+            core: CoreState {
+                config: config.clone(),
+                auth,
+                started_at: std::time::Instant::now(),
             },
-            context_engine: agent.context_engine,
-
-            // Session management
-            sessions: Arc::new(session_mgr),
-            cancel_tokens: Arc::new(RwLock::new(HashMap::new())),
-            write_lock,
-            run_queue: Arc::new(AgentRunQueue::new()),
-            session_subscribers: Arc::new(RwLock::new(HashSet::new())),
-            wizard_sessions: Arc::new(RwLock::new(HashMap::new())),
-
-            // RPC & networking
-            broadcaster: rpc.broadcaster,
-            rpc_router: rpc.rpc_router,
-            presence: rpc.presence,
-            node_registry: rpc.node_registry,
-            pairing_store: rpc.pairing_store,
-            bootstrap_store: rpc.bootstrap_store,
-            idempotency_cache: rpc.idempotency_cache,
-
-            // Exec approvals
-            exec_approval_manager,
-            exec_approvals_config,
-
-            // Channel adapters
-            channel_registry: channels.channel_registry,
-            channel_manager: channels.channel_manager,
-            dm_enforcer: channels.dm_enforcer,
-            approve_notifiers: channels.approve_notifiers,
-
-            // Infrastructure & observability
-            request_metrics: RequestMetrics::default(),
-            log_buffer: LogBuffer::new(config.logging.memory.capacity),
-            event_bus: infra.event_bus,
-            canvas_engine: Arc::new(CanvasEngine::new()),
-            plugin_registry: infra.plugin_registry,
-            bundle_skills_dirs: infra.bundle_skills_dirs,
-            bundle_agent_dirs: infra.bundle_agent_dirs,
-
-            // Unified agent session
-            agent_session,
-
-            // Transient MCP servers (runtime-only)
-            transient_mcp: Arc::new(RwLock::new(HashMap::new())),
+            agent: AgentSubState {
+                model: agent_bundle.model,
+                mcp_tools: agent_bundle.mcp_tools,
+                transient_mcp: Arc::new(RwLock::new(HashMap::new())),
+                cost_tracker: agent_bundle.cost_tracker,
+                usage_tracker: agent_bundle.usage_tracker,
+                memory_provider,
+                context_engine: agent_bundle.context_engine,
+                agent_session,
+            },
+            session: SessionSubState {
+                sessions: Arc::new(session_mgr),
+                cancel_tokens: Arc::new(RwLock::new(HashMap::new())),
+                write_lock,
+                run_queue: Arc::new(AgentRunQueue::new()),
+                session_subscribers: Arc::new(RwLock::new(HashSet::new())),
+                wizard_sessions: Arc::new(RwLock::new(HashMap::new())),
+            },
+            network: NetworkState {
+                broadcaster: rpc.broadcaster,
+                rpc_router: rpc.rpc_router,
+                presence: rpc.presence,
+                node_registry: rpc.node_registry,
+                pairing_store: rpc.pairing_store,
+                bootstrap_store: rpc.bootstrap_store,
+                idempotency_cache: rpc.idempotency_cache,
+            },
+            channel: ChannelSubState {
+                channel_registry: channels.channel_registry,
+                channel_manager: channels.channel_manager,
+                dm_enforcer: channels.dm_enforcer,
+                approve_notifiers: channels.approve_notifiers,
+                exec_approval_manager,
+                exec_approvals_config,
+            },
+            infra: InfraState {
+                request_metrics: RequestMetrics::default(),
+                log_buffer: LogBuffer::new(config.logging.memory.capacity),
+                event_bus: infra_bundle.event_bus,
+                canvas_engine: Arc::new(CanvasEngine::new()),
+                plugin_registry: infra_bundle.plugin_registry,
+                bundle_skills_dirs: infra_bundle.bundle_skills_dirs,
+                bundle_agent_dirs: infra_bundle.bundle_agent_dirs,
+            },
         };
 
         Ok(state)

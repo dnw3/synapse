@@ -38,7 +38,7 @@ fn validate_filename(name: &str) -> Result<(), RpcError> {
 
 pub async fn handle_list(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     let agent = params.get("agent").and_then(|v| v.as_str());
-    let dir = ctx.state.config.workspace_dir_for_agent(agent);
+    let dir = ctx.state.core.config.workspace_dir_for_agent(agent);
 
     let mut files = Vec::new();
     for &name in ALLOWED_AGENT_FILES {
@@ -83,7 +83,7 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
 
     validate_filename(name)?;
 
-    let dir = ctx.state.config.workspace_dir_for_agent(agent);
+    let dir = ctx.state.core.config.workspace_dir_for_agent(agent);
     let path = dir.join(name);
 
     let content = tokio::fs::read_to_string(&path)
@@ -112,7 +112,7 @@ pub async fn handle_set(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
 
     validate_filename(name)?;
 
-    let dir = ctx.state.config.workspace_dir_for_agent(agent);
+    let dir = ctx.state.core.config.workspace_dir_for_agent(agent);
 
     // Ensure directory exists
     tokio::fs::create_dir_all(&dir)

@@ -52,10 +52,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let wc_config = config
-        .webchat
+    let wc_configs: Vec<crate::config::WebChatBotConfig> = config.channel_configs("webchat");
+    let wc_config = wc_configs
         .first()
-        .ok_or("missing [[webchat]] section in config")?;
+        .ok_or("missing [[channels.webchat]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

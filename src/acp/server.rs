@@ -40,20 +40,20 @@ async fn handle_acp(
                 .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
 
             // Simple non-streaming execution
-            let memory = state.sessions.memory();
+            let memory = state.session.sessions.memory();
             let mut messages = memory.load(&session_id).await.unwrap_or_default();
             if messages.is_empty() {
-                if let Some(ref prompt) = state.config.base.agent.system_prompt {
+                if let Some(ref prompt) = state.core.config.base.agent.system_prompt {
                     messages.push(synaptic::core::Message::system(prompt));
                 }
             }
             messages.push(synaptic::core::Message::human(&run_params.task));
 
             let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
-            let checkpointer = std::sync::Arc::new(state.sessions.checkpointer());
+            let checkpointer = std::sync::Arc::new(state.session.sessions.checkpointer());
             let agent = crate::agent::build_deep_agent(
-                state.model.clone(),
-                &state.config,
+                state.agent.model.clone(),
+                &state.core.config,
                 &cwd,
                 checkpointer,
                 vec![],

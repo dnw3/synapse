@@ -188,13 +188,13 @@ fn build_mcp_config(
 
 async fn name_exists(state: &AppState, name: &str) -> bool {
     // Check persistent
-    if let Some(mcps) = &state.config.base.mcp {
+    if let Some(mcps) = &state.core.config.base.mcp {
         if mcps.iter().any(|m| m.name == name) {
             return true;
         }
     }
     // Check transient
-    let transient = state.transient_mcp.read().await;
+    let transient = state.agent.transient_mcp.read().await;
     transient.contains_key(name)
 }
 
@@ -303,12 +303,12 @@ async fn get_mcp(State(state): State<AppState>) -> Json<Vec<McpServerInfoRespons
     let mut servers = Vec::new();
 
     // Persistent servers from config
-    if let Some(mcps) = &state.config.base.mcp {
+    if let Some(mcps) = &state.core.config.base.mcp {
         let prefix_suffix = "_";
         for cfg in mcps {
             let prefix = format!("{}{}", cfg.name, prefix_suffix);
             let matching_tools: Vec<Arc<dyn Tool>> = state
-                .mcp_tools
+                .agent.mcp_tools
                 .iter()
                 .filter(|t| t.name().starts_with(&prefix))
                 .cloned()
@@ -319,9 +319,9 @@ async fn get_mcp(State(state): State<AppState>) -> Json<Vec<McpServerInfoRespons
 
     // Transient servers
     {
-        let transient = state.transient_mcp.read().await;
-        for (_, (cfg, tools)) in transient.iter() {
-            servers.push(build_server_info(cfg, tools, true));
+        let transient = state.agent.transient_mcp.read().await;
+        for (_, server) in transient.iter() {
+            servers.push(build_server_info(&server.config, &server.tools, true));
         }
     }
 
@@ -391,8 +391,8 @@ async fn create_mcp(
     );
 
     if body.transient {
-        let mut transient = state.transient_mcp.write().await;
-        transient.insert(cfg.name.clone(), (cfg.clone(), tools.clone()));
+        let mut transient = state.agent.transient_mcp.write().await;
+        transient.insert(cfg.name.clone(), crate::gateway::state::TransientMcpServer { config: cfg.clone(), tools: tools.clone() });
     } else {
         // Append to synapse.toml
         append_mcp_to_toml(&cfg).await?;
@@ -422,17 +422,17 @@ async fn update_mcp(
 ) -> Result<Json<McpServerInfoResponse>, (StatusCode, String)> {
     // Check transient first
     {
-        let transient = state.transient_mcp.read().await;
-        if let Some((existing_cfg, _)) = transient.get(&name) {
+        let transient = state.agent.transient_mcp.read().await;
+        if let Some(existing) = transient.get(&name) {
             let cfg = build_mcp_config(
                 name.clone(),
                 body.transport
-                    .unwrap_or_else(|| existing_cfg.transport.clone()),
-                body.command.or_else(|| existing_cfg.command.clone()),
-                body.args.or_else(|| existing_cfg.args.clone()),
-                body.env.or_else(|| existing_cfg.env.clone()),
-                body.url.or_else(|| existing_cfg.url.clone()),
-                body.headers.or_else(|| existing_cfg.headers.clone()),
+                    .unwrap_or_else(|| existing.config.transport.clone()),
+                body.command.or_else(|| existing.config.command.clone()),
+                body.args.or_else(|| existing.config.args.clone()),
+                body.env.or_else(|| existing.config.env.clone()),
+                body.url.or_else(|| existing.config.url.clone()),
+                body.headers.or_else(|| existing.config.headers.clone()),
             );
             drop(transient);
 
@@ -444,8 +444,8 @@ async fn update_mcp(
                 )
             })?;
 
-            let mut transient = state.transient_mcp.write().await;
-            transient.insert(name.clone(), (cfg.clone(), tools.clone()));
+            let mut transient = state.agent.transient_mcp.write().await;
+            transient.insert(name.clone(), crate::gateway::state::TransientMcpServer { config: cfg.clone(), tools: tools.clone() });
 
             tracing::info!(name = %name, tool_count = tools.len(), "transient MCP server updated");
             return Ok(Json(build_server_info(&cfg, &tools, true)));
@@ -454,7 +454,7 @@ async fn update_mcp(
 
     // Check persistent
     let existing_cfg = state
-        .config
+        .core.config
         .base
         .mcp
         .as_ref()
@@ -503,7 +503,7 @@ async fn delete_mcp(
 ) -> Result<Json<OkResponse>, (StatusCode, String)> {
     // Check transient first
     {
-        let mut transient = state.transient_mcp.write().await;
+        let mut transient = state.agent.transient_mcp.write().await;
         if transient.remove(&name).is_some() {
             tracing::info!(name = %name, "transient MCP server removed");
             return Ok(Json(OkResponse { ok: true }));
@@ -543,12 +543,12 @@ async fn test_mcp(
 ) -> Json<McpTestResponse> {
     // Find the config (transient or persistent)
     let cfg = {
-        let transient = state.transient_mcp.read().await;
-        if let Some((cfg, _)) = transient.get(&name) {
-            Some(cfg.clone())
+        let transient = state.agent.transient_mcp.read().await;
+        if let Some(server) = transient.get(&name) {
+            Some(server.config.clone())
         } else {
             state
-                .config
+                .core.config
                 .base
                 .mcp
                 .as_ref()
@@ -605,8 +605,8 @@ async fn persist_mcp(
     AxumPath(name): AxumPath<String>,
 ) -> Result<Json<McpServerInfoResponse>, (StatusCode, String)> {
     // Remove from transient
-    let (cfg, tools) = {
-        let mut transient = state.transient_mcp.write().await;
+    let server = {
+        let mut transient = state.agent.transient_mcp.write().await;
         transient.remove(&name).ok_or_else(|| {
             (
                 StatusCode::NOT_FOUND,
@@ -616,10 +616,10 @@ async fn persist_mcp(
     };
 
     // Append to TOML
-    append_mcp_to_toml(&cfg).await?;
+    append_mcp_to_toml(&server.config).await?;
 
     tracing::info!(name = %name, "transient MCP server persisted to config");
-    Ok(Json(build_server_info(&cfg, &tools, false)))
+    Ok(Json(build_server_info(&server.config, &server.tools, false)))
 }
 
 // ---------------------------------------------------------------------------
@@ -651,7 +651,7 @@ struct LlmDurationEntry {
 async fn get_requests(State(state): State<AppState>) -> Json<RequestMetricsResponse> {
     let mut endpoint_map: HashMap<(String, String), (u64, HashMap<u16, u64>)> = HashMap::new();
     {
-        let reqs = state.request_metrics.requests.read().await;
+        let reqs = state.infra.request_metrics.requests.read().await;
         for ((method, path, status), count) in reqs.iter() {
             let entry = endpoint_map
                 .entry((method.clone(), path.clone()))
@@ -661,7 +661,7 @@ async fn get_requests(State(state): State<AppState>) -> Json<RequestMetricsRespo
         }
     }
 
-    let durations = state.request_metrics.durations.read().await;
+    let durations = state.infra.request_metrics.durations.read().await;
     let mut endpoints: Vec<EndpointMetrics> = endpoint_map
         .into_iter()
         .map(|((method, path), (total, status_counts))| {
@@ -679,7 +679,7 @@ async fn get_requests(State(state): State<AppState>) -> Json<RequestMetricsRespo
         .collect();
     endpoints.sort_by(|a, b| a.path.cmp(&b.path).then(a.method.cmp(&b.method)));
 
-    let llm_durs = state.request_metrics.llm_durations.read().await;
+    let llm_durs = state.infra.request_metrics.llm_durations.read().await;
     let mut llm_durations: Vec<LlmDurationEntry> = llm_durs
         .iter()
         .map(|(model, (count, sum))| LlmDurationEntry {

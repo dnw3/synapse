@@ -31,7 +31,7 @@ pub async fn handle_approval_request(
     let request_id = uuid::Uuid::new_v4().to_string();
 
     // Check policy first
-    let config = ctx.state.exec_approvals_config.read().await;
+    let config = ctx.state.channel.exec_approvals_config.read().await;
     let policy_result =
         crate::gateway::exec_approvals::policy::evaluate(&config, &command, node_id.as_deref());
     drop(config);
@@ -45,7 +45,7 @@ pub async fn handle_approval_request(
         }
         crate::gateway::exec_approvals::policy::PolicyResult::Ask => {
             // Check session allows
-            let mgr = ctx.state.exec_approval_manager.read().await;
+            let mgr = ctx.state.channel.exec_approval_manager.read().await;
             if mgr.is_session_allowed(&command) {
                 return Ok(
                     json!({"decision": "allow", "request_id": request_id, "source": "session"}),
@@ -66,7 +66,7 @@ pub async fn handle_approval_request(
 
     let _rx = ctx
         .state
-        .exec_approval_manager
+        .channel.exec_approval_manager
         .write()
         .await
         .create(payload);
@@ -108,7 +108,7 @@ pub async fn handle_approval_resolve(
 
     let resolved = ctx
         .state
-        .exec_approval_manager
+        .channel.exec_approval_manager
         .write()
         .await
         .resolve(request_id, decision);
@@ -131,7 +131,7 @@ pub async fn handle_wait_decision(ctx: Arc<RpcContext>, params: Value) -> Result
         .unwrap_or(60_000);
 
     // Get the snapshot to check if it exists
-    let snapshot = ctx.state.exec_approval_manager.write().await.get_snapshot();
+    let snapshot = ctx.state.channel.exec_approval_manager.write().await.get_snapshot();
     if !snapshot.iter().any(|p| p.request_id == request_id) {
         return Err(RpcError::not_found(
             "approval request not found or already resolved",
@@ -142,7 +142,7 @@ pub async fn handle_wait_decision(ctx: Arc<RpcContext>, params: Value) -> Result
     let start = now_ms();
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        let snapshot = ctx.state.exec_approval_manager.write().await.get_snapshot();
+        let snapshot = ctx.state.channel.exec_approval_manager.write().await.get_snapshot();
         if !snapshot.iter().any(|p| p.request_id == request_id) {
             // Request was resolved (no longer pending)
             return Ok(json!({"resolved": true, "request_id": request_id}));
@@ -154,8 +154,8 @@ pub async fn handle_wait_decision(ctx: Arc<RpcContext>, params: Value) -> Result
 }
 
 pub async fn handle_approvals_get(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let config = ctx.state.exec_approvals_config.read().await;
-    let pending = ctx.state.exec_approval_manager.write().await.get_snapshot();
+    let config = ctx.state.channel.exec_approvals_config.read().await;
+    let pending = ctx.state.channel.exec_approval_manager.write().await.get_snapshot();
     Ok(json!({
         "mode": config.mode,
         "ask": config.ask,
@@ -181,7 +181,7 @@ pub async fn handle_approvals_set(ctx: Arc<RpcContext>, params: Value) -> Result
         .get("allowlist")
         .and_then(|v| serde_json::from_value(v.clone()).ok());
 
-    let mut config = ctx.state.exec_approvals_config.write().await;
+    let mut config = ctx.state.channel.exec_approvals_config.write().await;
     config
         .cas_update(expected_hash, new_mode, new_ask, new_allowlist)
         .map_err(RpcError::invalid_request)?;
@@ -200,7 +200,7 @@ pub async fn handle_node_approvals_get(
         .get("node_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing node_id"))?;
-    let config = ctx.state.exec_approvals_config.read().await;
+    let config = ctx.state.channel.exec_approvals_config.read().await;
     let node_config = config.node_overrides.get(node_id);
     Ok(serde_json::to_value(node_config).unwrap_or(Value::Null))
 }
@@ -219,7 +219,7 @@ pub async fn handle_node_approvals_set(
         serde_json::from_value(params.get("config").cloned().unwrap_or(Value::Null))
             .map_err(|e| RpcError::invalid_request(format!("invalid config: {e}")))?;
 
-    let mut config = ctx.state.exec_approvals_config.write().await;
+    let mut config = ctx.state.channel.exec_approvals_config.write().await;
     config.node_overrides.insert(node_id, node_config);
     config.save();
 

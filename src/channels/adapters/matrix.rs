@@ -22,10 +22,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mx_config = config
-        .matrix
+    let mx_configs: Vec<crate::config::MatrixBotConfig> = config.channel_configs("matrix");
+    let mx_config = mx_configs
         .first()
-        .ok_or("missing [[matrix]] section in config")?;
+        .ok_or("missing [[channels.matrix]] section in config")?;
 
     let password = resolve_secret(
         mx_config.password.as_deref(),

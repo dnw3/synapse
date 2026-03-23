@@ -96,17 +96,17 @@ fn build_agent_route_toml(
 
 pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let mut agents = Vec::new();
-    let effective = ctx.state.config.effective_agents();
+    let effective = ctx.state.core.config.effective_agents();
 
     // Default agent entry
     agents.push(json!({
         "name": "default",
         "id": "default",
-        "model": ctx.state.config.base.model.model,
-        "system_prompt": ctx.state.config.base.agent.system_prompt,
+        "model": ctx.state.core.config.base.model.model,
+        "system_prompt": ctx.state.core.config.base.agent.system_prompt,
         "channels": [],
         "is_default": true,
-        "workspace": ctx.state.config.workspace_dir().to_string_lossy(),
+        "workspace": ctx.state.core.config.workspace_dir().to_string_lossy(),
         "dm_scope": format!("{:?}", crate::config::DmSessionScope::default()).to_lowercase(),
         "tool_allow": [],
         "tool_deny": [],
@@ -120,7 +120,7 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
             "name": agent_def.id,
             "id": agent_def.id,
             "description": agent_def.description,
-            "model": agent_def.model.clone().unwrap_or_else(|| ctx.state.config.base.model.model.clone()),
+            "model": agent_def.model.clone().unwrap_or_else(|| ctx.state.core.config.base.model.model.clone()),
             "system_prompt": agent_def.system_prompt,
             "is_default": is_default_agent,
             "workspace": workspace.to_string_lossy(),
@@ -225,11 +225,11 @@ pub async fn handle_create(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 
     Ok(json!({
         "name": name,
-        "model": model.unwrap_or(&ctx.state.config.base.model.model),
+        "model": model.unwrap_or(&ctx.state.core.config.base.model.model),
         "system_prompt": system_prompt,
         "channels": channels,
         "is_default": false,
-        "workspace": ctx.state.config.workspace_dir_for_agent(Some(name)).to_string_lossy(),
+        "workspace": ctx.state.core.config.workspace_dir_for_agent(Some(name)).to_string_lossy(),
     }))
 }
 
@@ -314,11 +314,11 @@ pub async fn handle_update(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 
     Ok(json!({
         "name": name,
-        "model": model.unwrap_or(&ctx.state.config.base.model.model),
+        "model": model.unwrap_or(&ctx.state.core.config.base.model.model),
         "system_prompt": system_prompt,
         "channels": channels,
         "is_default": false,
-        "workspace": ctx.state.config.workspace_dir_for_agent(Some(name)).to_string_lossy(),
+        "workspace": ctx.state.core.config.workspace_dir_for_agent(Some(name)).to_string_lossy(),
     }))
 }
 

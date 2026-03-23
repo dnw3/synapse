@@ -13,7 +13,7 @@ use super::types::RpcError;
 // ---------------------------------------------------------------------------
 
 pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let config = &ctx.state.config;
+    let config = &ctx.state.core.config;
 
     let mut provider_models: HashMap<String, Vec<String>> = HashMap::new();
     if let Some(models) = &config.model_catalog {

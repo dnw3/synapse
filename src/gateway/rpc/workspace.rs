@@ -47,7 +47,7 @@ pub async fn handle_list(ctx: Arc<RpcContext>, params: Value) -> Result<Value, R
     use crate::agent::templates::WORKSPACE_TEMPLATES;
 
     let agent = params.get("agent").and_then(|v| v.as_str());
-    let cwd = workspace_dir(&ctx.state.config, agent);
+    let cwd = workspace_dir(&ctx.state.core.config, agent);
     let mut entries = Vec::new();
 
     for tmpl in WORKSPACE_TEMPLATES {
@@ -147,7 +147,7 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
     sanitize_filename(filename)?;
 
     let agent = params.get("agent").and_then(|v| v.as_str());
-    let path = workspace_dir(&ctx.state.config, agent).join(filename);
+    let path = workspace_dir(&ctx.state.core.config, agent).join(filename);
     let content = tokio::fs::read_to_string(&path)
         .await
         .map_err(|_| RpcError::not_found(format!("file '{}' not found", filename)))?;
@@ -178,7 +178,7 @@ pub async fn handle_set(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
     sanitize_filename(filename)?;
 
     let agent = params.get("agent").and_then(|v| v.as_str());
-    let path = workspace_dir(&ctx.state.config, agent).join(filename);
+    let path = workspace_dir(&ctx.state.core.config, agent).join(filename);
     if !path.exists() {
         return Err(RpcError::not_found(format!(
             "file '{}' not found -- use workspace.create",
@@ -211,7 +211,7 @@ pub async fn handle_create(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
     sanitize_filename(filename)?;
 
     let agent = params.get("agent").and_then(|v| v.as_str());
-    let path = workspace_dir(&ctx.state.config, agent).join(filename);
+    let path = workspace_dir(&ctx.state.core.config, agent).join(filename);
     if path.exists() {
         return Err(RpcError::invalid_request(format!(
             "file '{}' already exists -- use workspace.set to update",
@@ -238,7 +238,7 @@ pub async fn handle_delete(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
     sanitize_filename(filename)?;
 
     let agent = params.get("agent").and_then(|v| v.as_str());
-    let path = workspace_dir(&ctx.state.config, agent).join(filename);
+    let path = workspace_dir(&ctx.state.core.config, agent).join(filename);
     if !path.exists() {
         return Err(RpcError::not_found(format!(
             "file '{}' not found",
@@ -268,7 +268,7 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
         .ok_or_else(|| RpcError::not_found(format!("no default template for '{}'", filename)))?;
 
     let agent = params.get("agent").and_then(|v| v.as_str());
-    let path = workspace_dir(&ctx.state.config, agent).join(filename);
+    let path = workspace_dir(&ctx.state.core.config, agent).join(filename);
     tokio::fs::write(&path, default)
         .await
         .map_err(|e| RpcError::internal(format!("write: {}", e)))?;

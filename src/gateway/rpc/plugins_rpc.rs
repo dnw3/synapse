@@ -55,7 +55,7 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
     let mut plugins: Vec<Value> = Vec::new();
     let disabled = load_disabled_plugins();
 
-    let registry = ctx.state.plugin_registry.read().await;
+    let registry = ctx.state.infra.plugin_registry.read().await;
 
     for m in registry.plugins() {
         let regs = registry.plugin_registrations(&m.name);
@@ -164,7 +164,7 @@ pub async fn handle_toggle(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
     // 2. Hot unregister: immediately remove plugin's tools/interceptors/subscribers
     if !enabled {
         let service_ids = {
-            let mut registry = ctx.state.plugin_registry.write().await;
+            let mut registry = ctx.state.infra.plugin_registry.write().await;
             registry.unregister_plugin(name)
         };
         // Stop services that were removed (lock is dropped, safe to await)
@@ -210,7 +210,7 @@ pub async fn handle_service_control(
         .as_str()
         .ok_or_else(|| RpcError::invalid_request("missing 'action'"))?;
 
-    let registry = ctx.state.plugin_registry.read().await;
+    let registry = ctx.state.infra.plugin_registry.read().await;
     let service = registry
         .services()
         .iter()

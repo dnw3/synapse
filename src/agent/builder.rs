@@ -185,9 +185,9 @@ pub async fn build_deep_agent_with_callback(
     let backend: Arc<dyn synaptic::deep::backend::Backend> = Arc::new(FilesystemBackend::new(cwd));
 
     let mut options = DeepAgentOptions::new(backend.clone());
-    options.path_guard = Some(Arc::new(synaptic::deep::tools::path_guard::PathGuard::new(
-        cwd.to_path_buf(),
-    )));
+    options.filesystem.path_guard = Some(Arc::new(
+        synaptic::deep::tools::path_guard::PathGuard::new(cwd.to_path_buf()),
+    ));
 
     // --- System prompt + project context ---
     let mut system_prompt = system_prompt_override
@@ -218,7 +218,7 @@ pub async fn build_deep_agent_with_callback(
         }
     }
 
-    options.system_prompt = Some(system_prompt);
+    options.context.system_prompt = Some(system_prompt);
 
     // --- Memory provider + user profile ---
     // Get memory provider from plugin registry (set by memory plugin in build_infra_bundle)
@@ -247,8 +247,14 @@ pub async fn build_deep_agent_with_callback(
         };
         match memory_provider_arc.get_profile(user_id).await {
             Ok(Some(profile)) if !profile.is_empty() => {
-                let base = options.system_prompt.as_deref().unwrap_or("").to_string();
-                options.system_prompt = Some(format!("{}\n\n## User Profile\n{}", base, profile));
+                let base = options
+                    .context
+                    .system_prompt
+                    .as_deref()
+                    .unwrap_or("")
+                    .to_string();
+                options.context.system_prompt =
+                    Some(format!("{}\n\n## User Profile\n{}", base, profile));
                 tracing::debug!(user_id, "injected user profile into system prompt");
             }
             _ => {} // No profile or error — skip silently
@@ -277,26 +283,30 @@ pub async fn build_deep_agent_with_callback(
             capabilities: caps.iter().map(|s| s.to_string()).collect(),
             message_limit: limit,
         });
-        options.environment = Some(env);
-        options.self_section = Some(super::self_awareness::build_self_section(config, channel));
+        options.context.environment = Some(env);
+        options.context.self_section =
+            Some(super::self_awareness::build_self_section(config, channel));
     }
 
-    options.enable_filesystem = config.base.agent.tools.filesystem;
+    options.filesystem.enable_filesystem = config.base.agent.tools.filesystem;
     // Disable DeepMemoryMiddleware — bootstrap context (AGENTS.md etc.) is already
     // injected once at startup via BootstrapLoader. Re-reading on every model call
     // would cause double injection. Memory access at runtime goes through tools instead.
-    options.enable_memory = false;
-    options.memory_file = Some(config.base.paths.memory_file.clone());
+    options.context.enable_memory = false;
+    options.context.memory_file = Some(config.base.paths.memory_file.clone());
 
     // --- Skills directories ---
     setup_skills_dirs(&mut options, config, cwd, agent_name);
     // Append bundle-contributed skills dirs (from plugin ecosystem)
     for dir in extra_skills_dirs {
-        options.skills_dirs.push(dir.to_string_lossy().to_string());
+        options
+            .skills
+            .skills_dirs
+            .push(dir.to_string_lossy().to_string());
     }
 
-    options.skill_description_budget = config.skills.max_skills_prompt_chars;
-    options.command_executor = Some(Arc::new(ShellCommandExecutor::new(cwd)));
+    options.skills.skill_description_budget = config.skills.max_skills_prompt_chars;
+    options.skills.command_executor = Some(Arc::new(ShellCommandExecutor::new(cwd)));
     options.checkpointer = Some(checkpointer);
 
     // --- Subagent config ---
@@ -305,7 +315,7 @@ pub async fn build_deep_agent_with_callback(
     // --- Per-skill overrides ---
     if !config.skill_overrides.is_empty() {
         for (name, ov_cfg) in &config.skill_overrides {
-            options.skill_overrides.insert(
+            options.skills.skill_overrides.insert(
                 name.clone(),
                 synaptic::deep::SkillOverride {
                     enabled: Some(ov_cfg.enabled),
@@ -316,7 +326,7 @@ pub async fn build_deep_agent_with_callback(
     }
 
     if let Some(max_turns) = config.base.agent.max_turns {
-        options.max_input_tokens = max_turns * 4000;
+        options.condenser.max_input_tokens = max_turns * 4000;
     }
 
     // --- Tools ---
@@ -343,22 +353,22 @@ pub async fn build_deep_agent_with_callback(
     .await;
 
     // --- Hooks executor ---
-    options.hooks_executor = Some(Arc::new(crate::hooks::SynapseHooksExecutor::new(Arc::new(
-        config.clone(),
-    ))));
+    options.skills.hooks_executor = Some(Arc::new(crate::hooks::SynapseHooksExecutor::new(
+        Arc::new(config.clone()),
+    )));
 
     // --- Reflection ---
     middleware_setup::setup_reflection(&mut options, config, &model);
 
     // --- EventBus + metadata ---
-    options.event_bus = event_bus;
-    options.model_name = Some(config.base.model.model.clone());
-    options.provider_name = Some(config.base.model.provider.clone());
-    options.channel = Some(channel.to_string());
-    options.agent_id = agent_name.map(|s| s.to_string());
+    options.observability.event_bus = event_bus;
+    options.observability.model_name = Some(config.base.model.model.clone());
+    options.observability.provider_name = Some(config.base.model.provider.clone());
+    options.observability.channel = Some(channel.to_string());
+    options.observability.agent_id = agent_name.map(|s| s.to_string());
 
     // Plugin hook interceptor — bridges EventBus lifecycle events to plugin subscribers
-    if let Some(ref bus) = options.event_bus {
+    if let Some(ref bus) = options.observability.event_bus {
         options
             .interceptors
             .push(Arc::new(synaptic::middleware::PluginHookInterceptor::new(
@@ -417,44 +427,51 @@ fn setup_skills_dirs(
         skills_dirs.push(expanded);
     }
 
-    options.skills_dirs = skills_dirs;
+    options.skills.skills_dirs = skills_dirs;
 }
 
 /// Wire up subagent config: tool profiles, agent types, discovered agents.
 fn setup_subagents(options: &mut DeepAgentOptions, config: &SynapseConfig, cwd: &Path) {
-    options.enable_subagents = config.subagent.enabled;
-    options.max_subagent_depth = config.subagent.max_depth;
-    options.max_concurrent_subagents = config.subagent.max_concurrent;
-    options.max_children_per_agent = config.subagent.max_children_per_agent;
-    options.tool_profiles = config.subagent.tool_profiles.clone();
+    options.subagent.enable_subagents = config.subagent.enabled;
+    options.subagent.max_subagent_depth = config.subagent.max_depth;
+    options.subagent.max_concurrent_subagents = config.subagent.max_concurrent;
+    options.subagent.max_children_per_agent = config.subagent.max_children_per_agent;
+    options.subagent.tool_profiles = config.subagent.tool_profiles.clone();
 
     // Register custom agent types from TOML config
     for def_cfg in &config.subagent.agents {
-        options.subagents.push(synaptic::deep::SubAgentDef {
-            name: def_cfg.name.clone(),
-            description: def_cfg.description.clone(),
-            system_prompt: def_cfg.system_prompt.clone(),
-            tools: Vec::new(),
-            model: None,
-            tool_allow: def_cfg.tool_allow.clone(),
-            tool_deny: def_cfg.tool_deny.clone(),
-            timeout_secs: def_cfg.timeout_secs,
-            max_turns: def_cfg.max_turns,
-            tool_profile: def_cfg.tool_profile.clone(),
-            permission_mode: def_cfg.permission_mode.clone(),
-            skills: def_cfg.skills.clone(),
-            background: def_cfg.background,
-            hooks: None,
-            memory: None,
-        });
+        options
+            .subagent
+            .subagents
+            .push(synaptic::deep::SubAgentDef {
+                name: def_cfg.name.clone(),
+                description: def_cfg.description.clone(),
+                system_prompt: def_cfg.system_prompt.clone(),
+                tools: Vec::new(),
+                model: None,
+                tool_allow: def_cfg.tool_allow.clone(),
+                tool_deny: def_cfg.tool_deny.clone(),
+                timeout_secs: def_cfg.timeout_secs,
+                max_turns: def_cfg.max_turns,
+                tool_profile: def_cfg.tool_profile.clone(),
+                permission_mode: def_cfg.permission_mode.clone(),
+                skills: def_cfg.skills.clone(),
+                background: def_cfg.background,
+                hooks: None,
+                memory: None,
+            });
     }
 
     // Discover agents from .claude/agents/ directories
     let discovered_agents = discover_agents(cwd);
     for agent_def in discovered_agents {
-        let already_defined = options.subagents.iter().any(|a| a.name == agent_def.name);
+        let already_defined = options
+            .subagent
+            .subagents
+            .iter()
+            .any(|a| a.name == agent_def.name);
         if !already_defined {
-            options.subagents.push(agent_def);
+            options.subagent.subagents.push(agent_def);
         }
     }
 }

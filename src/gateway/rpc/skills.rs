@@ -56,7 +56,7 @@ pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
                     }
                     let enabled = !ctx
                         .state
-                        .config
+                        .core.config
                         .skill_overrides
                         .get(&name)
                         .map(|o| !o.enabled)
@@ -92,7 +92,7 @@ pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
                 }
                 let enabled = !ctx
                     .state
-                    .config
+                    .core.config
                     .skill_overrides
                     .get(&name)
                     .map(|o| !o.enabled)
@@ -129,7 +129,7 @@ pub async fn handle_install(ctx: Arc<RpcContext>, params: Value) -> Result<Value
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing 'slug' parameter"))?;
 
-    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.core.config);
     crate::hub::install::install_from_hub(&hub, slug, None, false)
         .await
         .map_err(|e| RpcError::internal(format!("install: {}", e)))?;
@@ -148,7 +148,7 @@ pub async fn handle_update(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         .ok_or_else(|| RpcError::invalid_request("missing 'name' parameter"))?;
 
     // Re-install = update
-    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.config);
+    let hub = crate::hub::ClawHubClient::from_config(&ctx.state.core.config);
     crate::hub::install::install_from_hub(&hub, name, None, true)
         .await
         .map_err(|e| RpcError::internal(format!("update: {}", e)))?;

@@ -262,10 +262,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let dt_config = config
-        .dingtalk
+    let dt_configs: Vec<crate::config::DingTalkBotConfig> = config.channel_configs("dingtalk");
+    let dt_config = dt_configs
         .first()
-        .ok_or("missing [[dingtalk]] section in config")?;
+        .ok_or("missing [[channels.dingtalk]] section in config")?;
 
     let app_secret = resolve_secret(
         dt_config.app_secret.as_deref(),

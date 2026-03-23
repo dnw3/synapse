@@ -34,8 +34,8 @@ async fn debug_invoke(
 ) -> Json<DebugInvokeResponse> {
     match body.method.as_str() {
         "health" => {
-            let uptime = state.started_at.elapsed().as_secs();
-            let active = state.cancel_tokens.read().await.len();
+            let uptime = state.core.started_at.elapsed().as_secs();
+            let active = state.session.cancel_tokens.read().await.len();
             Json(DebugInvokeResponse {
                 ok: true,
                 result: Some(serde_json::json!({
@@ -47,7 +47,7 @@ async fn debug_invoke(
             })
         }
         "cost_snapshot" => {
-            let snapshot = state.cost_tracker.snapshot().await;
+            let snapshot = state.agent.cost_tracker.snapshot().await;
             Json(DebugInvokeResponse {
                 ok: true,
                 result: Some(serde_json::json!({
@@ -60,14 +60,14 @@ async fn debug_invoke(
             })
         }
         "stats" => {
-            let snapshot = state.cost_tracker.snapshot().await;
+            let snapshot = state.agent.cost_tracker.snapshot().await;
             let sessions = state
-                .sessions
+                .session.sessions
                 .list_sessions()
                 .await
                 .map(|s| s.len())
                 .unwrap_or(0);
-            let active = state.cancel_tokens.read().await.len();
+            let active = state.session.cancel_tokens.read().await.len();
             Json(DebugInvokeResponse {
                 ok: true,
                 result: Some(serde_json::json!({
@@ -77,7 +77,7 @@ async fn debug_invoke(
                     "total_cost_usd": snapshot.estimated_cost_usd,
                     "total_requests": snapshot.total_requests,
                     "active_ws_sessions": active,
-                    "uptime_secs": state.started_at.elapsed().as_secs(),
+                    "uptime_secs": state.core.started_at.elapsed().as_secs(),
                 })),
                 error: None,
             })
@@ -92,7 +92,7 @@ async fn debug_invoke(
         }),
         "providers" => {
             let mut providers = Vec::new();
-            if let Some(catalog) = &state.config.provider_catalog {
+            if let Some(catalog) = &state.core.config.provider_catalog {
                 for p in catalog {
                     providers.push(serde_json::json!({
                         "name": p.name,
@@ -108,7 +108,7 @@ async fn debug_invoke(
         }
         "models.list" => {
             let mut models = Vec::new();
-            if let Some(catalog) = &state.config.model_catalog {
+            if let Some(catalog) = &state.core.config.model_catalog {
                 for m in catalog {
                     models.push(serde_json::json!({
                         "name": m.name,
@@ -123,7 +123,7 @@ async fn debug_invoke(
             })
         }
         "sessions" => {
-            let sessions = state.sessions.list_sessions().await.unwrap_or_default();
+            let sessions = state.session.sessions.list_sessions().await.unwrap_or_default();
             let list: Vec<_> = sessions
                 .iter()
                 .map(|s| {
@@ -140,7 +140,7 @@ async fn debug_invoke(
         }
         "schedules" => {
             let schedules: Vec<_> = state
-                .config
+                .core.config
                 .schedules
                 .as_ref()
                 .map(|entries| {
@@ -176,10 +176,10 @@ async fn debug_invoke(
                     "operator.pairing".to_string(),
                     "operator.approvals".to_string(),
                 ]),
-                broadcaster: state.broadcaster.clone(),
+                broadcaster: state.network.broadcaster.clone(),
             });
             let frame = state
-                .rpc_router
+                .network.rpc_router
                 .dispatch(
                     rpc_ctx,
                     "dashboard-rest-0".to_string(),

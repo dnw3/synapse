@@ -13,7 +13,7 @@ pub async fn list_traces(
     State(state): State<AppState>,
     Query(params): Query<TraceListParams>,
 ) -> Json<crate::gateway::trace_aggregator::TraceListResponse> {
-    let aggregator = TraceAggregator::new(std::sync::Arc::new(state.log_buffer.clone()));
+    let aggregator = TraceAggregator::new(std::sync::Arc::new(state.infra.log_buffer.clone()));
     let response = aggregator.list(&params).await;
     Json(response)
 }
@@ -28,7 +28,7 @@ pub async fn get_trace(
     State(state): State<AppState>,
     Path(request_id): Path<String>,
 ) -> impl IntoResponse {
-    let aggregator = TraceAggregator::new(std::sync::Arc::new(state.log_buffer.clone()));
+    let aggregator = TraceAggregator::new(std::sync::Arc::new(state.infra.log_buffer.clone()));
     match aggregator.detail(&request_id).await {
         Some(trace) => (StatusCode::OK, Json(serde_json::to_value(trace).unwrap())).into_response(),
         None => (

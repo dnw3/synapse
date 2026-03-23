@@ -85,10 +85,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let slack_config = config
-        .slack
+    let slack_configs: Vec<crate::config::SlackBotConfig> = config.channel_configs("slack");
+    let slack_config = slack_configs
         .first()
-        .ok_or("missing [[slack]] section in config")?;
+        .ok_or("missing [[channels.slack]] section in config")?;
 
     let app_token = resolve_secret(
         slack_config.app_token.as_deref(),

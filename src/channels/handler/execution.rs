@@ -83,11 +83,11 @@ impl AgentSession {
             None, // no LTM tools in bot mode
             None, // no session tools in bot mode
             None, // no session overrides in bot mode
-            self.cost_tracker.clone(),
+            self.tracking.as_ref().map(|t| t.cost_tracker.clone()),
             &self.channel,
             None, // agent routing resolved at higher level
-            self.event_bus.clone(),
-            self.plugin_registry.clone(),
+            self.plugins.as_ref().map(|p| p.event_bus.clone()),
+            self.plugins.as_ref().map(|p| p.plugin_registry.clone()),
             None, // no channel registry in bot mode
             crate::agent::SessionKind::Full,
             &[], // TODO: pass bundle_skills_dirs from gateway

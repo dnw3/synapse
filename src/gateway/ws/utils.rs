@@ -47,9 +47,9 @@ pub(crate) async fn handle_rpc(
 ) -> Result<serde_json::Value, String> {
     match method {
         "get_status" => {
-            let uptime = state.started_at.elapsed().as_secs();
+            let uptime = state.core.started_at.elapsed().as_secs();
             let auth_enabled = state
-                .auth
+                .core.auth
                 .as_ref()
                 .map(|a| a.config.enabled)
                 .unwrap_or(false);
@@ -61,7 +61,7 @@ pub(crate) async fn handle_rpc(
             }))
         }
         "get_messages" => {
-            let memory = state.sessions.memory();
+            let memory = state.session.sessions.memory();
             let messages = memory.load(session_key).await.unwrap_or_default();
             let msg_list: Vec<serde_json::Value> = messages
                 .iter()
@@ -75,7 +75,7 @@ pub(crate) async fn handle_rpc(
             Ok(serde_json::json!({ "messages": msg_list }))
         }
         "get_session_info" => {
-            let memory = state.sessions.memory();
+            let memory = state.session.sessions.memory();
             let messages = memory.load(session_key).await.unwrap_or_default();
             let overrides = load_session_overrides(session_key);
             Ok(serde_json::json!({
@@ -85,7 +85,7 @@ pub(crate) async fn handle_rpc(
             }))
         }
         "check_execution" => {
-            let is_executing = state.write_lock.is_locked(session_key).await;
+            let is_executing = state.session.write_lock.is_locked(session_key).await;
             Ok(serde_json::json!({ "executing": is_executing }))
         }
         _ => Err(format!("unknown method: {}", method)),

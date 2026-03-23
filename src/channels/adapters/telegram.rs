@@ -89,10 +89,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let tg_config = config
-        .telegram
+    let tg_configs: Vec<crate::config::TelegramBotConfig> = config.channel_configs("telegram");
+    let tg_config = tg_configs
         .first()
-        .ok_or("missing [[telegram]] section in config")?;
+        .ok_or("missing [[channels.telegram]] section in config")?;
 
     let bot_token = resolve_secret(
         tg_config.bot_token.as_deref(),

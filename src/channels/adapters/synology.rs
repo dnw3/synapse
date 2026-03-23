@@ -38,10 +38,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let syn_config = config
-        .synology
+    let syn_configs: Vec<crate::config::SynologyBotConfig> = config.channel_configs("synology");
+    let syn_config = syn_configs
         .first()
-        .ok_or("missing [[synology]] section in config")?;
+        .ok_or("missing [[channels.synology]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

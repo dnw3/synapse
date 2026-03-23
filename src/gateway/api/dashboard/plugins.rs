@@ -64,7 +64,7 @@ struct PluginsListResponse {
 async fn get_plugins(State(state): State<AppState>) -> Json<PluginsListResponse> {
     let disabled = load_disabled_plugins();
 
-    let registry = state.plugin_registry.read().await;
+    let registry = state.infra.plugin_registry.read().await;
     let mut plugins = Vec::new();
 
     for m in registry.plugins() {

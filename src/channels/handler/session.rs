@@ -19,7 +19,7 @@ impl AgentSession {
 
     /// Resolve the routing for this message via the binding router.
     pub(super) fn resolve_route(&self, msg: &InboundMessage) -> ResolvedRoute {
-        if let Some(ref router) = self.router {
+        if let Some(router) = self.gateway.as_ref().and_then(|g| g.router.as_ref()) {
             let ctx = Self::routing_context(msg);
             match router.resolve(&ctx) {
                 crate::router::RouteResult::Single(resolved) => {

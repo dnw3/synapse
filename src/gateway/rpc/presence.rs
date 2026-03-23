@@ -67,9 +67,9 @@ pub async fn handle_system_presence(
         ts: crate::gateway::presence::now_ms(),
     };
 
-    let changed = ctx.state.presence.write().await.upsert(entry);
+    let changed = ctx.state.network.presence.write().await.upsert(entry);
     if changed {
-        let snapshot = ctx.state.presence.write().await.snapshot_json();
+        let snapshot = ctx.state.network.presence.write().await.snapshot_json();
         ctx.broadcaster.broadcast("presence", snapshot).await;
     }
     Ok(json!({"ok": true}))
@@ -77,7 +77,7 @@ pub async fn handle_system_presence(
 
 /// Read-only query: return the current presence list.
 pub async fn handle_presence_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let snapshot = ctx.state.presence.write().await.snapshot_json();
+    let snapshot = ctx.state.network.presence.write().await.snapshot_json();
     Ok(snapshot)
 }
 

@@ -22,10 +22,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let twitch_config = config
-        .twitch
+    let twitch_configs: Vec<crate::config::TwitchBotConfig> = config.channel_configs("twitch");
+    let twitch_config = twitch_configs
         .first()
-        .ok_or("missing [[twitch]] section in config")?;
+        .ok_or("missing [[channels.twitch]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

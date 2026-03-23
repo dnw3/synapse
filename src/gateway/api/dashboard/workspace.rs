@@ -66,7 +66,7 @@ async fn get_workspace_files(
 ) -> Json<Vec<WorkspaceFileEntry>> {
     use crate::agent::templates::WORKSPACE_TEMPLATES;
 
-    let cwd = workspace_dir(&state.config, query.agent.as_deref());
+    let cwd = workspace_dir(&state.core.config, query.agent.as_deref());
     let mut entries = Vec::new();
 
     for tmpl in WORKSPACE_TEMPLATES {
@@ -169,7 +169,7 @@ async fn get_workspace_file(
     Query(query): Query<WorkspaceQuery>,
 ) -> Result<Json<WorkspaceFileContent>, (StatusCode, String)> {
     sanitize_workspace_filename(&filename)?;
-    let path = workspace_dir(&state.config, query.agent.as_deref()).join(&filename);
+    let path = workspace_dir(&state.core.config, query.agent.as_deref()).join(&filename);
     let content = tokio::fs::read_to_string(&path).await.map_err(|_| {
         (
             StatusCode::NOT_FOUND,
@@ -200,7 +200,7 @@ async fn put_workspace_file(
     Json(body): Json<WorkspaceFileBody>,
 ) -> Result<Json<OkResponse>, (StatusCode, String)> {
     sanitize_workspace_filename(&filename)?;
-    let path = workspace_dir(&state.config, query.agent.as_deref()).join(&filename);
+    let path = workspace_dir(&state.core.config, query.agent.as_deref()).join(&filename);
     if !path.exists() {
         return Err((
             StatusCode::NOT_FOUND,
@@ -227,7 +227,7 @@ async fn create_workspace_file(
     Json(body): Json<WorkspaceFileBody>,
 ) -> Result<Json<OkResponse>, (StatusCode, String)> {
     sanitize_workspace_filename(&filename)?;
-    let path = workspace_dir(&state.config, query.agent.as_deref()).join(&filename);
+    let path = workspace_dir(&state.core.config, query.agent.as_deref()).join(&filename);
     if path.exists() {
         return Err((
             StatusCode::CONFLICT,
@@ -253,7 +253,7 @@ async fn delete_workspace_file(
     Query(query): Query<WorkspaceQuery>,
 ) -> Result<Json<OkResponse>, (StatusCode, String)> {
     sanitize_workspace_filename(&filename)?;
-    let path = workspace_dir(&state.config, query.agent.as_deref()).join(&filename);
+    let path = workspace_dir(&state.core.config, query.agent.as_deref()).join(&filename);
     if !path.exists() {
         return Err((
             StatusCode::NOT_FOUND,
@@ -282,7 +282,7 @@ async fn reset_workspace_file(
             format!("no default template for '{}'", filename),
         )
     })?;
-    let path = workspace_dir(&state.config, query.agent.as_deref()).join(&filename);
+    let path = workspace_dir(&state.core.config, query.agent.as_deref()).join(&filename);
     tokio::fs::write(&path, default)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("write: {}", e)))?;
@@ -297,7 +297,7 @@ async fn get_identity(
     State(state): State<AppState>,
     Query(query): Query<WorkspaceQuery>,
 ) -> Json<crate::agent::workspace::IdentityInfo> {
-    let path = workspace_dir(&state.config, query.agent.as_deref()).join("IDENTITY.md");
+    let path = workspace_dir(&state.core.config, query.agent.as_deref()).join("IDENTITY.md");
     let info = match tokio::fs::read_to_string(&path).await {
         Ok(content) => crate::agent::workspace::parse_identity(&content),
         Err(_) => crate::agent::workspace::IdentityInfo::default(),

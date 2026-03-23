@@ -124,7 +124,7 @@ pub async fn handle_start(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
     };
 
     {
-        let mut sessions = ctx.state.wizard_sessions.write().await;
+        let mut sessions = ctx.state.session.wizard_sessions.write().await;
         sessions.insert(session_id.clone(), session);
     }
 
@@ -159,7 +159,7 @@ pub async fn handle_next(ctx: Arc<RpcContext>, params: Value) -> Result<Value, R
 
     let value = answer.get("value").cloned().unwrap_or(Value::Null);
 
-    let mut sessions = ctx.state.wizard_sessions.write().await;
+    let mut sessions = ctx.state.session.wizard_sessions.write().await;
     let session = sessions
         .get_mut(&session_id)
         .ok_or_else(|| RpcError::invalid_request("wizard session not found"))?;
@@ -255,7 +255,7 @@ pub async fn handle_cancel(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         .ok_or_else(|| RpcError::invalid_request("missing 'session_id'"))?;
 
     let removed = {
-        let mut sessions = ctx.state.wizard_sessions.write().await;
+        let mut sessions = ctx.state.session.wizard_sessions.write().await;
         sessions.remove(session_id).is_some()
     };
 
@@ -272,7 +272,7 @@ pub async fn handle_status(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing 'session_id'"))?;
 
-    let sessions = ctx.state.wizard_sessions.read().await;
+    let sessions = ctx.state.session.wizard_sessions.read().await;
     let session = sessions
         .get(session_id)
         .ok_or_else(|| RpcError::invalid_request("wizard session not found"))?;

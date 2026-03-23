@@ -193,10 +193,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let gchat_config = config
-        .googlechat
+    let gchat_configs: Vec<crate::config::GoogleChatBotConfig> = config.channel_configs("googlechat");
+    let gchat_config = gchat_configs
         .first()
-        .ok_or("missing [[googlechat]] section in config")?;
+        .ok_or("missing [[channels.googlechat]] section in config")?;
 
     let model = agent::build_model(config, model_override)?;
     let config_arc = Arc::new(config.clone());

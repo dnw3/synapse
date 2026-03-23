@@ -263,10 +263,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let wc_config = config
-        .wechat
+    let wc_configs: Vec<crate::config::WeChatBotConfig> = config.channel_configs("wechat");
+    let wc_config = wc_configs
         .first()
-        .ok_or("missing [[wechat]] section in config")?;
+        .ok_or("missing [[channels.wechat]] section in config")?;
 
     let webhook_key = resolve_secret(
         wc_config.webhook_key.as_deref(),

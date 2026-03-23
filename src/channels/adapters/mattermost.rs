@@ -25,10 +25,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mm_config = config
-        .mattermost
+    let mm_configs: Vec<crate::config::MattermostBotConfig> = config.channel_configs("mattermost");
+    let mm_config = mm_configs
         .first()
-        .ok_or("missing [[mattermost]] section in config")?;
+        .ok_or("missing [[channels.mattermost]] section in config")?;
 
     let token = resolve_secret(
         mm_config.token.as_deref(),

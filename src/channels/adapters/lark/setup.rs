@@ -23,10 +23,10 @@ pub async fn run(
     event_bus: Option<Arc<synaptic::events::EventBus>>,
     plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let lark_config = config
-        .lark
+    let lark_configs: Vec<crate::config::LarkBotConfig> = config.channel_configs("lark");
+    let lark_config = lark_configs
         .first()
-        .ok_or("missing [[lark]] section in config")?;
+        .ok_or("missing [[channels.lark]] section in config")?;
 
     let app_secret = resolve_secret(
         lark_config.app_secret.as_deref(),
@@ -51,13 +51,9 @@ pub async fn run(
 
     let mut session = AgentSession::new(model, config_arc, true)
         .with_channel("lark")
-        .with_cost_tracker(cost_tracker)
-        .with_usage_tracker(usage_tracker);
-    if let Some(eb) = event_bus {
-        session = session.with_event_bus(eb);
-    }
-    if let Some(pr) = plugin_registry {
-        session = session.with_plugin_registry(pr);
+        .with_tracking(cost_tracker, usage_tracker);
+    if let (Some(eb), Some(pr)) = (event_bus, plugin_registry) {
+        session = session.with_plugins(eb, pr);
     }
     let agent_session = Arc::new(session);
 

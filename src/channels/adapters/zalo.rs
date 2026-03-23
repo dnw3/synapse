@@ -51,10 +51,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let zalo_config = config
-        .zalo
+    let zalo_configs: Vec<crate::config::ZaloBotConfig> = config.channel_configs("zalo");
+    let zalo_config = zalo_configs
         .first()
-        .ok_or("missing [[zalo]] section in config")?;
+        .ok_or("missing [[channels.zalo]] section in config")?;
 
     let access_token = resolve_secret(
         zalo_config.access_token.as_deref(),

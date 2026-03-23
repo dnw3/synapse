@@ -24,10 +24,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let imessage_config = config
-        .imessage
+    let imessage_configs: Vec<crate::config::IMessageBotConfig> = config.channel_configs("imessage");
+    let imessage_config = imessage_configs
         .first()
-        .ok_or("missing [[imessage]] section in config")?;
+        .ok_or("missing [[channels.imessage]] section in config")?;
 
     let password = resolve_secret(
         imessage_config.password.as_deref(),

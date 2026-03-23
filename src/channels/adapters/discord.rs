@@ -91,8 +91,8 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let discord_config = config
-        .discord
+    let discord_configs: Vec<crate::config::DiscordBotConfig> = config.channel_configs("discord");
+    let discord_config = discord_configs
         .first()
         .ok_or("Discord bot configuration not found in config")?;
 

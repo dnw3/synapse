@@ -41,10 +41,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let wa_config = config
-        .whatsapp
+    let wa_configs: Vec<crate::config::WhatsAppBotConfig> = config.channel_configs("whatsapp");
+    let wa_config = wa_configs
         .first()
-        .ok_or("missing [[whatsapp]] section in config")?;
+        .ok_or("missing [[channels.whatsapp]] section in config")?;
 
     // Optionally resolve an API key (used as Bearer token for bridge).
     let api_key: Option<String> = resolve_secret(

@@ -46,72 +46,10 @@ pub struct SynapseConfig {
     #[serde(rename = "channel_models")]
     pub channel_model_bindings: Option<Vec<ChannelModelBinding>>,
 
-    /// Lark bot configuration (multi-account).
+    /// Dynamic channel configuration: platform name → list of account configs.
+    /// TOML: [[channels.lark]], [[channels.telegram]], etc.
     #[serde(default)]
-    pub lark: Vec<LarkBotConfig>,
-    /// Slack bot configuration (multi-account).
-    #[serde(default)]
-    pub slack: Vec<SlackBotConfig>,
-    /// Telegram bot configuration (multi-account).
-    #[serde(default)]
-    pub telegram: Vec<TelegramBotConfig>,
-    /// Discord bot configuration (multi-account).
-    #[serde(default)]
-    pub discord: Vec<DiscordBotConfig>,
-    /// DingTalk bot configuration (multi-account).
-    #[serde(default)]
-    pub dingtalk: Vec<DingTalkBotConfig>,
-    /// Mattermost bot configuration (multi-account).
-    #[serde(default)]
-    pub mattermost: Vec<MattermostBotConfig>,
-    /// Matrix bot configuration (multi-account).
-    #[serde(default)]
-    pub matrix: Vec<MatrixBotConfig>,
-    /// WhatsApp bot configuration (multi-account).
-    #[serde(default)]
-    pub whatsapp: Vec<WhatsAppBotConfig>,
-    /// Microsoft Teams bot configuration (multi-account).
-    #[serde(default)]
-    pub teams: Vec<TeamsBotConfig>,
-    /// Signal bot configuration (multi-account).
-    #[serde(default)]
-    pub signal: Vec<SignalBotConfig>,
-    /// WeCom (WeChat Work) bot configuration (multi-account).
-    #[serde(default)]
-    pub wechat: Vec<WeChatBotConfig>,
-    /// iMessage bot configuration (multi-account).
-    #[serde(default)]
-    pub imessage: Vec<IMessageBotConfig>,
-    /// LINE bot configuration (multi-account).
-    #[serde(default)]
-    pub line: Vec<LineBotConfig>,
-    /// Google Chat bot configuration (multi-account).
-    #[serde(default)]
-    pub googlechat: Vec<GoogleChatBotConfig>,
-    /// IRC bot configuration (multi-account).
-    #[serde(default)]
-    pub irc: Vec<IrcBotConfig>,
-    /// WebChat bot configuration (multi-account).
-    #[serde(default)]
-    pub webchat: Vec<WebChatBotConfig>,
-    /// Twitch bot configuration (multi-account).
-    #[serde(default)]
-    pub twitch: Vec<TwitchBotConfig>,
-    /// Nostr bot configuration (multi-account).
-    #[serde(default)]
-    pub nostr: Vec<NostrBotConfig>,
-    /// Nextcloud Talk bot configuration (multi-account).
-    #[serde(default)]
-    pub nextcloud: Vec<NextcloudBotConfig>,
-    /// Synology Chat bot configuration (multi-account).
-    #[serde(default)]
-    pub synology: Vec<SynologyBotConfig>,
-    /// Tlon (Urbit) bot configuration (multi-account).
-    #[serde(default)]
-    pub tlon: Vec<TlonBotConfig>,
-    /// Zalo bot configuration (multi-account).
-    #[serde(default)]
-    pub zalo: Vec<ZaloBotConfig>,
+    pub channels: HashMap<String, Vec<ChannelAccountConfig>>,
 
     /// Web server configuration.
     pub serve: Option<ServeConfig>,
@@ -214,6 +152,21 @@ pub struct SynapseConfig {
 }
 
 impl SynapseConfig {
+    /// Extract typed channel configs for a specific platform.
+    /// Deserializes from the dynamic `channels` map, filtering by `enabled`.
+    pub fn channel_configs<T: serde::de::DeserializeOwned>(&self, platform: &str) -> Vec<T> {
+        self.channels
+            .get(platform)
+            .map(|accounts| {
+                accounts
+                    .iter()
+                    .filter(|a| a.enabled.unwrap_or(true))
+                    .filter_map(|a| serde_json::from_value(a.settings.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Load configuration from a file (TOML, JSON, or YAML).
     ///
     /// Search order:

@@ -25,7 +25,7 @@ async fn metrics_handler(
     let mut out = String::with_capacity(4096);
 
     // --- Server info + uptime (bonus, kept from before) ---
-    let uptime = state.started_at.elapsed().as_secs();
+    let uptime = state.core.started_at.elapsed().as_secs();
     out.push_str("# HELP synapse_uptime_seconds Server uptime in seconds\n");
     out.push_str("# TYPE synapse_uptime_seconds gauge\n");
     out.push_str(&format!("synapse_uptime_seconds {}\n\n", uptime));
@@ -36,7 +36,7 @@ async fn metrics_handler(
     out.push_str("# HELP synapse_requests_total Total HTTP requests\n");
     out.push_str("# TYPE synapse_requests_total counter\n");
     {
-        let reqs = state.request_metrics.requests.read().await;
+        let reqs = state.infra.request_metrics.requests.read().await;
         let mut keys: Vec<_> = reqs.keys().collect();
         keys.sort();
         for (method, path, status) in keys {
@@ -55,7 +55,7 @@ async fn metrics_handler(
     out.push_str("# HELP synapse_request_duration_seconds HTTP request duration in seconds\n");
     out.push_str("# TYPE synapse_request_duration_seconds histogram\n");
     {
-        let durs = state.request_metrics.durations.read().await;
+        let durs = state.infra.request_metrics.durations.read().await;
         let mut keys: Vec<_> = durs.keys().collect();
         keys.sort();
         for (method, path) in keys {
@@ -77,7 +77,7 @@ async fn metrics_handler(
     // -------------------------------------------------------
     out.push_str("# HELP synapse_active_sessions Number of active WebSocket sessions\n");
     out.push_str("# TYPE synapse_active_sessions gauge\n");
-    let active = state.cancel_tokens.read().await.len();
+    let active = state.session.cancel_tokens.read().await.len();
     out.push_str(&format!("synapse_active_sessions {}\n\n", active));
 
     // -------------------------------------------------------
@@ -86,7 +86,7 @@ async fn metrics_handler(
     out.push_str("# HELP synapse_tokens_used_total Total tokens used\n");
     out.push_str("# TYPE synapse_tokens_used_total counter\n");
     {
-        let snapshot = state.cost_tracker.snapshot().await;
+        let snapshot = state.agent.cost_tracker.snapshot().await;
         if snapshot.per_model.is_empty() {
             // Emit aggregate totals without model label
             out.push_str(&format!(
@@ -121,7 +121,7 @@ async fn metrics_handler(
     out.push_str("# HELP synapse_llm_request_duration_seconds LLM request duration in seconds\n");
     out.push_str("# TYPE synapse_llm_request_duration_seconds histogram\n");
     {
-        let llm_durs = state.request_metrics.llm_durations.read().await;
+        let llm_durs = state.infra.request_metrics.llm_durations.read().await;
         let mut models: Vec<_> = llm_durs.keys().collect();
         models.sort();
         for model in models {
@@ -144,8 +144,8 @@ async fn metrics_handler(
     out.push_str("# HELP synapse_memory_entries Total message entries across all sessions\n");
     out.push_str("# TYPE synapse_memory_entries gauge\n");
     let memory_entries = {
-        let memory = state.sessions.memory();
-        let sessions = state.sessions.list_sessions().await.unwrap_or_default();
+        let memory = state.session.sessions.memory();
+        let sessions = state.session.sessions.list_sessions().await.unwrap_or_default();
         let mut total = 0usize;
         for s in &sessions {
             total += memory

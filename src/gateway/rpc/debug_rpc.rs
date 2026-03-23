@@ -20,8 +20,8 @@ pub async fn handle_invoke(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 
     match method {
         "health" => {
-            let uptime = ctx.state.started_at.elapsed().as_secs();
-            let active = ctx.state.cancel_tokens.read().await.len();
+            let uptime = ctx.state.core.started_at.elapsed().as_secs();
+            let active = ctx.state.session.cancel_tokens.read().await.len();
             Ok(json!({
                 "ok": true,
                 "result": {
@@ -32,7 +32,7 @@ pub async fn handle_invoke(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
             }))
         }
         "cost_snapshot" => {
-            let snapshot = ctx.state.cost_tracker.snapshot().await;
+            let snapshot = ctx.state.agent.cost_tracker.snapshot().await;
             Ok(json!({
                 "ok": true,
                 "result": {
@@ -44,15 +44,15 @@ pub async fn handle_invoke(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
             }))
         }
         "stats" => {
-            let snapshot = ctx.state.cost_tracker.snapshot().await;
+            let snapshot = ctx.state.agent.cost_tracker.snapshot().await;
             let sessions = ctx
                 .state
-                .sessions
+                .session.sessions
                 .list_sessions()
                 .await
                 .map(|s| s.len())
                 .unwrap_or(0);
-            let active = ctx.state.cancel_tokens.read().await.len();
+            let active = ctx.state.session.cancel_tokens.read().await.len();
             Ok(json!({
                 "ok": true,
                 "result": {
@@ -62,7 +62,7 @@ pub async fn handle_invoke(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
                     "total_cost_usd": snapshot.estimated_cost_usd,
                     "total_requests": snapshot.total_requests,
                     "active_ws_sessions": active,
-                    "uptime_secs": ctx.state.started_at.elapsed().as_secs(),
+                    "uptime_secs": ctx.state.core.started_at.elapsed().as_secs(),
                 },
             }))
         }
@@ -85,10 +85,10 @@ pub async fn handle_invoke(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 // ---------------------------------------------------------------------------
 
 pub async fn handle_health(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let active = ctx.state.cancel_tokens.read().await.len();
+    let active = ctx.state.session.cancel_tokens.read().await.len();
     let sessions = ctx
         .state
-        .sessions
+        .session.sessions
         .list_sessions()
         .await
         .map(|s| s.len())
@@ -110,7 +110,7 @@ pub async fn handle_health(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
 
     Ok(json!({
         "status": "ok",
-        "uptime_secs": ctx.state.started_at.elapsed().as_secs(),
+        "uptime_secs": ctx.state.core.started_at.elapsed().as_secs(),
         "memory_rss_mb": memory_rss_mb,
         "active_connections": active,
         "active_sessions": sessions,

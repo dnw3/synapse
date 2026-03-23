@@ -25,7 +25,7 @@ async fn handle_card_callback(
 
     match operation {
         "pair_approve" => {
-            let result = state.pairing_store.write().await.approve(request_id);
+            let result = state.network.pairing_store.write().await.approve(request_id);
             if result.is_some() {
                 Ok(Json(json!({
                     "toast": { "type": "success", "content": "Device approved" }
@@ -37,7 +37,7 @@ async fn handle_card_callback(
             }
         }
         "pair_reject" => {
-            let rejected = state.pairing_store.write().await.reject(request_id);
+            let rejected = state.network.pairing_store.write().await.reject(request_id);
             if rejected {
                 Ok(Json(json!({
                     "toast": { "type": "info", "content": "Device rejected" }

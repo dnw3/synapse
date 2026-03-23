@@ -129,11 +129,11 @@ pub async fn run_server_with_log_buffer(
     ));
 
     // Request metrics tracking layer (wraps all routes)
-    let metrics_state = app_state.request_metrics.clone();
+    let metrics_state = app_state.infra.request_metrics.clone();
 
     // Clone broadcaster and channel_manager before app_state is consumed by ws_router
-    let shutdown_broadcaster = app_state.broadcaster.clone();
-    let channel_manager = app_state.channel_manager.clone();
+    let shutdown_broadcaster = app_state.network.broadcaster.clone();
+    let channel_manager = app_state.channel.channel_manager.clone();
 
     let app = protected_api
         .merge(public_routes)
@@ -208,7 +208,7 @@ pub async fn run_server_with_log_buffer(
             text: "Synapse Gateway".to_string(),
             ts: crate::gateway::presence::now_ms(),
         };
-        app_state.presence.write().await.upsert(entry);
+        app_state.network.presence.write().await.upsert(entry);
     }
 
     // Spawn enabled bot adapters as background tasks within the gateway process.
@@ -242,7 +242,7 @@ pub async fn run_server_with_log_buffer(
 
     // Emit GatewayStart after successful bind
     {
-        let event_bus = app_state.event_bus.clone();
+        let event_bus = app_state.infra.event_bus.clone();
         let port_val = port;
         tokio::spawn(async move {
             let mut event = Event::new(
@@ -256,8 +256,8 @@ pub async fn run_server_with_log_buffer(
 
     // Graceful shutdown: broadcast shutdown event, then stop accepting connections
     let broadcaster = shutdown_broadcaster;
-    let event_bus_shutdown = app_state.event_bus.clone();
-    let plugin_registry_shutdown = app_state.plugin_registry.clone();
+    let event_bus_shutdown = app_state.infra.event_bus.clone();
+    let plugin_registry_shutdown = app_state.infra.plugin_registry.clone();
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             let _ = tokio::signal::ctrl_c().await;
@@ -410,144 +410,156 @@ fn spawn_channel_adapters(
     // continue — the gateway stays up even if a channel adapter can't connect.
 
     #[cfg(feature = "bot-lark")]
-    for account in &config.lark {
-        if !account.enabled {
-            continue;
-        }
-
-        // Register Lark approve notifier (for DM pairing approval notifications)
-        if let Ok(secret) = crate::config::bots::resolve_secret(
-            account.app_secret.as_deref(),
-            account.app_secret_env.as_deref(),
-            "Lark app secret (notifier)",
-        ) {
-            let notifier_client = synaptic::lark::LarkBotClient::new(
-                synaptic::lark::LarkConfig::new(&account.app_id, &secret),
-            );
-            let notifier = Arc::new(crate::channels::adapters::lark::LarkApproveNotifier {
-                client: notifier_client,
-            });
-            app_state.approve_notifiers.register("lark", notifier);
-            tracing::info!(channel = "lark", "registered DM pairing approval notifier");
-        }
-
-        let cfg = config.clone();
-        let account_id = account.account_id.clone();
-        let mgr = manager.clone();
-        let event_bus = app_state.event_bus.clone();
-        let plugin_registry = app_state.plugin_registry.clone();
-        let handle = Arc::new(channel_manager::ChannelStatusHandleImpl::new(
-            "lark",
-            &account_id,
-        ));
-        let status_handle: Arc<dyn synaptic::ChannelStatusHandle> = handle.clone();
-        let task = tokio::spawn(async move {
-            tracing::info!(channel = "lark", account_id = %account_id, "starting channel adapter");
-            loop {
-                match crate::channels::adapters::lark::run(
-                    &cfg,
-                    None,
-                    Some(status_handle.clone()),
-                    Some(event_bus.clone()),
-                    Some(plugin_registry.clone()),
-                )
-                .await
-                {
-                    Ok(()) => {
-                        tracing::info!(channel = "lark", account_id = %account_id, "adapter exited, restarting in 5s");
-                    }
-                    Err(e) => {
-                        tracing::error!(channel = "lark", account_id = %account_id, error = %e, "adapter failed, restarting in 5s");
-                    }
-                }
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    {
+        let lark_configs: Vec<crate::config::LarkBotConfig> = config.channel_configs("lark");
+        for account in &lark_configs {
+            if !account.enabled {
+                continue;
             }
-        });
-        let mgr2 = mgr.clone();
-        let aid = account.account_id.clone();
-        tokio::spawn(async move {
-            mgr2.register("lark", &aid, task, None, handle).await;
-        });
+
+            // Register Lark approve notifier (for DM pairing approval notifications)
+            if let Ok(secret) = crate::config::bots::resolve_secret(
+                account.app_secret.as_deref(),
+                account.app_secret_env.as_deref(),
+                "Lark app secret (notifier)",
+            ) {
+                let notifier_client = synaptic::lark::LarkBotClient::new(
+                    synaptic::lark::LarkConfig::new(&account.app_id, &secret),
+                );
+                let notifier = Arc::new(crate::channels::adapters::lark::LarkApproveNotifier {
+                    client: notifier_client,
+                });
+                app_state.channel.approve_notifiers.register("lark", notifier);
+                tracing::info!(channel = "lark", "registered DM pairing approval notifier");
+            }
+
+            let cfg = config.clone();
+            let account_id = account.account_id.clone();
+            let mgr = manager.clone();
+            let event_bus = app_state.infra.event_bus.clone();
+            let plugin_registry = app_state.infra.plugin_registry.clone();
+            let handle = Arc::new(channel_manager::ChannelStatusHandleImpl::new(
+                "lark",
+                &account_id,
+            ));
+            let status_handle: Arc<dyn synaptic::ChannelStatusHandle> = handle.clone();
+            let task = tokio::spawn(async move {
+                tracing::info!(channel = "lark", account_id = %account_id, "starting channel adapter");
+                loop {
+                    match crate::channels::adapters::lark::run(
+                        &cfg,
+                        None,
+                        Some(status_handle.clone()),
+                        Some(event_bus.clone()),
+                        Some(plugin_registry.clone()),
+                    )
+                    .await
+                    {
+                        Ok(()) => {
+                            tracing::info!(channel = "lark", account_id = %account_id, "adapter exited, restarting in 5s");
+                        }
+                        Err(e) => {
+                            tracing::error!(channel = "lark", account_id = %account_id, error = %e, "adapter failed, restarting in 5s");
+                        }
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                }
+            });
+            let mgr2 = mgr.clone();
+            let aid = account.account_id.clone();
+            tokio::spawn(async move {
+                mgr2.register("lark", &aid, task, None, handle).await;
+            });
+        }
     }
 
     #[cfg(feature = "bot-telegram")]
-    for account in &config.telegram {
-        if !account.enabled {
-            continue;
-        }
-        let cfg = config.clone();
-        let account_id = account.account_id.clone();
-        let mgr = manager.clone();
-        let handle = Arc::new(channel_manager::ChannelStatusHandleImpl::new(
-            "telegram",
-            &account_id,
-        ));
-        let task = tokio::spawn(async move {
-            tracing::info!(channel = "telegram", account_id = %account_id, "starting channel adapter");
-            if let Err(e) = crate::channels::adapters::telegram::run(&cfg, None).await {
-                tracing::error!(channel = "telegram", account_id = %account_id, error = %e, "adapter failed");
+    {
+        let telegram_configs: Vec<crate::config::TelegramBotConfig> = config.channel_configs("telegram");
+        for account in &telegram_configs {
+            if !account.enabled {
+                continue;
             }
-        });
-        let aid = account.account_id.clone();
-        tokio::spawn(async move {
-            mgr.register("telegram", &aid, task, None, handle).await;
-        });
+            let cfg = config.clone();
+            let account_id = account.account_id.clone();
+            let mgr = manager.clone();
+            let handle = Arc::new(channel_manager::ChannelStatusHandleImpl::new(
+                "telegram",
+                &account_id,
+            ));
+            let task = tokio::spawn(async move {
+                tracing::info!(channel = "telegram", account_id = %account_id, "starting channel adapter");
+                if let Err(e) = crate::channels::adapters::telegram::run(&cfg, None).await {
+                    tracing::error!(channel = "telegram", account_id = %account_id, error = %e, "adapter failed");
+                }
+            });
+            let aid = account.account_id.clone();
+            tokio::spawn(async move {
+                mgr.register("telegram", &aid, task, None, handle).await;
+            });
+        }
     }
 
     #[cfg(feature = "bot-discord")]
-    for account in &config.discord {
-        if !account.enabled {
-            continue;
-        }
-        let cfg = config.clone();
-        let account_id = account.account_id.clone();
-        let mgr = manager.clone();
-        let handle = Arc::new(channel_manager::ChannelStatusHandleImpl::new(
-            "discord",
-            &account_id,
-        ));
-        let task = tokio::spawn(async move {
-            tracing::info!(channel = "discord", account_id = %account_id, "starting channel adapter");
-            if let Err(e) = crate::channels::adapters::discord::run(&cfg, None).await {
-                tracing::error!(channel = "discord", account_id = %account_id, error = %e, "adapter failed");
+    {
+        let discord_configs: Vec<crate::config::DiscordBotConfig> = config.channel_configs("discord");
+        for account in &discord_configs {
+            if !account.enabled {
+                continue;
             }
-        });
-        let aid = account.account_id.clone();
-        tokio::spawn(async move {
-            mgr.register("discord", &aid, task, None, handle).await;
-        });
+            let cfg = config.clone();
+            let account_id = account.account_id.clone();
+            let mgr = manager.clone();
+            let handle = Arc::new(channel_manager::ChannelStatusHandleImpl::new(
+                "discord",
+                &account_id,
+            ));
+            let task = tokio::spawn(async move {
+                tracing::info!(channel = "discord", account_id = %account_id, "starting channel adapter");
+                if let Err(e) = crate::channels::adapters::discord::run(&cfg, None).await {
+                    tracing::error!(channel = "discord", account_id = %account_id, error = %e, "adapter failed");
+                }
+            });
+            let aid = account.account_id.clone();
+            tokio::spawn(async move {
+                mgr.register("discord", &aid, task, None, handle).await;
+            });
+        }
     }
 
     #[cfg(feature = "bot-slack")]
-    for account in &config.slack {
-        if !account.enabled {
-            continue;
-        }
-        let cfg = config.clone();
-        let account_id = account.account_id.clone();
-        let mgr = manager.clone();
-        let handle = Arc::new(channel_manager::ChannelStatusHandleImpl::new(
-            "slack",
-            &account_id,
-        ));
-        let task = tokio::spawn(async move {
-            tracing::info!(channel = "slack", account_id = %account_id, "starting channel adapter");
-            if let Err(e) = crate::channels::adapters::slack::run(&cfg, None).await {
-                tracing::error!(channel = "slack", account_id = %account_id, error = %e, "adapter failed");
+    {
+        let slack_configs: Vec<crate::config::SlackBotConfig> = config.channel_configs("slack");
+        for account in &slack_configs {
+            if !account.enabled {
+                continue;
             }
-        });
-        let aid = account.account_id.clone();
-        tokio::spawn(async move {
-            mgr.register("slack", &aid, task, None, handle).await;
-        });
+            let cfg = config.clone();
+            let account_id = account.account_id.clone();
+            let mgr = manager.clone();
+            let handle = Arc::new(channel_manager::ChannelStatusHandleImpl::new(
+                "slack",
+                &account_id,
+            ));
+            let task = tokio::spawn(async move {
+                tracing::info!(channel = "slack", account_id = %account_id, "starting channel adapter");
+                if let Err(e) = crate::channels::adapters::slack::run(&cfg, None).await {
+                    tracing::error!(channel = "slack", account_id = %account_id, error = %e, "adapter failed");
+                }
+            });
+            let aid = account.account_id.clone();
+            tokio::spawn(async move {
+                mgr.register("slack", &aid, task, None, handle).await;
+            });
+        }
     }
 }
 
 #[cfg(feature = "web")]
 async fn health_handler(state: state::AppState) -> axum::Json<HealthResponse> {
-    let uptime = state.started_at.elapsed().as_secs();
+    let uptime = state.core.started_at.elapsed().as_secs();
     let auth_enabled = state
-        .auth
+        .core.auth
         .as_ref()
         .map(|a| a.config.enabled)
         .unwrap_or(false);

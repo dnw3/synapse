@@ -22,10 +22,10 @@ pub async fn run(
     config: &SynapseConfig,
     model_override: Option<&str>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let nostr_config = config
-        .nostr
+    let nostr_configs: Vec<crate::config::NostrBotConfig> = config.channel_configs("nostr");
+    let nostr_config = nostr_configs
         .first()
-        .ok_or("missing [[nostr]] section in config")?;
+        .ok_or("missing [[channels.nostr]] section in config")?;
 
     let private_key = resolve_secret(
         nostr_config.private_key.as_deref(),

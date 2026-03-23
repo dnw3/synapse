@@ -15,7 +15,7 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
     let agent = params.get("agent").and_then(|v| v.as_str());
     let path = ctx
         .state
-        .config
+        .core.config
         .workspace_dir_for_agent(agent)
         .join("IDENTITY.md");
 
@@ -56,6 +56,6 @@ pub async fn handle_gateway_identity(
     Ok(json!({
         "device_id": device_id.trim(),
         "version": env!("CARGO_PKG_VERSION"),
-        "uptime_secs": ctx.state.started_at.elapsed().as_secs(),
+        "uptime_secs": ctx.state.core.started_at.elapsed().as_secs(),
     }))
 }

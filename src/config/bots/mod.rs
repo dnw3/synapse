@@ -3,6 +3,20 @@ mod lark;
 
 use serde::{Deserialize, Serialize};
 
+/// Dynamic channel account configuration — one entry per [[channels.PLATFORM]] block.
+#[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct ChannelAccountConfig {
+    /// Whether this account is enabled (default true).
+    pub enabled: Option<bool>,
+    /// Optional account identifier for multi-account setups.
+    pub account_id: Option<String>,
+    /// Platform-specific settings (deserialized lazily per platform).
+    #[serde(flatten)]
+    pub settings: serde_json::Value,
+}
+
+#[allow(unused_imports)]
 pub use self::common::*;
 pub use self::lark::*;
 

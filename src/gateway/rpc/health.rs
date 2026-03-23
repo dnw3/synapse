@@ -13,7 +13,7 @@ use super::types::RpcError;
 /// Returns a simple health check with uptime and response duration.
 pub async fn handle_health(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let start = Instant::now();
-    let uptime_secs = ctx.state.started_at.elapsed().as_secs();
+    let uptime_secs = ctx.state.core.started_at.elapsed().as_secs();
     let duration = start.elapsed().as_micros() as f64 / 1000.0; // ms
 
     Ok(json!({
@@ -27,10 +27,10 @@ pub async fn handle_health(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
 ///
 /// Returns server status including auth state and connection count.
 pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
-    let uptime_secs = ctx.state.started_at.elapsed().as_secs();
+    let uptime_secs = ctx.state.core.started_at.elapsed().as_secs();
     let auth_enabled = ctx
         .state
-        .auth
+        .core.auth
         .as_ref()
         .map(|a| a.config.enabled)
         .unwrap_or(false);

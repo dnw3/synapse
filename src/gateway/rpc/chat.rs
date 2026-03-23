@@ -21,7 +21,7 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
     let session_id = if let Some(sk) = params.get("sessionKey").and_then(|v| v.as_str()) {
         // Resolve sessionKey → session_id via session list lookup
         let store_key = crate::session::key::to_store_key("default", sk);
-        let sessions = ctx.state.sessions.list_sessions().await.unwrap_or_default();
+        let sessions = ctx.state.session.sessions.list_sessions().await.unwrap_or_default();
         sessions
             .iter()
             .find(|s| s.session_key.as_deref() == Some(&store_key))
@@ -33,7 +33,7 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
         return Err(RpcError::invalid_request("missing 'sessionKey' parameter"));
     };
 
-    let memory = ctx.state.sessions.memory();
+    let memory = ctx.state.session.sessions.memory();
     let messages = memory
         .load(&session_id)
         .await
@@ -72,7 +72,7 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
 
     // Build session_config from stored SessionInfo fields.
     let session_config = {
-        let all_sessions = ctx.state.sessions.list_sessions().await.unwrap_or_default();
+        let all_sessions = ctx.state.session.sessions.list_sessions().await.unwrap_or_default();
         if let Some(s) = all_sessions.iter().find(|s| s.session_id == session_id) {
             // Derive channel: prefer stored field, fall back to session_id prefix
             let channel = s
@@ -129,7 +129,7 @@ pub async fn handle_abort(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
         crate::session::key::to_store_key("default", raw_key)
     };
 
-    let tokens = ctx.state.cancel_tokens.read().await;
+    let tokens = ctx.state.session.cancel_tokens.read().await;
     let aborted = if let Some(sender) = tokens.get(&store_key) {
         let _ = sender.send(true);
         tracing::info!(store_key = %store_key, "chat.abort: cancel signal sent");
@@ -177,7 +177,7 @@ pub async fn handle_inject(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         }
     };
 
-    let memory = ctx.state.sessions.memory();
+    let memory = ctx.state.session.sessions.memory();
     memory
         .append(session_id, message)
         .await
@@ -201,7 +201,7 @@ pub async fn handle_session_send(ctx: Arc<RpcContext>, params: Value) -> Result<
         .ok_or_else(|| RpcError::invalid_request("missing 'message'"))?;
 
     // Store the human message
-    let memory = ctx.state.sessions.memory();
+    let memory = ctx.state.session.sessions.memory();
     memory
         .append(session_id, Message::human(message))
         .await

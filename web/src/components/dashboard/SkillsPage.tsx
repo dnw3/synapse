@@ -19,9 +19,8 @@ import {
   EmptyState,
   LoadingSkeleton,
   Toggle,
-  useToast,
-  ToastContainer,
 } from "./shared";
+import { useToast } from "../ui/toast";
 import { cn } from "../../lib/cn";
 
 // ---------------------------------------------------------------------------
@@ -56,7 +55,7 @@ type Tab = "local" | "store";
 export default function SkillsPage() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>("local");
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
 
   return (
     <div className="space-y-4">
@@ -78,10 +77,8 @@ export default function SkillsPage() {
           }
         />
 
-        {tab === "local" ? <LocalTab addToast={addToast} /> : <StoreTab addToast={addToast} />}
+        {tab === "local" ? <LocalTab toast={toast} /> : <StoreTab toast={toast} />}
       </SectionCard>
-
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }
@@ -106,7 +103,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 // LOCAL TAB
 // ===========================================================================
 
-function LocalTab({ addToast }: { addToast: (msg: string, type: "success" | "error") => void }) {
+function LocalTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
   const { t } = useTranslation();
   const api = useDashboardAPI();
 
@@ -162,14 +159,9 @@ function LocalTab({ addToast }: { addToast: (msg: string, type: "success" | "err
       setSkills((prev) =>
         prev.map((s) => (s.name === skill.name ? { ...s, enabled: prevEnabled } : s))
       );
-      addToast(t("dashboard.skillToggleFailed", "Failed to toggle skill"), "error");
+      toast({ variant: "error", title: t("dashboard.skillToggleFailed", "Failed to toggle skill") });
     } else {
-      addToast(
-        result.enabled
-          ? t("dashboard.skillEnabled", "Skill enabled")
-          : t("dashboard.skillDisabled", "Skill disabled"),
-        "success"
-      );
+      toast({ variant: "success", title: result.enabled ? t("dashboard.skillEnabled", "Skill enabled") : t("dashboard.skillDisabled", "Skill disabled") });
     }
   };
 
@@ -653,7 +645,7 @@ type FilterMode = "all" | "installed" | "not-installed";
 
 const PAGE_SIZE = 30;
 
-function StoreTab({ addToast }: { addToast: (msg: string, type: "success" | "error") => void }) {
+function StoreTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
   const { t } = useTranslation();
   const api = useDashboardAPI();
 
@@ -731,9 +723,9 @@ function StoreTab({ addToast }: { addToast: (msg: string, type: "success" | "err
     });
     if (result?.ok) {
       setInstalled((prev) => new Set(prev).add(slug));
-      addToast(t("dashboard.storeInstallSuccess", "Skill installed successfully"), "success");
+      toast({ variant: "success", title: t("dashboard.storeInstallSuccess", "Skill installed successfully") });
     } else {
-      addToast(t("dashboard.storeInstallFailed", "Failed to install skill"), "error");
+      toast({ variant: "error", title: t("dashboard.storeInstallFailed", "Failed to install skill") });
     }
   };
 

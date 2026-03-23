@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import { SectionCard, EmptyState, LoadingSpinner, useToast, ToastContainer } from "./shared";
+import { SectionCard, EmptyState, LoadingSpinner } from "./shared";
+import { useToast } from "../ui/toast";
 
 type EditorMode = "form" | "raw";
 
@@ -357,7 +358,7 @@ const SECTION_FILTERS: Record<string, string[]> = {
 export default function ConfigPage({ filterSection }: { filterSection?: string } = {}) {
   const { t } = useTranslation();
   const api = useDashboardAPI();
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [configPath, setConfigPath] = useState("");
@@ -550,17 +551,17 @@ export default function ConfigPage({ filterSection }: { filterSection?: string }
 
   // Save
   const handleSave = useCallback(async () => {
-    if (!isValid) { addToast(t("config.invalidToml"), "error"); return; }
+    if (!isValid) { toast({ variant: "error", title: t("config.invalidToml") }); return; }
     setSaving(true);
     const ok = await api.saveConfig(content);
     setSaving(false);
-    if (ok) { setOriginalContent(content); setValidationErrors([]); addToast(t("config.saved"), "success"); }
-    else addToast(t("config.saveFailed"), "error");
-  }, [api, content, isValid, addToast, t]);
+    if (ok) { setOriginalContent(content); setValidationErrors([]); toast({ variant: "success", title: t("config.saved") }); }
+    else toast({ variant: "error", title: t("config.saveFailed") });
+  }, [api, content, isValid, toast, t]);
 
   const handleReload = useCallback(async () => {
-    await loadConfig(); setValidationErrors([]); addToast(t("config.reloaded"), "success");
-  }, [loadConfig, addToast, t]);
+    await loadConfig(); setValidationErrors([]); toast({ variant: "success", title: t("config.reloaded") });
+  }, [loadConfig, toast, t]);
 
   const handleDiscard = useCallback(() => {
     setContent(originalContent); setValidationErrors([]);
@@ -972,7 +973,6 @@ export default function ConfigPage({ filterSection }: { filterSection?: string }
         </div>
       </div>
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

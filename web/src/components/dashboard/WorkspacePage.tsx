@@ -6,7 +6,8 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import { LoadingSpinner, useToast, ToastContainer, useInlineConfirm } from "./shared";
+import { LoadingSpinner, useInlineConfirm } from "./shared";
+import { useToast } from "../ui/toast";
 import type { WorkspaceFileEntry, IdentityInfo, AgentEntry } from "../../types/dashboard";
 
 const ICON_MAP: Record<string, React.ReactNode> = {
@@ -42,7 +43,7 @@ function timeAgo(iso: string): string {
 export default function WorkspacePage() {
   const { t } = useTranslation();
   const api = useDashboardAPI();
-  const toast = useToast();
+  const { toast } = useToast();
 
   const [files, setFiles] = useState<WorkspaceFileEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,7 +117,7 @@ export default function WorkspacePage() {
     if (!tmpl) return;
     const result = await api.resetWorkspaceFile(filename, agentParam);
     if (result?.ok) {
-      toast.addToast(t("workspace.created", { name: filename }), "success");
+      toast({ variant: "success", title: t("workspace.created", { name: filename }) });
       await loadFiles();
       await loadIdentity();
       openEditor(filename);
@@ -132,12 +133,12 @@ export default function WorkspacePage() {
       : await api.createWorkspaceFile(editingFile, editContent, agentParam);
     setSaving(false);
     if (result?.ok) {
-      toast.addToast(t("workspace.saved"), "success");
+      toast({ variant: "success", title: t("workspace.saved") });
       setOriginalContent(editContent);
       await loadFiles();
       await loadIdentity();
     } else {
-      toast.addToast(t("workspace.saveFailed"), "error");
+      toast({ variant: "error", title: t("workspace.saveFailed") });
     }
   }, [editingFile, editContent, files, api, agentParam, loadFiles, loadIdentity, toast, t]);
 
@@ -145,7 +146,7 @@ export default function WorkspacePage() {
     if (!editingFile) return;
     const result = await api.resetWorkspaceFile(editingFile, agentParam);
     if (result?.ok) {
-      toast.addToast(t("workspace.resetDone"), "success");
+      toast({ variant: "success", title: t("workspace.resetDone") });
       const data = await api.fetchWorkspaceFile(editingFile, agentParam);
       if (data) {
         setEditContent(data.content);
@@ -161,7 +162,7 @@ export default function WorkspacePage() {
     if (!editingFile) return;
     const ok = await api.deleteWorkspaceFile(editingFile, agentParam);
     if (ok) {
-      toast.addToast(t("workspace.deleted"), "success");
+      toast({ variant: "success", title: t("workspace.deleted") });
       setEditingFile(null);
       deleteConfirm.reset();
       await loadFiles();
@@ -174,13 +175,13 @@ export default function WorkspacePage() {
     if (!fname || fname === ".md") return;
     const result = await api.createWorkspaceFile(fname, `# ${fname.replace(".md", "")}\n\n`, agentParam);
     if (result?.ok) {
-      toast.addToast(t("workspace.created", { name: fname }), "success");
+      toast({ variant: "success", title: t("workspace.created", { name: fname }) });
       setCreating(false);
       setNewFilename("");
       await loadFiles();
       openEditor(fname);
     } else {
-      toast.addToast(t("workspace.createFailed"), "error");
+      toast({ variant: "error", title: t("workspace.createFailed") });
     }
   }, [newFilename, api, agentParam, loadFiles, openEditor, toast, t]);
 
@@ -500,8 +501,6 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      {/* Toast */}
-      <ToastContainer toasts={toast.toasts} />
     </div>
   );
 }

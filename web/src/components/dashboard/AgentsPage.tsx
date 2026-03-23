@@ -11,8 +11,9 @@ import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
 import type { AgentEntry, BindingEntry, BroadcastGroupEntry, ToolCatalogGroup, SkillEntry } from "../../types/dashboard";
 import {
-  SectionCard, SectionHeader, EmptyState, LoadingSkeleton, useToast, ToastContainer,
+  SectionCard, SectionHeader, EmptyState, LoadingSkeleton,
 } from "./shared";
+import { useToast } from "../ui/toast";
 
 type DetailTab = "overview" | "tools" | "bindings" | "skills" | "cron" | "files";
 
@@ -36,7 +37,7 @@ function agentEmoji(name: string): string {
 export default function AgentsPage() {
   const { t } = useTranslation();
   const api = useDashboardAPI();
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
 
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [bindings, setBindings] = useState<BindingEntry[]>([]);
@@ -164,12 +165,12 @@ export default function AgentsPage() {
     }
 
     if (result) {
-      addToast(t("agents.saved"), "success");
+      toast({ variant: "success", title: t("agents.saved") });
       setEditing(false);
       setSelected(editName.trim());
       await loadAgents();
     } else {
-      addToast(t("agents.saveFailed"), "error");
+      toast({ variant: "error", title: t("agents.saveFailed") });
     }
     setSaving(false);
   };
@@ -177,11 +178,11 @@ export default function AgentsPage() {
   const handleDelete = async (name: string) => {
     const ok = await api.deleteAgent(name);
     if (ok) {
-      addToast(t("agents.deleted"), "success");
+      toast({ variant: "success", title: t("agents.deleted") });
       if (selected === name) setSelected(null);
       await loadAgents();
     } else {
-      addToast(t("agents.deleteFailed"), "error");
+      toast({ variant: "error", title: t("agents.deleteFailed") });
     }
   };
 
@@ -768,7 +769,6 @@ export default function AgentsPage() {
         </SectionCard>
       )}
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

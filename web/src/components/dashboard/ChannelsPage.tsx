@@ -10,9 +10,8 @@ import {
   LoadingSkeleton,
   StatusDot,
   Toggle,
-  useToast,
-  ToastContainer,
 } from "./shared";
+import { useToast } from "../ui/toast";
 import { cn } from "../../lib/cn";
 
 interface ChannelAccountStatus {
@@ -463,9 +462,9 @@ interface AllowlistEntry {
   sender_id: string;
 }
 
-function DmPairingSection({ api, addToast }: {
+function DmPairingSection({ api, toast }: {
   api: ReturnType<typeof import("../../hooks/useDashboardAPI").useDashboardAPI>;
-  addToast: (msg: string, type: "success" | "error") => void;
+  toast: ReturnType<typeof useToast>["toast"];
 }) {
   const { t } = useTranslation();
   const [pending, setPending] = useState<PairingRequest[]>([]);
@@ -531,11 +530,11 @@ function DmPairingSection({ api, addToast }: {
     const resp = await api.debugInvoke({ method: "dm.pairing.approve", params: { channel, code } });
     setApprovingCode(null);
     if (resp?.ok && (resp.result as { approved?: boolean })?.approved) {
-      addToast(t("dmPairing.approved"), "success");
+      toast({ variant: "success", title: t("dmPairing.approved") });
       fetchData();
     } else {
       const err = (resp?.result as { error?: string })?.error ?? "Unknown error";
-      addToast(`${t("dmPairing.approveFailed")}: ${err}`, "error");
+      toast({ variant: "error", title: `${t("dmPairing.approveFailed")}: ${err}` });
     }
   };
 
@@ -545,10 +544,10 @@ function DmPairingSection({ api, addToast }: {
     const resp = await api.debugInvoke({ method: "dm.pairing.remove", params: { channel, sender_id: senderId } });
     setRemovingKey(null);
     if (resp?.ok && (resp.result as { removed?: boolean })?.removed) {
-      addToast(t("dmPairing.removed"), "success");
+      toast({ variant: "success", title: t("dmPairing.removed") });
       fetchData();
     } else {
-      addToast(t("dmPairing.removeFailed"), "error");
+      toast({ variant: "error", title: t("dmPairing.removeFailed") });
     }
   };
 
@@ -715,7 +714,7 @@ function DmPairingSection({ api, addToast }: {
 export default function ChannelsPage() {
   const { t } = useTranslation();
   const api = useDashboardAPI();
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
 
   const [channels, setChannels] = useState<ChannelEntry[]>([]);
   const [bindings, setBindings] = useState<BindingEntry[]>([]);
@@ -770,14 +769,9 @@ export default function ChannelsPage() {
           c.name === channel.name ? { ...c, enabled: prevEnabled } : c
         )
       );
-      addToast(t("dashboard.channelToggleFailed", "Failed to toggle channel"), "error");
+      toast({ variant: "error", title: t("dashboard.channelToggleFailed", "Failed to toggle channel") });
     } else {
-      addToast(
-        result.enabled
-          ? t("dashboard.channelEnabled", "Channel enabled")
-          : t("dashboard.channelDisabled", "Channel disabled"),
-        "success"
-      );
+      toast({ variant: "success", title: result.enabled ? t("dashboard.channelEnabled", "Channel enabled") : t("dashboard.channelDisabled", "Channel disabled") });
     }
   };
 
@@ -793,9 +787,9 @@ export default function ChannelsPage() {
           c.name === name ? { ...c, config } : c
         )
       );
-      addToast(t("dashboard.channelConfigSaved", "Channel config saved"), "success");
+      toast({ variant: "success", title: t("dashboard.channelConfigSaved", "Channel config saved") });
     } else {
-      addToast(t("dashboard.channelConfigFailed", "Failed to save channel config"), "error");
+      toast({ variant: "error", title: t("dashboard.channelConfigFailed", "Failed to save channel config") });
     }
   };
 
@@ -944,9 +938,8 @@ export default function ChannelsPage() {
       </SectionCard>
 
       {/* DM Pairing */}
-      <DmPairingSection api={api} addToast={addToast} />
+      <DmPairingSection api={api} toast={toast} />
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

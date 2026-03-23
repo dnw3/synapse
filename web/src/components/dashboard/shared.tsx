@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback } from "react";
 import { ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
@@ -172,43 +173,6 @@ export function useInlineConfirm(timeoutMs = 3000) {
   return { confirming, requestConfirm, reset };
 }
 
-// Toast notification system
-export function useToast() {
-  const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: "success" | "error" }>>([]);
-  const nextId = useRef(0);
-
-  const addToast = useCallback((message: string, type: "success" | "error" = "success") => {
-    const id = nextId.current++;
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3000);
-  }, []);
-
-  return { toasts, addToast };
-}
-
-export function ToastContainer({ toasts }: { toasts: Array<{ id: number; message: string; type: "success" | "error" }> }) {
-  if (!toasts.length) return null;
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={cn(
-            "px-4 py-2.5 rounded-[var(--radius-md)] text-[12px] font-medium shadow-[var(--shadow-md)] border animate-fade-in",
-            t.type === "success"
-              ? "bg-[var(--bg-elevated)] text-[var(--success)] border-[var(--success)]/20"
-              : "bg-[var(--bg-elevated)] text-[var(--error)] border-[var(--error)]/20"
-          )}
-        >
-          {t.message}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // Pagination component
 export function Pagination({
   total, limit, offset, onChange,
@@ -293,37 +257,3 @@ export function Toggle({
   );
 }
 
-// Helpers
-export function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
-}
-
-export function formatCost(c: number): string {
-  return `$${c.toFixed(2)}`;
-}
-
-export function formatDate(v: string, locale?: string): string {
-  try {
-    const d = /^\d+$/.test(v) ? new Date(Number(v)) : new Date(v);
-    if (isNaN(d.getTime())) return v;
-    return d.toLocaleString(locale?.startsWith("zh") ? "zh-CN" : "en-US", {
-      month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-    });
-  } catch {
-    return v;
-  }
-}
-
-export function formatUptime(s: number): string {
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (d > 0) return `${d}d ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-}
-
-// Need to import these for hooks
-import { useState, useRef, useCallback } from "react";

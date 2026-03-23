@@ -13,11 +13,10 @@ import {
   EmptyState,
   LoadingSkeleton,
   Toggle,
-  useToast,
-  ToastContainer,
   useInlineConfirm,
 } from "./shared";
 import { StatusDot } from "./shared";
+import { useToast } from "../ui/toast";
 import { cn } from "../../lib/cn";
 
 // ---------------------------------------------------------------------------
@@ -50,7 +49,7 @@ const VIEW_KEY = "synapse:plugins-view";
 export default function PluginsPage() {
   const { t } = useTranslation();
   const api = useDashboardAPI();
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
   const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm();
 
   // Data state
@@ -102,15 +101,15 @@ export default function PluginsPage() {
     await withActionLoading(`toggle:${plugin.name}`, async () => {
       try {
         await api.togglePlugin(plugin.name, !plugin.enabled);
-        addToast(t("dashboard.plugins.toast.toggled", { action: plugin.enabled ? t("dashboard.plugins.detail.disable") : t("dashboard.plugins.detail.enable") }));
-        addToast(t("dashboard.plugins.detail.restartRequired"), "success");
+        toast({ variant: "info", title: t("dashboard.plugins.toast.toggled", { action: plugin.enabled ? t("dashboard.plugins.detail.disable") : t("dashboard.plugins.detail.enable") }) });
+        toast({ variant: "success", title: t("dashboard.plugins.detail.restartRequired") });
         await fetchData();
         // Update selected if same
         if (selectedPlugin?.name === plugin.name) {
           setSelectedPlugin((prev) => prev ? { ...prev, enabled: !prev.enabled } : null);
         }
       } catch (e) {
-        addToast(t("dashboard.plugins.toast.error", { message: String(e) }), "error");
+        toast({ variant: "error", title: t("dashboard.plugins.toast.error", { message: String(e) }) });
       }
     });
   };
@@ -124,10 +123,10 @@ export default function PluginsPage() {
     await withActionLoading(`svc:${service.id}`, async () => {
       try {
         await api.controlService(plugin.name, service.id, action);
-        addToast(t("dashboard.plugins.toast.serviceControlled", { action }));
+        toast({ variant: "success", title: t("dashboard.plugins.toast.serviceControlled", { action }) });
         await fetchData();
       } catch (e) {
-        addToast(t("dashboard.plugins.toast.error", { message: String(e) }), "error");
+        toast({ variant: "error", title: t("dashboard.plugins.toast.error", { message: String(e) }) });
       }
     });
   };
@@ -141,11 +140,11 @@ export default function PluginsPage() {
     await withActionLoading(`uninstall:${plugin.name}`, async () => {
       try {
         await api.removePlugin(plugin.name);
-        addToast(t("dashboard.plugins.toast.removed"));
+        toast({ variant: "success", title: t("dashboard.plugins.toast.removed") });
         setSelectedPlugin(null);
         await fetchData();
       } catch (e) {
-        addToast(t("dashboard.plugins.toast.error", { message: String(e) }), "error");
+        toast({ variant: "error", title: t("dashboard.plugins.toast.error", { message: String(e) }) });
       }
     });
   };
@@ -155,12 +154,12 @@ export default function PluginsPage() {
     await withActionLoading("install", async () => {
       try {
         await api.installPlugin(installPath.trim());
-        addToast(t("dashboard.plugins.toast.installed"));
+        toast({ variant: "success", title: t("dashboard.plugins.toast.installed") });
         setShowInstallDialog(false);
         setInstallPath("");
         await fetchData();
       } catch (e) {
-        addToast(t("dashboard.plugins.toast.error", { message: String(e) }), "error");
+        toast({ variant: "error", title: t("dashboard.plugins.toast.error", { message: String(e) }) });
       }
     });
   };
@@ -333,7 +332,6 @@ export default function PluginsPage() {
         />
       )}
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

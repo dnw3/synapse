@@ -11,13 +11,10 @@ import {
   LoadingSkeleton,
   Pagination,
   StatsCard,
-  formatTokens,
-  formatCost,
-  formatDate,
   useInlineConfirm,
-  useToast,
-  ToastContainer,
 } from "./shared";
+import { useToast } from "../ui/toast";
+import { formatTokens, formatCost, formatDate } from "../../lib/format";
 
 type SortField = "id" | "created_at" | "message_count" | "token_count";
 type SortOrder = "asc" | "desc";
@@ -176,7 +173,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm(3000);
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -240,10 +237,10 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
     resetConfirm();
     const ok = await api.deleteSession(id);
     if (ok) {
-      addToast(t("sessions.deleted"), "success");
+      toast({ variant: "success", title: t("sessions.deleted") });
       loadSessions();
     } else {
-      addToast(t("sessions.deleteFailed"), "error");
+      toast({ variant: "error", title: t("sessions.deleteFailed") });
     }
   };
 
@@ -254,10 +251,10 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
     }
     const result = await api.renameSession(id, editValue.trim());
     if (result) {
-      addToast(t("sessions.renamed"), "success");
+      toast({ variant: "success", title: t("sessions.renamed") });
       loadSessions();
     } else {
-      addToast(t("sessions.renameFailed"), "error");
+      toast({ variant: "error", title: t("sessions.renameFailed") });
     }
     setEditingId(null);
   };
@@ -265,13 +262,13 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
   const handleLabelSave = async (id: string) => {
     const result = await api.patchSessionOverrides(id, { label: editLabelValue.trim() || undefined });
     if (result) {
-      addToast(t("sessions.labelUpdated"), "success");
+      toast({ variant: "success", title: t("sessions.labelUpdated") });
       // Update local state immediately
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, label: editLabelValue.trim() || undefined } : s))
       );
     } else {
-      addToast(t("sessions.updateFailed"), "error");
+      toast({ variant: "error", title: t("sessions.updateFailed") });
     }
     setEditingLabelId(null);
   };
@@ -282,19 +279,19 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, thinking_level: value } : s))
       );
-      addToast(t("sessions.thinkingUpdated"), "success");
+      toast({ variant: "success", title: t("sessions.thinkingUpdated") });
     } else {
-      addToast(t("sessions.updateFailed"), "error");
+      toast({ variant: "error", title: t("sessions.updateFailed") });
     }
   };
 
   const handleCompact = async (id: string) => {
     const result = await api.compactSession(id);
     if (result) {
-      addToast(t("sessions.compacted"), "success");
+      toast({ variant: "success", title: t("sessions.compacted") });
       loadSessions();
     } else {
-      addToast(t("sessions.compactFailed"), "error");
+      toast({ variant: "error", title: t("sessions.compactFailed") });
     }
   };
 
@@ -799,7 +796,6 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
         )}
       </SectionCard>
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

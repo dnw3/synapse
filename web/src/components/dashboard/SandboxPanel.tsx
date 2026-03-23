@@ -7,13 +7,14 @@ import type { SandboxInstanceInfo, SandboxExplanation } from "../../hooks/useSan
 import {
   StatsCard, SectionCard, SectionHeader,
   EmptyState, LoadingSpinner, useInlineConfirm,
-  useToast, ToastContainer, formatDate,
 } from "./shared";
+import { useToast } from "../ui/toast";
+import { formatDate } from "../../lib/format";
 
 export default function SandboxPanel() {
   const { t, i18n } = useTranslation();
   const api = useSandboxAPI();
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
   const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm();
 
   const [instances, setInstances] = useState<SandboxInstanceInfo[] | null>(null);
@@ -66,10 +67,10 @@ export default function SandboxPanel() {
     resetConfirm();
     const ok = await api.destroy(runtimeId);
     if (ok) {
-      addToast(t("sandbox.destroy") + " OK", "success");
+      toast({ variant: "success", title: t("sandbox.destroy") + " OK" });
       loadData();
     } else {
-      addToast(t("sandbox.destroy") + " failed", "error");
+      toast({ variant: "error", title: t("sandbox.destroy") + " failed" });
     }
   };
 
@@ -83,10 +84,10 @@ export default function SandboxPanel() {
     resetConfirm();
     const result = await api.recreate({ all: true });
     if (result) {
-      addToast(`${t("sandbox.recreate_all")}: ${result.count}`, "success");
+      toast({ variant: "success", title: `${t("sandbox.recreate_all")}: ${result.count}` });
       loadData();
     } else {
-      addToast(t("sandbox.recreate_all") + " failed", "error");
+      toast({ variant: "error", title: t("sandbox.recreate_all") + " failed" });
     }
   };
 
@@ -234,7 +235,6 @@ export default function SandboxPanel() {
         )}
       </SectionCard>
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

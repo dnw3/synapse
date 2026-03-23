@@ -17,8 +17,8 @@ import type {
 import {
   StatsCard, StatusDot, SectionCard, SectionHeader,
   EmptyState, LoadingSkeleton, ChartTooltip,
-  formatTokens, formatCost, formatUptime,
 } from "./shared";
+import { formatTokens, formatCost, formatUptime } from "../../lib/format";
 
 const MODEL_COLORS = [
   "var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)",

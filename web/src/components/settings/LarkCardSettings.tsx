@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Save, Eye, Check } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { SectionCard, SectionHeader, Toggle, useToast, ToastContainer } from "../dashboard/shared";
+import { SectionCard, SectionHeader, Toggle } from "../dashboard/shared";
+import { useToast } from "../ui/toast";
 
 const COLOR_MAP: Record<string, string> = {
   blue: "#3370FF",
@@ -30,7 +31,7 @@ interface LarkCardConfig {
 
 export default function LarkCardSettings() {
   const { t } = useTranslation();
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
 
   const [config, setConfig] = useState<LarkCardConfig>({
     template_color: "blue",
@@ -70,12 +71,12 @@ export default function LarkCardSettings() {
         body: JSON.stringify(config),
       });
       if (res.ok) {
-        addToast(t("larkCard.saved"), "success");
+        toast({ variant: "success", title: t("larkCard.saved") });
       } else {
-        addToast("Failed to save", "error");
+        toast({ variant: "error", title: "Failed to save" });
       }
     } catch {
-      addToast("Failed to save", "error");
+      toast({ variant: "error", title: "Failed to save" });
     } finally {
       setSaving(false);
     }
@@ -95,10 +96,10 @@ export default function LarkCardSettings() {
         const data = await res.json();
         setPreviewJson(JSON.stringify(data, null, 2));
       } else {
-        addToast("Preview failed", "error");
+        toast({ variant: "error", title: "Preview failed" });
       }
     } catch {
-      addToast("Preview failed", "error");
+      toast({ variant: "error", title: "Preview failed" });
     }
   };
 
@@ -247,7 +248,6 @@ export default function LarkCardSettings() {
         </SectionCard>
       )}
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

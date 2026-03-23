@@ -7,8 +7,9 @@ import {
 import { cn } from "../../lib/cn";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
 import {
-  SectionCard, SectionHeader, EmptyState, LoadingSkeleton, StatsCard, formatUptime,
+  SectionCard, SectionHeader, EmptyState, LoadingSkeleton, StatsCard,
 } from "./shared";
+import { formatUptime } from "../../lib/format";
 import type { DebugHealthResponse, DebugInvokeResponse } from "../../types/dashboard";
 
 interface HistoryItem {

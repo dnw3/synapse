@@ -25,9 +25,8 @@ import {
   EmptyState,
   LoadingSkeleton,
   StatusDot,
-  useToast,
-  ToastContainer,
 } from "./shared";
+import { useToast } from "../ui/toast";
 import { cn } from "../../lib/cn";
 
 interface PairedNode {
@@ -82,7 +81,7 @@ function relativeTime(isoOrMs?: string | number): string {
 
 export default function NodesPage() {
   const { t } = useTranslation();
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
   const [nodes, setNodes] = useState<PairedNode[]>([]);
   const [pending, setPending] = useState<PendingRequest[]>([]);
   const [approvalConfig, setApprovalConfig] = useState<ExecApprovalConfig>({
@@ -179,12 +178,12 @@ export default function NodesPage() {
         const data = await res.json();
         setQrData(data);
         setQrExpiry(Math.floor((data.ttl_ms ?? 600000) / 1000));
-        addToast(t("nodes.qrGenerated"), "success");
+        toast({ variant: "success", title: t("nodes.qrGenerated") });
       } else {
-        addToast(t("nodes.qrFailed"), "error");
+        toast({ variant: "error", title: t("nodes.qrFailed") });
       }
     } catch {
-      addToast(t("nodes.qrFailed"), "error");
+      toast({ variant: "error", title: t("nodes.qrFailed") });
     }
     setQrLoading(false);
   };
@@ -192,7 +191,7 @@ export default function NodesPage() {
   const handleCopySetupCode = () => {
     if (qrData?.setup_code) {
       navigator.clipboard.writeText(qrData.setup_code);
-      addToast(t("nodes.setupCodeCopied"), "success");
+      toast({ variant: "success", title: t("nodes.setupCodeCopied") });
     }
   };
 
@@ -204,13 +203,13 @@ export default function NodesPage() {
         body: JSON.stringify({ request_id: requestId }),
       });
       if (res.ok) {
-        addToast(t("nodes.approved"), "success");
+        toast({ variant: "success", title: t("nodes.approved") });
         loadData(true);
       } else {
-        addToast(t("nodes.approveFailed"), "error");
+        toast({ variant: "error", title: t("nodes.approveFailed") });
       }
     } catch {
-      addToast(t("nodes.approveFailed"), "error");
+      toast({ variant: "error", title: t("nodes.approveFailed") });
     }
   };
 
@@ -223,13 +222,13 @@ export default function NodesPage() {
         body: JSON.stringify({ request_id: requestId }),
       });
       if (res.ok) {
-        addToast(t("nodes.rejected"), "success");
+        toast({ variant: "success", title: t("nodes.rejected") });
         loadData(true);
       } else {
-        addToast(t("nodes.rejectFailed"), "error");
+        toast({ variant: "error", title: t("nodes.rejectFailed") });
       }
     } catch {
-      addToast(t("nodes.rejectFailed"), "error");
+      toast({ variant: "error", title: t("nodes.rejectFailed") });
     }
   };
 
@@ -242,13 +241,13 @@ export default function NodesPage() {
         body: JSON.stringify({ node_id: nodeId }),
       });
       if (res.ok) {
-        addToast(t("nodes.removed"), "success");
+        toast({ variant: "success", title: t("nodes.removed") });
         loadData(true);
       } else {
-        addToast(t("nodes.removeFailed"), "error");
+        toast({ variant: "error", title: t("nodes.removeFailed") });
       }
     } catch {
-      addToast(t("nodes.removeFailed"), "error");
+      toast({ variant: "error", title: t("nodes.removeFailed") });
     }
   };
 
@@ -261,14 +260,14 @@ export default function NodesPage() {
         body: JSON.stringify({ node_id: nodeId, name: renameValue.trim() }),
       });
       if (res.ok) {
-        addToast(t("nodes.renamed"), "success");
+        toast({ variant: "success", title: t("nodes.renamed") });
         setRenamingId(null);
         loadData(true);
       } else {
-        addToast(t("nodes.renameFailed"), "error");
+        toast({ variant: "error", title: t("nodes.renameFailed") });
       }
     } catch {
-      addToast(t("nodes.renameFailed"), "error");
+      toast({ variant: "error", title: t("nodes.renameFailed") });
     }
   };
 
@@ -283,13 +282,13 @@ export default function NodesPage() {
       if (res.ok) {
         const data = await res.json();
         setRotatedToken({ nodeId, token: data.token });
-        addToast(t("nodes.tokenRotated"), "success");
+        toast({ variant: "success", title: t("nodes.tokenRotated") });
         loadData(true);
       } else {
-        addToast(t("nodes.rotateFailed"), "error");
+        toast({ variant: "error", title: t("nodes.rotateFailed") });
       }
     } catch {
-      addToast(t("nodes.rotateFailed"), "error");
+      toast({ variant: "error", title: t("nodes.rotateFailed") });
     }
   };
 
@@ -302,19 +301,19 @@ export default function NodesPage() {
         body: JSON.stringify({ node_id: nodeId }),
       });
       if (res.ok) {
-        addToast(t("nodes.tokenRevoked"), "success");
+        toast({ variant: "success", title: t("nodes.tokenRevoked") });
         loadData(true);
       } else {
-        addToast(t("nodes.revokeFailed"), "error");
+        toast({ variant: "error", title: t("nodes.revokeFailed") });
       }
     } catch {
-      addToast(t("nodes.revokeFailed"), "error");
+      toast({ variant: "error", title: t("nodes.revokeFailed") });
     }
   };
 
   const handleCopyToken = (token: string) => {
     navigator.clipboard.writeText(token);
-    addToast(t("nodes.tokenCopied"), "success");
+    toast({ variant: "success", title: t("nodes.tokenCopied") });
   };
 
   if (loading) {
@@ -738,7 +737,6 @@ export default function NodesPage() {
         </SectionCard>
       </div>
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

@@ -12,10 +12,9 @@ import {
   EmptyState,
   LoadingSkeleton,
   StatusDot,
-  useToast,
-  ToastContainer,
   useInlineConfirm,
 } from "./shared";
+import { useToast } from "../ui/toast";
 import McpServerModal from "./McpServerModal";
 import { cn } from "../../lib/cn";
 
@@ -48,7 +47,7 @@ function transportBadgeStyle(transport: McpServerInfo["transport"]): React.CSSPr
 export default function McpServersPage() {
   const { t } = useTranslation();
   const api = useDashboardAPI();
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
   const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm();
 
   // Data state
@@ -67,12 +66,12 @@ export default function McpServersPage() {
       const res = await api.fetchMcpServers();
       setServers(res ?? []);
     } catch (e) {
-      addToast(t("dashboard.mcpServers.fetchError"), "error");
+      toast({ variant: "error", title: t("dashboard.mcpServers.fetchError") });
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [api, t, addToast]);
+  }, [api, t, toast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -90,16 +89,12 @@ export default function McpServersPage() {
       try {
         const result = await api.testMcpServer(name);
         if (result?.success) {
-          addToast(t("dashboard.mcpServers.testResult", {
-            name,
-            toolCount: String(result.toolCount),
-            latency: String(result.latencyMs),
-          }));
+          toast({ variant: "success", title: t("dashboard.mcpServers.testResult", { name, toolCount: String(result.toolCount), latency: String(result.latencyMs) }) });
         } else {
-          addToast(result?.error ?? t("dashboard.mcpServers.testFailed"), "error");
+          toast({ variant: "error", title: result?.error ?? t("dashboard.mcpServers.testFailed") });
         }
       } catch (e) {
-        addToast(t("dashboard.mcpServers.testFailed"), "error");
+        toast({ variant: "error", title: t("dashboard.mcpServers.testFailed") });
         console.error(e);
       }
     });
@@ -111,10 +106,10 @@ export default function McpServersPage() {
     await withActionLoading(`reconnect:${server.name}`, async () => {
       try {
         await api.updateMcpServer(server.name, {});
-        addToast(t("dashboard.mcpServers.reconnected"));
+        toast({ variant: "success", title: t("dashboard.mcpServers.reconnected") });
         await fetchData();
       } catch (e) {
-        addToast(t("dashboard.mcpServers.reconnectFailed"), "error");
+        toast({ variant: "error", title: t("dashboard.mcpServers.reconnectFailed") });
         console.error(e);
       }
     });
@@ -126,10 +121,10 @@ export default function McpServersPage() {
     await withActionLoading(`persist:${name}`, async () => {
       try {
         await api.persistMcpServer(name);
-        addToast(t("dashboard.mcpServers.persisted"));
+        toast({ variant: "success", title: t("dashboard.mcpServers.persisted") });
         await fetchData();
       } catch (e) {
-        addToast(String(e), "error");
+        toast({ variant: "error", title: String(e) });
         console.error(e);
       }
     });
@@ -146,10 +141,10 @@ export default function McpServersPage() {
     await withActionLoading(`delete:${name}`, async () => {
       try {
         await api.deleteMcpServer(name);
-        addToast(t("dashboard.mcpServers.deleted"));
+        toast({ variant: "success", title: t("dashboard.mcpServers.deleted") });
         await fetchData();
       } catch (e) {
-        addToast(String(e), "error");
+        toast({ variant: "error", title: String(e) });
         console.error(e);
       }
     });
@@ -162,7 +157,7 @@ export default function McpServersPage() {
     } else {
       await api.createMcpServer(server);
     }
-    addToast(t("dashboard.mcpServers.saved"));
+    toast({ variant: "success", title: t("dashboard.mcpServers.saved") });
     await fetchData();
   };
 
@@ -449,7 +444,6 @@ export default function McpServersPage() {
         editServer={editServer}
       />
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

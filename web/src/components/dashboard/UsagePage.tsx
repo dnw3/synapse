@@ -13,8 +13,9 @@ import type {
 } from "../../types/dashboard";
 import {
   StatsCard, SectionCard, SectionHeader, EmptyState, LoadingSkeleton,
-  ChartTooltip, formatTokens, formatCost, Pagination,
+  ChartTooltip, Pagination,
 } from "./shared";
+import { formatTokens, formatCost } from "../../lib/format";
 
 type TimeRange = "today" | "7d" | "30d";
 type ViewMode = "tokens" | "cost";

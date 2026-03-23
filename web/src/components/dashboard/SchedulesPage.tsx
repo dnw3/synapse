@@ -8,8 +8,9 @@ import { useDashboardAPI } from "../../hooks/useDashboardAPI";
 import type { ScheduleEntry, ScheduleRunEntry } from "../../types/dashboard";
 import {
   StatsCard, SectionCard, SectionHeader, EmptyState, LoadingSkeleton,
-  Toggle, useInlineConfirm, useToast, ToastContainer,
+  Toggle, useInlineConfirm,
 } from "./shared";
+import { useToast } from "../ui/toast";
 
 type ScheduleType = "cron" | "interval";
 
@@ -48,7 +49,7 @@ export default function SchedulesPage() {
   const [runsLoading, setRunsLoading] = useState(false);
 
   const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm(3000);
-  const { toasts, addToast } = useToast();
+  const { toast } = useToast();
 
   // ── Load schedules ──
   const loadSchedules = useCallback(async () => {
@@ -105,7 +106,7 @@ export default function SchedulesPage() {
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.prompt.trim()) {
-      addToast(t("schedules.nameAndPromptRequired"), "error");
+      toast({ variant: "error", title: t("schedules.nameAndPromptRequired") });
       return;
     }
     setSaving(true);
@@ -126,11 +127,11 @@ export default function SchedulesPage() {
     }
 
     if (result) {
-      addToast(editing ? t("schedules.updated") : t("schedules.created"), "success");
+      toast({ variant: "success", title: editing ? t("schedules.updated") : t("schedules.created") });
       clearForm();
       await loadSchedules();
     } else {
-      addToast(t("schedules.operationFailed"), "error");
+      toast({ variant: "error", title: t("schedules.operationFailed") });
     }
     setSaving(false);
   };
@@ -143,11 +144,11 @@ export default function SchedulesPage() {
     resetConfirm();
     const ok = await api.deleteSchedule(name);
     if (ok) {
-      addToast(t("schedules.deleted"), "success");
+      toast({ variant: "success", title: t("schedules.deleted") });
       if (selectedName === name) clearForm();
       await loadSchedules();
     } else {
-      addToast(t("schedules.deleteFailed"), "error");
+      toast({ variant: "error", title: t("schedules.deleteFailed") });
     }
   };
 
@@ -157,12 +158,7 @@ export default function SchedulesPage() {
       setSchedules((prev) =>
         prev?.map((s) => (s.name === entry.name ? { ...s, enabled: result.enabled } : s)) ?? null
       );
-      addToast(
-        result.enabled
-          ? t("schedules.enabled")
-          : t("schedules.disabled"),
-        "success"
-      );
+      toast({ variant: "success", title: result.enabled ? t("schedules.enabled") : t("schedules.disabled") });
     }
   };
 
@@ -170,10 +166,10 @@ export default function SchedulesPage() {
     setTriggeringName(name);
     const result = await api.triggerSchedule(name);
     if (result) {
-      addToast(t("schedules.triggered"), "success");
+      toast({ variant: "success", title: t("schedules.triggered") });
       if (selectedName === name) loadRuns(name);
     } else {
-      addToast(t("schedules.triggerFailed"), "error");
+      toast({ variant: "error", title: t("schedules.triggerFailed") });
     }
     setTriggeringName(null);
   };
@@ -596,7 +592,6 @@ export default function SchedulesPage() {
         </SectionCard>
       )}
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

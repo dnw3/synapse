@@ -19,37 +19,10 @@ import {
   Box,
   Cable,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { cn } from "../lib/cn";
-import { StatusDot } from "./dashboard/shared";
-import { Badge } from "./ui/badge";
 import type { TabKey, TabDef, SidebarSection } from "../types/dashboard";
 
-// Lazy-loaded page components
-import OverviewPage from "./dashboard/OverviewPage";
-import UsagePage from "./dashboard/UsagePage";
-import SessionsPage from "./dashboard/SessionsPage";
-import LogsPage from "./dashboard/LogsPage";
-import SchedulesPage from "./dashboard/SchedulesPage";
-import ConfigPage from "./dashboard/ConfigPage";
-import SkillsPage from "./dashboard/SkillsPage";
-import ChannelsPage from "./dashboard/ChannelsPage";
-import AgentsPage from "./dashboard/AgentsPage";
-import DebugPage from "./dashboard/DebugPage";
-import InstancesPage from "./dashboard/InstancesPage";
-import NodesPage from "./dashboard/NodesPage";
-import PluginsPage from "./dashboard/PluginsPage";
-import McpServersPage from "./dashboard/McpServersPage";
-import SandboxPanel from "./dashboard/SandboxPanel";
-
-// Tabs that need full-height flex layout (editors, log viewers, scrollable tables)
-// Pages that manage their own scroll (have internal scroll areas, editors, etc.)
-// These get overflow-hidden on the content wrapper so they don't double-scroll.
-const SELF_SCROLL_TABS = new Set<TabKey>(["config", "logs", "sessions", "communications", "automation", "infrastructure", "ai-agents"]);
-
 // ---------------------------------------------------------------------------
-// Tab & Sidebar Definitions (exported for App.tsx)
+// Tab & Sidebar Definitions (exported for App.tsx, DashboardRouter, Sidebar)
 // ---------------------------------------------------------------------------
 
 export type { TabKey };
@@ -87,105 +60,8 @@ export const SIDEBAR_SECTIONS: (SidebarSection & { i18nKey: string })[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Dashboard — thin router
+// Stub default export — kept so App.tsx does not break before Task 6 replaces it
 // ---------------------------------------------------------------------------
 
-interface DashboardProps {
-  connected: boolean;
-  sessionCount: number;
-  messageCount: number;
-  activeTab: TabKey;
-  onNavigateToChat?: (sessionKey: string) => void;
-}
-
-export default function Dashboard({ connected: wsConnected, sessionCount, messageCount, activeTab, onNavigateToChat }: DashboardProps) {
-  const { t } = useTranslation();
-
-  // Use HTTP health check for gateway status (WS is only connected during chat)
-  const [gatewayOnline, setGatewayOnline] = useState(wsConnected);
-  useEffect(() => {
-    let cancelled = false;
-    const check = () => {
-      fetch("/api/health").then((r) => {
-        if (!cancelled) setGatewayOnline(r.ok);
-      }).catch(() => {
-        if (!cancelled) setGatewayOnline(false);
-      });
-    };
-    check();
-    const timer = setInterval(check, 15_000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, []);
-  const tab = TABS.find(t => t.key === activeTab);
-
-  return (
-    <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden">
-      {/* Sticky Header */}
-      <div className="flex-shrink-0 bg-[var(--bg-window)]/80 backdrop-blur-sm border-b border-[var(--border-subtle)] z-10">
-        <div className="flex items-center justify-between px-6 h-14">
-          <div className="flex flex-col gap-0.5">
-            <h2
-              className="text-[24px] font-bold text-[var(--text-primary)] leading-tight"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
-              {tab ? t(tab.i18nKey) : ""}
-            </h2>
-            <span className="text-[14px] text-[var(--text-secondary)] hidden sm:inline">
-              {new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={gatewayOnline ? "success" : "error"}>
-              <span className="inline-flex items-center gap-1.5">
-                <StatusDot status={gatewayOnline ? "online" : "offline"} />
-                {gatewayOnline ? t("dashboard.allOperational", "All Systems Operational") : t("dashboard.gatewayDisconnected", "Gateway Disconnected")}
-              </span>
-            </Badge>
-          </div>
-        </div>
-      </div>
-
-      {/* Content Area — always flex-1, pages fill available height */}
-      <div className={cn(
-        "flex-1 min-h-0 flex flex-col px-6 py-6",
-        SELF_SCROLL_TABS.has(activeTab)
-          ? ""
-          : "overflow-y-auto [&>*:first-child]:flex-1 [&>*:first-child]:min-h-fit"
-      )}>
-        {activeTab === "overview" && (
-          <OverviewPage connected={gatewayOnline} sessionCount={sessionCount} messageCount={messageCount} />
-        )}
-        {activeTab === "usage" && <UsagePage />}
-        {activeTab === "sessions" && <SessionsPage onNavigateToChat={onNavigateToChat} />}
-        {activeTab === "logs" && <LogsPage />}
-        {activeTab === "schedules" && <SchedulesPage />}
-        {activeTab === "config" && <ConfigPage />}
-        {activeTab === "skills" && <SkillsPage />}
-        {activeTab === "channels" && <ChannelsPage />}
-        {activeTab === "agents" && <AgentsPage />}
-        {activeTab === "instances" && <InstancesPage />}
-        {activeTab === "nodes" && <NodesPage />}
-        {activeTab === "plugins" && <PluginsPage />}
-        {activeTab === "mcp-servers" && <McpServersPage />}
-        {activeTab === "sandbox" && <SandboxPanel />}
-        {activeTab === "communications" && <ConfigPage filterSection="communications" />}
-        {activeTab === "automation" && <ConfigPage filterSection="automation" />}
-        {activeTab === "infrastructure" && <ConfigPage filterSection="infrastructure" />}
-        {activeTab === "ai-agents" && <ConfigPage filterSection="ai-agents" />}
-        {activeTab === "debug" && <DebugPage />}
-
-        {/* Footer — pinned at bottom of scroll for normal pages, hidden for self-scroll */}
-        {!SELF_SCROLL_TABS.has(activeTab) && (
-          <div className="flex items-center justify-between pt-3 pb-4 mt-auto border-t border-[var(--border-subtle)] flex-shrink-0">
-            <span className="text-[11px] text-[var(--text-tertiary)] font-mono">
-              {t("dashboard.poweredBy")}
-            </span>
-            <span className="text-[11px] text-[var(--text-tertiary)] font-mono">
-              {t("dashboard.lastRefresh")}: {new Date().toLocaleTimeString()}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default function Dashboard(_props: any) { return null; }

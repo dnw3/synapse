@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
 use synaptic::core::SynapticError;
 use synaptic::deep::sandbox::{
     SandboxCreateRequest, SandboxInstance, SandboxInstanceInfo, SandboxProviderRegistry,
     SandboxWorkspace,
 };
+use tokio::sync::RwLock;
 
 use super::config::*;
 use super::explain::{SandboxExplanation, SandboxSecuritySummary};
@@ -68,12 +68,7 @@ impl SandboxOrchestrator {
         Ok(ResolvedBackend::Sandboxed(instance))
     }
 
-    fn compute_scope_key(
-        &self,
-        scope: &SandboxScope,
-        session_key: &str,
-        agent_id: &str,
-    ) -> String {
+    fn compute_scope_key(&self, scope: &SandboxScope, session_key: &str, agent_id: &str) -> String {
         match scope {
             SandboxScope::Session => format!("session:{session_key}"),
             SandboxScope::Agent => format!("agent:{agent_id}"),
@@ -108,10 +103,7 @@ impl SandboxOrchestrator {
 
         // Create new instance via provider
         let provider = self.registry.get(&config.backend).ok_or_else(|| {
-            SynapticError::Tool(format!(
-                "sandbox provider '{}' not found",
-                config.backend
-            ))
+            SynapticError::Tool(format!("sandbox provider '{}' not found", config.backend))
         })?;
 
         let workspace = SandboxWorkspace {
@@ -173,12 +165,8 @@ impl SandboxOrchestrator {
         for info in &instances {
             let matches = match filter {
                 SandboxFilter::All => true,
-                SandboxFilter::BySession(key) => {
-                    info.scope_key == format!("session:{key}")
-                }
-                SandboxFilter::ByAgent(id) => {
-                    info.scope_key.starts_with(&format!("agent:{id}"))
-                }
+                SandboxFilter::BySession(key) => info.scope_key == format!("session:{key}"),
+                SandboxFilter::ByAgent(id) => info.scope_key.starts_with(&format!("agent:{id}")),
             };
 
             if matches {
@@ -193,9 +181,7 @@ impl SandboxOrchestrator {
         // Clear from in-memory pool
         {
             let mut pool = self.instances.write().await;
-            pool.retain(|_, inst| {
-                !instances.iter().any(|i| i.runtime_id == inst.runtime_id)
-            });
+            pool.retain(|_, inst| !instances.iter().any(|i| i.runtime_id == inst.runtime_id));
         }
 
         Ok(count)
@@ -227,10 +213,9 @@ impl SandboxOrchestrator {
 
     /// Prune idle/expired instances.
     pub async fn maybe_prune(&self) -> Result<u32, SynapticError> {
-        let prunable = self.persistent.prunable(
-            self.config.prune.idle_hours,
-            self.config.prune.max_age_days,
-        )?;
+        let prunable = self
+            .persistent
+            .prunable(self.config.prune.idle_hours, self.config.prune.max_age_days)?;
 
         let mut count = 0;
         for entry in &prunable {
@@ -246,10 +231,6 @@ impl SandboxOrchestrator {
     /// Destroy all instances (for graceful shutdown).
     pub async fn destroy_all(&self) -> Result<(), SynapticError> {
         self.recreate(&SandboxFilter::All).await?;
-        Ok(())
-    }
-}
-f.recreate(&SandboxFilter::All).await?;
         Ok(())
     }
 }

@@ -14,7 +14,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 const pages: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {
   overview: lazy(() => import("./dashboard/OverviewPage")),
   usage: lazy(() => import("./dashboard/UsagePage")),
-  sessions: lazy(() => import("./dashboard/SessionsPage")),
+  sessions: lazy(() => import("./dashboard/sessions")),
   logs: lazy(() => import("./dashboard/logs")),
   schedules: lazy(() => import("./dashboard/SchedulesPage")),
   config: lazy(() => import("./dashboard/config")),
@@ -23,7 +23,7 @@ const pages: Record<string, React.LazyExoticComponent<React.ComponentType<any>>>
   agents: lazy(() => import("./dashboard/AgentsPage")),
   debug: lazy(() => import("./dashboard/DebugPage")),
   instances: lazy(() => import("./dashboard/InstancesPage")),
-  nodes: lazy(() => import("./dashboard/NodesPage")),
+  nodes: lazy(() => import("./dashboard/nodes")),
   plugins: lazy(() => import("./dashboard/PluginsPage")),
   "mcp-servers": lazy(() => import("./dashboard/McpServersPage")),
   sandbox: lazy(() => import("./dashboard/SandboxPanel")),

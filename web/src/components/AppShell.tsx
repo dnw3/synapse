@@ -10,7 +10,7 @@ import { fetchJSON } from "../lib/api";
 import { IdentityContext, GatewayContext, SessionContext } from "../contexts";
 import UnifiedSidebar from "./UnifiedSidebar";
 import Toolbar from "./Toolbar";
-import ChatPanel, { FocusModeExitButton } from "./ChatPanel";
+import ChatPanel, { FocusModeExitButton } from "./chat";
 import CommandPalette, { type PaletteEntry } from "./CommandPalette";
 import SetupWizard from "./SetupWizard";
 import ToolOutputSidebar from "./ToolOutputSidebar";

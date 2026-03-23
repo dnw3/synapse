@@ -4,6 +4,8 @@ mod devices;
 mod fallback;
 mod memory;
 mod model;
+#[cfg(feature = "sandbox")]
+mod sandbox;
 mod session;
 mod system;
 
@@ -17,6 +19,8 @@ use synaptic::session::SessionManager;
 
 use crate::config::SynapseConfig;
 use crate::memory::LongTermMemory;
+#[cfg(feature = "sandbox")]
+use crate::sandbox::orchestrator::SandboxOrchestrator;
 
 pub enum CommandResult {
     Continue,
@@ -37,6 +41,7 @@ pub async fn handle_command(
     verbose: &mut bool,
     thinking: &mut Option<ThinkingLevel>,
     ltm: &LongTermMemory,
+    #[cfg(feature = "sandbox")] sandbox_orchestrator: &Option<Arc<SandboxOrchestrator>>,
 ) -> CommandResult {
     let (cmd, arg) = match input.split_once(' ') {
         Some((c, a)) => (c, a.trim()),
@@ -79,6 +84,19 @@ pub async fn handle_command(
         "/pair" | "/devices" => devices::cmd_pair(arg, config),
         #[cfg(feature = "web")]
         "/dm" => devices::cmd_dm(arg).await,
+
+        #[cfg(feature = "sandbox")]
+        "/sandbox" => {
+            if let Some(ref orch) = sandbox_orchestrator {
+                sandbox::cmd_sandbox(arg, orch, session_id).await
+            } else {
+                eprintln!(
+                    "{} Sandbox not configured. Add [sandbox] to synapse.toml",
+                    "sandbox:".yellow().bold()
+                );
+                CommandResult::Continue
+            }
+        }
 
         _ => fallback::handle_fallback(cmd, arg, config, messages, model).await,
     }

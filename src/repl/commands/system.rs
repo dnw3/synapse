@@ -73,6 +73,13 @@ pub fn cmd_help(config: &SynapseConfig) -> CommandResult {
             "/dm list|approve|allowlist|remove <channel>".cyan()
         );
     }
+    #[cfg(feature = "sandbox")]
+    {
+        println!(
+            "  {} -- Manage sandbox (list, recreate, explain, status)",
+            "/sandbox".cyan()
+        );
+    }
     if let Some(ref commands) = config.commands {
         if !commands.is_empty() {
             println!();

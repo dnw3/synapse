@@ -12,6 +12,8 @@ use synaptic::session::SessionManager;
 
 use crate::config::SynapseConfig;
 use crate::memory::LongTermMemory;
+#[cfg(feature = "sandbox")]
+use crate::sandbox::orchestrator::SandboxOrchestrator;
 use crate::tools::pruning as tool_pruning;
 
 use super::commands::{handle_command, CommandResult};
@@ -28,6 +30,7 @@ pub async fn repl(
     messages: &mut Vec<Message>,
     tracker: Arc<CostTrackingCallback>,
     ltm: Arc<LongTermMemory>,
+    #[cfg(feature = "sandbox")] sandbox_orchestrator: Option<Arc<SandboxOrchestrator>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut model = model;
     let mut current_model_name = config.base.model.model.clone();
@@ -152,6 +155,8 @@ pub async fn repl(
                         &mut verbose,
                         &mut thinking,
                         &ltm,
+                        #[cfg(feature = "sandbox")]
+                        &sandbox_orchestrator,
                     )
                     .await
                     {

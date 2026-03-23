@@ -465,6 +465,8 @@ async fn run_chat(
             &mut messages,
             tracker,
             ltm.clone(),
+            #[cfg(feature = "sandbox")]
+            None, // TODO: wire up sandbox orchestrator when available
         )
         .await
     }

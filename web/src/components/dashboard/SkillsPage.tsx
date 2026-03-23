@@ -11,8 +11,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { useCodeTheme } from "../../hooks/useCodeTheme";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import type { SkillEntry, StoreSkillItem, StoreSkillDetail, StoreSearchResult } from "../../types/dashboard";
+import {
+  useSkills, useToggleSkill,
+} from "../../hooks/queries/useSkillsQueries";
+import { fetchJSON, postJSON } from "../../lib/api";
+import type { SkillEntry, StoreSkillItem, StoreSkillDetail, StoreSearchResult, StoreStatus } from "../../types/dashboard";
 import {
   SectionCard,
   SectionHeader,
@@ -103,12 +106,15 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 // LOCAL TAB
 // ===========================================================================
 
-function LocalTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
+function LocalTab({ toast: _toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
 
-  const [skills, setSkills] = useState<SkillEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const skillsQ = useSkills();
+  const toggleMut = useToggleSkill();
+
+  const skills = skillsQ.data ?? [];
+  const loading = skillsQ.isPending;
+
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<SourceGroup, boolean>>({
     project: false,
@@ -116,16 +122,6 @@ function LocalTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
     "built-in": false,
   });
   const [detailSkill, setDetailSkill] = useState<SkillEntry | null>(null);
-
-  const loadSkills = useCallback(async () => {
-    const data = await api.fetchSkills();
-    if (data) setSkills(data);
-    setLoading(false);
-  }, [api]);
-
-  useEffect(() => {
-    loadSkills();
-  }, [loadSkills]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return skills;
@@ -150,19 +146,7 @@ function LocalTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
   };
 
   const handleToggleSkill = async (skill: SkillEntry) => {
-    const prevEnabled = skill.enabled !== false;
-    setSkills((prev) =>
-      prev.map((s) => (s.name === skill.name ? { ...s, enabled: !prevEnabled } : s))
-    );
-    const result = await api.toggleSkill(skill.name);
-    if (result === null) {
-      setSkills((prev) =>
-        prev.map((s) => (s.name === skill.name ? { ...s, enabled: prevEnabled } : s))
-      );
-      toast({ variant: "error", title: t("dashboard.skillToggleFailed", "Failed to toggle skill") });
-    } else {
-      toast({ variant: "success", title: result.enabled ? t("dashboard.skillEnabled", "Skill enabled") : t("dashboard.skillDisabled", "Skill disabled") });
-    }
+    toggleMut.mutate(skill.name);
   };
 
   if (loading) {
@@ -284,7 +268,6 @@ function LocalSkillDetailModal({
 }) {
   const codeTheme = useCodeTheme();
   const { t } = useTranslation();
-  const api = useDashboardAPI();
   const [detailTab, setDetailTab] = useState<"info" | "files">("info");
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -308,26 +291,26 @@ function LocalSkillDetailModal({
   // Load SKILL.md content for Info tab
   useEffect(() => {
     if (skill.path) {
-      api.fetchSkillFileContent(skill.path).then(data => {
+      fetchJSON<{ content: string }>(`/skills/content?path=${encodeURIComponent(skill.path)}`).then(data => {
         if (data?.content) setContent(data.content);
         setLoading(false);
-      });
+      }).catch(() => setLoading(false));
     } else {
       setLoading(false);
     }
-  }, [skill.path, api]);
+  }, [skill.path]);
 
   // Lazy-load file list when Files tab is selected
   useEffect(() => {
     if (detailTab === "files" && !filesLoaded.current && skillDir) {
       filesLoaded.current = true;
       setFilesLoading(true);
-      api.fetchSkillFiles(skillDir).then(data => {
+      fetchJSON<{ files: { name: string; size: number }[] }>(`/skills/files?path=${encodeURIComponent(skillDir)}`).then(data => {
         if (data?.files) setFileList(data.files);
         setFilesLoading(false);
-      });
+      }).catch(() => setFilesLoading(false));
     }
-  }, [detailTab, api, skillDir]);
+  }, [detailTab, skillDir]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -543,7 +526,7 @@ function LocalSkillDetailModal({
                           setSelectedFileContent(null);
                           setFileContentLoading(true);
                           const fullPath = `${skillDir}/${f.name}`;
-                          api.fetchSkillFileContent(fullPath).then((d) => {
+                          fetchJSON<{ content: string }>(`/skills/content?path=${encodeURIComponent(fullPath)}`).then((d) => {
                             setSelectedFileContent(d?.content ?? null);
                             setFileContentLoading(false);
                           });
@@ -647,7 +630,6 @@ const PAGE_SIZE = 30;
 
 function StoreTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortMode>("downloads");
@@ -670,8 +652,8 @@ function StoreTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
     setHasMore(true);
     (async () => {
       const [status, list] = await Promise.all([
-        api.storeStatus(),
-        api.storeList(PAGE_SIZE, sort),
+        fetchJSON<StoreStatus>("/store/status").catch(() => null),
+        fetchJSON<{ items: StoreSkillItem[]; source: string }>(`/store/skills?limit=${PAGE_SIZE}&sort=${sort}`).catch(() => null),
       ]);
       if (status) {
         setConfigured(status.configured);
@@ -683,21 +665,25 @@ function StoreTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
       }
       setLoading(false);
     })();
-  }, [api, sort]);
+  }, [sort]);
 
   // Load more
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
-    const list = await api.storeList(PAGE_SIZE, sort, items.length);
-    if (list) {
-      setItems((prev) => [...prev, ...list.items]);
-      setHasMore(list.items.length >= PAGE_SIZE);
-    } else {
+    try {
+      const list = await fetchJSON<{ items: StoreSkillItem[]; source: string }>(`/store/skills?limit=${PAGE_SIZE}&sort=${sort}&cursor=${items.length}`);
+      if (list) {
+        setItems((prev) => [...prev, ...list.items]);
+        setHasMore(list.items.length >= PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+    } catch {
       setHasMore(false);
     }
     setLoadingMore(false);
-  }, [api, sort, items.length, loadingMore, hasMore]);
+  }, [sort, items.length, loadingMore, hasMore]);
 
   // Debounced search
   useEffect(() => {
@@ -707,15 +693,17 @@ function StoreTab({ toast }: { toast: ReturnType<typeof useToast>["toast"] }) {
     }
     clearTimeout(searchTimeout.current);
     searchTimeout.current = setTimeout(async () => {
-      const data = await api.storeSearch(search.trim(), 50);
-      if (data) setSearchResults(data.results);
+      try {
+        const data = await fetchJSON<{ results: StoreSearchResult[]; source: string }>(`/store/search?q=${encodeURIComponent(search.trim())}&limit=50`);
+        if (data) setSearchResults(data.results);
+      } catch { /* ignore */ }
     }, 400);
     return () => clearTimeout(searchTimeout.current);
-  }, [search, api]);
+  }, [search]);
 
   const handleInstall = async (slug: string) => {
     setInstalling((prev) => new Set(prev).add(slug));
-    const result = await api.storeInstall(slug);
+    const result = await postJSON<{ ok: boolean }>("/store/install", { slug }).catch(() => null);
     setInstalling((prev) => {
       const next = new Set(prev);
       next.delete(slug);
@@ -897,7 +885,6 @@ function StoreSkillCard({
   onDetail: () => void;
 }) {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
   const downloads = item.stats?.downloads ?? item.stats?.installsAllTime ?? 0;
   const stars = item.stats?.stars ?? 0;
   const versions = item.stats?.versions ?? 0;
@@ -910,10 +897,10 @@ function StoreSkillCard({
   const onHover = useCallback(() => {
     if (ownerLoaded.current) return;
     ownerLoaded.current = true;
-    api.storeDetail(item.slug).then((d) => {
+    fetchJSON<StoreSkillDetail>(`/store/skills/${encodeURIComponent(item.slug)}`).then((d) => {
       if (d?.owner) setOwner(d.owner);
-    });
-  }, [api, item.slug]);
+    }).catch(() => {});
+  }, [item.slug]);
 
   return (
     <div
@@ -1044,7 +1031,6 @@ function StoreSkillDetailModal({
 }) {
   const { t } = useTranslation();
   const codeTheme = useCodeTheme();
-  const api = useDashboardAPI();
   const [detail, setDetail] = useState<StoreSkillDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -1059,26 +1045,26 @@ function StoreSkillDetailModal({
 
   useEffect(() => {
     setLoading(true);
-    api.storeDetail(slug).then((d) => {
+    fetchJSON<StoreSkillDetail>(`/store/skills/${encodeURIComponent(slug)}`).then((d) => {
       setDetail(d);
       setLoading(false);
-    });
-  }, [api, slug]);
+    }).catch(() => setLoading(false));
+  }, [slug]);
 
   // Lazy-load files when Files tab is selected
   useEffect(() => {
     if (detailTab === "files" && !filesLoaded.current) {
       filesLoaded.current = true;
       setFilesLoading(true);
-      api.storeFiles(slug).then((d) => {
+      fetchJSON<{ files: { name: string; size: number }[]; skillMd: string | null }>(`/store/skills/${encodeURIComponent(slug)}/files`).then((d) => {
         if (d) {
           setSkillMd(d.skillMd);
           setFileList(d.files);
         }
         setFilesLoading(false);
-      });
+      }).catch(() => setFilesLoading(false));
     }
-  }, [detailTab, api, slug]);
+  }, [detailTab, slug]);
 
   // Close on Escape
   useEffect(() => {
@@ -1346,7 +1332,7 @@ function StoreSkillDetailModal({
                               setSelectedFileContent(skillMd);
                             } else {
                               setFileContentLoading(true);
-                              api.storeFileContent(slug, f.name).then((d) => {
+                              fetchJSON<{ content: string | null }>(`/store/skills/${encodeURIComponent(slug)}/files/${f.name.split("/").map(encodeURIComponent).join("/")}`).then((d) => {
                                 setSelectedFileContent(d?.content ?? null);
                                 setFileContentLoading(false);
                               });

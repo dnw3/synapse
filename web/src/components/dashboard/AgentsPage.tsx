@@ -8,7 +8,12 @@ import {
   Link2, Megaphone, CalendarClock, Eye, Pencil,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import {
+  useAgents, useCreateAgent, useUpdateAgent, useDeleteAgent,
+  useToolsCatalog, useBindings, useBroadcasts,
+} from "../../hooks/queries/useAgentsQueries";
+import { useSkills } from "../../hooks/queries/useSkillsQueries";
+import { fetchJSON, putJSON } from "../../lib/api";
 import type { AgentEntry, BindingEntry, BroadcastGroupEntry, ToolCatalogGroup, SkillEntry } from "../../types/dashboard";
 import {
   SectionCard, SectionHeader, EmptyState, LoadingSkeleton,
@@ -36,15 +41,24 @@ function agentEmoji(name: string): string {
 
 export default function AgentsPage() {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
   const { toast } = useToast();
 
-  const [agents, setAgents] = useState<AgentEntry[]>([]);
-  const [bindings, setBindings] = useState<BindingEntry[]>([]);
-  const [broadcasts, setBroadcasts] = useState<BroadcastGroupEntry[]>([]);
-  const [toolsCatalog, setToolsCatalog] = useState<ToolCatalogGroup[]>([]);
-  const [skills, setSkills] = useState<SkillEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const agentsQ = useAgents();
+  const toolsQ = useToolsCatalog();
+  const skillsQ = useSkills();
+  const bindingsQ = useBindings();
+  const broadcastsQ = useBroadcasts();
+  const createMut = useCreateAgent();
+  const updateMut = useUpdateAgent();
+  const deleteMut = useDeleteAgent();
+
+  const agents = agentsQ.data ?? [];
+  const bindings: BindingEntry[] = bindingsQ.data ?? [];
+  const broadcasts: BroadcastGroupEntry[] = broadcastsQ.data ?? [];
+  const toolsCatalog: ToolCatalogGroup[] = toolsQ.data ?? [];
+  const skills: SkillEntry[] = skillsQ.data ?? [];
+  const loading = agentsQ.isPending;
+
   const [selected, setSelected] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("overview");
   const [editing, setEditing] = useState(false);
@@ -67,9 +81,12 @@ export default function AgentsPage() {
   const agentParam = selected && selected !== "default" ? selected : undefined;
 
   const loadWorkspaceFiles = useCallback(async () => {
-    const data = await api.fetchWorkspaceFiles(agentParam);
-    if (data) setWorkspaceFiles(data.map((f) => ({ name: f.filename, size: f.size_bytes ?? 0 })));
-  }, [api, agentParam]);
+    try {
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      const data = await fetchJSON<{ filename: string; size_bytes?: number }[]>(`/workspace/files${qs}`);
+      if (data) setWorkspaceFiles(data.map((f) => ({ name: f.filename, size: f.size_bytes ?? 0 })));
+    } catch { /* ignore */ }
+  }, [agentParam]);
 
   // Reload workspace files when selected agent changes
   useEffect(() => {
@@ -86,49 +103,37 @@ export default function AgentsPage() {
     setFileSaved(false);
     setFileLoading(true);
     try {
-      const data = await api.fetchWorkspaceFile(filename, agentParam);
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      const data = await fetchJSON<{ content: string }>(`/workspace/files/${encodeURIComponent(filename)}${qs}`);
       setFileContent(data?.content ?? "");
     } catch {
       setFileContent("");
     } finally {
       setFileLoading(false);
     }
-  }, [api, agentParam]);
+  }, [agentParam]);
 
   const saveFile = useCallback(async () => {
     if (!selectedFile) return;
     setFileSaving(true);
     try {
-      await api.saveWorkspaceFile(selectedFile, fileContent, agentParam);
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      await putJSON(`/workspace/files/${encodeURIComponent(selectedFile)}${qs}`, { content: fileContent });
       setFileSaved(true);
       setTimeout(() => setFileSaved(false), 2000);
     } catch { /* ignore */ }
     finally {
       setFileSaving(false);
     }
-  }, [api, selectedFile, fileContent, agentParam]);
+  }, [selectedFile, fileContent, agentParam]);
 
-  const loadAgents = useCallback(async () => {
-    const [data, tools, sk, bd, bc] = await Promise.all([
-      api.fetchAgents(), api.fetchToolsCatalog(), api.fetchSkills(),
-      api.fetchBindings(), api.fetchBroadcasts(),
-    ]);
-    if (data) {
-      setAgents(data);
-      if (!selected && data.length > 0) {
-        setSelected(data[0].name);
-      }
-    }
-    if (tools) setToolsCatalog(tools);
-    if (sk) setSkills(sk);
-    setBindings(bd ?? []);
-    setBroadcasts(bc ?? []);
-    setLoading(false);
-  }, [api, selected]);
-
+  // Select first agent when data arrives
+  const firstAgentName = agents[0]?.name;
   useEffect(() => {
-    loadAgents();
-  }, [loadAgents]);
+    if (!selected && firstAgentName) {
+      setSelected(firstAgentName);
+    }
+  }, [firstAgentName, selected]);
 
   const selectedAgent = agents.find((a) => a.name === selected) ?? null;
 
@@ -157,32 +162,27 @@ export default function AgentsPage() {
     };
 
     const existing = agents.find((a) => a.name === editName.trim());
-    let result: AgentEntry | null;
-    if (existing) {
-      result = await api.updateAgent(editName.trim(), payload);
-    } else {
-      result = await api.createAgent(payload);
-    }
-
-    if (result) {
+    try {
+      if (existing) {
+        await updateMut.mutateAsync({ name: editName.trim(), agent: payload });
+      } else {
+        await createMut.mutateAsync(payload);
+      }
       toast({ variant: "success", title: t("agents.saved") });
       setEditing(false);
       setSelected(editName.trim());
-      await loadAgents();
-    } else {
+    } catch {
       toast({ variant: "error", title: t("agents.saveFailed") });
     }
     setSaving(false);
   };
 
   const handleDelete = async (name: string) => {
-    const ok = await api.deleteAgent(name);
-    if (ok) {
-      toast({ variant: "success", title: t("agents.deleted") });
+    try {
+      await deleteMut.mutateAsync(name);
       if (selected === name) setSelected(null);
-      await loadAgents();
-    } else {
-      toast({ variant: "error", title: t("agents.deleteFailed") });
+    } catch {
+      // toast handled by mutation
     }
   };
 

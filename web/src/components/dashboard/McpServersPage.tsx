@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Cable, Plus, MoreVertical, RefreshCw, Save, Trash2,
   Loader2, Pencil, Zap, ChevronDown, ChevronRight,
 } from "lucide-react";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import {
+  useMcpServers, useCreateMcpServer, useUpdateMcpServer,
+  useDeleteMcpServer, useTestMcpServer, usePersistMcpServer,
+} from "../../hooks/queries/useMcpQueries";
 import type { McpServerInfo, McpTestResult } from "../../types/dashboard";
 import {
   SectionCard,
@@ -46,34 +49,25 @@ function transportBadgeStyle(transport: McpServerInfo["transport"]): React.CSSPr
 
 export default function McpServersPage() {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
   const { toast } = useToast();
   const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm();
 
-  // Data state
-  const [servers, setServers] = useState<McpServerInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const serversQ = useMcpServers();
+  const createMut = useCreateMcpServer();
+  const updateMut = useUpdateMcpServer();
+  const deleteMut = useDeleteMcpServer();
+  const testMut = useTestMcpServer();
+  const persistMut = usePersistMcpServer();
+
+  const servers = serversQ.data ?? [];
+  const loading = serversQ.isPending;
+
+  // UI state
   const [expandedServer, setExpandedServer] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editServer, setEditServer] = useState<McpServerInfo | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
-
-  // Fetch
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.fetchMcpServers();
-      setServers(res ?? []);
-    } catch (e) {
-      toast({ variant: "error", title: t("dashboard.mcpServers.fetchError") });
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [api, t, toast]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   // Action loading helper
   const withActionLoading = async (key: string, fn: () => Promise<void>) => {
@@ -86,17 +80,13 @@ export default function McpServersPage() {
   // Test a server
   const handleTest = async (name: string) => {
     await withActionLoading(`test:${name}`, async () => {
-      try {
-        const result = await api.testMcpServer(name);
-        if (result?.success) {
-          toast({ variant: "success", title: t("dashboard.mcpServers.testResult", { name, toolCount: String(result.toolCount), latency: String(result.latencyMs) }) });
-        } else {
-          toast({ variant: "error", title: result?.error ?? t("dashboard.mcpServers.testFailed") });
-        }
-      } catch (e) {
-        toast({ variant: "error", title: t("dashboard.mcpServers.testFailed") });
-        console.error(e);
-      }
+      testMut.mutate(name, {
+        onSuccess: (result) => {
+          if (result?.success) {
+            toast({ variant: "success", title: t("dashboard.mcpServers.testResult", { name, toolCount: String(result.toolCount), latency: String(result.latencyMs) }) });
+          }
+        },
+      });
     });
   };
 
@@ -105,9 +95,8 @@ export default function McpServersPage() {
     setMenuOpen(null);
     await withActionLoading(`reconnect:${server.name}`, async () => {
       try {
-        await api.updateMcpServer(server.name, {});
+        await updateMut.mutateAsync({ name: server.name, server: {} });
         toast({ variant: "success", title: t("dashboard.mcpServers.reconnected") });
-        await fetchData();
       } catch (e) {
         toast({ variant: "error", title: t("dashboard.mcpServers.reconnectFailed") });
         console.error(e);
@@ -119,14 +108,7 @@ export default function McpServersPage() {
   const handlePersist = async (name: string) => {
     setMenuOpen(null);
     await withActionLoading(`persist:${name}`, async () => {
-      try {
-        await api.persistMcpServer(name);
-        toast({ variant: "success", title: t("dashboard.mcpServers.persisted") });
-        await fetchData();
-      } catch (e) {
-        toast({ variant: "error", title: String(e) });
-        console.error(e);
-      }
+      persistMut.mutate(name);
     });
   };
 
@@ -139,41 +121,31 @@ export default function McpServersPage() {
     resetConfirm();
     setMenuOpen(null);
     await withActionLoading(`delete:${name}`, async () => {
-      try {
-        await api.deleteMcpServer(name);
-        toast({ variant: "success", title: t("dashboard.mcpServers.deleted") });
-        await fetchData();
-      } catch (e) {
-        toast({ variant: "error", title: String(e) });
-        console.error(e);
-      }
+      deleteMut.mutate(name);
     });
   };
 
   // Modal save handler
   const handleModalSave = async (server: Omit<McpServerInfo, "status" | "tools" | "lastChecked" | "error">) => {
     if (editServer) {
-      await api.updateMcpServer(editServer.name, server);
+      await updateMut.mutateAsync({ name: editServer.name, server });
     } else {
-      await api.createMcpServer(server);
+      await createMut.mutateAsync(server);
     }
     toast({ variant: "success", title: t("dashboard.mcpServers.saved") });
-    await fetchData();
   };
 
   // Modal test handler — creates/updates first then tests
   const handleModalTest = async (server: Omit<McpServerInfo, "status" | "tools" | "lastChecked" | "error">): Promise<McpTestResult | null> => {
     try {
       if (editServer) {
-        await api.updateMcpServer(editServer.name, server);
+        await updateMut.mutateAsync({ name: editServer.name, server });
       } else {
-        await api.createMcpServer(server);
+        await createMut.mutateAsync(server);
       }
-      const result = await api.testMcpServer(server.name);
-      await fetchData();
+      const result = await testMut.mutateAsync(server.name);
       return result;
     } catch {
-      await fetchData();
       return null;
     }
   };

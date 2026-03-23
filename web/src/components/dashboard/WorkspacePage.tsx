@@ -5,10 +5,11 @@ import {
   FileText, Plus, RotateCcw, Trash2, Save, FilePlus, ChevronDown,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import { useAgents } from "../../hooks/queries/useAgentsQueries";
+import { fetchJSON, postJSON, putJSON, deleteJSON } from "../../lib/api";
 import { LoadingSpinner, useInlineConfirm } from "./shared";
 import { useToast } from "../ui/toast";
-import type { WorkspaceFileEntry, IdentityInfo, AgentEntry } from "../../types/dashboard";
+import type { WorkspaceFileEntry, IdentityInfo } from "../../types/dashboard";
 
 const ICON_MAP: Record<string, React.ReactNode> = {
   heart: <Heart className="h-4 w-4" />,
@@ -42,15 +43,16 @@ function timeAgo(iso: string): string {
 
 export default function WorkspacePage() {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
   const { toast } = useToast();
+
+  const agentsQ = useAgents();
+  const agents = agentsQ.data ?? [];
 
   const [files, setFiles] = useState<WorkspaceFileEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [identity, setIdentity] = useState<IdentityInfo | null>(null);
 
   // Agent selection for per-agent workspace
-  const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string | undefined>(undefined);
   const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -64,13 +66,6 @@ export default function WorkspacePage() {
   // New file modal
   const [creating, setCreating] = useState(false);
   const [newFilename, setNewFilename] = useState("");
-
-  // Load agents list
-  useEffect(() => {
-    api.fetchAgents().then(data => {
-      if (data) setAgents(data);
-    });
-  }, [api]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -86,15 +81,21 @@ export default function WorkspacePage() {
   const agentParam = selectedAgent === "default" ? undefined : selectedAgent;
 
   const loadFiles = useCallback(async () => {
-    const data = await api.fetchWorkspaceFiles(agentParam);
-    if (data) setFiles(data);
+    try {
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      const data = await fetchJSON<WorkspaceFileEntry[]>(`/workspace/files${qs}`);
+      if (data) setFiles(data);
+    } catch { /* ignore */ }
     setLoading(false);
-  }, [api, agentParam]);
+  }, [agentParam]);
 
   const loadIdentity = useCallback(async () => {
-    const data = await api.fetchIdentity(agentParam);
-    if (data) setIdentity(data);
-  }, [api, agentParam]);
+    try {
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      const data = await fetchJSON<IdentityInfo>(`/identity${qs}`);
+      if (data) setIdentity(data);
+    } catch { /* ignore */ }
+  }, [agentParam]);
 
   useEffect(() => {
     setEditingFile(null);
@@ -104,86 +105,106 @@ export default function WorkspacePage() {
   }, [loadFiles, loadIdentity]);
 
   const openEditor = useCallback(async (filename: string) => {
-    const data = await api.fetchWorkspaceFile(filename, agentParam);
-    if (data) {
-      setEditingFile(filename);
-      setEditContent(data.content);
-      setOriginalContent(data.content);
-    }
-  }, [api, agentParam]);
+    try {
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      const data = await fetchJSON<{ content: string }>(`/workspace/files/${encodeURIComponent(filename)}${qs}`);
+      if (data) {
+        setEditingFile(filename);
+        setEditContent(data.content);
+        setOriginalContent(data.content);
+      }
+    } catch { /* ignore */ }
+  }, [agentParam]);
 
   const handleCreateFromTemplate = useCallback(async (filename: string) => {
     const tmpl = files.find(f => f.filename === filename && f.is_template);
     if (!tmpl) return;
-    const result = await api.resetWorkspaceFile(filename, agentParam);
-    if (result?.ok) {
-      toast({ variant: "success", title: t("workspace.created", { name: filename }) });
-      await loadFiles();
-      await loadIdentity();
-      openEditor(filename);
-    }
-  }, [api, agentParam, files, loadFiles, loadIdentity, openEditor, toast, t]);
+    try {
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      const result = await postJSON<{ ok: boolean }>(`/workspace/files/${encodeURIComponent(filename)}/reset${qs}`);
+      if (result?.ok) {
+        toast({ variant: "success", title: t("workspace.created", { name: filename }) });
+        await loadFiles();
+        await loadIdentity();
+        openEditor(filename);
+      }
+    } catch { /* ignore */ }
+  }, [agentParam, files, loadFiles, loadIdentity, openEditor, toast, t]);
 
   const handleSave = useCallback(async () => {
     if (!editingFile) return;
     setSaving(true);
-    const fileExists = files.find(f => f.filename === editingFile)?.exists;
-    const result = fileExists
-      ? await api.saveWorkspaceFile(editingFile, editContent, agentParam)
-      : await api.createWorkspaceFile(editingFile, editContent, agentParam);
-    setSaving(false);
-    if (result?.ok) {
-      toast({ variant: "success", title: t("workspace.saved") });
-      setOriginalContent(editContent);
-      await loadFiles();
-      await loadIdentity();
-    } else {
+    try {
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      const fileExists = files.find(f => f.filename === editingFile)?.exists;
+      const result = fileExists
+        ? await putJSON<{ ok: boolean }>(`/workspace/files/${encodeURIComponent(editingFile)}${qs}`, { content: editContent })
+        : await postJSON<{ ok: boolean }>(`/workspace/files/${encodeURIComponent(editingFile)}${qs}`, { content: editContent });
+      if (result?.ok) {
+        toast({ variant: "success", title: t("workspace.saved") });
+        setOriginalContent(editContent);
+        await loadFiles();
+        await loadIdentity();
+      } else {
+        toast({ variant: "error", title: t("workspace.saveFailed") });
+      }
+    } catch {
       toast({ variant: "error", title: t("workspace.saveFailed") });
     }
-  }, [editingFile, editContent, files, api, agentParam, loadFiles, loadIdentity, toast, t]);
+    setSaving(false);
+  }, [editingFile, editContent, files, agentParam, loadFiles, loadIdentity, toast, t]);
 
   const handleReset = useCallback(async () => {
     if (!editingFile) return;
-    const result = await api.resetWorkspaceFile(editingFile, agentParam);
-    if (result?.ok) {
-      toast({ variant: "success", title: t("workspace.resetDone") });
-      const data = await api.fetchWorkspaceFile(editingFile, agentParam);
-      if (data) {
-        setEditContent(data.content);
-        setOriginalContent(data.content);
+    try {
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      const result = await postJSON<{ ok: boolean }>(`/workspace/files/${encodeURIComponent(editingFile)}/reset${qs}`);
+      if (result?.ok) {
+        toast({ variant: "success", title: t("workspace.resetDone") });
+        const data = await fetchJSON<{ content: string }>(`/workspace/files/${encodeURIComponent(editingFile)}${qs}`);
+        if (data) {
+          setEditContent(data.content);
+          setOriginalContent(data.content);
+        }
+        await loadFiles();
+        await loadIdentity();
       }
-      await loadFiles();
-      await loadIdentity();
-    }
-  }, [editingFile, api, agentParam, loadFiles, loadIdentity, toast, t]);
+    } catch { /* ignore */ }
+  }, [editingFile, agentParam, loadFiles, loadIdentity, toast, t]);
 
   const deleteConfirm = useInlineConfirm();
   const handleDelete = useCallback(async () => {
     if (!editingFile) return;
-    const ok = await api.deleteWorkspaceFile(editingFile, agentParam);
-    if (ok) {
+    try {
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      await deleteJSON(`/workspace/files/${encodeURIComponent(editingFile)}${qs}`);
       toast({ variant: "success", title: t("workspace.deleted") });
       setEditingFile(null);
       deleteConfirm.reset();
       await loadFiles();
       await loadIdentity();
-    }
-  }, [editingFile, api, agentParam, loadFiles, loadIdentity, toast, t, deleteConfirm]);
+    } catch { /* ignore */ }
+  }, [editingFile, agentParam, loadFiles, loadIdentity, toast, t, deleteConfirm]);
 
   const handleCreateNew = useCallback(async () => {
     const fname = newFilename.endsWith(".md") ? newFilename : `${newFilename}.md`;
     if (!fname || fname === ".md") return;
-    const result = await api.createWorkspaceFile(fname, `# ${fname.replace(".md", "")}\n\n`, agentParam);
-    if (result?.ok) {
-      toast({ variant: "success", title: t("workspace.created", { name: fname }) });
-      setCreating(false);
-      setNewFilename("");
-      await loadFiles();
-      openEditor(fname);
-    } else {
+    try {
+      const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
+      const result = await postJSON<{ ok: boolean }>(`/workspace/files/${encodeURIComponent(fname)}${qs}`, { content: `# ${fname.replace(".md", "")}\n\n` });
+      if (result?.ok) {
+        toast({ variant: "success", title: t("workspace.created", { name: fname }) });
+        setCreating(false);
+        setNewFilename("");
+        await loadFiles();
+        openEditor(fname);
+      } else {
+        toast({ variant: "error", title: t("workspace.createFailed") });
+      }
+    } catch {
       toast({ variant: "error", title: t("workspace.createFailed") });
     }
-  }, [newFilename, api, agentParam, loadFiles, openEditor, toast, t]);
+  }, [newFilename, agentParam, loadFiles, openEditor, toast, t]);
 
   // Group files by category
   const grouped = CATEGORY_ORDER

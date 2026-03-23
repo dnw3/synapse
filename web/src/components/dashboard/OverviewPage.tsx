@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -10,10 +10,8 @@ import {
   Link2, Copy, Check, RefreshCw,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import type {
-  StatsData, UsageData, ProviderInfo, HealthData, RequestEntry,
-} from "../../types/dashboard";
+import { useStats, useUsage, useProviders, useHealth, useRequests } from "../../hooks/queries/useOverviewQueries";
+import type { RequestEntry } from "../../types/dashboard";
 import {
   StatsCard, StatusDot, SectionCard, SectionHeader,
   EmptyState, LoadingSkeleton, ChartTooltip,
@@ -39,57 +37,33 @@ function setCachedUptime(serverUptime: number) {
   uptimeCache.fetchedAt = Date.now();
 }
 
-interface OverviewPageProps {
-  connected: boolean;
-  sessionCount: number;
-  messageCount: number;
-}
-
-export default function OverviewPage({ connected, sessionCount, messageCount }: OverviewPageProps) {
+export default function OverviewPage() {
   const { t } = useTranslation();
 
-  const api = useDashboardAPI();
+  const statsQ = useStats();
+  const usageQ = useUsage();
+  const providersQ = useProviders();
+  const healthQ = useHealth();
+  const requestsQ = useRequests();
 
-  const [stats, setStats] = useState<StatsData | null>(null);
-  const [usage, setUsage] = useState<UsageData | null>(null);
-  const [providers, setProviders] = useState<ProviderInfo[] | null>(null);
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [requests, setRequests] = useState<RequestEntry[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const stats = statsQ.data ?? null;
+  const usage = usageQ.data ?? null;
+  const providers = providersQ.data ?? null;
+  const health = healthQ.data ?? null;
+  const requests: RequestEntry[] = requestsQ.data ?? [];
+  const connected = !!healthQ.data;
+  const loading = statsQ.isPending && usageQ.isPending && providersQ.isPending && healthQ.isPending && requestsQ.isPending;
 
   // Live uptime counter — initialized from module-level cache to survive tab switches
   const [liveUptime, setLiveUptime] = useState(() => getCachedUptime());
 
-  const loadOverview = useCallback(async () => {
-    const [s, u, p, h, r] = await Promise.all([
-      api.fetchStats(),
-      api.fetchUsage(),
-      api.fetchProviders(),
-      api.fetchHealth(),
-      api.fetchRequests(),
-    ]);
-    if (s) {
-      setStats(s);
-      setCachedUptime(s.uptime_secs);
-      setLiveUptime(s.uptime_secs);
+  // Update cache when stats arrive
+  useEffect(() => {
+    if (stats) {
+      setCachedUptime(stats.uptime_secs);
+      setLiveUptime(stats.uptime_secs);
     }
-    if (u) setUsage(u);
-    if (p) setProviders(p);
-    if (h) setHealth(h);
-    if (r) setRequests(r);
-    setLoading(false);
-  }, [api]);
-
-  // Initial load
-  useEffect(() => {
-    loadOverview();
-  }, [loadOverview]);
-
-  // Auto-refresh every 30s
-  useEffect(() => {
-    const interval = setInterval(loadOverview, 30_000);
-    return () => clearInterval(interval);
-  }, [loadOverview]);
+  }, [stats]);
 
   // Live uptime ticker (1s) — reads from module cache for continuity
   useEffect(() => {
@@ -110,6 +84,15 @@ export default function OverviewPage({ connected, sessionCount, messageCount }: 
   // Derive gateway access info from current page location
   const wsUrl = `ws://${window.location.hostname}:${window.location.port || "3000"}/ws`;
   const apiBaseUrl = `${window.location.protocol}//${window.location.hostname}:${window.location.port || "3000"}/api`;
+
+  // Refetch all queries
+  const handleRefresh = () => {
+    statsQ.refetch();
+    usageQ.refetch();
+    providersQ.refetch();
+    healthQ.refetch();
+    requestsQ.refetch();
+  };
 
   if (loading) {
     return (
@@ -134,6 +117,8 @@ export default function OverviewPage({ connected, sessionCount, messageCount }: 
     );
   }
 
+  const sessionCount = stats?.session_count ?? 0;
+  const messageCount = stats?.total_messages ?? 0;
   const totalTokens = (stats?.total_input_tokens ?? 0) + (stats?.total_output_tokens ?? 0);
   const modelData = usage?.per_model ?? [];
 
@@ -150,7 +135,7 @@ export default function OverviewPage({ connected, sessionCount, messageCount }: 
     output: m.output_tokens,
   }));
 
-  const totalRequests = requests?.reduce((sum, r) => sum + r.total_requests, 0) ?? 0;
+  const totalRequests = requests.reduce((sum, r) => sum + r.total_requests, 0);
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -160,8 +145,8 @@ export default function OverviewPage({ connected, sessionCount, messageCount }: 
           <StatsCard
             icon={<MessageSquare className="h-5 w-5" />}
             label={t("overview.sessions")}
-            value={stats?.session_count ?? sessionCount}
-            sub={t("overview.messageCount", { count: stats?.total_messages ?? messageCount })}
+            value={sessionCount}
+            sub={t("overview.messageCount", { count: messageCount })}
             accent="var(--chart-1)"
           />
         </div>
@@ -234,7 +219,7 @@ export default function OverviewPage({ connected, sessionCount, messageCount }: 
             title={t("overview.snapshot")}
             right={
               <button
-                onClick={loadOverview}
+                onClick={handleRefresh}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-[var(--radius-sm)] text-[11px] font-medium text-[var(--text-tertiary)] bg-[var(--bg-grouped)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
               >
                 <RefreshCw className="h-3 w-3" />
@@ -254,7 +239,7 @@ export default function OverviewPage({ connected, sessionCount, messageCount }: 
             />
             <SnapshotItem
               label={t("overview.version")}
-              value={stats ? "v0.2.0" : "—"}
+              value={stats ? "v0.2.0" : "\u2014"}
             />
             <SnapshotItem
               label={t("overview.activeWs")}
@@ -418,7 +403,7 @@ export default function OverviewPage({ connected, sessionCount, messageCount }: 
               </span>
             }
           />
-          {!requests || requests.length === 0 ? (
+          {requests.length === 0 ? (
             <EmptyState
               icon={<Server className="h-8 w-8 opacity-40" />}
               message={t("overview.noRequestData")}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Settings2, Save, Check, X, RefreshCw, Code, FormInput, Search,
@@ -7,7 +7,7 @@ import {
   Folder, Eye, EyeOff, AlertTriangle,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import { useConfig, useConfigSchema, useSaveConfig, useValidateConfig } from "../../hooks/queries/useConfigQueries";
 import { SectionCard, EmptyState, LoadingSpinner } from "./shared";
 import { useToast } from "../ui/toast";
 
@@ -357,10 +357,17 @@ const SECTION_FILTERS: Record<string, string[]> = {
 
 export default function ConfigPage({ filterSection }: { filterSection?: string } = {}) {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
   const { toast } = useToast();
 
-  const [loading, setLoading] = useState(true);
+  const configQ = useConfig();
+  const schemaQ = useConfigSchema();
+  const saveMut = useSaveConfig();
+  const validateMut = useValidateConfig();
+
+  const loading = configQ.isPending;
+  const schema = (schemaQ.data && typeof schemaQ.data === "object" && "sections" in schemaQ.data && Array.isArray((schemaQ.data as unknown as ConfigSchemaData).sections))
+    ? schemaQ.data as unknown as ConfigSchemaData : null;
+
   const [configPath, setConfigPath] = useState("");
   const [originalContent, setOriginalContent] = useState("");
   const [content, setContent] = useState("");
@@ -368,42 +375,18 @@ export default function ConfigPage({ filterSection }: { filterSection?: string }
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [schema, setSchema] = useState<ConfigSchemaData | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validating, setValidating] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load config
-  const loadConfig = useCallback(async () => {
-    setLoading(true);
-    const data = await api.fetchConfig();
-    if (data) {
-      setConfigPath(data.path);
-      setOriginalContent(data.content);
-      setContent(data.content);
-    }
-    setLoading(false);
-  }, [api]);
-
-  // Load schema separately (fire-and-forget, cached)
+  // Sync config data from query
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/dashboard/config/schema");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && data && Array.isArray(data.sections)) {
-          setSchema(data as ConfigSchemaData);
-        }
-      } catch {
-        // Schema unavailable — form falls back to TOML-only mode
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => { loadConfig(); }, [loadConfig]);
+    if (configQ.data) {
+      setConfigPath(configQ.data.path);
+      setOriginalContent(configQ.data.content);
+      setContent(configQ.data.content);
+    }
+  }, [configQ.data]);
 
   // Parsed TOML sections
   const parsedSections = useMemo(() => parseTomlSections(content), [content]);
@@ -531,12 +514,17 @@ export default function ConfigPage({ filterSection }: { filterSection?: string }
     const timer = setTimeout(async () => {
       if (!content.trim()) { setValidationErrors([]); return; }
       setValidating(true);
-      const result = await api.validateConfig(content);
+      try {
+        const result = await validateMut.mutateAsync(content);
+        if (result) setValidationErrors(result.errors ?? []);
+      } catch {
+        // validation request failed, don't update errors
+      }
       setValidating(false);
-      if (result) setValidationErrors(result.errors ?? []);
     }, 800);
     return () => clearTimeout(timer);
-  }, [content, originalContent, api]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, originalContent]);
 
   const isValid = validationErrors.length === 0;
   const hasChanges = content !== originalContent;
@@ -550,18 +538,22 @@ export default function ConfigPage({ filterSection }: { filterSection?: string }
   }, [originalContent, content, hasChanges]);
 
   // Save
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     if (!isValid) { toast({ variant: "error", title: t("config.invalidToml") }); return; }
     setSaving(true);
-    const ok = await api.saveConfig(content);
+    try {
+      await saveMut.mutateAsync(content);
+      setOriginalContent(content);
+      setValidationErrors([]);
+    } catch {
+      // toast handled by mutation
+    }
     setSaving(false);
-    if (ok) { setOriginalContent(content); setValidationErrors([]); toast({ variant: "success", title: t("config.saved") }); }
-    else toast({ variant: "error", title: t("config.saveFailed") });
-  }, [api, content, isValid, toast, t]);
+  };
 
-  const handleReload = useCallback(async () => {
-    await loadConfig(); setValidationErrors([]); toast({ variant: "success", title: t("config.reloaded") });
-  }, [loadConfig, toast, t]);
+  const handleReload = async () => {
+    await configQ.refetch(); setValidationErrors([]); toast({ variant: "success", title: t("config.reloaded") });
+  };
 
   const handleDiscard = useCallback(() => {
     setContent(originalContent); setValidationErrors([]);

@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Puzzle, Plus, LayoutGrid, List, X, Loader2,
   Wrench, Radio, Shield, Bell, Play, Square, Trash2,
   RefreshCw, FolderOpen,
 } from "lucide-react";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import {
+  usePlugins, useTogglePlugin, useControlService,
+  useInstallPlugin, useRemovePlugin,
+} from "../../hooks/queries/usePluginsQueries";
 import type { PluginInfo, ServiceInfo } from "../../types/dashboard";
 import {
   SectionCard,
@@ -48,14 +51,18 @@ const VIEW_KEY = "synapse:plugins-view";
 
 export default function PluginsPage() {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
   const { toast } = useToast();
   const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm();
 
-  // Data state
-  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const pluginsQ = usePlugins();
+  const toggleMut = useTogglePlugin();
+  const controlMut = useControlService();
+  const installMut = useInstallPlugin();
+  const removeMut = useRemovePlugin();
+
+  const plugins = pluginsQ.data?.plugins ?? [];
+  const loading = pluginsQ.isPending;
+  const error = pluginsQ.error ? t("dashboard.plugins.fetchError") : null;
 
   // UI state
   const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
@@ -65,23 +72,6 @@ export default function PluginsPage() {
   const [showInstallDialog, setShowInstallDialog] = useState(false);
   const [installPath, setInstallPath] = useState("");
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
-
-  // Fetch
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.fetchPlugins();
-      setPlugins(res?.plugins || []);
-    } catch (e) {
-      setError(t("dashboard.plugins.fetchError"));
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [api, t]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   // Persist view mode
   const changeView = (mode: "grid" | "list") => {
@@ -100,10 +90,9 @@ export default function PluginsPage() {
   const handleToggle = async (plugin: PluginInfo) => {
     await withActionLoading(`toggle:${plugin.name}`, async () => {
       try {
-        await api.togglePlugin(plugin.name, !plugin.enabled);
+        await toggleMut.mutateAsync({ name: plugin.name, enabled: !plugin.enabled });
         toast({ variant: "info", title: t("dashboard.plugins.toast.toggled", { action: plugin.enabled ? t("dashboard.plugins.detail.disable") : t("dashboard.plugins.detail.enable") }) });
         toast({ variant: "success", title: t("dashboard.plugins.detail.restartRequired") });
-        await fetchData();
         // Update selected if same
         if (selectedPlugin?.name === plugin.name) {
           setSelectedPlugin((prev) => prev ? { ...prev, enabled: !prev.enabled } : null);
@@ -122,9 +111,8 @@ export default function PluginsPage() {
     resetConfirm();
     await withActionLoading(`svc:${service.id}`, async () => {
       try {
-        await api.controlService(plugin.name, service.id, action);
+        await controlMut.mutateAsync({ plugin: plugin.name, service: service.id, action });
         toast({ variant: "success", title: t("dashboard.plugins.toast.serviceControlled", { action }) });
-        await fetchData();
       } catch (e) {
         toast({ variant: "error", title: t("dashboard.plugins.toast.error", { message: String(e) }) });
       }
@@ -139,10 +127,9 @@ export default function PluginsPage() {
     resetConfirm();
     await withActionLoading(`uninstall:${plugin.name}`, async () => {
       try {
-        await api.removePlugin(plugin.name);
+        await removeMut.mutateAsync(plugin.name);
         toast({ variant: "success", title: t("dashboard.plugins.toast.removed") });
         setSelectedPlugin(null);
-        await fetchData();
       } catch (e) {
         toast({ variant: "error", title: t("dashboard.plugins.toast.error", { message: String(e) }) });
       }
@@ -153,11 +140,10 @@ export default function PluginsPage() {
     if (!installPath.trim()) return;
     await withActionLoading("install", async () => {
       try {
-        await api.installPlugin(installPath.trim());
+        await installMut.mutateAsync(installPath.trim());
         toast({ variant: "success", title: t("dashboard.plugins.toast.installed") });
         setShowInstallDialog(false);
         setInstallPath("");
-        await fetchData();
       } catch (e) {
         toast({ variant: "error", title: t("dashboard.plugins.toast.error", { message: String(e) }) });
       }
@@ -252,7 +238,7 @@ export default function PluginsPage() {
             message={error}
             action={
               <button
-                onClick={fetchData}
+                onClick={() => pluginsQ.refetch()}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[12px] font-medium bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer border border-[var(--border-subtle)]"
               >
                 <RefreshCw className="h-3.5 w-3.5" />

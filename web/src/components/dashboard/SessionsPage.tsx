@@ -1,8 +1,13 @@
-import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { MessageSquare, ChevronDown, ChevronRight, Trash2, Pencil, PackageMinus, Search, Filter, Clock, ExternalLink, Bot } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import {
+  useSessions, useDeleteSession, useRenameSession,
+  usePatchSessionOverrides, useCompactSession,
+} from "../../hooks/queries/useSessionsQueries";
+import { useSessionCtx } from "../../contexts";
 import type { SessionEntry } from "../../types/dashboard";
 import {
   SectionCard,
@@ -13,7 +18,6 @@ import {
   StatsCard,
   useInlineConfirm,
 } from "./shared";
-import { useToast } from "../ui/toast";
 import { formatTokens, formatCost, formatDate } from "../../lib/format";
 
 type SortField = "id" | "created_at" | "message_count" | "token_count";
@@ -135,17 +139,11 @@ function InlineSelect({
   );
 }
 
-interface SessionsPageProps {
-  onNavigateToChat?: (sessionKey: string) => void;
-}
-
-export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
+export default function SessionsPage() {
   const { t, i18n } = useTranslation();
-  const api = useDashboardAPI();
+  const navigate = useNavigate();
+  const sessionCtx = useSessionCtx();
 
-  const [sessions, setSessions] = useState<SessionEntry[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [offset, setOffset] = useState(0);
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -173,34 +171,33 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm(3000);
-  const { toast } = useToast();
 
-  const loadSessions = useCallback(async () => {
-    setLoading(true);
-    const data = await api.fetchSessions({
-      limit: limitInput ? parseInt(limitInput, 10) || PAGE_LIMIT : PAGE_LIMIT,
-      offset,
-      sort: sortField,
-      order: sortOrder,
-    });
-    if (data) {
-      const dataUnk = data as unknown;
-      const raw: Record<string, unknown>[] = Array.isArray(dataUnk)
-        ? (dataUnk as Record<string, unknown>[])
-        : (((dataUnk as { sessions?: Record<string, unknown>[] }).sessions) ?? []);
-      const normalized = raw.map(normalizeSession);
-      setSessions(normalized);
-      const tot = Array.isArray(dataUnk)
-        ? normalized.length
-        : (((dataUnk as { total?: number }).total) ?? normalized.length);
-      setTotal(tot);
-    }
-    setLoading(false);
-  }, [api, offset, sortField, sortOrder, limitInput]);
+  const deleteMut = useDeleteSession();
+  const renameMut = useRenameSession();
+  const patchMut = usePatchSessionOverrides();
+  const compactMut = useCompactSession();
 
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
+  const sessionsQ = useSessions({
+    limit: limitInput ? parseInt(limitInput, 10) || PAGE_LIMIT : PAGE_LIMIT,
+    offset,
+    sort: sortField,
+    order: sortOrder,
+  });
+
+  const rawData = sessionsQ.data;
+  const sessions = useMemo(() => {
+    if (!rawData) return [];
+    const rawArr = rawData.sessions ?? [];
+    return rawArr.map((r) => normalizeSession(r as unknown as Record<string, unknown>));
+  }, [rawData]);
+  const total = rawData?.total ?? sessions.length;
+  const loading = sessionsQ.isPending;
+
+  // Helper for navigation to chat
+  const onNavigateToChat = (key: string) => {
+    sessionCtx.setActiveKey(key);
+    navigate("/chat");
+  };
 
   // Focus edit inputs
   useEffect(() => {
@@ -235,13 +232,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
       return;
     }
     resetConfirm();
-    const ok = await api.deleteSession(id);
-    if (ok) {
-      toast({ variant: "success", title: t("sessions.deleted") });
-      loadSessions();
-    } else {
-      toast({ variant: "error", title: t("sessions.deleteFailed") });
-    }
+    deleteMut.mutate(id);
   };
 
   const handleRename = async (id: string) => {
@@ -249,50 +240,21 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
       setEditingId(null);
       return;
     }
-    const result = await api.renameSession(id, editValue.trim());
-    if (result) {
-      toast({ variant: "success", title: t("sessions.renamed") });
-      loadSessions();
-    } else {
-      toast({ variant: "error", title: t("sessions.renameFailed") });
-    }
+    renameMut.mutate({ id, displayName: editValue.trim() });
     setEditingId(null);
   };
 
   const handleLabelSave = async (id: string) => {
-    const result = await api.patchSessionOverrides(id, { label: editLabelValue.trim() || undefined });
-    if (result) {
-      toast({ variant: "success", title: t("sessions.labelUpdated") });
-      // Update local state immediately
-      setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, label: editLabelValue.trim() || undefined } : s))
-      );
-    } else {
-      toast({ variant: "error", title: t("sessions.updateFailed") });
-    }
+    patchMut.mutate({ id, overrides: { label: editLabelValue.trim() || undefined } });
     setEditingLabelId(null);
   };
 
   const handleThinkingChange = async (id: string, value: string) => {
-    const result = await api.patchSessionOverrides(id, { thinking: value });
-    if (result) {
-      setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, thinking_level: value } : s))
-      );
-      toast({ variant: "success", title: t("sessions.thinkingUpdated") });
-    } else {
-      toast({ variant: "error", title: t("sessions.updateFailed") });
-    }
+    patchMut.mutate({ id, overrides: { thinking: value } });
   };
 
   const handleCompact = async (id: string) => {
-    const result = await api.compactSession(id);
-    if (result) {
-      toast({ variant: "success", title: t("sessions.compacted") });
-      loadSessions();
-    } else {
-      toast({ variant: "error", title: t("sessions.compactFailed") });
-    }
+    compactMut.mutate(id);
   };
 
   const startEditing = (id: string) => {
@@ -588,13 +550,8 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                             />
                           ) : (
                             <span
-                              onClick={() => onNavigateToChat?.(session.id)}
-                              className={cn(
-                                "flex items-center gap-1 group truncate",
-                                onNavigateToChat
-                                  ? "cursor-pointer hover:text-[var(--accent)] transition-colors"
-                                  : "cursor-default"
-                              )}
+                              onClick={() => onNavigateToChat(session.id)}
+                              className="flex items-center gap-1 group truncate cursor-pointer hover:text-[var(--accent)] transition-colors"
                               title={session.label || session.display_name || session.id}
                             >
                               {session.label ? (
@@ -606,9 +563,7 @@ export default function SessionsPage({ onNavigateToChat }: SessionsPageProps) {
                                   {t("sessions.noLabel")}
                                 </span>
                               )}
-                              {onNavigateToChat && (
-                                <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
-                              )}
+                              <ExternalLink className="h-2.5 w-2.5 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0" />
                             </span>
                           )}
                         </td>

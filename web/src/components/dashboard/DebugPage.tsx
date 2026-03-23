@@ -1,16 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Terminal, Play, Heart, Cpu, Activity, Clock, Trash2,
   Database, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import { useDebugHealth, useDebugInvoke } from "../../hooks/queries/useDebugQueries";
+import { useStats, useProviders } from "../../hooks/queries/useOverviewQueries";
 import {
   SectionCard, SectionHeader, EmptyState, LoadingSkeleton, StatsCard,
 } from "./shared";
 import { formatUptime } from "../../lib/format";
-import type { DebugHealthResponse, DebugInvokeResponse } from "../../types/dashboard";
+import type { DebugInvokeResponse } from "../../types/dashboard";
 
 interface HistoryItem {
   id: number;
@@ -80,15 +81,18 @@ const COMMON_METHODS = [
 
 export default function DebugPage() {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
 
-  const [health, setHealth] = useState<DebugHealthResponse | null>(null);
-  const [healthLoading, setHealthLoading] = useState(true);
+  const healthQ = useDebugHealth();
+  const statsQ = useStats();
+  const providersQ = useProviders();
+  const debugInvoke = useDebugInvoke();
+
+  const health = healthQ.data ?? null;
+  const healthLoading = healthQ.isPending;
 
   // Invoke form
   const [method, setMethod] = useState("health");
   const [paramsText, setParamsText] = useState("{}");
-  const [executing, setExecuting] = useState(false);
   const [response, setResponse] = useState<DebugInvokeResponse | null>(null);
 
   // History
@@ -96,40 +100,13 @@ export default function DebugPage() {
   const nextIdRef = useRef(0);
 
   // Snapshots (collapsible JSON sections)
-  const [snapshots, setSnapshots] = useState<Record<string, unknown>>({});
   const [snapshotOpen, setSnapshotOpen] = useState<Record<string, boolean>>({});
 
-  // Health polling
-  const pollHealth = useCallback(async () => {
-    const h = await api.fetchDebugHealth();
-    if (h) {
-      setHealth(h);
-      setSnapshots(prev => ({ ...prev, health: h }));
-    }
-    setHealthLoading(false);
-  }, [api]);
-
-  useEffect(() => {
-    pollHealth();
-    const interval = setInterval(pollHealth, 10_000);
-    return () => clearInterval(interval);
-  }, [pollHealth]);
-
-  // Load additional snapshots (stats, usage, providers)
-  useEffect(() => {
-    const loadSnapshots = async () => {
-      const [stats, providers] = await Promise.all([
-        api.fetchStats(),
-        api.fetchProviders(),
-      ]);
-      setSnapshots(prev => ({
-        ...prev,
-        ...(stats ? { status: stats } : {}),
-        ...(providers ? { providers } : {}),
-      }));
-    };
-    loadSnapshots();
-  }, [api]);
+  // Build snapshots from query data
+  const snapshots: Record<string, unknown> = {};
+  if (health) snapshots.health = health;
+  if (statsQ.data) snapshots.status = statsQ.data;
+  if (providersQ.data) snapshots.providers = providersQ.data;
 
   // Execute method
   const handleExecute = async () => {
@@ -141,21 +118,35 @@ export default function DebugPage() {
       return;
     }
 
-    setExecuting(true);
-    const result = await api.debugInvoke({ method, params });
-    const resp = result ?? { ok: false, error: "Request failed" };
-    setResponse(resp);
-
-    const item: HistoryItem = {
-      id: nextIdRef.current++,
-      timestamp: new Date().toLocaleTimeString(),
-      method,
-      params,
-      response: resp,
-    };
-    setHistory((prev) => [item, ...prev].slice(0, 50));
-    setExecuting(false);
+    debugInvoke.mutate({ method, params }, {
+      onSuccess: (result) => {
+        const resp = result ?? { ok: false, error: "Request failed" };
+        setResponse(resp);
+        const item: HistoryItem = {
+          id: nextIdRef.current++,
+          timestamp: new Date().toLocaleTimeString(),
+          method,
+          params,
+          response: resp,
+        };
+        setHistory((prev) => [item, ...prev].slice(0, 50));
+      },
+      onError: () => {
+        const resp: DebugInvokeResponse = { ok: false, error: "Request failed" };
+        setResponse(resp);
+        const item: HistoryItem = {
+          id: nextIdRef.current++,
+          timestamp: new Date().toLocaleTimeString(),
+          method,
+          params,
+          response: resp,
+        };
+        setHistory((prev) => [item, ...prev].slice(0, 50));
+      },
+    });
   };
+
+  const executing = debugInvoke.isPending;
 
   const clearHistory = () => {
     setHistory([]);

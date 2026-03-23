@@ -217,10 +217,37 @@ export interface StoreStatus {
   source: string;
 }
 
-export interface McpEntry {
+// ---------------------------------------------------------------------------
+// MCP Servers
+// ---------------------------------------------------------------------------
+
+export interface McpToolInfo {
   name: string;
-  transport: string;
+  prefixedName: string;
+  description: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface McpServerInfo {
+  name: string;
+  transport: "stdio" | "sse" | "streamable-http";
   command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
+  status: "connected" | "disconnected" | "error" | "unknown";
+  tools: McpToolInfo[];
+  lastChecked?: string;
+  error?: string;
+  transient: boolean;
+}
+
+export interface McpTestResult {
+  success: boolean;
+  toolCount: number;
+  latencyMs: number;
+  error?: string;
 }
 
 export interface RequestEntry {
@@ -277,6 +304,7 @@ export type TabKey =
   | "nodes"
   | "plugins"
   | "sandbox"
+  | "mcp-servers"
   | "communications"
   | "automation"
   | "infrastructure"

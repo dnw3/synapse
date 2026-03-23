@@ -7,7 +7,9 @@ import {
   BarChart3, DollarSign, Zap, Activity, Download, RefreshCw, Radio, Bot, Timer,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import { useUsage } from "../../hooks/queries/useOverviewQueries";
+import { useDebugInvoke } from "../../hooks/queries/useDebugQueries";
+import { fetchJSON } from "../../lib/api";
 import type {
   UsageData, UsageTimeseriesEntry, UsageSessionEntry,
 } from "../../types/dashboard";
@@ -125,9 +127,11 @@ function DistributionBars({ entries }: { entries: AggregateEntry[] }) {
 export default function UsagePage() {
   const { t, i18n } = useTranslation();
   const isZh = i18n.language?.startsWith("zh");
-  const api = useDashboardAPI();
 
-  const [usage, setUsage] = useState<UsageData | null>(null);
+  const usageQ = useUsage();
+  const debugInvoke = useDebugInvoke();
+  const usage = usageQ.data ?? null;
+
   const [timeseries, setTimeseries] = useState<UsageTimeseriesEntry[] | null>(null);
   const [sessions, setSessions] = useState<UsageSessionEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,7 +153,7 @@ export default function UsagePage() {
 
   const fetchAggregates = useCallback(async () => {
     try {
-      const resp = await api.debugInvoke({ method: "usage.aggregates", params: { since_days: sinceDays } });
+      const resp = await debugInvoke.mutateAsync({ method: "usage.aggregates", params: { since_days: sinceDays } });
       if (resp?.ok && resp.result) {
         const data = resp.result as UsageAggregates;
         setChannelUsage(data.by_channel ?? []);
@@ -162,35 +166,38 @@ export default function UsagePage() {
       setAgentUsage([]);
       setLatencyStats(null);
     }
-  }, [api, sinceDays]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sinceDays]);
 
   const load = useCallback(async () => {
     const params = rangeToParams(range);
-    const [u, ts, ss] = await Promise.all([
-      api.fetchUsage(),
-      api.fetchUsageTimeseries(params.from, params.to, params.granularity),
-      api.fetchUsageSessions(params.from, params.to, sessSort, sessLimit, sessOffset),
+    const [ts, ss] = await Promise.all([
+      fetchJSON<UsageTimeseriesEntry[]>(`/usage/timeseries?${new URLSearchParams({ ...(params.from ? { from: params.from } : {}), ...(params.to ? { to: params.to } : {}), ...(params.granularity ? { granularity: params.granularity } : {}) })}`).catch(() => null),
+      fetchJSON<UsageSessionEntry[]>(`/usage/sessions?${new URLSearchParams({ ...(params.from ? { from: params.from } : {}), ...(params.to ? { to: params.to } : {}), sort: sessSort, limit: String(sessLimit), offset: String(sessOffset) })}`).catch(() => null),
       fetchAggregates(),
     ]);
-    if (u) setUsage(u);
     if (ts && ts.length > 0) {
       setTimeseries(ts);
-    } else if (u) {
+    } else if (usage) {
       // Fallback: create synthetic timeseries from aggregate data
-      setTimeseries(syntheticTimeseries(u, range));
+      setTimeseries(syntheticTimeseries(usage, range));
     }
     if (ss) setSessions(ss);
     setLoading(false);
     setRefreshing(false);
-  }, [api, range, sessSort, sessOffset, fetchAggregates]);
+  }, [range, sessSort, sessOffset, fetchAggregates, usage]);
 
   useEffect(() => {
-    setLoading(true);
-    load();
-  }, [load]);
+    if (!usageQ.isPending) {
+      setLoading(true);
+      load();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [load, usageQ.isPending]);
 
   const handleRefresh = () => {
     setRefreshing(true);
+    usageQ.refetch();
     load();
   };
 

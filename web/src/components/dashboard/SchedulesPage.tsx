@@ -1,11 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   CalendarClock, Plus, Zap, Power, Trash2, Pencil, Play, Clock, Save, X,
 } from "lucide-react";
 import { cn } from "../../lib/cn";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import type { ScheduleEntry, ScheduleRunEntry } from "../../types/dashboard";
+import {
+  useSchedules, useCreateSchedule, useUpdateSchedule,
+  useDeleteSchedule, useToggleSchedule, useTriggerSchedule, useScheduleRuns,
+} from "../../hooks/queries/useSchedulesQueries";
+import type { ScheduleEntry } from "../../types/dashboard";
 import {
   StatsCard, SectionCard, SectionHeader, EmptyState, LoadingSkeleton,
   Toggle, useInlineConfirm,
@@ -36,48 +39,29 @@ const emptyForm: FormState = {
 
 export default function SchedulesPage() {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
 
-  const [schedules, setSchedules] = useState<ScheduleEntry[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const schedulesQ = useSchedules();
+  const createMut = useCreateSchedule();
+  const updateMut = useUpdateSchedule();
+  const deleteMut = useDeleteSchedule();
+  const toggleMut = useToggleSchedule();
+  const triggerMut = useTriggerSchedule();
+
+  const schedules = schedulesQ.data ?? null;
+  const loading = schedulesQ.isPending;
+
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [triggeringName, setTriggeringName] = useState<string | null>(null);
-  const [runs, setRuns] = useState<ScheduleRunEntry[]>([]);
-  const [runsLoading, setRunsLoading] = useState(false);
+
+  const runsQ = useScheduleRuns(selectedName ?? "");
+  const runs = runsQ.data ?? [];
+  const runsLoading = runsQ.isPending && !!selectedName;
 
   const { confirming, requestConfirm, reset: resetConfirm } = useInlineConfirm(3000);
   const { toast } = useToast();
-
-  // ── Load schedules ──
-  const loadSchedules = useCallback(async () => {
-    setLoading(true);
-    const data = await api.fetchSchedules();
-    if (data) setSchedules(data);
-    setLoading(false);
-  }, [api]);
-
-  useEffect(() => {
-    loadSchedules();
-  }, [loadSchedules]);
-
-  // ── Load runs when a schedule is selected ──
-  const loadRuns = useCallback(async (name: string) => {
-    setRunsLoading(true);
-    const data = await api.fetchScheduleRuns(name);
-    setRuns(data ?? []);
-    setRunsLoading(false);
-  }, [api]);
-
-  useEffect(() => {
-    if (selectedName) {
-      loadRuns(selectedName);
-    } else {
-      setRuns([]);
-    }
-  }, [selectedName, loadRuns]);
 
   // ── Stats ──
   const enabledCount = schedules?.filter((s) => s.enabled).length ?? 0;
@@ -119,18 +103,15 @@ export default function SchedulesPage() {
       interval_secs: form.scheduleType === "interval" ? form.interval_secs : undefined,
     };
 
-    let result: ScheduleEntry | null;
-    if (editing && selectedName) {
-      result = await api.updateSchedule(selectedName, payload);
-    } else {
-      result = await api.createSchedule(payload);
-    }
-
-    if (result) {
+    try {
+      if (editing && selectedName) {
+        await updateMut.mutateAsync({ name: selectedName, schedule: payload });
+      } else {
+        await createMut.mutateAsync(payload);
+      }
       toast({ variant: "success", title: editing ? t("schedules.updated") : t("schedules.created") });
       clearForm();
-      await loadSchedules();
-    } else {
+    } catch {
       toast({ variant: "error", title: t("schedules.operationFailed") });
     }
     setSaving(false);
@@ -142,34 +123,25 @@ export default function SchedulesPage() {
       return;
     }
     resetConfirm();
-    const ok = await api.deleteSchedule(name);
-    if (ok) {
-      toast({ variant: "success", title: t("schedules.deleted") });
+    try {
+      await deleteMut.mutateAsync(name);
       if (selectedName === name) clearForm();
-      await loadSchedules();
-    } else {
-      toast({ variant: "error", title: t("schedules.deleteFailed") });
+    } catch {
+      // toast already handled by mutation hook
     }
   };
 
   const handleToggle = async (entry: ScheduleEntry) => {
-    const result = await api.toggleSchedule(entry.name);
-    if (result) {
-      setSchedules((prev) =>
-        prev?.map((s) => (s.name === entry.name ? { ...s, enabled: result.enabled } : s)) ?? null
-      );
-      toast({ variant: "success", title: result.enabled ? t("schedules.enabled") : t("schedules.disabled") });
-    }
+    toggleMut.mutate(entry.name);
   };
 
   const handleTrigger = async (name: string) => {
     setTriggeringName(name);
-    const result = await api.triggerSchedule(name);
-    if (result) {
-      toast({ variant: "success", title: t("schedules.triggered") });
-      if (selectedName === name) loadRuns(name);
-    } else {
-      toast({ variant: "error", title: t("schedules.triggerFailed") });
+    try {
+      await triggerMut.mutateAsync(name);
+      if (selectedName === name) runsQ.refetch();
+    } catch {
+      // toast handled by mutation
     }
     setTriggeringName(null);
   };

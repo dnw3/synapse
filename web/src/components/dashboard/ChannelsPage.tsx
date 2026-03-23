@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Radio, RefreshCw, ChevronDown, ChevronRight, Save, Wifi, WifiOff, ShieldCheck, UserCheck, UserX, Check, Loader2 } from "lucide-react";
-import { useDashboardAPI } from "../../hooks/useDashboardAPI";
+import { useChannels, useToggleChannel, useUpdateChannelConfig } from "../../hooks/queries/useChannelsQueries";
+import { useBindings } from "../../hooks/queries/useAgentsQueries";
+import { useDebugInvoke } from "../../hooks/queries/useDebugQueries";
 import type { ChannelEntry, BindingEntry } from "../../types/dashboard";
 import {
   SectionCard,
@@ -40,15 +42,16 @@ function formatRelativeTime(unixSecs: number): string {
 
 // ---------- Live Status Section ----------
 
-function LiveStatusSection({ api }: { api: ReturnType<typeof import("../../hooks/useDashboardAPI").useDashboardAPI> }) {
+function LiveStatusSection() {
   const { t } = useTranslation();
+  const debugInvoke = useDebugInvoke();
   const [channelMap, setChannelMap] = useState<Record<string, ChannelAccountStatus[]> | null>(null);
   const [loadingLive, setLoadingLive] = useState(true);
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchLiveStatus = useCallback(async () => {
-    const resp = await api.debugInvoke({ method: "channels.status", params: {} });
+    const resp = await debugInvoke.mutateAsync({ method: "channels.status", params: {} }).catch(() => null);
     if (resp?.ok && resp.result && typeof resp.result === "object" && "channels" in resp.result) {
       const raw = (resp.result as { channels: Record<string, { accounts: ChannelAccountStatus[]; configured: number }> }).channels;
       // Extract accounts arrays, filtering to only channels with configured > 0
@@ -63,7 +66,8 @@ function LiveStatusSection({ api }: { api: ReturnType<typeof import("../../hooks
       setChannelMap({});
     }
     setLoadingLive(false);
-  }, [api]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     fetchLiveStatus();
@@ -462,11 +466,10 @@ interface AllowlistEntry {
   sender_id: string;
 }
 
-function DmPairingSection({ api, toast }: {
-  api: ReturnType<typeof import("../../hooks/useDashboardAPI").useDashboardAPI>;
-  toast: ReturnType<typeof useToast>["toast"];
-}) {
+function DmPairingSection() {
   const { t } = useTranslation();
+  const { toast } = useToast();
+  const debugInvoke = useDebugInvoke();
   const [pending, setPending] = useState<PairingRequest[]>([]);
   const [allowEntries, setAllowEntries] = useState<AllowlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -476,7 +479,7 @@ function DmPairingSection({ api, toast }: {
 
   const fetchData = useCallback(async () => {
     // First discover which channels have pairing data
-    const chResp = await api.debugInvoke({ method: "dm.pairing.channels", params: {} });
+    const chResp = await debugInvoke.mutateAsync({ method: "dm.pairing.channels", params: {} }).catch(() => null);
     const channels: string[] = (chResp?.ok && chResp.result)
       ? (chResp.result as { channels: string[] }).channels ?? []
       : [];
@@ -492,8 +495,8 @@ function DmPairingSection({ api, toast }: {
     // Fetch pending + allowlist for all channels in parallel
     const results = await Promise.all(
       channels.flatMap((ch) => [
-        api.debugInvoke({ method: "dm.pairing.list", params: { channel: ch } }),
-        api.debugInvoke({ method: "dm.pairing.allowlist", params: { channel: ch } }),
+        debugInvoke.mutateAsync({ method: "dm.pairing.list", params: { channel: ch } }).catch(() => null),
+        debugInvoke.mutateAsync({ method: "dm.pairing.allowlist", params: { channel: ch } }).catch(() => null),
       ])
     );
 
@@ -517,7 +520,8 @@ function DmPairingSection({ api, toast }: {
     setAllowEntries(allAllow);
     setFetchedAt(Date.now());
     setLoading(false);
-  }, [api]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -527,7 +531,7 @@ function DmPairingSection({ api, toast }: {
 
   const handleApprove = async (channel: string, code: string) => {
     setApprovingCode(code);
-    const resp = await api.debugInvoke({ method: "dm.pairing.approve", params: { channel, code } });
+    const resp = await debugInvoke.mutateAsync({ method: "dm.pairing.approve", params: { channel, code } }).catch(() => null);
     setApprovingCode(null);
     if (resp?.ok && (resp.result as { approved?: boolean })?.approved) {
       toast({ variant: "success", title: t("dmPairing.approved") });
@@ -541,7 +545,7 @@ function DmPairingSection({ api, toast }: {
   const handleRemove = async (channel: string, senderId: string) => {
     const key = `${channel}:${senderId}`;
     setRemovingKey(key);
-    const resp = await api.debugInvoke({ method: "dm.pairing.remove", params: { channel, sender_id: senderId } });
+    const resp = await debugInvoke.mutateAsync({ method: "dm.pairing.remove", params: { channel, sender_id: senderId } }).catch(() => null);
     setRemovingKey(null);
     if (resp?.ok && (resp.result as { removed?: boolean })?.removed) {
       toast({ variant: "success", title: t("dmPairing.removed") });
@@ -713,29 +717,20 @@ function DmPairingSection({ api, toast }: {
 
 export default function ChannelsPage() {
   const { t } = useTranslation();
-  const api = useDashboardAPI();
   const { toast } = useToast();
 
-  const [channels, setChannels] = useState<ChannelEntry[]>([]);
-  const [bindings, setBindings] = useState<BindingEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const channelsQ = useChannels();
+  const bindingsQ = useBindings();
+  const toggleMut = useToggleChannel();
+  const updateConfigMut = useUpdateChannelConfig();
+
+  const channels = channelsQ.data ?? [];
+  const bindings: BindingEntry[] = bindingsQ.data ?? [];
+  const loading = channelsQ.isPending;
+
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
   const [savingChannel, setSavingChannel] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
-
-  const loadData = useCallback(async () => {
-    const [ch, bd] = await Promise.all([
-      api.fetchChannels(),
-      api.fetchBindings(),
-    ]);
-    if (ch) setChannels(ch);
-    if (bd) setBindings(bd);
-    setLoading(false);
-  }, [api]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
 
   const handleToggleChannel = async (channel: ChannelEntry) => {
     // When enabling, validate required fields are filled
@@ -753,49 +748,27 @@ export default function ChannelsPage() {
       }
     }
 
-    // Optimistic update
-    const prevEnabled = channel.enabled;
-    setChannels((prev) =>
-      prev.map((c) =>
-        c.name === channel.name ? { ...c, enabled: !prevEnabled } : c
-      )
-    );
-
-    const result = await api.toggleChannel(channel.name);
-    if (result === null) {
-      // Rollback
-      setChannels((prev) =>
-        prev.map((c) =>
-          c.name === channel.name ? { ...c, enabled: prevEnabled } : c
-        )
-      );
-      toast({ variant: "error", title: t("dashboard.channelToggleFailed", "Failed to toggle channel") });
-    } else {
-      toast({ variant: "success", title: result.enabled ? t("dashboard.channelEnabled", "Channel enabled") : t("dashboard.channelDisabled", "Channel disabled") });
-    }
+    toggleMut.mutate(channel.name, {
+      onError: () => {
+        toast({ variant: "error", title: t("dashboard.channelToggleFailed", "Failed to toggle channel") });
+      },
+    });
   };
 
   const handleSaveConfig = async (name: string, config: Record<string, string>) => {
     setSavingChannel(name);
-    const result = await api.updateChannelConfig(name, config);
-    setSavingChannel(null);
-
-    if (result?.ok) {
-      // Update local state with new config
-      setChannels((prev) =>
-        prev.map((c) =>
-          c.name === name ? { ...c, config } : c
-        )
-      );
+    try {
+      await updateConfigMut.mutateAsync({ name, config });
       toast({ variant: "success", title: t("dashboard.channelConfigSaved", "Channel config saved") });
-    } else {
+    } catch {
       toast({ variant: "error", title: t("dashboard.channelConfigFailed", "Failed to save channel config") });
     }
+    setSavingChannel(null);
   };
 
   const handleRefresh = () => {
-    setLoading(true);
-    loadData();
+    channelsQ.refetch();
+    bindingsQ.refetch();
   };
 
   const toggleExpand = (name: string) => {
@@ -824,7 +797,7 @@ export default function ChannelsPage() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Live Channel Status */}
-      <LiveStatusSection api={api} />
+      <LiveStatusSection />
 
       {/* Bot Channels */}
       <SectionCard>
@@ -938,7 +911,7 @@ export default function ChannelsPage() {
       </SectionCard>
 
       {/* DM Pairing */}
-      <DmPairingSection api={api} toast={toast} />
+      <DmPairingSection />
 
     </div>
   );

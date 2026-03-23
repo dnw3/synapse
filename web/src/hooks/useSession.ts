@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Session, Message, FileAttachment } from "../types";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import type { Message, FileAttachment } from "../types";
 import type { UseGatewayReturn } from "./useGateway";
+import { useSessionLifecycle } from "./useSessionLifecycle";
+import { useStreamingHandler } from "./useStreamingHandler";
+import type { ApprovalRequest } from "./useStreamingHandler";
 
-/** Streaming event types that build real-time messages. */
+// ---------------------------------------------------------------------------
+// Public types (unchanged from original)
+// ---------------------------------------------------------------------------
+
 export interface StreamingState {
   messages: Message[];
   pendingApproval: { tool_name: string; args_preview: string; risk_level: string } | null;
@@ -10,7 +16,7 @@ export interface StreamingState {
 }
 
 export interface UseSessionReturn {
-  sessions: Session[];
+  sessions: import("../types").Session[];
   activeKey: string | null;
   setActiveKey: (key: string) => void;
   messages: Message[];
@@ -30,342 +36,161 @@ export interface UseSessionReturn {
   dismissError: () => void;
 }
 
+// ---------------------------------------------------------------------------
+// Chat state reducer
+// ---------------------------------------------------------------------------
+
+type ChatState = {
+  sendLock: boolean;
+  chatError: string | null;
+  pendingApproval: ApprovalRequest | null;
+};
+
+type ChatAction =
+  | { type: "LOCK" }
+  | { type: "UNLOCK" }
+  | { type: "SET_ERROR"; error: string }
+  | { type: "CLEAR_ERROR" }
+  | { type: "SET_APPROVAL"; request: ApprovalRequest }
+  | { type: "CLEAR_APPROVAL" };
+
+const initialChatState: ChatState = {
+  sendLock: false,
+  chatError: null,
+  pendingApproval: null,
+};
+
+function chatReducer(state: ChatState, action: ChatAction): ChatState {
+  switch (action.type) {
+    case "LOCK":
+      return { ...state, sendLock: true };
+    case "UNLOCK":
+      return { ...state, sendLock: false };
+    case "SET_ERROR":
+      return { ...state, chatError: action.error };
+    case "CLEAR_ERROR":
+      return { ...state, chatError: null };
+    case "SET_APPROVAL":
+      return { ...state, pendingApproval: action.request };
+    case "CLEAR_APPROVAL":
+      return { ...state, pendingApproval: null };
+    default:
+      return state;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Composition hook
+// ---------------------------------------------------------------------------
+
 export function useSession(gw: UseGatewayReturn): UseSessionReturn {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [sendLock, setSendLock] = useState(false);
+  const lifecycle = useSessionLifecycle(gw);
+  const [chatState, dispatch] = useReducer(chatReducer, initialChatState);
   const [messageQueue, setMessageQueue] = useState<Array<{ id: string; content: string; attachments?: FileAttachment[] }>>([]);
-  const [chatError, setChatError] = useState<string | null>(null);
 
-  // Streaming state
-  const [streamingMessages, setStreamingMessages] = useState<Message[]>([]);
-  const [pendingApproval, setPendingApproval] = useState<{ tool_name: string; args_preview: string; risk_level: string } | null>(null);
-  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
+  // Ref to clearStreaming so onTurnComplete can call it without a forward reference
+  const clearStreamingRef = useRef<() => void>(() => {});
 
-  // Accumulator refs for streaming content
-  const assistantContentRef = useRef("");
-  const reasoningContentRef = useRef("");
+  // --- Callbacks for streaming handler ---
 
-  // Per-session message cache
-  const messageCacheRef = useRef<Record<string, Message[]>>({});
-  const activeKeyRef = useRef<string | null>(null);
-
-  // Pending message for when WS reconnects
-  const pendingMessageRef = useRef<{ content: string; attachments?: FileAttachment[] } | null>(null);
-
-  // Stable ref to gw — prevents callbacks from depending on gwRef.current.connected
-  const gwRef = useRef(gw);
-  gwRef.current = gw;
-
-  // Keep activeKeyRef in sync via effect (not during render)
-  useEffect(() => {
-    activeKeyRef.current = activeKey;
-  }, [activeKey]);
-
-  const clearStreaming = useCallback(() => {
-    setStreamingMessages([]);
-    setPendingApproval(null);
-    setCurrentRequestId(null);
-    assistantContentRef.current = "";
-    reasoningContentRef.current = "";
-  }, []);
-
-  // Load sessions — uses gwRef to avoid dependency on gwRef.current.connected
-  const refreshSessions = useCallback(async () => {
-    if (!gwRef.current.connected) return;
-    try {
-      const result = await gwRef.current.call<{ sessions: Session[] }>("sessions.list");
-      const list = result.sessions ?? (result as unknown as Session[]);
-      setSessions(Array.isArray(list) ? list : []);
-    } catch {
-      // Will retry on reconnect
-    }
-  }, []);
-
-  // Load messages for active session — uses gwRef
-  const refreshMessages = useCallback(async () => {
-    const key = activeKeyRef.current;
-    if (!key || !gwRef.current.connected) return;
-    try {
-      const result = await gwRef.current.call<{ messages: Message[] }>("chat.history", { sessionKey: key });
-      const msgs = result.messages ?? (result as unknown as Message[]);
-      setMessages(msgs);
-      messageCacheRef.current[key] = msgs;
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  // On connect: load sessions, select default
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (!gwRef.current.connected) return;
-    refreshSessions().then(() => {
-      // Send pending message if any
-      if (pendingMessageRef.current && activeKeyRef.current) {
-        const { content, attachments } = pendingMessageRef.current;
-        pendingMessageRef.current = null;
-        const id = rpcId();
-        const params: Record<string, unknown> = {
-          sessionKey: activeKeyRef.current,
-          message: content,
-          idempotencyKey: id,
-        };
-        if (attachments && attachments.length > 0) {
-          params.attachments = attachments;
-        }
-        gwRef.current.send({
-          type: "request",
-          id,
-          method: "chat.send",
-          params,
-        });
-      }
-    });
-  }, [gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Select default session when sessions load and no active key
-  useEffect(() => {
-    if (activeKey) return;
-    if (sessions.length === 0) {
-      // No sessions yet — set default key so first chat.send can create one implicitly
-      setActiveKey("main");
-      return;
-    }
-    const webSession = sessions.find(s => s.channel === "web" || s.channel === "webchat");
-    const defaultKey = webSession?.sessionKey ?? sessions[0]?.sessionKey ?? "main";
-    setActiveKey(defaultKey);
-  }, [sessions, activeKey]);
-
-  // Load messages when active key changes
-  useEffect(() => {
-    if (!activeKey) {
-      setMessages([]);
-      return;
-    }
-
-    // Restore from cache
-    const cached = messageCacheRef.current[activeKey];
-    if (cached && cached.length > 0) {
-      setMessages(cached);
-    } else {
-      setMessages([]);
-    }
-
-    // Clear streaming from previous session
-    clearStreaming();
-    setSendLock(false);
-    setChatError(null);
-
-    // Fetch from server
-    if (gwRef.current.connected) {
-      setLoading(true);
-      gwRef.current.call<{ messages: Message[] }>("chat.history", { sessionKey: activeKey })
+  const onTurnComplete = useCallback(() => {
+    dispatch({ type: "UNLOCK" });
+    // Refresh messages from server, then clear streaming & flush queue
+    const key = lifecycle.activeKeyRef.current;
+    if (key && lifecycle.gwRef.current.connected) {
+      lifecycle.gwRef.current.call<{ messages: Message[] }>("chat.history", { sessionKey: key })
         .then(result => {
           const msgs = result.messages ?? (result as unknown as Message[]);
-          setMessages(current => (msgs.length >= current.length ? msgs : current));
-          messageCacheRef.current[activeKey] = msgs;
+          lifecycle.setMessages(msgs);
+          lifecycle.updateCache(key, msgs);
         })
         .catch(() => {})
-        .finally(() => setLoading(false));
-    }
-  }, [activeKey, gw.connected]); // eslint-disable-line react-hooks/exhaustive-deps
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  // Subscribe to streaming events
-  useEffect(() => {
-    const unsubscribe = gw.subscribe((event, payload) => {
-      // Filter by sessionKey if present
-      const evtKey = payload.sessionKey as string | undefined;
-      if (evtKey && evtKey !== activeKeyRef.current) return;
-
-      switch (event) {
-        case "agent.message.start":
-          setCurrentRequestId((payload.request_id as string) ?? null);
-          break;
-
-        case "agent.message.delta":
-          assistantContentRef.current += (payload.content as string) ?? "";
-          // Trigger re-render with current accumulated content
-          setStreamingMessages(prev => {
-            const newMsg: Message = {
-              role: "assistant",
-              content: assistantContentRef.current,
-              tool_calls: [],
-              reasoning: reasoningContentRef.current || undefined,
-            };
-            // Replace last assistant message or add new one
-            const lastIdx = prev.length - 1;
-            if (lastIdx >= 0 && prev[lastIdx].role === "assistant" && prev[lastIdx].tool_calls.length === 0) {
-              const updated = [...prev];
-              updated[lastIdx] = newMsg;
-              return updated;
-            }
-            return [...prev, newMsg];
-          });
-          break;
-
-        case "agent.thinking.delta":
-          reasoningContentRef.current += (payload.content as string) ?? "";
-          setStreamingMessages(prev => {
-            const newMsg: Message = {
-              role: "assistant",
-              content: assistantContentRef.current,
-              tool_calls: [],
-              reasoning: reasoningContentRef.current || undefined,
-            };
-            const lastIdx = prev.length - 1;
-            if (lastIdx >= 0 && prev[lastIdx].role === "assistant" && prev[lastIdx].tool_calls.length === 0) {
-              const updated = [...prev];
-              updated[lastIdx] = newMsg;
-              return updated;
-            }
-            return [...prev, newMsg];
-          });
-          break;
-
-        case "agent.tool.start":
-          // Flush any accumulated assistant content first
-          if (assistantContentRef.current || reasoningContentRef.current) {
-            setStreamingMessages(prev => {
-              // Check if the last message is already the streaming assistant msg — keep it
-              const last = prev[prev.length - 1];
-              const needsFlush = !last || last.role !== "assistant" || last.tool_calls.length > 0;
-              const base = needsFlush ? [...prev, {
-                role: "assistant" as const,
-                content: assistantContentRef.current,
-                tool_calls: [],
-                reasoning: reasoningContentRef.current || undefined,
-              }] : prev;
-              assistantContentRef.current = "";
-              reasoningContentRef.current = "";
-              return [
-                ...base,
-                {
-                  role: "assistant" as const,
-                  content: "",
-                  tool_calls: [{ name: (payload.name as string) ?? "", arguments: (payload.args as Record<string, unknown>) ?? {}, display: payload.display as Message["tool_calls"][number]["display"] }],
-                },
-              ];
-            });
-          } else {
-            setStreamingMessages(prev => [
-              ...prev,
-              {
-                role: "assistant" as const,
-                content: "",
-                tool_calls: [{ name: (payload.name as string) ?? "", arguments: (payload.args as Record<string, unknown>) ?? {}, display: payload.display as Message["tool_calls"][number]["display"] }],
+        .finally(() => {
+          clearStreamingRef.current();
+          // Flush queue
+          setMessageQueue(prev => {
+            if (prev.length === 0) return prev;
+            const [next, ...rest] = prev;
+            dispatch({ type: "LOCK" });
+            lifecycle.gwRef.current.send({
+              type: "request",
+              id: next.id,
+              method: "chat.send",
+              params: {
+                sessionKey: lifecycle.activeKeyRef.current,
+                message: next.content,
+                idempotencyKey: next.id,
+                ...(next.attachments && next.attachments.length > 0 ? { attachments: next.attachments } : {}),
               },
-            ]);
-          }
-          break;
-
-        case "agent.tool.result":
-          setStreamingMessages(prev => [
-            ...prev,
-            { role: "tool" as const, content: (payload.content as string) ?? "", tool_calls: [] },
-          ]);
-          break;
-
-        case "approval.requested":
-          setPendingApproval({
-            tool_name: (payload.tool_name as string) ?? "",
-            args_preview: (payload.args_preview as string) ?? "",
-            risk_level: (payload.risk_level as string) ?? "",
+            });
+            return rest;
           });
-          break;
+        });
+    } else {
+      clearStreamingRef.current();
+    }
+  }, [lifecycle]);
 
-        case "agent.turn.complete": {
-          setSendLock(false);
-          // Refresh messages from server, then clear streaming
-          const key = activeKeyRef.current;
-          if (key && gwRef.current.connected) {
-            gwRef.current.call<{ messages: Message[] }>("chat.history", { sessionKey: key })
-              .then(result => {
-                const msgs = result.messages ?? (result as unknown as Message[]);
-                setMessages(msgs);
-                messageCacheRef.current[key] = msgs;
-              })
-              .catch(() => {})
-              .finally(() => {
-                clearStreaming();
-                // Flush queue
-                setMessageQueue(prev => {
-                  if (prev.length === 0) return prev;
-                  const [next, ...rest] = prev;
-                  setSendLock(true);
-                  gwRef.current.send({
-                    type: "request",
-                    id: next.id,
-                    method: "chat.send",
-                    params: {
-                      sessionKey: activeKeyRef.current,
-                      message: next.content,
-                      idempotencyKey: next.id,
-                      ...(next.attachments && next.attachments.length > 0 ? { attachments: next.attachments } : {}),
-                    },
-                  });
-                  return rest;
-                });
-              });
-          } else {
-            clearStreaming();
-          }
-          break;
-        }
+  const onApproval = useCallback((request: ApprovalRequest) => {
+    dispatch({ type: "SET_APPROVAL", request });
+  }, []);
 
-        case "agent.error": {
-          const rid = (payload.request_id as string) ?? null;
-          const msg = (payload.message as string) ?? "Unknown error";
-          const errorMsg = rid ? `${msg}\n[LogID: ${rid}]` : msg;
-          setSendLock(false);
-          setChatError(errorMsg);
-          break;
-        }
+  const onError = useCallback((error: string) => {
+    dispatch({ type: "SET_ERROR", error });
+    dispatch({ type: "UNLOCK" });
+  }, []);
 
-        case "sessions.changed":
-          refreshSessions();
-          refreshMessages();
-          break;
+  const onSessionsChanged = useCallback(() => {
+    lifecycle.refreshSessions();
+    lifecycle.refreshMessages();
+  }, [lifecycle]);
 
-        case "session.compacted":
-          // Handled by App.tsx toast — just refresh messages
-          refreshMessages();
-          break;
+  const streamingHandler = useStreamingHandler(
+    gw,
+    lifecycle.activeKeyRef,
+    onTurnComplete,
+    onApproval,
+    onError,
+    onSessionsChanged,
+  );
 
-        default:
-          break;
-      }
-    });
+  // Keep the ref in sync
+  useEffect(() => {
+    clearStreamingRef.current = streamingHandler.clearStreaming;
+  });
 
-    return unsubscribe;
-  }, [clearStreaming]);
+  // Clear streaming + chat state on session switch (matches original behavior)
+  useEffect(() => {
+    streamingHandler.clearStreaming();
+    dispatch({ type: "UNLOCK" });
+    dispatch({ type: "CLEAR_ERROR" });
+  }, [lifecycle.activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Public actions ---
 
   const sendMessage = useCallback((content: string, attachments?: FileAttachment[]) => {
-    const key = activeKeyRef.current;
+    const key = lifecycle.activeKeyRef.current;
     if (!key) return;
 
     const humanMsg: Message = { role: "human", content, tool_calls: [] };
     const idempotencyKey = crypto.randomUUID();
 
-    setChatError(null);
+    dispatch({ type: "CLEAR_ERROR" });
 
-    if (sendLock) {
+    if (chatState.sendLock) {
       setMessageQueue(prev => [...prev, { id: idempotencyKey, content, attachments }]);
-      setMessages(prev => [...prev, humanMsg]);
+      lifecycle.setMessages(prev => [...prev, humanMsg]);
       return;
     }
 
-    if (!gwRef.current.connected) {
-      pendingMessageRef.current = { content, attachments };
-      setMessages(prev => [...prev, humanMsg]);
+    if (!lifecycle.gwRef.current.connected) {
+      lifecycle.setPendingMessage({ content, attachments });
+      lifecycle.setMessages(prev => [...prev, humanMsg]);
       return;
     }
 
-    setSendLock(true);
-    setMessages(prev => [...prev, humanMsg]);
+    dispatch({ type: "LOCK" });
+    lifecycle.setMessages(prev => [...prev, humanMsg]);
 
     const params: Record<string, unknown> = {
       sessionKey: key,
@@ -375,87 +200,89 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
     if (attachments && attachments.length > 0) {
       params.attachments = attachments;
     }
-    gwRef.current.send({
+    lifecycle.gwRef.current.send({
       type: "request",
       id: rpcId(),
       method: "chat.send",
       params,
     });
-  }, [sendLock]);
+  }, [chatState.sendLock, lifecycle]);
 
   const deleteSession = useCallback(async (key: string) => {
-    await gwRef.current.call("sessions.delete", { sessionKey: key });
-    delete messageCacheRef.current[key];
-    setSessions(prev => prev.filter(s => s.sessionKey !== key));
-    if (activeKey === key) {
-      setActiveKey(null);
-      setMessages([]);
+    await lifecycle.gwRef.current.call("sessions.delete", { sessionKey: key });
+    lifecycle.evictCache(key);
+    lifecycle.setSessions(prev => prev.filter(s => s.sessionKey !== key));
+    if (lifecycle.activeKey === key) {
+      lifecycle.setActiveKey("");
+      lifecycle.setMessages([]);
     }
-  }, [activeKey]);
+  }, [lifecycle]);
 
   const resetSession = useCallback(async () => {
-    const key = activeKeyRef.current;
+    const key = lifecycle.activeKeyRef.current;
     if (key) {
       try {
-        await gwRef.current.call("sessions.delete", { sessionKey: key });
+        await lifecycle.gwRef.current.call("sessions.delete", { sessionKey: key });
       } catch {
         // ignore
       }
-      delete messageCacheRef.current[key];
+      lifecycle.evictCache(key);
     }
-    setMessages([]);
-    clearStreaming();
-    setSendLock(false);
-    setChatError(null);
+    lifecycle.setMessages([]);
+    streamingHandler.clearStreaming();
+    dispatch({ type: "UNLOCK" });
+    dispatch({ type: "CLEAR_ERROR" });
     // Refresh sessions — backend may auto-recreate
-    await refreshSessions();
-  }, [clearStreaming, refreshSessions]);
+    await lifecycle.refreshSessions();
+  }, [lifecycle, streamingHandler]);
 
   const cancelGeneration = useCallback(() => {
-    gwRef.current.send({
+    lifecycle.gwRef.current.send({
       type: "request",
       id: rpcId(),
       method: "chat.stop",
       params: {},
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lifecycle]);
 
   const respondApproval = useCallback((approved: boolean, allowAll?: boolean) => {
     const method = approved ? "approval.approve" : "approval.deny";
-    gwRef.current.send({
+    lifecycle.gwRef.current.send({
       type: "request",
       id: rpcId(),
       method,
       params: { allow_all: allowAll ?? false },
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lifecycle]);
 
-  const dismissError = useCallback(() => setChatError(null), []);
+  const dismissError = useCallback(() => dispatch({ type: "CLEAR_ERROR" }), []);
+
+  // --- Compose streaming state (add pendingApproval from chatState) ---
 
   const streaming: StreamingState = {
-    messages: streamingMessages,
-    pendingApproval,
-    requestId: currentRequestId,
+    messages: streamingHandler.streaming.messages,
+    pendingApproval: chatState.pendingApproval,
+    requestId: streamingHandler.streaming.requestId,
   };
 
   return {
-    sessions,
-    activeKey,
-    setActiveKey,
-    messages,
-    loading,
+    sessions: lifecycle.sessions,
+    activeKey: lifecycle.activeKey,
+    setActiveKey: lifecycle.setActiveKey,
+    messages: lifecycle.messages,
+    loading: lifecycle.loading,
     sendMessage,
     deleteSession,
     resetSession,
-    refreshMessages,
-    refreshSessions,
-    setMessages,
+    refreshMessages: lifecycle.refreshMessages,
+    refreshSessions: lifecycle.refreshSessions,
+    setMessages: lifecycle.setMessages,
     streaming,
-    sendLock,
+    sendLock: chatState.sendLock,
     cancelGeneration,
     respondApproval,
     messageQueue,
-    chatError,
+    chatError: chatState.chatError,
     dismissError,
   };
 }

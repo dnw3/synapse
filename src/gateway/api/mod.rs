@@ -3,6 +3,8 @@ pub mod files;
 pub mod lark_callback;
 pub mod lark_card_config;
 pub mod logs;
+#[cfg(feature = "sandbox")]
+pub mod sandbox;
 pub mod traces;
 pub mod upload;
 
@@ -16,12 +18,17 @@ pub fn create_router(state: AppState) -> Router {
 }
 
 fn api_routes() -> Router<AppState> {
-    Router::new()
+    let router = Router::new()
         .merge(files::routes())
         .merge(dashboard::routes())
         .merge(logs::routes())
         .merge(traces::routes())
         .merge(upload::routes())
         .merge(lark_callback::routes())
-        .merge(lark_card_config::routes())
+        .merge(lark_card_config::routes());
+
+    #[cfg(feature = "sandbox")]
+    let router = router.merge(sandbox::routes());
+
+    router
 }

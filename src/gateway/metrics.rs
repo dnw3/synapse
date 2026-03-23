@@ -145,7 +145,12 @@ async fn metrics_handler(
     out.push_str("# TYPE synapse_memory_entries gauge\n");
     let memory_entries = {
         let memory = state.session.sessions.memory();
-        let sessions = state.session.sessions.list_sessions().await.unwrap_or_default();
+        let sessions = state
+            .session
+            .sessions
+            .list_sessions()
+            .await
+            .unwrap_or_default();
         let mut total = 0usize;
         for s in &sessions {
             total += memory

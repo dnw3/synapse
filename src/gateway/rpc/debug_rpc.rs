@@ -47,7 +47,8 @@ pub async fn handle_invoke(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
             let snapshot = ctx.state.agent.cost_tracker.snapshot().await;
             let sessions = ctx
                 .state
-                .session.sessions
+                .session
+                .sessions
                 .list_sessions()
                 .await
                 .map(|s| s.len())
@@ -88,7 +89,8 @@ pub async fn handle_health(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
     let active = ctx.state.session.cancel_tokens.read().await.len();
     let sessions = ctx
         .state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map(|s| s.len())

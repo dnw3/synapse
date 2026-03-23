@@ -37,10 +37,7 @@ use synaptic::core::{
 ///   "body": "Hello!"
 /// }
 /// ```
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let wa_configs: Vec<crate::config::WhatsAppBotConfig> = config.channel_configs("whatsapp");
     let wa_config = wa_configs
         .first()
@@ -102,7 +99,7 @@ async fn run_ws_loop(
     api_key: Option<&str>,
     agent_session: Arc<AgentSession>,
     allowlist: &crate::config::BotAllowlist,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     // Build the WebSocket URL — replace http(s) scheme with ws(s).
     let ws_url = if bridge_url.starts_with("https://") {
         format!("wss://{}/ws", &bridge_url["https://".len()..])

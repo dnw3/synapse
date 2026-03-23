@@ -15,7 +15,8 @@ use super::types::RpcError;
 pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let sessions = ctx
         .state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;

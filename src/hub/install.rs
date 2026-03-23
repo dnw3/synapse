@@ -16,7 +16,7 @@ pub struct InstalledManifest {
 }
 
 /// Validate a skill slug: must be non-empty, no path separators or traversal.
-fn validate_slug(slug: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn validate_slug(slug: &str) -> crate::error::Result<()> {
     if slug.is_empty()
         || slug.contains('/')
         || slug.contains('\\')
@@ -40,7 +40,7 @@ pub async fn install_from_hub(
     slug: &str,
     version: Option<&str>,
     upgrade: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     validate_slug(slug)?;
 
     let global_dir = global_skills_dir();
@@ -69,10 +69,13 @@ pub async fn install_from_hub(
 
     // Extract zip contents (with Zip Slip protection)
     let reader = std::io::Cursor::new(&zip_bytes);
-    let mut archive = zip::ZipArchive::new(reader)?;
+    let mut archive =
+        zip::ZipArchive::new(reader).map_err(|e| crate::error::SynapseError::Hub(e.to_string()))?;
     let canonical_target = std::fs::canonicalize(&target)?;
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i)?;
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| crate::error::SynapseError::Hub(e.to_string()))?;
         let name = file.name().to_string();
 
         // Reject entries with path traversal components
@@ -193,10 +196,7 @@ fn check_requirements(skill_md: &str) {
 }
 
 /// Update an installed hub skill to the latest version.
-pub async fn update_skill(
-    hub: &super::ClawHubClient,
-    name: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn update_skill(hub: &super::ClawHubClient, name: &str) -> crate::error::Result<()> {
     let target = global_skills_dir().join(name);
     if !target.exists() {
         return Err(format!("skill '{}' not installed", name).into());
@@ -250,7 +250,7 @@ pub struct LockEntry {
 }
 
 /// Compute fingerprint (SHA256 of sorted file paths + contents hashes).
-pub fn compute_fingerprint(dir: &Path) -> Result<String, Box<dyn std::error::Error>> {
+pub fn compute_fingerprint(dir: &Path) -> crate::error::Result<String> {
     use sha2::{Digest, Sha256};
 
     let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
@@ -272,7 +272,7 @@ fn collect_files(
     base: &Path,
     dir: &Path,
     out: &mut Vec<(String, Vec<u8>)>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -287,7 +287,11 @@ fn collect_files(
             }
             collect_files(base, &path, out)?;
         } else {
-            let rel = path.strip_prefix(base)?.to_string_lossy().to_string();
+            let rel = path
+                .strip_prefix(base)
+                .map_err(|e| crate::error::SynapseError::Hub(e.to_string()))?
+                .to_string_lossy()
+                .to_string();
             let content = std::fs::read(&path)?;
             out.push((rel, content));
         }
@@ -306,7 +310,7 @@ pub fn read_lock_file() -> LockFile {
 }
 
 /// Write the lock file to the skills directory.
-pub fn write_lock_file(lock: &LockFile) -> Result<(), Box<dyn std::error::Error>> {
+pub fn write_lock_file(lock: &LockFile) -> crate::error::Result<()> {
     let dir = global_skills_dir().join(".clawhub");
     std::fs::create_dir_all(&dir)?;
     let content = serde_json::to_string_pretty(lock)?;
@@ -319,7 +323,7 @@ pub fn update_lock_entry(
     name: &str,
     version: Option<&str>,
     fingerprint: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let mut lock = read_lock_file();
     if lock.version.is_empty() {
         lock.version = "1".to_string();

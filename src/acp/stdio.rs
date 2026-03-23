@@ -19,7 +19,7 @@ use crate::config::SynapseConfig;
 pub async fn run_stdio(
     config: &SynapseConfig,
     model: Arc<dyn ChatModel>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let handler = AcpHandler::new("synapse", env!("CARGO_PKG_VERSION"));
     let session_mgr = crate::build_session_manager(config);
 
@@ -165,7 +165,7 @@ async fn handle_agent_run(
     let memory = session_mgr.memory();
     let mut messages = memory.load(&sid).await.unwrap_or_default();
     if messages.is_empty() {
-        if let Some(ref prompt) = config.base.agent.system_prompt {
+        if let Some(ref prompt) = config.agent_config().system_prompt {
             messages.push(Message::system(prompt));
         }
     }

@@ -49,7 +49,8 @@ pub(crate) async fn handle_rpc(
         "get_status" => {
             let uptime = state.core.started_at.elapsed().as_secs();
             let auth_enabled = state
-                .core.auth
+                .core
+                .auth
                 .as_ref()
                 .map(|a| a.config.enabled)
                 .unwrap_or(false);

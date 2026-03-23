@@ -18,10 +18,7 @@ use crate::config::SynapseConfig;
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 
 /// Run the Matrix bot adapter using the Client-Server REST API (long-polling sync).
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let mx_configs: Vec<crate::config::MatrixBotConfig> = config.channel_configs("matrix");
     let mx_config = mx_configs
         .first()
@@ -160,7 +157,7 @@ async fn login(
     homeserver: &str,
     user_id: &str,
     password: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> crate::error::Result<String> {
     let url = format!("{}/_matrix/client/v3/login", homeserver);
     let body = serde_json::json!({
         "type": "m.login.password",
@@ -207,7 +204,7 @@ async fn sync_once(
     homeserver: &str,
     access_token: &str,
     since: Option<&str>,
-) -> Result<(String, Vec<RoomEvent>), Box<dyn std::error::Error>> {
+) -> crate::error::Result<(String, Vec<RoomEvent>)> {
     let mut url = format!(
         "{}/_matrix/client/v3/sync?timeout=30000&filter={}",
         homeserver,

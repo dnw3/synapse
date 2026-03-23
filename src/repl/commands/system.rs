@@ -116,7 +116,7 @@ pub async fn cmd_status(
     println!(
         "  {} {}",
         "Provider:".bold(),
-        config.base.model.provider.dimmed()
+        config.model_config().provider.dimmed()
     );
     println!("  {} {}", "Messages:".bold(), count);
     println!("  {} {} in memory", "Context:".bold(), messages.len());
@@ -127,7 +127,7 @@ pub async fn cmd_status(
             fallbacks.join(", ").dimmed()
         );
     }
-    if let Some(ref mcps) = config.base.mcp {
+    if let Some(mcps) = config.mcp_configs() {
         if !mcps.is_empty() {
             let names: Vec<&str> = mcps.iter().map(|m| m.name.as_str()).collect();
             println!("  {} {}", "MCP servers:".bold(), names.join(", ").dimmed());

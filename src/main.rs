@@ -9,6 +9,7 @@ mod config;
 pub mod cron;
 mod display;
 mod doctor;
+pub mod error;
 mod heartbeat;
 mod hooks;
 mod hub;
@@ -98,7 +99,7 @@ pub(crate) fn build_session_manager(config: &SynapseConfig) -> SessionManager {
     session::build_session_manager(config)
 }
 
-async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+async fn run(cli: Cli) -> crate::error::Result<()> {
     // Init doesn't need config
     if matches!(cli.command, Some(Command::Init)) {
         return init::run_init().await;
@@ -397,14 +398,14 @@ async fn run_chat(
     message: Option<&str>,
     session_id: Option<&str>,
     model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let model = agent::build_model(config, model_override)?;
 
     let session_mgr = build_session_manager(config);
     let memory = session_mgr.memory();
 
     // Long-term memory
-    let sessions_dir = PathBuf::from(&config.base.paths.sessions_dir);
+    let sessions_dir = PathBuf::from(&config.sessions_dir());
     let ltm = Arc::new(memory::LongTermMemory::new(
         sessions_dir.join("long_term_memory"),
         config.memory.clone(),
@@ -477,8 +478,8 @@ async fn run_memory_command(
     action: &str,
     query: Option<&str>,
     limit: usize,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let sessions_dir = PathBuf::from(&config.base.paths.sessions_dir);
+) -> crate::error::Result<()> {
+    let sessions_dir = PathBuf::from(&config.sessions_dir());
     let ltm =
         memory::LongTermMemory::new(sessions_dir.join("long_term_memory"), config.memory.clone());
     ltm.load().await.ok();

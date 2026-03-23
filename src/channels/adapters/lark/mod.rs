@@ -55,10 +55,7 @@ pub struct LarkApproveNotifier {
 
 #[async_trait]
 impl crate::channels::dm::ApproveNotifier for LarkApproveNotifier {
-    async fn notify_approved(
-        &self,
-        sender_id: &str,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn notify_approved(&self, sender_id: &str) -> crate::error::Result<()> {
         self.client
             .send_text(
                 "open_id",
@@ -66,7 +63,7 @@ impl crate::channels::dm::ApproveNotifier for LarkApproveNotifier {
                 "\u{60a8}\u{7684}\u{914d}\u{5bf9}\u{8bf7}\u{6c42}\u{5df2}\u{901a}\u{8fc7}\u{ff0c}\u{73b0}\u{5728}\u{53ef}\u{4ee5}\u{5f00}\u{59cb}\u{5bf9}\u{8bdd}\u{4e86}\u{3002}",
             )
             .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+            .map_err(|e| crate::error::SynapseError::Channel(e.to_string()))?;
         Ok(())
     }
 }
@@ -82,7 +79,7 @@ impl ChannelSender for LarkSender {
         target: &DeliveryContext,
         content: &str,
         _meta: Option<&serde_json::Value>,
-    ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<SendResult> {
         let chat_id = target
             .to
             .as_deref()
@@ -92,7 +89,7 @@ impl ChannelSender for LarkSender {
         self.client
             .send_text("chat_id", chat_id, content)
             .await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+            .map_err(|e| crate::error::SynapseError::Channel(e.to_string()))?;
 
         Ok(SendResult {
             message_id: None,

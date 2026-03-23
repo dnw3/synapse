@@ -115,7 +115,8 @@ async fn get_skills(
                     ) = parse_skill_full_info(&path).await;
 
                     let enabled = !state
-                        .core.config
+                        .core
+                        .config
                         .skill_overrides
                         .get(&name)
                         .map(|o| !o.enabled)
@@ -174,7 +175,8 @@ async fn get_skills(
                     ) = parse_skill_full_info(&skill_md).await;
 
                     let enabled = !state
-                        .core.config
+                        .core
+                        .config
                         .skill_overrides
                         .get(&name)
                         .map(|o| !o.enabled)
@@ -220,7 +222,8 @@ async fn toggle_skill(
     })?;
 
     let current_enabled = !state
-        .core.config
+        .core
+        .config
         .skill_overrides
         .get(&name)
         .map(|o| !o.enabled)

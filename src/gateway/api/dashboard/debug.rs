@@ -62,7 +62,8 @@ async fn debug_invoke(
         "stats" => {
             let snapshot = state.agent.cost_tracker.snapshot().await;
             let sessions = state
-                .session.sessions
+                .session
+                .sessions
                 .list_sessions()
                 .await
                 .map(|s| s.len())
@@ -123,7 +124,12 @@ async fn debug_invoke(
             })
         }
         "sessions" => {
-            let sessions = state.session.sessions.list_sessions().await.unwrap_or_default();
+            let sessions = state
+                .session
+                .sessions
+                .list_sessions()
+                .await
+                .unwrap_or_default();
             let list: Vec<_> = sessions
                 .iter()
                 .map(|s| {
@@ -140,7 +146,8 @@ async fn debug_invoke(
         }
         "schedules" => {
             let schedules: Vec<_> = state
-                .core.config
+                .core
+                .config
                 .schedules
                 .as_ref()
                 .map(|entries| {
@@ -179,7 +186,8 @@ async fn debug_invoke(
                 broadcaster: state.network.broadcaster.clone(),
             });
             let frame = state
-                .network.rpc_router
+                .network
+                .rpc_router
                 .dispatch(
                     rpc_ctx,
                     "dashboard-rest-0".to_string(),

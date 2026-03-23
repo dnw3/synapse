@@ -22,7 +22,8 @@ pub async fn handle_pair_approve(ctx: Arc<RpcContext>, params: Value) -> Result<
         .ok_or_else(|| RpcError::invalid_request("missing request_id"))?;
     let paired = ctx
         .state
-        .network.pairing_store
+        .network
+        .pairing_store
         .write()
         .await
         .approve(request_id)
@@ -35,7 +36,13 @@ pub async fn handle_pair_reject(ctx: Arc<RpcContext>, params: Value) -> Result<V
         .get("request_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing request_id"))?;
-    let removed = ctx.state.network.pairing_store.write().await.reject(request_id);
+    let removed = ctx
+        .state
+        .network
+        .pairing_store
+        .write()
+        .await
+        .reject(request_id);
     if removed {
         Ok(json!({"ok": true}))
     } else {
@@ -48,10 +55,21 @@ pub async fn handle_pair_remove(ctx: Arc<RpcContext>, params: Value) -> Result<V
         .get("node_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| RpcError::invalid_request("missing node_id"))?;
-    let removed = ctx.state.network.pairing_store.write().await.remove_paired(node_id);
+    let removed = ctx
+        .state
+        .network
+        .pairing_store
+        .write()
+        .await
+        .remove_paired(node_id);
     if removed {
         // Also unregister from live registry
-        ctx.state.network.node_registry.write().await.unregister(node_id);
+        ctx.state
+            .network
+            .node_registry
+            .write()
+            .await
+            .unregister(node_id);
         Ok(json!({"ok": true}))
     } else {
         Err(RpcError::not_found("paired device not found"))
@@ -174,7 +192,8 @@ pub async fn handle_bootstrap_verify(
 
     let valid = ctx
         .state
-        .network.bootstrap_store
+        .network
+        .bootstrap_store
         .write()
         .await
         .verify(token, device_id, public_key, role, &scopes);
@@ -212,7 +231,8 @@ pub async fn handle_qr_generate(ctx: Arc<RpcContext>, params: Value) -> Result<V
             // Try to construct from config
             let port = ctx
                 .state
-                .core.config
+                .core
+                .config
                 .serve
                 .as_ref()
                 .and_then(|s| s.port)

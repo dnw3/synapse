@@ -66,10 +66,10 @@ pub async fn run_tui(
     model: Arc<dyn ChatModel>,
     session_id: &str,
     model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let model_name = model_override
         .map(|s| s.to_string())
-        .unwrap_or_else(|| config.base.model.model.clone());
+        .unwrap_or_else(|| config.model_config().model.clone());
 
     // Build initial messages with system prompt
     let cwd = std::env::current_dir().unwrap_or_default();
@@ -115,7 +115,7 @@ async fn run_event_loop(
     terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
     app: &mut App,
     model: Arc<dyn ChatModel>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     loop {
         // Draw
         terminal.draw(|f| draw_ui(f, app))?;

@@ -259,10 +259,7 @@ async fn handle_callback(
 }
 
 /// Run the WeCom (WeChat Work) bot adapter.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let wc_configs: Vec<crate::config::WeChatBotConfig> = config.channel_configs("wechat");
     let wc_config = wc_configs
         .first()

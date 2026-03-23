@@ -107,10 +107,7 @@ async fn get_channels(State(state): State<AppState>) -> Json<Vec<ChannelResponse
     let mut channels: Vec<(String, bool)> = Vec::new();
     for &name in KNOWN_CHANNELS {
         seen.insert(name.to_string());
-        let has_accounts = config
-            .channels
-            .get(name)
-            .is_some_and(|v| !v.is_empty());
+        let has_accounts = config.channels.get(name).is_some_and(|v| !v.is_empty());
         channels.push((name.to_string(), has_accounts));
     }
     // Include any extra platforms configured but not in KNOWN_CHANNELS

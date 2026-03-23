@@ -119,10 +119,7 @@ impl ModelRegistry {
     }
 
     /// Resolve a model name or alias to a ChatModel instance.
-    pub fn resolve(
-        &self,
-        name_or_alias: &str,
-    ) -> Result<Arc<dyn ChatModel>, Box<dyn std::error::Error>> {
+    pub fn resolve(&self, name_or_alias: &str) -> crate::error::Result<Arc<dyn ChatModel>> {
         let canonical = self
             .canonical_name(name_or_alias)
             .ok_or_else(|| format!("model '{}' not found in catalog", name_or_alias))?;
@@ -137,7 +134,7 @@ impl ModelRegistry {
     pub fn resolve_for_channel(
         &self,
         channel_id: &str,
-    ) -> Option<Result<Arc<dyn ChatModel>, Box<dyn std::error::Error>>> {
+    ) -> Option<crate::error::Result<Arc<dyn ChatModel>>> {
         // Exact match first
         let binding = self
             .channel_bindings
@@ -215,7 +212,7 @@ impl ModelRegistry {
         &self,
         entry: &ModelEntry,
         key_override: Option<&str>,
-    ) -> Result<Arc<dyn ChatModel>, Box<dyn std::error::Error>> {
+    ) -> crate::error::Result<Arc<dyn ChatModel>> {
         let http = Arc::new(HttpBackend::new());
 
         // Resolve API key
@@ -230,13 +227,13 @@ impl ModelRegistry {
                 if let Some(ref env_name) = prov.api_key_env {
                     std::env::var(env_name).unwrap_or_default()
                 } else {
-                    self.config.base.resolve_api_key().unwrap_or_default()
+                    self.config.resolve_api_key().unwrap_or_default()
                 }
             } else {
-                self.config.base.resolve_api_key().unwrap_or_default()
+                self.config.resolve_api_key().unwrap_or_default()
             }
         } else {
-            self.config.base.resolve_api_key().unwrap_or_default()
+            self.config.resolve_api_key().unwrap_or_default()
         };
 
         let mut oai_config = OpenAiConfig::new(&api_key, &entry.name);

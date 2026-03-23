@@ -21,10 +21,7 @@ use crate::config::{BotAllowlist, SynapseConfig};
 use crate::gateway::messages::{ChannelInfo, ChatInfo, InboundMessage, SenderInfo};
 
 /// Run the Mattermost bot adapter using WebSocket events.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let mm_configs: Vec<crate::config::MattermostBotConfig> = config.channel_configs("mattermost");
     let mm_config = mm_configs
         .first()
@@ -78,7 +75,7 @@ pub async fn run(
 }
 
 /// Fetch the bot's own user ID via REST API.
-async fn get_bot_user_id(url: &str, token: &str) -> Result<String, Box<dyn std::error::Error>> {
+async fn get_bot_user_id(url: &str, token: &str) -> crate::error::Result<String> {
     let client = reqwest::Client::new();
     let resp = client
         .get(format!("{}/api/v4/users/me", url))
@@ -100,7 +97,7 @@ async fn run_ws(
     bot_user_id: &str,
     agent_session: Arc<AgentSession>,
     allowlist: &BotAllowlist,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     // Build WSS URL: replace http(s) with ws(s)
     let ws_url = if url.starts_with("https://") {
         format!("wss://{}/api/v4/websocket", &url["https://".len()..])

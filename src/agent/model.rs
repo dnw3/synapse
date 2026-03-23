@@ -76,8 +76,8 @@ pub fn provider_base_url_defaults() -> Vec<(&'static str, &'static str)> {
 pub fn build_model(
     config: &SynapseConfig,
     model_override: Option<&str>,
-) -> Result<Arc<dyn ChatModel>, Box<dyn std::error::Error>> {
-    let model_name = model_override.unwrap_or(&config.base.model.model);
+) -> crate::error::Result<Arc<dyn ChatModel>> {
+    let model_name = model_override.unwrap_or(&config.model_config().model);
     let model = build_model_by_name(config, model_name)?;
 
     // Wrap with rate limiting if configured
@@ -104,7 +104,7 @@ pub fn build_model(
 pub fn build_model_by_name(
     config: &SynapseConfig,
     model_name: &str,
-) -> Result<Arc<dyn ChatModel>, Box<dyn std::error::Error>> {
+) -> crate::error::Result<Arc<dyn ChatModel>> {
     // Try registry first (catalog + aliases)
     let registry = ModelRegistry::from_config(config);
     if registry.contains(model_name) {
@@ -124,8 +124,8 @@ pub fn build_model_by_name(
 pub(crate) fn build_model_by_name_raw(
     config: &SynapseConfig,
     model_name: &str,
-) -> Result<Arc<dyn ChatModel>, Box<dyn std::error::Error>> {
-    let api_key = config.base.resolve_api_key().unwrap_or_else(|e| {
+) -> crate::error::Result<Arc<dyn ChatModel>> {
+    let api_key = config.resolve_api_key().unwrap_or_else(|e| {
         tracing::warn!(error = %e, "API key resolution failed — requests will likely fail");
         String::new()
     });
@@ -140,21 +140,21 @@ pub(crate) fn build_model_by_name_raw(
 
     // Auto-detect base_url for known providers
     let auto_base_url =
-        auto_detect_base_url(provider_prefix.unwrap_or(&config.base.model.provider));
+        auto_detect_base_url(provider_prefix.unwrap_or(&config.model_config().provider));
 
     let mut oai_config = OpenAiConfig::new(&api_key, actual_model);
 
     // Priority: explicit config base_url > auto-detected > default OpenAI
-    if let Some(ref url) = config.base.model.base_url {
+    if let Some(ref url) = config.model_config().base_url {
         oai_config = oai_config.with_base_url(url);
     } else if let Some(url) = auto_base_url {
         oai_config = oai_config.with_base_url(url);
     }
 
-    if let Some(temp) = config.base.model.temperature {
+    if let Some(temp) = config.model_config().temperature {
         oai_config = oai_config.with_temperature(temp);
     }
-    if let Some(max) = config.base.model.max_tokens {
+    if let Some(max) = config.model_config().max_tokens {
         oai_config = oai_config.with_max_tokens(max);
     }
 

@@ -329,10 +329,7 @@ async fn handle_webhook(
 }
 
 /// Run the LINE bot adapter.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let line_configs: Vec<crate::config::LineBotConfig> = config.channel_configs("line");
     let line_config = line_configs
         .first()

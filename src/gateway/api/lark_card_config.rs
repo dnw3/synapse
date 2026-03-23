@@ -46,7 +46,8 @@ pub async fn preview_lark_card(
 
     // Use inline config from request body, fall back to server config.
     let card_config = body.config.unwrap_or_else(|| {
-        let lark_configs: Vec<crate::config::LarkBotConfig> = state.core.config.channel_configs("lark");
+        let lark_configs: Vec<crate::config::LarkBotConfig> =
+            state.core.config.channel_configs("lark");
         lark_configs
             .first()
             .map(|lark| lark.card.clone())

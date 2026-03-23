@@ -71,11 +71,7 @@ use crate::config::SynapseConfig;
 #[cfg(feature = "web")]
 /// Start the web server.
 #[allow(dead_code)]
-pub async fn run_server(
-    config: &SynapseConfig,
-    host: &str,
-    port: u16,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_server(config: &SynapseConfig, host: &str, port: u16) -> crate::error::Result<()> {
     run_server_with_log_buffer(config, host, port, None).await
 }
 
@@ -86,7 +82,7 @@ pub async fn run_server_with_log_buffer(
     host: &str,
     port: u16,
     log_buffer: Option<synaptic::logging::LogBuffer>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let app_state = if let Some(buf) = log_buffer {
         state::AppState::with_log_buffer(config, buf).await?
     } else {
@@ -410,7 +406,7 @@ fn spawn_simple_adapter<C, F, Fut>(
 ) where
     C: serde::de::DeserializeOwned + crate::config::bots::AdapterConfig,
     F: Fn(SynapseConfig) -> Fut + Send + Clone + 'static,
-    Fut: std::future::Future<Output = Result<(), Box<dyn std::error::Error>>> + Send,
+    Fut: std::future::Future<Output = crate::error::Result<()>> + Send,
 {
     let accounts: Vec<C> = config.channel_configs(platform);
     for account in &accounts {

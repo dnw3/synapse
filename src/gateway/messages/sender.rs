@@ -22,5 +22,5 @@ pub trait ChannelSender: Send + Sync {
         target: &DeliveryContext,
         content: &str,
         meta: Option<&serde_json::Value>,
-    ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> crate::error::Result<SendResult>;
 }

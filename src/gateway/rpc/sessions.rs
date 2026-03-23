@@ -155,7 +155,8 @@ fn parse_session_key(id: &str) -> SessionKeyMeta {
 pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let sessions = ctx
         .state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -224,7 +225,8 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
 
     let sessions = ctx
         .state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -326,7 +328,8 @@ pub async fn handle_patch(_ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 pub async fn handle_create(ctx: Arc<RpcContext>, params: Value) -> Result<Value, RpcError> {
     let session_id = ctx
         .state
-        .session.sessions
+        .session
+        .sessions
         .create_session()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -372,7 +375,8 @@ pub async fn handle_delete(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
         .ok_or_else(|| RpcError::invalid_request("missing 'id' parameter"))?;
 
     ctx.state
-        .session.sessions
+        .session
+        .sessions
         .delete_session(id)
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -449,7 +453,8 @@ pub async fn handle_compact(ctx: Arc<RpcContext>, params: Value) -> Result<Value
 pub async fn handle_usage(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let sessions = ctx
         .state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -607,7 +612,8 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
     // If so: delete the old session entirely, create a fresh one with the same key.
     let existing_info = ctx
         .state
-        .session.sessions
+        .session
+        .sessions
         .get_session(session_id)
         .await
         .ok()
@@ -620,7 +626,8 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
     {
         // Delete the old session (messages + metadata + checkpoints)
         ctx.state
-            .session.sessions
+            .session
+            .sessions
             .delete_session(session_id)
             .await
             .map_err(|e| RpcError::internal(e.to_string()))?;
@@ -628,7 +635,8 @@ pub async fn handle_reset(ctx: Arc<RpcContext>, params: Value) -> Result<Value, 
         // Create a new session and tag it with the main session key
         let new_id = ctx
             .state
-            .session.sessions
+            .session
+            .sessions
             .create_session()
             .await
             .map_err(|e| RpcError::internal(e.to_string()))?;

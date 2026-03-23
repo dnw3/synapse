@@ -20,11 +20,9 @@ use synaptic::core::{
 ///
 /// Polls `GET /api/v1/message?limit=10&offset=0&after=<timestamp>&password=<pw>`
 /// for incoming messages and replies via `POST /api/v1/message/text`.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let imessage_configs: Vec<crate::config::IMessageBotConfig> = config.channel_configs("imessage");
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
+    let imessage_configs: Vec<crate::config::IMessageBotConfig> =
+        config.channel_configs("imessage");
     let imessage_config = imessage_configs
         .first()
         .ok_or("missing [[channels.imessage]] section in config")?;

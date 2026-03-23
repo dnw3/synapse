@@ -63,7 +63,7 @@ impl ProseVm {
         &self,
         instructions: &[ProseInstruction],
         state: &mut ProseState,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<()> {
         for instruction in instructions {
             match instruction {
                 ProseInstruction::SetVar { name, value } => {

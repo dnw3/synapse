@@ -132,14 +132,15 @@ async fn get_sessions(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<SessionResponse>>, (StatusCode, String)> {
     let sessions = state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let overrides = load_overrides();
     let memory = state.session.sessions.memory();
-    let model_name = state.core.config.base.model.model.clone();
+    let model_name = state.core.config.model_config().model.clone();
     let mut result = Vec::with_capacity(sessions.len());
     for s in sessions {
         let messages = memory.load(&s.session_id).await.unwrap_or_default();
@@ -194,7 +195,8 @@ async fn delete_session(
     extract::Path(id): extract::Path<String>,
 ) -> Result<Json<OkResponse>, (StatusCode, String)> {
     state
-        .session.sessions
+        .session
+        .sessions
         .delete_session(&id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

@@ -3,7 +3,7 @@ use synaptic::core::{MemoryStore, Message};
 use synaptic::session::SessionManager;
 
 /// List all sessions.
-pub async fn list_sessions(mgr: &SessionManager) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn list_sessions(mgr: &SessionManager) -> crate::error::Result<()> {
     let sessions = mgr.list_sessions().await.map_err(|e| format!("{}", e))?;
     if sessions.is_empty() {
         println!("{}", "No sessions found.".dimmed());
@@ -49,7 +49,7 @@ pub async fn list_sessions(mgr: &SessionManager) -> Result<(), Box<dyn std::erro
 pub async fn prune_sessions(
     mgr: &SessionManager,
     max_age_days: u64,
-) -> Result<usize, Box<dyn std::error::Error>> {
+) -> crate::error::Result<usize> {
     let sessions = mgr.list_sessions().await.map_err(|e| format!("{}", e))?;
 
     let cutoff = {
@@ -111,7 +111,7 @@ pub async fn save_session_title(
 pub async fn view_session_history(
     mgr: &SessionManager,
     target_session_id: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     mgr.get_session(target_session_id)
         .await
         .map_err(|e| format!("{}", e))?
@@ -170,7 +170,7 @@ pub async fn send_to_session(
     mgr: &SessionManager,
     target_session_id: &str,
     message: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     mgr.get_session(target_session_id)
         .await
         .map_err(|e| format!("{}", e))?

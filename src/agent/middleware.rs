@@ -98,7 +98,7 @@ pub fn build_fallback_interceptor(config: &SynapseConfig) -> Option<FallbackInte
     let mut fallbacks: Vec<Arc<dyn ChatModel>> = Vec::new();
 
     // 1. Multi-key rotation fallbacks for the primary model
-    let primary_model = &config.base.model.model;
+    let primary_model = &config.model_config().model;
     if let Some(key_fallbacks) = registry.rotation_fallbacks(primary_model) {
         tracing::info!(
             count = key_fallbacks.len(),

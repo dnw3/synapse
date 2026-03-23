@@ -7,7 +7,7 @@ pub fn run_models_command(
     config: &SynapseConfig,
     action: &str,
     _name: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let registry = ModelRegistry::from_config(config);
 
     match action {
@@ -21,8 +21,8 @@ pub fn run_models_command(
                 println!();
                 println!(
                     "Current default: {} ({})",
-                    config.base.model.model.cyan(),
-                    config.base.model.provider.dimmed()
+                    config.model_config().model.cyan(),
+                    config.model_config().provider.dimmed()
                 );
             } else {
                 println!(
@@ -49,7 +49,7 @@ pub fn run_models_command(
                 println!();
                 println!(
                     "Default: {} (from [model] config)",
-                    config.base.model.model.cyan()
+                    config.model_config().model.cyan()
                 );
             }
         }
@@ -59,25 +59,25 @@ pub fn run_models_command(
             println!(
                 "  {} {}",
                 "Default model:".bold(),
-                config.base.model.model.cyan()
+                config.model_config().model.cyan()
             );
             println!(
                 "  {} {}",
                 "Provider:".bold(),
-                config.base.model.provider.dimmed()
+                config.model_config().provider.dimmed()
             );
 
-            if let Some(ref url) = config.base.model.base_url {
+            if let Some(ref url) = config.model_config().base_url {
                 println!("  {} {}", "Base URL:".bold(), url.dimmed());
             }
-            if let Some(temp) = config.base.model.temperature {
+            if let Some(temp) = config.model_config().temperature {
                 println!("  {} {}", "Temperature:".bold(), temp);
             }
-            if let Some(max) = config.base.model.max_tokens {
+            if let Some(max) = config.model_config().max_tokens {
                 println!("  {} {}", "Max tokens:".bold(), max);
             }
 
-            let api_key_set = config.base.resolve_api_key().is_ok();
+            let api_key_set = config.resolve_api_key().is_ok();
             println!(
                 "  {} {}",
                 "API key:".bold(),

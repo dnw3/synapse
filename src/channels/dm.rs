@@ -81,10 +81,7 @@ const DEFAULT_PAIRING_TTL_MS: u64 = 3_600_000; // 1 hour
 #[async_trait]
 pub trait ApproveNotifier: Send + Sync {
     /// Send a message to the given sender_id (e.g. open_id for Lark).
-    async fn notify_approved(
-        &self,
-        sender_id: &str,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+    async fn notify_approved(&self, sender_id: &str) -> crate::error::Result<()>;
 }
 
 /// Registry of per-channel approve notifiers.

@@ -126,7 +126,7 @@ pub struct AgentSession {
 impl AgentSession {
     /// Create a new AgentSession with persistent storage and deep agent support.
     pub fn new(model: Arc<dyn ChatModel>, config: Arc<SynapseConfig>, deep_agent: bool) -> Self {
-        let sessions_dir = PathBuf::from(&config.base.paths.sessions_dir);
+        let sessions_dir = PathBuf::from(&config.sessions_dir());
         let store = Arc::new(FileStore::new(sessions_dir));
         let session_mgr = SessionManager::new(store);
         let display_resolver = Arc::new(crate::agent::tool_display::ToolDisplayResolver::new(
@@ -172,7 +172,7 @@ impl AgentSession {
             None => default_model,
         };
 
-        let sessions_dir = PathBuf::from(&config.base.paths.sessions_dir);
+        let sessions_dir = PathBuf::from(&config.sessions_dir());
         let store = Arc::new(FileStore::new(sessions_dir));
         let session_mgr = SessionManager::new(store);
 
@@ -304,7 +304,7 @@ impl AgentSession {
         &self,
         msg: InboundMessage,
         ctx: synaptic::core::RunContext,
-    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<AgentReply> {
         use synaptic::deep::StreamingOutputHandle;
 
         let request_id = msg.request_id.clone();
@@ -369,29 +369,28 @@ impl AgentSession {
         // Extract StreamingOutput from RunContext for on_complete/on_error callbacks
         let output_handle = ctx.streaming_output::<StreamingOutputHandle>();
 
-        let result: Result<(String, u32, u32), Box<dyn std::error::Error + Send + Sync>> =
-            if self.deep_agent {
-                self.handle_deep_agent(
-                    &sid,
-                    &msg.content,
-                    &content_blocks,
-                    ctx,
-                    &agent_info,
-                    Some(&msg.request_id),
-                )
-                .await
-            } else {
-                // Simple chat doesn't support streaming, fall back
-                let res = self
-                    .handle_simple_chat(&sid, &msg.content, &content_blocks)
-                    .await;
-                if let Ok(ref response) = res {
-                    if let Some(ref handle) = output_handle {
-                        handle.0.on_token(response).await;
-                    }
+        let result: crate::error::Result<(String, u32, u32)> = if self.deep_agent {
+            self.handle_deep_agent(
+                &sid,
+                &msg.content,
+                &content_blocks,
+                ctx,
+                &agent_info,
+                Some(&msg.request_id),
+            )
+            .await
+        } else {
+            // Simple chat doesn't support streaming, fall back
+            let res = self
+                .handle_simple_chat(&sid, &msg.content, &content_blocks)
+                .await;
+            if let Ok(ref response) = res {
+                if let Some(ref handle) = output_handle {
+                    handle.0.on_token(response).await;
                 }
-                res.map(|r| (r, 0u32, 0u32))
-            };
+            }
+            res.map(|r| (r, 0u32, 0u32))
+        };
 
         let duration_ms = start.elapsed().as_millis() as u64;
         match &result {
@@ -560,3 +559,9 @@ impl std::fmt::Display for AgentError {
 }
 
 impl std::error::Error for AgentError {}
+
+impl From<AgentError> for crate::error::SynapseError {
+    fn from(e: AgentError) -> Self {
+        Self::Channel(e.0)
+    }
+}

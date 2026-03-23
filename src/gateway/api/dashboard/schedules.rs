@@ -40,7 +40,8 @@ struct ScheduleResponseItem {
 
 async fn get_schedules(State(state): State<AppState>) -> Json<Vec<ScheduleResponseItem>> {
     let schedules = state
-        .core.config
+        .core
+        .config
         .schedules
         .as_ref()
         .map(|entries| {

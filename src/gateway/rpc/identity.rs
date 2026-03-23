@@ -15,7 +15,8 @@ pub async fn handle_get(ctx: Arc<RpcContext>, params: Value) -> Result<Value, Rp
     let agent = params.get("agent").and_then(|v| v.as_str());
     let path = ctx
         .state
-        .core.config
+        .core
+        .config
         .workspace_dir_for_agent(agent)
         .join("IDENTITY.md");
 

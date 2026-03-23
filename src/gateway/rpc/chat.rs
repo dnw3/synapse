@@ -21,7 +21,13 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
     let session_id = if let Some(sk) = params.get("sessionKey").and_then(|v| v.as_str()) {
         // Resolve sessionKey → session_id via session list lookup
         let store_key = crate::session::key::to_store_key("default", sk);
-        let sessions = ctx.state.session.sessions.list_sessions().await.unwrap_or_default();
+        let sessions = ctx
+            .state
+            .session
+            .sessions
+            .list_sessions()
+            .await
+            .unwrap_or_default();
         sessions
             .iter()
             .find(|s| s.session_key.as_deref() == Some(&store_key))
@@ -72,7 +78,13 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
 
     // Build session_config from stored SessionInfo fields.
     let session_config = {
-        let all_sessions = ctx.state.session.sessions.list_sessions().await.unwrap_or_default();
+        let all_sessions = ctx
+            .state
+            .session
+            .sessions
+            .list_sessions()
+            .await
+            .unwrap_or_default();
         if let Some(s) = all_sessions.iter().find(|s| s.session_id == session_id) {
             // Derive channel: prefer stored field, fall back to session_id prefix
             let channel = s

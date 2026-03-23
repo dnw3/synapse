@@ -45,13 +45,13 @@ pub trait ChannelOutboundAdapter: Send + Sync {
     async fn send_payload(
         &self,
         ctx: &OutboundContext,
-    ) -> Result<OutboundDeliveryResult, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> crate::error::Result<OutboundDeliveryResult>;
 
     /// Send text content (may be chunked across multiple messages).
     async fn send_text(
         &self,
         ctx: &OutboundContext,
-    ) -> Result<Vec<OutboundDeliveryResult>, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<Vec<OutboundDeliveryResult>> {
         let chunks = self.chunk_text(&ctx.text);
         let mut results = Vec::new();
         for chunk in chunks {
@@ -68,7 +68,7 @@ pub trait ChannelOutboundAdapter: Send + Sync {
     async fn send_media(
         &self,
         ctx: &OutboundContext,
-    ) -> Result<OutboundDeliveryResult, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<OutboundDeliveryResult> {
         self.send_payload(ctx).await
     }
 }

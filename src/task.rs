@@ -18,7 +18,7 @@ pub async fn run_task(
     message: &str,
     session_id: Option<&str>,
     cwd: Option<&Path>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let session_mgr = crate::build_session_manager(config);
     let memory = session_mgr.memory();
 
@@ -58,7 +58,7 @@ pub async fn run_task(
     let mcp_tools = agent::load_mcp_tools(config).await;
 
     // Long-term memory (load before agent so we can share it)
-    let sessions_dir = PathBuf::from(&config.base.paths.sessions_dir);
+    let sessions_dir = PathBuf::from(&config.sessions_dir());
     let ltm = Arc::new(LongTermMemory::new(
         sessions_dir.join("long_term_memory"),
         config.memory.clone(),

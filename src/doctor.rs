@@ -29,7 +29,7 @@ impl CheckResult {
 }
 
 /// Run all doctor checks and print results.
-pub async fn run_doctor(config: &SynapseConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_doctor(config: &SynapseConfig) -> crate::error::Result<()> {
     println!();
     println!("{}", "═══ Synapse Doctor ═══".bold().cyan());
     println!();
@@ -53,7 +53,7 @@ pub async fn run_doctor(config: &SynapseConfig) -> Result<(), Box<dyn std::error
     }
 
     // 5. MCP servers
-    if let Some(ref mcps) = config.base.mcp {
+    if let Some(mcps) = config.mcp_configs() {
         for mc in mcps {
             results.push(check_mcp_server(mc));
         }
@@ -135,7 +135,7 @@ fn check_config() -> CheckResult {
 }
 
 fn check_api_key(config: &SynapseConfig) -> CheckResult {
-    let env_var = &config.base.model.api_key_env;
+    let env_var = &config.model_config().api_key_env;
     match std::env::var(env_var) {
         Ok(val) if !val.is_empty() => {
             let masked = format!(
@@ -155,9 +155,12 @@ async fn check_model(config: &SynapseConfig) -> CheckResult {
         Err(e) => return CheckResult::fail("Model", &format!("build error: {}", e)),
     };
 
-    match test_model_connectivity(&*model, &config.base.model.model).await {
-        Ok(()) => CheckResult::pass("Model", &format!("{} reachable", config.base.model.model)),
-        Err(e) => CheckResult::fail("Model", &format!("{} — {}", config.base.model.model, e)),
+    match test_model_connectivity(&*model, &config.model_config().model).await {
+        Ok(()) => CheckResult::pass(
+            "Model",
+            &format!("{} reachable", config.model_config().model),
+        ),
+        Err(e) => CheckResult::fail("Model", &format!("{} — {}", config.model_config().model, e)),
     }
 }
 
@@ -248,7 +251,7 @@ async fn check_docker(config: &SynapseConfig) -> CheckResult {
 }
 
 fn check_sessions_dir(config: &SynapseConfig) -> CheckResult {
-    let dir = &config.base.paths.sessions_dir;
+    let dir = &config.sessions_dir();
     let path = std::path::Path::new(dir);
     if path.exists() {
         CheckResult::pass("Sessions dir", &format!("{} exists", dir))

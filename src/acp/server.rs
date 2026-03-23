@@ -43,7 +43,7 @@ async fn handle_acp(
             let memory = state.session.sessions.memory();
             let mut messages = memory.load(&session_id).await.unwrap_or_default();
             if messages.is_empty() {
-                if let Some(ref prompt) = state.core.config.base.agent.system_prompt {
+                if let Some(ref prompt) = state.core.config.agent_config().system_prompt {
                     messages.push(synaptic::core::Message::system(prompt));
                 }
             }

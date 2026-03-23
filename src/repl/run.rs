@@ -31,9 +31,9 @@ pub async fn repl(
     tracker: Arc<CostTrackingCallback>,
     ltm: Arc<LongTermMemory>,
     #[cfg(feature = "sandbox")] sandbox_orchestrator: Option<Arc<SandboxOrchestrator>>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let mut model = model;
-    let mut current_model_name = config.base.model.model.clone();
+    let mut current_model_name = config.model_config().model.clone();
     tracker.set_model(&current_model_name).await;
 
     let mut current_session_id = session_id.to_string();
@@ -106,7 +106,7 @@ pub async fn repl(
         .unwrap_or_else(|| PathBuf::from("."))
         .join(".synapse_history");
 
-    let mut rl = rustyline::DefaultEditor::new()?;
+    let mut rl = rustyline::DefaultEditor::new().map_err(crate::error::SynapseError::internal)?;
     let _ = rl.load_history(&history_path);
 
     loop {

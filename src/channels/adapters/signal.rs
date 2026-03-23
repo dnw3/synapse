@@ -19,10 +19,7 @@ use synaptic::core::{
 ///
 /// Polls `GET /v1/receive/{number}` for incoming messages and replies via
 /// `POST /v2/send`.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let signal_configs: Vec<crate::config::SignalBotConfig> = config.channel_configs("signal");
     let signal_config = signal_configs
         .first()

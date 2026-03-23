@@ -186,7 +186,8 @@ pub async fn status_handler(State(state): State<AppState>) -> impl IntoResponse 
     }
 
     let auth_enabled = state
-        .core.auth
+        .core
+        .auth
         .as_ref()
         .map(|a| a.config.enabled)
         .unwrap_or(false);

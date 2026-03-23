@@ -68,7 +68,7 @@ impl GatewayClient {
         url: &str,
         session: Option<&str>,
         _token: Option<&str>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> crate::error::Result<Self> {
         // Ensure URL ends with /ws (unified endpoint, session key sent per-request)
         let _ = session; // session key is now sent per-request in chat.send params
         let ws_url = if url.ends_with("/ws") {
@@ -80,7 +80,9 @@ impl GatewayClient {
 
         tracing::info!(url = %ws_url, "connecting to gateway");
 
-        let (ws_stream, _) = tokio_tungstenite::connect_async(&ws_url).await?;
+        let (ws_stream, _) = tokio_tungstenite::connect_async(&ws_url)
+            .await
+            .map_err(crate::error::SynapseError::internal)?;
         let (write, read) = ws_stream.split();
 
         tracing::info!("gateway connected");
@@ -89,30 +91,36 @@ impl GatewayClient {
     }
 
     /// Send a message to the gateway.
-    pub async fn send_message(&mut self, content: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn send_message(&mut self, content: &str) -> crate::error::Result<()> {
         let cmd = WsCommand::SendMessage {
             content: content.to_string(),
         };
         let json = serde_json::to_string(&cmd)?;
-        self.write.send(WsMsg::Text(json.into())).await?;
+        self.write
+            .send(WsMsg::Text(json.into()))
+            .await
+            .map_err(crate::error::SynapseError::internal)?;
         Ok(())
     }
 
     /// Send a cancel signal.
-    pub async fn send_cancel(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn send_cancel(&mut self) -> crate::error::Result<()> {
         let cmd = WsCommand::Cancel {};
         let json = serde_json::to_string(&cmd)?;
-        self.write.send(WsMsg::Text(json.into())).await?;
+        self.write
+            .send(WsMsg::Text(json.into()))
+            .await
+            .map_err(crate::error::SynapseError::internal)?;
         Ok(())
     }
 
     /// Receive and display events until Done or Error.
     /// Returns the final response text.
-    pub async fn recv_until_done(&mut self) -> Result<String, Box<dyn std::error::Error>> {
+    pub async fn recv_until_done(&mut self) -> crate::error::Result<String> {
         let mut full_response = String::new();
 
         while let Some(msg) = self.read.next().await {
-            let msg = msg?;
+            let msg = msg.map_err(crate::error::SynapseError::internal)?;
             let text = match msg {
                 WsMsg::Text(t) => t.to_string(),
                 WsMsg::Close(_) => break,
@@ -194,11 +202,11 @@ pub async fn run_connect(
     url: &str,
     session: Option<&str>,
     token: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let mut client = GatewayClient::connect(url, session, token).await?;
 
     // Set up readline for interactive input
-    let mut rl = rustyline::DefaultEditor::new()?;
+    let mut rl = rustyline::DefaultEditor::new().map_err(crate::error::SynapseError::internal)?;
 
     loop {
         let readline = rl.readline("you> ");

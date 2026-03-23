@@ -93,7 +93,7 @@ fn try_acquire_leader(instance_id: &str) -> bool {
 pub async fn start_scheduler(
     config: &SynapseConfig,
     model: Arc<dyn ChatModel>,
-) -> Result<Arc<TokioScheduler>, Box<dyn std::error::Error>> {
+) -> crate::error::Result<Arc<TokioScheduler>> {
     // Check leader election gate
     if let Some(ref gw) = config.gateway {
         if gw.leader_election.unwrap_or(false) {

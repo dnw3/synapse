@@ -16,10 +16,7 @@ use synaptic::core::{
 };
 
 /// Run the Nextcloud Talk bot adapter using REST long-polling.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let nc_configs: Vec<crate::config::NextcloudBotConfig> = config.channel_configs("nextcloud");
     let nc_config = nc_configs
         .first()

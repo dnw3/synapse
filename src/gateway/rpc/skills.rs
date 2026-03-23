@@ -56,7 +56,8 @@ pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
                     }
                     let enabled = !ctx
                         .state
-                        .core.config
+                        .core
+                        .config
                         .skill_overrides
                         .get(&name)
                         .map(|o| !o.enabled)
@@ -92,7 +93,8 @@ pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
                 }
                 let enabled = !ctx
                     .state
-                    .core.config
+                    .core
+                    .config
                     .skill_overrides
                     .get(&name)
                     .map(|o| !o.enabled)

@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 /// Generate and optionally install a service configuration.
-pub fn install_service(config_path: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn install_service(config_path: Option<&str>) -> crate::error::Result<()> {
     #[cfg(target_os = "linux")]
     {
         install_systemd(config_path)
@@ -22,7 +22,7 @@ pub fn install_service(config_path: Option<&str>) -> Result<(), Box<dyn std::err
 }
 
 #[cfg(target_os = "linux")]
-fn install_systemd(config_path: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+fn install_systemd(config_path: Option<&str>) -> crate::error::Result<()> {
     let binary = std::env::current_exe()?;
     let config_flag = config_path
         .map(|p| format!(" --config {}", p))
@@ -59,7 +59,7 @@ WantedBy=multi-user.target
 }
 
 #[cfg(target_os = "macos")]
-fn install_launchd(config_path: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+fn install_launchd(config_path: Option<&str>) -> crate::error::Result<()> {
     let binary = std::env::current_exe()?;
     let config_flag = config_path
         .map(|p| {

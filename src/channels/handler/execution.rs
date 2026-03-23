@@ -23,7 +23,7 @@ impl AgentSession {
         ctx: RunContext,
         agent_info: &ResolvedAgentInfo,
         request_id: Option<&str>,
-    ) -> Result<(String, u32, u32), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<(String, u32, u32)> {
         let memory = self.session_mgr.memory();
 
         // Load existing messages
@@ -34,7 +34,7 @@ impl AgentSession {
             let system_prompt = agent_info
                 .prompt_override
                 .clone()
-                .or_else(|| self.config.base.agent.system_prompt.clone())
+                .or_else(|| self.config.agent_config().system_prompt.clone())
                 .unwrap_or_else(|| {
                     "You are Synapse, a helpful AI assistant. You can read and write files, \
                      execute commands, and help with complex tasks. Keep responses concise \
@@ -64,7 +64,9 @@ impl AgentSession {
         memory
             .append(session_id, human_msg.clone())
             .await
-            .map_err(|e| AgentError(format!("failed to save message: {}", e)))?;
+            .map_err(|e| {
+                crate::error::SynapseError::Channel(format!("failed to save message: {}", e))
+            })?;
         messages.push(human_msg);
 
         // Build deep agent
@@ -93,7 +95,9 @@ impl AgentSession {
             &[], // TODO: pass bundle_skills_dirs from gateway
         )
         .await
-        .map_err(|e| AgentError(format!("failed to build agent: {}", e)))?;
+        .map_err(|e| {
+            crate::error::SynapseError::Channel(format!("failed to build agent: {}", e))
+        })?;
 
         // Stream agent execution using RunContext
         let initial_state = MessageState::with_messages(messages);
@@ -191,7 +195,7 @@ impl AgentSession {
                             final_state = Some(event.state);
                         }
                         Some(Err(e)) => {
-                            return Err(Box::new(AgentError(format!("agent stream error: {}", e))));
+                            return Err(crate::error::SynapseError::Channel(format!("agent stream error: {}", e)));
                         }
                         None => {
                             break;
@@ -206,8 +210,9 @@ impl AgentSession {
             }
         }
 
-        let final_state =
-            final_state.ok_or_else(|| AgentError("no output from agent stream".into()))?;
+        let final_state = final_state.ok_or_else(|| {
+            crate::error::SynapseError::Channel("no output from agent stream".into())
+        })?;
         let response = extract_final_response(&final_state.messages);
 
         // Save new messages to history, injecting request_id + timestamp
@@ -237,7 +242,7 @@ impl AgentSession {
             let ltm_dir = if agent_info.id != "default" {
                 crate::config::agent_memory_dir(&agent_info.id)
             } else {
-                PathBuf::from(&self.config.base.paths.sessions_dir).join("long_term_memory")
+                PathBuf::from(&self.config.sessions_dir()).join("long_term_memory")
             };
             let ltm = LongTermMemory::new(ltm_dir, self.config.memory.clone());
             ltm.load().await.ok();
@@ -274,7 +279,7 @@ impl AgentSession {
         session_id: &str,
         text: &str,
         content_blocks: &[ContentBlock],
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<String> {
         let memory = self.session_mgr.memory();
 
         // Load existing messages
@@ -282,7 +287,7 @@ impl AgentSession {
 
         // Add system prompt if new conversation
         if messages.is_empty() {
-            if let Some(ref prompt) = self.config.base.agent.system_prompt {
+            if let Some(ref prompt) = self.config.agent_config().system_prompt {
                 messages.push(Message::system(prompt));
             }
         }
@@ -302,7 +307,7 @@ impl AgentSession {
             .model
             .chat(request)
             .await
-            .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+            .map_err(|e| crate::error::SynapseError::Channel(e.to_string()))?;
 
         let content = response.message.content().to_string();
 

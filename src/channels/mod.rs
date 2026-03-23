@@ -8,13 +8,14 @@ pub mod reactions;
 pub mod session_key;
 
 use crate::config::SynapseConfig;
+use crate::error::SynapseError;
 
 /// Run a bot adapter by platform name.
 pub async fn run_bot(
     config: &SynapseConfig,
     platform: &str,
     model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     match platform {
         #[cfg(feature = "bot-lark")]
         "lark" | "feishu" => adapters::lark::run(config, model_override, None, None, None).await,
@@ -84,7 +85,7 @@ pub async fn run_bot(
 
         _ => {
             let available = available_platforms();
-            Err(format!(
+            Err(SynapseError::Channel(format!(
                 "unknown platform '{}'. Available: {}",
                 platform,
                 if available.is_empty() {
@@ -92,8 +93,7 @@ pub async fn run_bot(
                 } else {
                     available.join(", ")
                 }
-            )
-            .into())
+            )))
         }
     }
 }

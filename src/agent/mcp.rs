@@ -41,7 +41,7 @@ pub fn config_to_mcp_connection(mc: &synaptic::config::McpServerConfig) -> Optio
 
 /// Load MCP tools from config. Returns empty vec on failure (non-fatal).
 pub async fn load_mcp_tools(config: &SynapseConfig) -> Vec<Arc<dyn Tool>> {
-    let mcp_configs = match &config.base.mcp {
+    let mcp_configs = match config.mcp_configs() {
         Some(configs) if !configs.is_empty() => configs,
         _ => return Vec::new(),
     };

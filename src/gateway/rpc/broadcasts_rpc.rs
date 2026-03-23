@@ -13,7 +13,8 @@ use super::types::RpcError;
 pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let groups: Vec<Value> = ctx
         .state
-        .core.config
+        .core
+        .config
         .broadcasts
         .iter()
         .map(|g| {

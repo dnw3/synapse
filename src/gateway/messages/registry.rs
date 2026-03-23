@@ -64,7 +64,7 @@ mod tests {
             _target: &DeliveryContext,
             _content: &str,
             _meta: Option<&serde_json::Value>,
-        ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>> {
+        ) -> crate::error::Result<SendResult> {
             Ok(SendResult {
                 message_id: Some("test_msg_1".into()),
                 delivered_at_ms: 1000,

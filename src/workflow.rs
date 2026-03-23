@@ -511,7 +511,7 @@ pub async fn run_workflow_command(
     name: Option<&str>,
     input: Option<&str>,
     data: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     match action {
         "list" | "ls" => {
             let registry = WorkflowRegistry::discover();
@@ -730,7 +730,7 @@ fn status_label(status: &WorkflowStatus) -> &str {
 async fn find_workflow_name_from_token(
     _runner: &WorkflowRunner,
     token: &str,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> crate::error::Result<String> {
     // The WorkflowRunner stores WorkflowCheckpoint with workflow_name in the checkpoint.
     // We query the checkpoint via status. The checkpoint state is a WorkflowCheckpoint.
     // Since we can't directly access the internal checkpoint, we use a heuristic:

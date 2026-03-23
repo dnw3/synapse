@@ -12,7 +12,7 @@ impl AgentSession {
         msg: &InboundMessage,
         agents: &[ResolvedAgentInfo],
         strategy: &crate::config::BroadcastStrategy,
-    ) -> Result<AgentReply, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<AgentReply> {
         use crate::config::BroadcastStrategy;
 
         let request_id = msg.request_id.clone();
@@ -63,7 +63,7 @@ impl AgentSession {
                             let sys_prompt = info
                                 .prompt_override
                                 .clone()
-                                .or_else(|| config.base.agent.system_prompt.clone())
+                                .or_else(|| config.agent_config().system_prompt.clone())
                                 .unwrap_or_else(|| "You are a helpful AI assistant.".into());
                             messages.push(Message::system(&sys_prompt));
                         }
@@ -101,23 +101,21 @@ impl AgentSession {
                                 &[], // no bundle skills in broadcast mode
                             )
                             .await
-                            .map_err(|e| AgentError(format!("agent build: {}", e)))?;
+                            .map_err(|e| {
+                                crate::error::SynapseError::Channel(format!("agent build: {}", e))
+                            })?;
 
                             let initial_state = MessageState::with_messages(messages);
-                            let result = agent
-                                .invoke(initial_state)
-                                .await
-                                .map_err(|e| AgentError(format!("agent error: {}", e)))?;
+                            let result = agent.invoke(initial_state).await.map_err(|e| {
+                                crate::error::SynapseError::Channel(format!("agent error: {}", e))
+                            })?;
                             let response = extract_final_response(&result.into_state().messages);
-                            Ok::<(String, String), Box<dyn std::error::Error + Send + Sync>>((
-                                agent_id, response,
-                            ))
+                            Ok::<(String, String), crate::error::SynapseError>((agent_id, response))
                         } else {
                             let req = ChatRequest::new(messages);
-                            let resp = model
-                                .chat(req)
-                                .await
-                                .map_err(|e| AgentError(format!("chat error: {}", e)))?;
+                            let resp = model.chat(req).await.map_err(|e| {
+                                crate::error::SynapseError::Channel(format!("chat error: {}", e))
+                            })?;
                             let text = resp.message.content().to_string();
                             Ok((agent_id, text))
                         }

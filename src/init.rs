@@ -59,7 +59,7 @@ const PROVIDERS: &[ProviderInfo] = &[
 ];
 
 /// Run the interactive init wizard.
-pub async fn run_init() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run_init() -> crate::error::Result<()> {
     println!();
     println!("{}", "═══ Synapse Setup Wizard ═══".bold().cyan());
     println!();
@@ -189,7 +189,7 @@ memory_file = "AGENTS.md"
     Ok(())
 }
 
-async fn run_custom_provider_init() -> Result<(), Box<dyn std::error::Error>> {
+async fn run_custom_provider_init() -> crate::error::Result<()> {
     println!("{}", "Custom OpenAI-compatible provider setup:".bold());
     println!();
 
@@ -238,13 +238,13 @@ memory_file = "AGENTS.md"
     Ok(())
 }
 
-fn read_line() -> Result<String, Box<dyn std::error::Error>> {
+fn read_line() -> crate::error::Result<String> {
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
     Ok(input.trim().to_string())
 }
 
-fn read_line_default(default: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn read_line_default(default: &str) -> crate::error::Result<String> {
     let input = read_line()?;
     if input.is_empty() {
         Ok(default.to_string())
@@ -253,7 +253,7 @@ fn read_line_default(default: &str) -> Result<String, Box<dyn std::error::Error>
     }
 }
 
-fn read_choice(min: usize, max: usize) -> Result<usize, Box<dyn std::error::Error>> {
+fn read_choice(min: usize, max: usize) -> crate::error::Result<usize> {
     loop {
         print!("{} ", ">".green().bold());
         io::stdout().flush()?;
@@ -267,7 +267,7 @@ fn read_choice(min: usize, max: usize) -> Result<usize, Box<dyn std::error::Erro
     }
 }
 
-fn confirm(prompt: &str) -> Result<bool, Box<dyn std::error::Error>> {
+fn confirm(prompt: &str) -> crate::error::Result<bool> {
     print!("{} [y/N] ", prompt);
     io::stdout().flush()?;
     let input = read_line()?;

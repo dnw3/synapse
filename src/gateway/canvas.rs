@@ -22,10 +22,7 @@ pub struct CanvasAction {
 #[async_trait]
 pub trait CanvasRenderer: Send + Sync {
     fn canvas_type(&self) -> &str;
-    fn render(
-        &self,
-        data: &Value,
-    ) -> Result<CanvasOutput, Box<dyn std::error::Error + Send + Sync>>;
+    fn render(&self, data: &Value) -> crate::error::Result<CanvasOutput>;
 }
 
 pub struct CanvasEngine {
@@ -74,10 +71,7 @@ impl CanvasRenderer for DiagramRenderer {
         "diagram"
     }
 
-    fn render(
-        &self,
-        data: &Value,
-    ) -> Result<CanvasOutput, Box<dyn std::error::Error + Send + Sync>> {
+    fn render(&self, data: &Value) -> crate::error::Result<CanvasOutput> {
         let content = data.get("content").and_then(|v| v.as_str()).unwrap_or("");
 
         let html = format!(r#"<div class="mermaid">{content}</div>"#);
@@ -102,10 +96,7 @@ impl CanvasRenderer for FormRenderer {
         "form"
     }
 
-    fn render(
-        &self,
-        data: &Value,
-    ) -> Result<CanvasOutput, Box<dyn std::error::Error + Send + Sync>> {
+    fn render(&self, data: &Value) -> crate::error::Result<CanvasOutput> {
         let title = data.get("title").and_then(|v| v.as_str()).unwrap_or("Form");
         let action = data.get("action").and_then(|v| v.as_str()).unwrap_or("#");
         let method = data
@@ -209,10 +200,7 @@ impl CanvasRenderer for TableRenderer {
         "table"
     }
 
-    fn render(
-        &self,
-        data: &Value,
-    ) -> Result<CanvasOutput, Box<dyn std::error::Error + Send + Sync>> {
+    fn render(&self, data: &Value) -> crate::error::Result<CanvasOutput> {
         let empty_columns: Vec<Value> = vec![];
         let empty_rows: Vec<Value> = vec![];
 
@@ -306,10 +294,7 @@ impl CanvasRenderer for PlotRenderer {
         "plot"
     }
 
-    fn render(
-        &self,
-        data: &Value,
-    ) -> Result<CanvasOutput, Box<dyn std::error::Error + Send + Sync>> {
+    fn render(&self, data: &Value) -> crate::error::Result<CanvasOutput> {
         let chart_type = data
             .get("chart_type")
             .and_then(|v| v.as_str())
@@ -367,10 +352,7 @@ impl CanvasRenderer for CardRenderer {
         "card"
     }
 
-    fn render(
-        &self,
-        data: &Value,
-    ) -> Result<CanvasOutput, Box<dyn std::error::Error + Send + Sync>> {
+    fn render(&self, data: &Value) -> crate::error::Result<CanvasOutput> {
         let title = data.get("title").and_then(|v| v.as_str()).unwrap_or("Card");
         let description = data
             .get("description")
@@ -611,10 +593,7 @@ mod tests {
             fn canvas_type(&self) -> &str {
                 "echo"
             }
-            fn render(
-                &self,
-                data: &Value,
-            ) -> Result<CanvasOutput, Box<dyn std::error::Error + Send + Sync>> {
+            fn render(&self, data: &Value) -> crate::error::Result<CanvasOutput> {
                 Ok(CanvasOutput {
                     html: data.to_string(),
                     interactive: false,

@@ -25,7 +25,7 @@ pub async fn single_shot(
     messages: &mut Vec<Message>,
     user_message: &str,
     ltm: &LongTermMemory,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     eprintln!("{} {}", "Session:".bold(), session_id.cyan());
 
     // Recall relevant long-term memories

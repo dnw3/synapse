@@ -25,7 +25,7 @@ pub fn build_session_manager(config: &SynapseConfig) -> SessionManager {
         }
     }
 
-    let sessions_dir = PathBuf::from(&config.base.paths.sessions_dir);
+    let sessions_dir = PathBuf::from(&config.sessions_dir());
     let store: Arc<dyn Store> = Arc::new(FileStore::new(sessions_dir));
     SessionManager::new(store)
 }

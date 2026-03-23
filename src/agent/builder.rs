@@ -192,7 +192,7 @@ pub async fn build_deep_agent_with_callback(
     // --- System prompt + project context ---
     let mut system_prompt = system_prompt_override
         .map(|s| s.to_string())
-        .or_else(|| config.base.agent.system_prompt.clone())
+        .or_else(|| config.agent_config().system_prompt.clone())
         .unwrap_or_else(|| {
             "You are Synapse, a helpful AI assistant powered by the Synaptic framework.".to_string()
         });
@@ -288,12 +288,12 @@ pub async fn build_deep_agent_with_callback(
             Some(super::self_awareness::build_self_section(config, channel));
     }
 
-    options.filesystem.enable_filesystem = config.base.agent.tools.filesystem;
+    options.filesystem.enable_filesystem = config.agent_config().tools.filesystem;
     // Disable DeepMemoryMiddleware — bootstrap context (AGENTS.md etc.) is already
     // injected once at startup via BootstrapLoader. Re-reading on every model call
     // would cause double injection. Memory access at runtime goes through tools instead.
     options.context.enable_memory = false;
-    options.context.memory_file = Some(config.base.paths.memory_file.clone());
+    options.context.memory_file = Some(config.memory_file().to_string());
 
     // --- Skills directories ---
     setup_skills_dirs(&mut options, config, cwd, agent_name);
@@ -325,7 +325,7 @@ pub async fn build_deep_agent_with_callback(
         }
     }
 
-    if let Some(max_turns) = config.base.agent.max_turns {
+    if let Some(max_turns) = config.agent_config().max_turns {
         options.condenser.max_input_tokens = max_turns * 4000;
     }
 
@@ -362,8 +362,8 @@ pub async fn build_deep_agent_with_callback(
 
     // --- EventBus + metadata ---
     options.observability.event_bus = event_bus;
-    options.observability.model_name = Some(config.base.model.model.clone());
-    options.observability.provider_name = Some(config.base.model.provider.clone());
+    options.observability.model_name = Some(config.model_config().model.clone());
+    options.observability.provider_name = Some(config.model_config().provider.clone());
     options.observability.channel = Some(channel.to_string());
     options.observability.agent_id = agent_name.map(|s| s.to_string());
 

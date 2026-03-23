@@ -47,10 +47,7 @@ struct ZaloMessage {
 }
 
 /// Run the Zalo bot adapter (webhook HTTP mode).
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let zalo_configs: Vec<crate::config::ZaloBotConfig> = config.channel_configs("zalo");
     let zalo_config = zalo_configs
         .first()

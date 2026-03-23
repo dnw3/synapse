@@ -46,7 +46,7 @@ impl ChannelSender for SlackSender {
         target: &DeliveryContext,
         content: &str,
         _meta: Option<&serde_json::Value>,
-    ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<SendResult> {
         let channel = target
             .to
             .as_deref()
@@ -81,10 +81,7 @@ impl ChannelSender for SlackSender {
 }
 
 /// Run the Slack bot adapter using Socket Mode.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let slack_configs: Vec<crate::config::SlackBotConfig> = config.channel_configs("slack");
     let slack_config = slack_configs
         .first()
@@ -308,7 +305,7 @@ async fn run_socket_mode(
     bot_token: &str,
     agent_session: Arc<AgentSession>,
     allowlist: &BotAllowlist,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     // Step 1: Open a WebSocket connection via apps.connections.open
     let client = reqwest::Client::new();
     let resp = client

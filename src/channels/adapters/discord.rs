@@ -52,7 +52,7 @@ impl ChannelSender for DiscordSender {
         target: &DeliveryContext,
         content: &str,
         _meta: Option<&serde_json::Value>,
-    ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<SendResult> {
         let channel_id = target
             .to
             .as_deref()
@@ -87,10 +87,7 @@ impl ChannelSender for DiscordSender {
 }
 
 /// Run the Discord bot.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let discord_configs: Vec<crate::config::DiscordBotConfig> = config.channel_configs("discord");
     let discord_config = discord_configs
         .first()

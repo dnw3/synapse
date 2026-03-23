@@ -16,10 +16,7 @@ use crate::config::bots::resolve_secret;
 use crate::config::{SynapseConfig, TlonBotConfig};
 
 /// Run the Tlon (Urbit) bot adapter using HTTP SSE polling.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let tlon_configs: Vec<crate::config::TlonBotConfig> = config.channel_configs("tlon");
     let tlon_config = tlon_configs
         .first()
@@ -67,7 +64,7 @@ async fn poll_messages(
     _api_key: &str,
     _agent_session: &Arc<AgentSession>,
     _allowlist: &crate::config::BotAllowlist,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     // Placeholder: In a full implementation, this would:
     // 1. Subscribe to Tlon channel SSE events
     // 2. Parse incoming chat messages

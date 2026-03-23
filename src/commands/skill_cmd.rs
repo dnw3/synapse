@@ -9,10 +9,7 @@ use colored::Colorize;
 use synaptic::deep::skill::load_manifest;
 
 /// Run skill subcommand.
-pub fn run_skill_command(
-    action: &str,
-    arg: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_skill_command(action: &str, arg: Option<&str>) -> crate::error::Result<()> {
     match action {
         "list" | "ls" => list_skills(),
         "info" => {
@@ -284,7 +281,7 @@ fn parse_skill_md_info(content: &str) -> Option<SkillInfo> {
     })
 }
 
-fn list_skills() -> Result<(), Box<dyn std::error::Error>> {
+fn list_skills() -> crate::error::Result<()> {
     let global_dir = global_skills_dir();
     let legacy_dir = legacy_global_skills_dir();
     let workspace_dir = workspace_skills_dir();
@@ -374,7 +371,7 @@ fn list_skills() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn skill_info(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn skill_info(name: &str) -> crate::error::Result<()> {
     let dirs_to_check: Vec<(&str, PathBuf)> = {
         let mut v = Vec::new();
         if let Some(ws) = workspace_skills_dir() {
@@ -445,7 +442,7 @@ fn skill_info(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Install a skill from a source path (directory containing SKILL.md or manifest.toml).
-fn install_skill(source: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn install_skill(source: &str) -> crate::error::Result<()> {
     let source_path = Path::new(source);
     if !source_path.exists() {
         return Err(format!("source path '{}' does not exist", source).into());
@@ -500,7 +497,7 @@ fn install_skill(source: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Enable a previously disabled skill.
-fn enable_skill(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn enable_skill(name: &str) -> crate::error::Result<()> {
     let skill_dir = find_skill_dir(name)?;
     let marker = skill_dir.join(".disabled");
 
@@ -515,7 +512,7 @@ fn enable_skill(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Disable a skill by creating a `.disabled` marker.
-fn disable_skill(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn disable_skill(name: &str) -> crate::error::Result<()> {
     let skill_dir = find_skill_dir(name)?;
     let marker = skill_dir.join(".disabled");
 
@@ -530,7 +527,7 @@ fn disable_skill(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Remove a skill entirely.
-fn remove_skill(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn remove_skill(name: &str) -> crate::error::Result<()> {
     let skill_dir = find_skill_dir(name)?;
     std::fs::remove_dir_all(&skill_dir)?;
     println!(
@@ -543,10 +540,7 @@ fn remove_skill(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Publish a skill directory to ClawHub.
-async fn publish_skill(
-    hub: &crate::hub::ClawHubClient,
-    source: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn publish_skill(hub: &crate::hub::ClawHubClient, source: &str) -> crate::error::Result<()> {
     let source_path = Path::new(source);
     if !source_path.exists() || !source_path.is_dir() {
         return Err("source must be a directory containing SKILL.md".into());
@@ -590,7 +584,7 @@ fn collect_publish_files(
     base: &Path,
     dir: &Path,
     out: &mut Vec<(String, Vec<u8>)>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -601,7 +595,11 @@ fn collect_publish_files(
         if path.is_dir() {
             collect_publish_files(base, &path, out)?;
         } else {
-            let rel = path.strip_prefix(base)?.to_string_lossy().to_string();
+            let rel = path
+                .strip_prefix(base)
+                .map_err(|e| crate::error::SynapseError::Skill(e.to_string()))?
+                .to_string_lossy()
+                .to_string();
             let content = std::fs::read(&path)?;
             out.push((rel, content));
         }
@@ -610,7 +608,7 @@ fn collect_publish_files(
 }
 
 /// Run health checks on all installed skills.
-fn doctor_skills() -> Result<(), Box<dyn std::error::Error>> {
+fn doctor_skills() -> crate::error::Result<()> {
     let global_dir = global_skills_dir();
     let ws_dir = workspace_skills_dir();
 
@@ -725,7 +723,7 @@ fn check_frontmatter_requirements(content: &str, issues: &mut Vec<String>) {
 }
 
 /// Find the directory for a named skill (checks workspace first, then global).
-fn find_skill_dir(name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn find_skill_dir(name: &str) -> crate::error::Result<PathBuf> {
     if let Some(ws) = workspace_skills_dir() {
         let dir = ws.join(name);
         if dir.exists() {

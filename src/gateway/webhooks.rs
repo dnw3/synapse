@@ -42,7 +42,8 @@ async fn handle_webhook(
 
     let request = synaptic::core::ChatRequest::new(messages);
     let response = state
-        .agent.model
+        .agent
+        .model
         .chat(request)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

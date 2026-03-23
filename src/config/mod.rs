@@ -31,7 +31,7 @@ pub use self::server::*;
 #[allow(dead_code)]
 pub struct SynapseConfig {
     #[serde(flatten)]
-    pub base: SynapticAgentConfig,
+    pub(crate) base: SynapticAgentConfig,
 
     /// Fallback model names for automatic failover.
     pub fallback_models: Option<Vec<String>>,
@@ -152,6 +152,35 @@ pub struct SynapseConfig {
 }
 
 impl SynapseConfig {
+    // ── Accessor methods wrapping `self.base.*` ──────────────────────────
+
+    pub fn model_config(&self) -> &synaptic::config::ModelConfig {
+        &self.base.model
+    }
+    pub fn agent_config(&self) -> &synaptic::config::AgentConfig {
+        &self.base.agent
+    }
+    #[allow(dead_code)]
+    pub fn paths(&self) -> &synaptic::config::PathsConfig {
+        &self.base.paths
+    }
+    pub fn mcp_configs(&self) -> Option<&[synaptic::config::McpServerConfig]> {
+        self.base.mcp.as_deref()
+    }
+    pub fn resolve_api_key(&self) -> std::result::Result<String, SynapticError> {
+        self.base.resolve_api_key()
+    }
+    pub fn sessions_dir(&self) -> &str {
+        &self.base.paths.sessions_dir
+    }
+    pub fn memory_file(&self) -> &str {
+        &self.base.paths.memory_file
+    }
+    #[allow(dead_code)]
+    pub fn skills_dir(&self) -> &str {
+        &self.base.paths.skills_dir
+    }
+
     /// Extract typed channel configs for a specific platform.
     /// Deserializes from the dynamic `channels` map, filtering by `enabled`.
     pub fn channel_configs<T: serde::de::DeserializeOwned>(&self, platform: &str) -> Vec<T> {
@@ -311,7 +340,7 @@ impl SynapseConfig {
     }
 
     /// Load config, falling back to sensible defaults if no config file exists.
-    pub fn load_or_default(path: Option<&Path>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn load_or_default(path: Option<&Path>) -> crate::error::Result<Self> {
         match Self::load(path) {
             Ok(config) => Ok(config),
             Err(SynapticError::Config(msg)) if path.is_none() => {

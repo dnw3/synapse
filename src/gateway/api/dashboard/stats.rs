@@ -41,7 +41,8 @@ async fn get_stats(
     State(state): State<AppState>,
 ) -> Result<Json<StatsResponse>, (StatusCode, String)> {
     let sessions = state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -192,7 +193,8 @@ async fn get_usage_sessions(
     Query(_query): Query<UsageSessionsQuery>,
 ) -> Result<Json<Vec<UsageSessionEntry>>, (StatusCode, String)> {
     let sessions = state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -260,13 +262,20 @@ async fn get_providers(State(state): State<AppState>) -> Json<Vec<ProviderRespon
     }
 
     if !providers.iter().any(|p| p.name == "default") {
-        let base_model = state.core.config.base.model.model.clone();
-        let base_provider = state.core.config.base.model.provider.clone();
+        let base_model = state.core.config.model_config().model.clone();
+        let base_provider = state.core.config.model_config().provider.clone();
         providers.insert(
             0,
             ProviderResponse {
                 name: base_provider,
-                base_url: state.core.config.base.model.base_url.clone().unwrap_or_default(),
+                base_url: state
+                    .core
+                    .config
+                    .base
+                    .model
+                    .base_url
+                    .clone()
+                    .unwrap_or_default(),
                 models: vec![base_model],
             },
         );
@@ -303,7 +312,8 @@ async fn get_health(
     State(state): State<AppState>,
 ) -> Result<Json<HealthResponse>, (StatusCode, String)> {
     let sessions = state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -320,7 +330,8 @@ async fn get_health(
 
     let active = state.session.cancel_tokens.read().await.len();
     let auth_enabled = state
-        .core.auth
+        .core
+        .auth
         .as_ref()
         .map(|a| a.config.enabled)
         .unwrap_or(false);
@@ -335,11 +346,19 @@ async fn get_health(
         active_sessions: active,
         session_count: sessions.len(),
         config_summary: ConfigSummary {
-            model: state.core.config.base.model.model.clone(),
-            provider: state.core.config.base.model.provider.clone(),
-            mcp_servers: state.core.config.base.mcp.as_ref().map(|m| m.len()).unwrap_or(0),
+            model: state.core.config.model_config().model.clone(),
+            provider: state.core.config.model_config().provider.clone(),
+            mcp_servers: state
+                .core
+                .config
+                .base
+                .mcp
+                .as_ref()
+                .map(|m| m.len())
+                .unwrap_or(0),
             scheduled_jobs: state
-                .core.config
+                .core
+                .config
                 .schedules
                 .as_ref()
                 .map(|s| s.len())
@@ -365,7 +384,8 @@ struct DebugHealthResponse {
 async fn debug_health(State(state): State<AppState>) -> Json<DebugHealthResponse> {
     let active = state.session.cancel_tokens.read().await.len();
     let sessions = state
-        .session.sessions
+        .session
+        .sessions
         .list_sessions()
         .await
         .map(|s| s.len())

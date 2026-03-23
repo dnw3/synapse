@@ -61,7 +61,7 @@ pub trait Plugin: Send + Sync {
     fn description(&self) -> &str;
 
     /// Called once when the plugin is loaded. Return an error to abort loading.
-    fn on_load(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn on_load(&self) -> crate::error::Result<()> {
         Ok(())
     }
 
@@ -393,11 +393,13 @@ fn find_shared_library(dir: &Path) -> Option<std::path::PathBuf> {
 /// extern "C" fn synapse_plugin_create() -> *mut dyn Plugin;
 /// ```
 #[cfg(feature = "plugins")]
-fn load_dynamic_plugin(lib_path: &Path) -> Result<Box<dyn Plugin>, Box<dyn std::error::Error>> {
+fn load_dynamic_plugin(lib_path: &Path) -> crate::error::Result<Box<dyn Plugin>> {
     unsafe {
-        let lib = libloading::Library::new(lib_path)?;
-        let create_fn: libloading::Symbol<unsafe extern "C" fn() -> *mut dyn Plugin> =
-            lib.get(b"synapse_plugin_create")?;
+        let lib =
+            libloading::Library::new(lib_path).map_err(crate::error::SynapseError::internal)?;
+        let create_fn: libloading::Symbol<unsafe extern "C" fn() -> *mut dyn Plugin> = lib
+            .get(b"synapse_plugin_create")
+            .map_err(crate::error::SynapseError::internal)?;
         let plugin = Box::from_raw(create_fn());
 
         // Call on_load
@@ -448,7 +450,7 @@ pub fn register_builtin_plugins(
     registry: &mut PluginRegistry,
     cost_tracker: Arc<synaptic::callbacks::CostTrackingCallback>,
     usage_tracker: Arc<crate::gateway::usage::UsageTracker>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     // --- 1. Tracing subscriber ---
     registry.register_event_subscriber(
         Arc::new(crate::agent::subscribers::TracingSubscriber::new()),

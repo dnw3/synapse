@@ -98,7 +98,7 @@ async fn fetch_bot_token(
     client: &reqwest::Client,
     app_id: &str,
     app_password: &str,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+) -> crate::error::Result<String> {
     let params = [
         ("grant_type", "client_credentials"),
         ("client_id", app_id),
@@ -322,10 +322,7 @@ async fn handle_message(
 }
 
 /// Run the Microsoft Teams bot adapter (Bot Framework webhook mode).
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let teams_configs: Vec<crate::config::TeamsBotConfig> = config.channel_configs("teams");
     let teams_config = teams_configs
         .first()

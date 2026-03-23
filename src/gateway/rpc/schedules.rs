@@ -96,7 +96,8 @@ async fn append_schedule_run(entry: ScheduleRunEntry) {
 pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let schedules: Vec<Value> = ctx
         .state
-        .core.config
+        .core
+        .config
         .schedules
         .as_ref()
         .map(|entries| {
@@ -329,7 +330,8 @@ pub async fn handle_status_toggle(ctx: Arc<RpcContext>, params: Value) -> Result
     // Find the schedule in config to report current enabled state
     let enabled = ctx
         .state
-        .core.config
+        .core
+        .config
         .schedules
         .as_ref()
         .and_then(|entries| entries.iter().find(|e| e.name == name))

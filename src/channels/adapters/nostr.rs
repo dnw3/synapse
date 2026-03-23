@@ -18,10 +18,7 @@ use crate::config::{NostrBotConfig, SynapseConfig};
 ///
 /// Connects to Nostr relays via WebSocket (NIP-01 protocol) and responds to
 /// direct messages (NIP-04 kind 4) and mentions.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let nostr_configs: Vec<crate::config::NostrBotConfig> = config.channel_configs("nostr");
     let nostr_config = nostr_configs
         .first()
@@ -63,7 +60,7 @@ async fn poll_relay(
     _private_key: &str,
     _agent_session: &Arc<AgentSession>,
     _allowlist: &crate::config::BotAllowlist,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     // Placeholder: In a full implementation, this would:
     // 1. Connect to relay via WebSocket
     // 2. Subscribe to kind 4 (DM) and kind 1 (text note) events mentioning the bot

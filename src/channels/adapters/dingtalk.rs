@@ -258,10 +258,7 @@ async fn handle_callback(
 }
 
 /// Run the DingTalk bot adapter.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let dt_configs: Vec<crate::config::DingTalkBotConfig> = config.channel_configs("dingtalk");
     let dt_config = dt_configs
         .first()

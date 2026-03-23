@@ -22,7 +22,7 @@ pub async fn run(
     status_handle: Option<Arc<dyn synaptic::ChannelStatusHandle>>,
     event_bus: Option<Arc<synaptic::events::EventBus>>,
     plugin_registry: Option<Arc<tokio::sync::RwLock<synaptic::plugin::PluginRegistry>>>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let lark_configs: Vec<crate::config::LarkBotConfig> = config.channel_configs("lark");
     let lark_config = lark_configs
         .first()

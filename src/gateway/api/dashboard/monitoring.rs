@@ -188,7 +188,7 @@ fn build_mcp_config(
 
 async fn name_exists(state: &AppState, name: &str) -> bool {
     // Check persistent
-    if let Some(mcps) = &state.core.config.base.mcp {
+    if let Some(mcps) = state.core.config.mcp_configs() {
         if mcps.iter().any(|m| m.name == name) {
             return true;
         }
@@ -303,12 +303,13 @@ async fn get_mcp(State(state): State<AppState>) -> Json<Vec<McpServerInfoRespons
     let mut servers = Vec::new();
 
     // Persistent servers from config
-    if let Some(mcps) = &state.core.config.base.mcp {
+    if let Some(mcps) = state.core.config.mcp_configs() {
         let prefix_suffix = "_";
         for cfg in mcps {
             let prefix = format!("{}{}", cfg.name, prefix_suffix);
             let matching_tools: Vec<Arc<dyn Tool>> = state
-                .agent.mcp_tools
+                .agent
+                .mcp_tools
                 .iter()
                 .filter(|t| t.name().starts_with(&prefix))
                 .cloned()
@@ -392,7 +393,13 @@ async fn create_mcp(
 
     if body.transient {
         let mut transient = state.agent.transient_mcp.write().await;
-        transient.insert(cfg.name.clone(), crate::gateway::state::TransientMcpServer { config: cfg.clone(), tools: tools.clone() });
+        transient.insert(
+            cfg.name.clone(),
+            crate::gateway::state::TransientMcpServer {
+                config: cfg.clone(),
+                tools: tools.clone(),
+            },
+        );
     } else {
         // Append to synapse.toml
         append_mcp_to_toml(&cfg).await?;
@@ -445,7 +452,13 @@ async fn update_mcp(
             })?;
 
             let mut transient = state.agent.transient_mcp.write().await;
-            transient.insert(name.clone(), crate::gateway::state::TransientMcpServer { config: cfg.clone(), tools: tools.clone() });
+            transient.insert(
+                name.clone(),
+                crate::gateway::state::TransientMcpServer {
+                    config: cfg.clone(),
+                    tools: tools.clone(),
+                },
+            );
 
             tracing::info!(name = %name, tool_count = tools.len(), "transient MCP server updated");
             return Ok(Json(build_server_info(&cfg, &tools, true)));
@@ -454,7 +467,8 @@ async fn update_mcp(
 
     // Check persistent
     let existing_cfg = state
-        .core.config
+        .core
+        .config
         .base
         .mcp
         .as_ref()
@@ -548,7 +562,8 @@ async fn test_mcp(
             Some(server.config.clone())
         } else {
             state
-                .core.config
+                .core
+                .config
                 .base
                 .mcp
                 .as_ref()
@@ -619,7 +634,11 @@ async fn persist_mcp(
     append_mcp_to_toml(&server.config).await?;
 
     tracing::info!(name = %name, "transient MCP server persisted to config");
-    Ok(Json(build_server_info(&server.config, &server.tools, false)))
+    Ok(Json(build_server_info(
+        &server.config,
+        &server.tools,
+        false,
+    )))
 }
 
 // ---------------------------------------------------------------------------

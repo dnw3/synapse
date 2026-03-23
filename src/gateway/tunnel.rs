@@ -26,7 +26,7 @@ pub async fn start_tunnel(
     provider: &str,
     local_port: u16,
     remote_host: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     match provider {
         "cloudflared" | "cloudflare" => run_cloudflared(local_port).await,
         "bore" => run_bore(local_port).await,
@@ -43,7 +43,7 @@ pub async fn start_tunnel(
     }
 }
 
-async fn run_cloudflared(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_cloudflared(port: u16) -> crate::error::Result<()> {
     // Check if cloudflared is available
     let which = tokio::process::Command::new("which")
         .arg("cloudflared")
@@ -76,7 +76,7 @@ async fn run_cloudflared(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn run_bore(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_bore(port: u16) -> crate::error::Result<()> {
     let which = tokio::process::Command::new("which")
         .arg("bore")
         .output()
@@ -105,10 +105,7 @@ async fn run_bore(port: u16) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn run_ssh_tunnel(
-    local_port: u16,
-    remote_host: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_ssh_tunnel(local_port: u16, remote_host: &str) -> crate::error::Result<()> {
     eprintln!(
         "{} Starting SSH tunnel: localhost:{} -> {}",
         "tunnel:".cyan().bold(),
@@ -135,7 +132,7 @@ async fn run_ssh_tunnel(
     Ok(())
 }
 
-async fn run_tailscale_funnel(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_tailscale_funnel(port: u16) -> crate::error::Result<()> {
     // Check if tailscale is available
     let which = tokio::process::Command::new("which")
         .arg("tailscale")
@@ -212,7 +209,7 @@ async fn run_tailscale_funnel(port: u16) -> Result<(), Box<dyn std::error::Error
 /// This is a non-blocking variant that starts the funnel in the background
 /// and returns the URL immediately.
 #[allow(dead_code)]
-pub async fn setup_tailscale_funnel(port: u16) -> Result<String, Box<dyn std::error::Error>> {
+pub async fn setup_tailscale_funnel(port: u16) -> crate::error::Result<String> {
     let output = tokio::process::Command::new("tailscale")
         .args(["funnel", &port.to_string(), "--bg"])
         .output()

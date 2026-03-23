@@ -21,7 +21,7 @@ pub fn build_self_section(config: &SynapseConfig, channel: &str) -> String {
     };
 
     let session_dir = if is_local {
-        config.base.paths.sessions_dir.as_str()
+        config.sessions_dir()
     } else {
         "(internal)"
     };

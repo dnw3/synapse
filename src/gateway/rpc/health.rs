@@ -30,7 +30,8 @@ pub async fn handle_status(ctx: Arc<RpcContext>, _params: Value) -> Result<Value
     let uptime_secs = ctx.state.core.started_at.elapsed().as_secs();
     let auth_enabled = ctx
         .state
-        .core.auth
+        .core
+        .auth
         .as_ref()
         .map(|a| a.config.enabled)
         .unwrap_or(false);

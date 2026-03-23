@@ -189,11 +189,9 @@ async fn handle_webhook(
 }
 
 /// Run the Google Chat bot adapter (webhook mode).
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let gchat_configs: Vec<crate::config::GoogleChatBotConfig> = config.channel_configs("googlechat");
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
+    let gchat_configs: Vec<crate::config::GoogleChatBotConfig> =
+        config.channel_configs("googlechat");
     let gchat_config = gchat_configs
         .first()
         .ok_or("missing [[channels.googlechat]] section in config")?;

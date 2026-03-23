@@ -18,7 +18,8 @@ pub async fn handle_search(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 
     let results = ctx
         .state
-        .agent.memory_provider
+        .agent
+        .memory_provider
         .search(query, session_key, limit)
         .await
         .map_err(|e| RpcError::internal(format!("memory search failed: {}", e)))?;
@@ -34,7 +35,8 @@ pub async fn handle_add_resource(ctx: Arc<RpcContext>, params: Value) -> Result<
     let uri = params["uri"].as_str().unwrap_or("");
 
     ctx.state
-        .agent.memory_provider
+        .agent
+        .memory_provider
         .add_resource(uri)
         .await
         .map_err(|e| RpcError::internal(format!("add resource failed: {}", e)))?;

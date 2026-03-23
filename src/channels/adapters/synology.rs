@@ -34,10 +34,7 @@ struct SynologyWebhook {
 }
 
 /// Run the Synology Chat bot adapter (incoming webhook mode).
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let syn_configs: Vec<crate::config::SynologyBotConfig> = config.channel_configs("synology");
     let syn_config = syn_configs
         .first()

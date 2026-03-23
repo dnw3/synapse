@@ -178,7 +178,7 @@ impl ClawHubClient {
         &self,
         query: &str,
         limit: usize,
-    ) -> Result<Vec<HubSearchResult>, Box<dyn std::error::Error>> {
+    ) -> crate::error::Result<Vec<HubSearchResult>> {
         let url = format!(
             "{}/api/v1/search?q={}&limit={}",
             self.base_url,
@@ -208,7 +208,7 @@ impl ClawHubClient {
         limit: usize,
         sort: Option<&str>,
         cursor: Option<&str>,
-    ) -> Result<Vec<HubSkillListItem>, Box<dyn std::error::Error>> {
+    ) -> crate::error::Result<Vec<HubSkillListItem>> {
         let mut url = format!("{}/api/v1/skills?limit={}", self.base_url, limit);
         if let Some(s) = sort {
             url.push_str(&format!("&sort={}", s));
@@ -234,10 +234,7 @@ impl ClawHubClient {
     // -----------------------------------------------------------------------
 
     /// Get detailed info about a skill (includes owner, metadata).
-    pub async fn detail(
-        &self,
-        slug: &str,
-    ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    pub async fn detail(&self, slug: &str) -> crate::error::Result<serde_json::Value> {
         let url = format!(
             "{}/api/v1/skills/{}",
             self.base_url,
@@ -260,7 +257,7 @@ impl ClawHubClient {
         &self,
         slug: &str,
         version: Option<&str>,
-    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    ) -> crate::error::Result<Vec<u8>> {
         let url = match version {
             Some(v) => format!(
                 "{}/api/v1/download?slug={}&version={}",
@@ -305,19 +302,19 @@ impl ClawHubClient {
     // -----------------------------------------------------------------------
 
     /// Download a skill zip and extract file listing + SKILL.md content.
-    pub async fn skill_files(
-        &self,
-        slug: &str,
-    ) -> Result<SkillFilesResponse, Box<dyn std::error::Error>> {
+    pub async fn skill_files(&self, slug: &str) -> crate::error::Result<SkillFilesResponse> {
         let zip_bytes = self.download_zip(slug, None).await?;
         let cursor = std::io::Cursor::new(zip_bytes);
-        let mut archive = zip::ZipArchive::new(cursor)?;
+        let mut archive = zip::ZipArchive::new(cursor)
+            .map_err(|e| crate::error::SynapseError::Hub(e.to_string()))?;
 
         let mut files = Vec::new();
         let mut skill_md = None;
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
+            let mut file = archive
+                .by_index(i)
+                .map_err(|e| crate::error::SynapseError::Hub(e.to_string()))?;
             let name = file.name().to_string();
             let size = file.size();
             files.push(SkillFileEntry {
@@ -341,13 +338,16 @@ impl ClawHubClient {
         &self,
         slug: &str,
         file_path: &str,
-    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    ) -> crate::error::Result<Option<String>> {
         let zip_bytes = self.download_zip(slug, None).await?;
         let cursor = std::io::Cursor::new(zip_bytes);
-        let mut archive = zip::ZipArchive::new(cursor)?;
+        let mut archive = zip::ZipArchive::new(cursor)
+            .map_err(|e| crate::error::SynapseError::Hub(e.to_string()))?;
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
+            let mut file = archive
+                .by_index(i)
+                .map_err(|e| crate::error::SynapseError::Hub(e.to_string()))?;
             if file.name() == file_path {
                 let mut content = String::new();
                 std::io::Read::read_to_string(&mut file, &mut content)?;
@@ -363,10 +363,7 @@ impl ClawHubClient {
     // -----------------------------------------------------------------------
 
     /// List versions of a skill.
-    pub async fn list_versions(
-        &self,
-        slug: &str,
-    ) -> Result<Vec<HubVersionEntry>, Box<dyn std::error::Error>> {
+    pub async fn list_versions(&self, slug: &str) -> crate::error::Result<Vec<HubVersionEntry>> {
         let url = format!(
             "{}/api/v1/skills/{}/versions",
             self.base_url,
@@ -386,7 +383,7 @@ impl ClawHubClient {
         &self,
         slug: &str,
         hash: &str,
-    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    ) -> crate::error::Result<Option<String>> {
         let url = format!(
             "{}/api/v1/resolve?slug={}&hash={}",
             self.base_url,
@@ -412,7 +409,7 @@ impl ClawHubClient {
     // -----------------------------------------------------------------------
 
     /// Star a skill.
-    pub async fn star(&self, slug: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn star(&self, slug: &str) -> crate::error::Result<()> {
         let url = format!(
             "{}/api/v1/stars/{}",
             self.base_url,
@@ -427,7 +424,7 @@ impl ClawHubClient {
     }
 
     /// Unstar a skill.
-    pub async fn unstar(&self, slug: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn unstar(&self, slug: &str) -> crate::error::Result<()> {
         let url = format!(
             "{}/api/v1/stars/{}",
             self.base_url,
@@ -451,7 +448,7 @@ impl ClawHubClient {
         slug: &str,
         version: &str,
         files: Vec<(String, Vec<u8>)>,
-    ) -> Result<HubPublishResult, Box<dyn std::error::Error>> {
+    ) -> crate::error::Result<HubPublishResult> {
         let url = format!("{}/api/v1/skills", self.base_url);
         let mut form = reqwest::multipart::Form::new()
             .text("slug", slug.to_string())
@@ -474,7 +471,7 @@ impl ClawHubClient {
     // -----------------------------------------------------------------------
 
     /// Get current user info (whoami).
-    pub async fn whoami(&self) -> Result<HubUser, Box<dyn std::error::Error>> {
+    pub async fn whoami(&self) -> crate::error::Result<HubUser> {
         let url = format!("{}/api/v1/whoami", self.base_url);
         let req = self.auth(self.client.get(&url));
         let resp = req.send().await?;

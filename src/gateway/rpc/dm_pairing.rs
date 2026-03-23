@@ -42,11 +42,18 @@ pub async fn handle_approve(ctx: Arc<RpcContext>, params: Value) -> Result<Value
         .as_str()
         .ok_or_else(|| RpcError::invalid_request("missing 'code'"))?;
 
-    match ctx.state.channel.dm_enforcer.approve_code(channel, code).await {
+    match ctx
+        .state
+        .channel
+        .dm_enforcer
+        .approve_code(channel, code)
+        .await
+    {
         Ok(sender_id) => {
             // Notify the user that they've been approved
             ctx.state
-                .channel.approve_notifiers
+                .channel
+                .approve_notifiers
                 .notify(channel, &sender_id)
                 .await;
             Ok(json!({ "approved": true, "sender_id": sender_id }))
@@ -83,7 +90,8 @@ pub async fn handle_remove(ctx: Arc<RpcContext>, params: Value) -> Result<Value,
 
     let removed = ctx
         .state
-        .channel.dm_enforcer
+        .channel
+        .dm_enforcer
         .remove_from_allowlist(channel, sender_id);
     Ok(json!({ "removed": removed }))
 }

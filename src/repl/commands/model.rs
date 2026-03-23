@@ -72,12 +72,12 @@ pub async fn cmd_model(
             println!(
                 "  {} {}",
                 "Provider:".bold(),
-                config.base.model.provider.dimmed()
+                config.model_config().provider.dimmed()
             );
-            if let Some(temp) = config.base.model.temperature {
+            if let Some(temp) = config.model_config().temperature {
                 println!("  {} {}", "Temperature:".bold(), temp);
             }
-            if let Some(max) = config.base.model.max_tokens {
+            if let Some(max) = config.model_config().max_tokens {
                 println!("  {} {}", "Max tokens:".bold(), max);
             }
             if let Some(ref fallbacks) = config.fallback_models {

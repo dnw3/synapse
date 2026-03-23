@@ -66,7 +66,8 @@ pub async fn handle_approval_request(
 
     let _rx = ctx
         .state
-        .channel.exec_approval_manager
+        .channel
+        .exec_approval_manager
         .write()
         .await
         .create(payload);
@@ -108,7 +109,8 @@ pub async fn handle_approval_resolve(
 
     let resolved = ctx
         .state
-        .channel.exec_approval_manager
+        .channel
+        .exec_approval_manager
         .write()
         .await
         .resolve(request_id, decision);
@@ -131,7 +133,13 @@ pub async fn handle_wait_decision(ctx: Arc<RpcContext>, params: Value) -> Result
         .unwrap_or(60_000);
 
     // Get the snapshot to check if it exists
-    let snapshot = ctx.state.channel.exec_approval_manager.write().await.get_snapshot();
+    let snapshot = ctx
+        .state
+        .channel
+        .exec_approval_manager
+        .write()
+        .await
+        .get_snapshot();
     if !snapshot.iter().any(|p| p.request_id == request_id) {
         return Err(RpcError::not_found(
             "approval request not found or already resolved",
@@ -142,7 +150,13 @@ pub async fn handle_wait_decision(ctx: Arc<RpcContext>, params: Value) -> Result
     let start = now_ms();
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        let snapshot = ctx.state.channel.exec_approval_manager.write().await.get_snapshot();
+        let snapshot = ctx
+            .state
+            .channel
+            .exec_approval_manager
+            .write()
+            .await
+            .get_snapshot();
         if !snapshot.iter().any(|p| p.request_id == request_id) {
             // Request was resolved (no longer pending)
             return Ok(json!({"resolved": true, "request_id": request_id}));
@@ -155,7 +169,13 @@ pub async fn handle_wait_decision(ctx: Arc<RpcContext>, params: Value) -> Result
 
 pub async fn handle_approvals_get(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, RpcError> {
     let config = ctx.state.channel.exec_approvals_config.read().await;
-    let pending = ctx.state.channel.exec_approval_manager.write().await.get_snapshot();
+    let pending = ctx
+        .state
+        .channel
+        .exec_approval_manager
+        .write()
+        .await
+        .get_snapshot();
     Ok(json!({
         "mode": config.mode,
         "ask": config.ask,

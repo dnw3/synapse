@@ -47,7 +47,7 @@ impl ChannelSender for TelegramSender {
         target: &DeliveryContext,
         content: &str,
         _meta: Option<&serde_json::Value>,
-    ) -> Result<SendResult, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<SendResult> {
         let chat_id = target
             .to
             .as_deref()
@@ -85,10 +85,7 @@ impl ChannelSender for TelegramSender {
 }
 
 /// Run the Telegram bot adapter using Long Polling.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let tg_configs: Vec<crate::config::TelegramBotConfig> = config.channel_configs("telegram");
     let tg_config = tg_configs
         .first()
@@ -470,7 +467,7 @@ async fn resolve_telegram_file(
     client: &reqwest::Client,
     base_url: &str,
     file_id: &str,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+) -> crate::error::Result<String> {
     let url = format!("{}/getFile?file_id={}", base_url, file_id);
     let resp: serde_json::Value = client.get(&url).send().await?.json().await?;
     let file_path = resp

@@ -176,7 +176,7 @@ pub(crate) async fn setup_middleware(
 
     // Cost tracking interceptor — records token usage from every LLM response
     if let Some(tracker) = cost_tracker {
-        let model_name = config.base.model.model.clone();
+        let model_name = config.model_config().model.clone();
         tracker.set_model(&model_name).await;
         options
             .interceptors
@@ -210,7 +210,7 @@ fn setup_secret_masking(options: &mut DeepAgentOptions, config: &SynapseConfig) 
     if config.secrets.as_ref().is_none_or(|s| s.mask_api_keys) {
         let registry = Arc::new(SecretRegistry::new());
 
-        if let Ok(api_key) = config.base.resolve_api_key() {
+        if let Ok(api_key) = config.resolve_api_key() {
             if !api_key.is_empty() {
                 registry.register("api_key", &api_key);
             }
@@ -293,7 +293,7 @@ fn setup_thinking(
         .or_else(|| {
             // Check model entry for default thinking level
             if let Some(ref models) = config.model_catalog {
-                let primary = &config.base.model.model;
+                let primary = &config.model_config().model;
                 models
                     .iter()
                     .find(|m| m.name == *primary || m.aliases.contains(&primary.to_string()))
@@ -344,7 +344,7 @@ pub(crate) fn setup_reflection(
                 Ok(m) => {
                     let rcfg = synaptic::deep::ReflectionConfig {
                         min_messages: config.reflection.min_messages,
-                        memory_file: config.base.paths.memory_file.clone(),
+                        memory_file: config.memory_file().to_string(),
                         ..Default::default()
                     };
                     options.observability.reflection_model = Some(m);
@@ -359,7 +359,7 @@ pub(crate) fn setup_reflection(
                 // Use main model (fallback)
                 let rcfg = synaptic::deep::ReflectionConfig {
                     min_messages: config.reflection.min_messages,
-                    memory_file: config.base.paths.memory_file.clone(),
+                    memory_file: config.memory_file().to_string(),
                     ..Default::default()
                 };
                 options.observability.reflection_model = Some(model.clone());

@@ -147,9 +147,7 @@ struct AgentBundle {
     context_engine: SharedContextEngine,
 }
 
-async fn build_agent_bundle(
-    config: &SynapseConfig,
-) -> Result<AgentBundle, Box<dyn std::error::Error>> {
+async fn build_agent_bundle(config: &SynapseConfig) -> crate::error::Result<AgentBundle> {
     let model = agent::build_model(config, None)?;
     let mcp_tools = agent::load_mcp_tools(config).await;
 
@@ -440,13 +438,13 @@ impl AppState {
     pub async fn with_log_buffer(
         config: &SynapseConfig,
         log_buffer: LogBuffer,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    ) -> crate::error::Result<Self> {
         let mut state = Self::new(config).await?;
         state.infra.log_buffer = log_buffer;
         Ok(state)
     }
 
-    pub async fn new(config: &SynapseConfig) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(config: &SynapseConfig) -> crate::error::Result<Self> {
         // ── Agent & model ───────────────────────────────────────────────
         let agent_bundle = build_agent_bundle(config).await?;
 

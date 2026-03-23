@@ -36,10 +36,17 @@ async fn get_agents(State(state): State<AppState>) -> Json<Vec<AgentResponse>> {
 
     agents.push(AgentResponse {
         name: "default".to_string(),
-        model: state.core.config.base.model.model.clone(),
-        system_prompt: state.core.config.base.agent.system_prompt.clone(),
+        model: state.core.config.model_config().model.clone(),
+        system_prompt: state.core.config.agent_config().system_prompt.clone(),
         channels: vec![],
-        workspace: Some(state.core.config.workspace_dir().to_string_lossy().to_string()),
+        workspace: Some(
+            state
+                .core
+                .config
+                .workspace_dir()
+                .to_string_lossy()
+                .to_string(),
+        ),
         is_default: true,
     });
 
@@ -50,13 +57,14 @@ async fn get_agents(State(state): State<AppState>) -> Json<Vec<AgentResponse>> {
                 model: route
                     .model
                     .clone()
-                    .unwrap_or_else(|| state.core.config.base.model.model.clone()),
+                    .unwrap_or_else(|| state.core.config.model_config().model.clone()),
                 system_prompt: route.system_prompt.clone(),
                 channels: route.channels.clone(),
                 is_default: false,
                 workspace: Some(
                     state
-                        .core.config
+                        .core
+                        .config
                         .workspace_dir_for_agent(Some(&route.name))
                         .to_string_lossy()
                         .to_string(),
@@ -143,13 +151,14 @@ async fn create_agent(
         name: body.name.clone(),
         model: body
             .model
-            .unwrap_or_else(|| state.core.config.base.model.model.clone()),
+            .unwrap_or_else(|| state.core.config.model_config().model.clone()),
         system_prompt: body.system_prompt,
         channels: body.channels,
         is_default: false,
         workspace: Some(
             state
-                .core.config
+                .core
+                .config
                 .workspace_dir_for_agent(Some(&body.name))
                 .to_string_lossy()
                 .to_string(),
@@ -213,13 +222,14 @@ async fn update_agent(
         name: body.name.clone(),
         model: body
             .model
-            .unwrap_or_else(|| state.core.config.base.model.model.clone()),
+            .unwrap_or_else(|| state.core.config.model_config().model.clone()),
         system_prompt: body.system_prompt,
         channels: body.channels,
         is_default: false,
         workspace: Some(
             state
-                .core.config
+                .core
+                .config
                 .workspace_dir_for_agent(Some(&body.name))
                 .to_string_lossy()
                 .to_string(),
@@ -459,7 +469,7 @@ async fn get_tools_catalog(State(state): State<AppState>) -> Json<Vec<ToolCatalo
         ],
     });
 
-    if let Some(ref mcp_servers) = state.core.config.base.mcp {
+    if let Some(mcp_servers) = state.core.config.mcp_configs() {
         let mut mcp_tools = Vec::new();
         for server in mcp_servers {
             let desc = server

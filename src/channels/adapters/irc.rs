@@ -18,10 +18,7 @@ use synaptic::core::{
 };
 
 /// Run the IRC bot adapter using raw TCP.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let irc_configs: Vec<crate::config::IrcBotConfig> = config.channel_configs("irc");
     let irc_config = irc_configs
         .first()
@@ -65,7 +62,7 @@ async fn run_tcp(
     irc_config: &IrcBotConfig,
     agent_session: Arc<AgentSession>,
     allowlist: &BotAllowlist,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let port = irc_config.port.unwrap_or(6667);
     let addr = format!("{}:{}", irc_config.server, port);
 

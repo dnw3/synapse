@@ -104,7 +104,8 @@ async fn approve_node(
         .as_deref()
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing request_id".to_string()))?;
     let paired = state
-        .network.pairing_store
+        .network
+        .pairing_store
         .write()
         .await
         .approve(request_id)
@@ -152,9 +153,19 @@ async fn remove_node(
         .node_id
         .as_deref()
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing node_id".to_string()))?;
-    let removed = state.network.pairing_store.write().await.remove_paired(node_id);
+    let removed = state
+        .network
+        .pairing_store
+        .write()
+        .await
+        .remove_paired(node_id);
     if removed {
-        state.network.node_registry.write().await.unregister(node_id);
+        state
+            .network
+            .node_registry
+            .write()
+            .await
+            .unregister(node_id);
         Ok(Json(serde_json::json!({"ok": true})))
     } else {
         Err((StatusCode::NOT_FOUND, "paired device not found".to_string()))
@@ -176,13 +187,15 @@ async fn rename_node(
     Json(body): Json<RenameRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     let renamed = state
-        .network.pairing_store
+        .network
+        .pairing_store
         .write()
         .await
         .rename(&body.node_id, &body.name);
     if renamed {
         state
-            .network.node_registry
+            .network
+            .node_registry
             .write()
             .await
             .rename(&body.node_id, &body.name);
@@ -211,7 +224,8 @@ async fn rotate_node_token(
     let token_hash = format!("{:x}", sha2::Sha256::digest(new_token.as_bytes()));
 
     let updated = state
-        .network.pairing_store
+        .network
+        .pairing_store
         .write()
         .await
         .update_token_hash(node_id, &token_hash);
@@ -239,7 +253,8 @@ async fn revoke_node_token(
         .ok_or_else(|| (StatusCode::BAD_REQUEST, "missing node_id".to_string()))?;
 
     let updated = state
-        .network.pairing_store
+        .network
+        .pairing_store
         .write()
         .await
         .update_token_hash(node_id, "");
@@ -269,7 +284,8 @@ async fn generate_qr(
 
     let gateway_url = body.url.unwrap_or_else(|| {
         let port = state
-            .core.config
+            .core
+            .config
             .serve
             .as_ref()
             .and_then(|s| s.port)

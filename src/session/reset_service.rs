@@ -19,7 +19,7 @@ impl ResetService {
         old_info: &SessionInfo,
         reason: &str,
         memory_provider: Option<&Arc<dyn synaptic::memory::MemoryProvider>>,
-    ) -> Result<SessionInfo, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> crate::error::Result<SessionInfo> {
         let old_session_id = &old_info.session_id;
 
         // 0. Before archiving, commit memories so important context is persisted

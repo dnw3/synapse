@@ -44,13 +44,13 @@ pub async fn handle_list(ctx: Arc<RpcContext>, _params: Value) -> Result<Value, 
             .map(|n| n == "default")
             .unwrap_or(false)
     }) {
-        let base_model = config.base.model.model.clone();
-        let base_provider = config.base.model.provider.clone();
+        let base_model = config.model_config().model.clone();
+        let base_provider = config.model_config().provider.clone();
         providers.insert(
             0,
             json!({
                 "name": base_provider,
-                "base_url": config.base.model.base_url.clone().unwrap_or_default(),
+                "base_url": config.model_config().base_url.clone().unwrap_or_default(),
                 "models": [base_model],
             }),
         );

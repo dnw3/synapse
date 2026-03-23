@@ -9,10 +9,7 @@ use std::path::{Path, PathBuf};
 use colored::Colorize;
 
 /// Run plugin subcommand.
-pub fn run_plugin_command(
-    action: &str,
-    arg: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run_plugin_command(action: &str, arg: Option<&str>) -> crate::error::Result<()> {
     match action {
         "list" | "ls" => plugin_list(),
         "install" => {
@@ -69,7 +66,7 @@ fn global_plugins_dir() -> PathBuf {
 }
 
 /// Ensure the global plugins directory exists.
-fn ensure_global_plugins_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn ensure_global_plugins_dir() -> crate::error::Result<PathBuf> {
     let dir = global_plugins_dir();
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
@@ -114,9 +111,7 @@ fn load_disabled_plugins() -> std::collections::HashSet<String> {
 }
 
 /// Persist the disabled-plugin set back to `state.json`.
-fn save_disabled_plugins(
-    disabled: &std::collections::HashSet<String>,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn save_disabled_plugins(disabled: &std::collections::HashSet<String>) -> crate::error::Result<()> {
     let path = plugin_state_path();
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -159,7 +154,7 @@ fn read_manifest(dir: &Path) -> Manifest {
 
 /// List all plugins discovered in workspace `.synapse/plugins/` and global
 /// `~/.synapse/plugins/`.
-fn plugin_list() -> Result<(), Box<dyn std::error::Error>> {
+fn plugin_list() -> crate::error::Result<()> {
     let workspace_dir = workspace_plugins_dir();
     let global_dir = global_plugins_dir();
 
@@ -236,7 +231,7 @@ fn plugin_list() -> Result<(), Box<dyn std::error::Error>> {
 ///   workspace plugins dir (existing behaviour).
 /// - Otherwise → create a placeholder entry in `~/.synapse/plugins/<name>/`
 ///   (registry download not yet implemented).
-fn plugin_install(name_or_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn plugin_install(name_or_path: &str) -> crate::error::Result<()> {
     let source_path = Path::new(name_or_path);
 
     // --- Local path install ---
@@ -338,7 +333,7 @@ tools = false
 }
 
 /// Mark a plugin as enabled in the state file.
-fn plugin_enable(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn plugin_enable(name: &str) -> crate::error::Result<()> {
     // Check workspace dir first, then global.
     let workspace_plugin = workspace_plugins_dir().join(name);
     let global_plugin = global_plugins_dir().join(name);
@@ -361,7 +356,7 @@ fn plugin_enable(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Mark a plugin as disabled in the state file.
-fn plugin_disable(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn plugin_disable(name: &str) -> crate::error::Result<()> {
     let workspace_plugin = workspace_plugins_dir().join(name);
     let global_plugin = global_plugins_dir().join(name);
     if !workspace_plugin.exists() && !global_plugin.exists() {
@@ -383,7 +378,7 @@ fn plugin_disable(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Scaffold a new plugin directory with a `plugin.toml` template.
-fn plugin_create(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn plugin_create(name: &str) -> crate::error::Result<()> {
     let plugin_dir = Path::new(name);
 
     if plugin_dir.exists() {
@@ -435,7 +430,7 @@ tools = true
 }
 
 /// Remove a plugin directory entirely (checks workspace then global dir).
-fn plugin_remove(name: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn plugin_remove(name: &str) -> crate::error::Result<()> {
     let workspace_plugin = workspace_plugins_dir().join(name);
     let global_plugin = global_plugins_dir().join(name);
 
@@ -464,7 +459,7 @@ fn plugin_remove(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Search the plugin registry (placeholder — registry not yet configured).
-fn plugin_search(query: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn plugin_search(query: &str) -> crate::error::Result<()> {
     if !query.is_empty() {
         println!("Searching for: {}", query.cyan());
     }
@@ -476,7 +471,7 @@ fn plugin_search(query: &str) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Check for plugin updates (placeholder — registry not yet configured).
-fn plugin_update(name: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+fn plugin_update(name: Option<&str>) -> crate::error::Result<()> {
     if let Some(n) = name {
         println!("Checking updates for: {}", n.cyan());
     }

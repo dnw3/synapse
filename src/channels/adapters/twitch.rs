@@ -18,10 +18,7 @@ use synaptic::core::{
 };
 
 /// Run the Twitch bot adapter using IRC over TCP (irc.chat.twitch.tv:6667).
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let twitch_configs: Vec<crate::config::TwitchBotConfig> = config.channel_configs("twitch");
     let twitch_config = twitch_configs
         .first()
@@ -60,7 +57,7 @@ async fn run_twitch_irc(
     config: &TwitchBotConfig,
     agent_session: Arc<AgentSession>,
     allowlist: &BotAllowlist,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let addr = "irc.chat.twitch.tv:6667";
     let stream = TcpStream::connect(addr).await?;
     let (reader_half, writer_half) = stream.into_split();

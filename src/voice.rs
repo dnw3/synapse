@@ -90,7 +90,7 @@ impl WakeWordDetector {
 pub fn record_audio(
     silence_threshold: f32,
     silence_duration_ms: u64,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+) -> crate::error::Result<Vec<u8>> {
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     use std::sync::{Arc as StdArc, Mutex};
     use std::time::{Duration, Instant};
@@ -195,7 +195,7 @@ pub fn record_audio(
 /// On any initialisation or playback error, a warning is printed and the
 /// function returns `Ok(())` — TTS audio is best-effort.
 #[cfg(feature = "voice")]
-pub fn play_audio(pcm_bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+pub fn play_audio(pcm_bytes: &[u8]) -> crate::error::Result<()> {
     use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     use std::sync::{Arc as StdArc, Mutex};
 
@@ -337,7 +337,7 @@ pub fn play_audio(pcm_bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
 pub async fn run_voice_loop(
     model: Arc<dyn ChatModel>,
     voice_config: Option<&VoiceConfig>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let wake_word = voice_config
         .and_then(|vc| vc.wake_word.as_deref())
         .unwrap_or("synapse");
@@ -569,7 +569,7 @@ pub async fn run_voice_loop(
 pub async fn run_voice_mode(
     model: Arc<dyn ChatModel>,
     voice_config: Option<&VoiceConfig>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     let voice_name = voice_config
         .and_then(|vc| vc.voice.as_deref())
         .unwrap_or("alloy");

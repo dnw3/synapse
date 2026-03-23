@@ -17,7 +17,7 @@ impl ConfigWatcher {
     ///
     /// Includes a 500ms debounce to handle rapid successive writes (e.g. editor saves).
     /// The watcher runs until the channel is closed or an error occurs.
-    pub async fn watch<F>(&self, on_change: F) -> Result<(), Box<dyn std::error::Error>>
+    pub async fn watch<F>(&self, on_change: F) -> crate::error::Result<()>
     where
         F: Fn(super::SynapseConfig) + Send + 'static,
     {
@@ -79,9 +79,10 @@ impl ConfigWatcher {
         Ok(())
     }
 
-    fn reload_config(&self) -> Result<super::SynapseConfig, Box<dyn std::error::Error>> {
+    fn reload_config(&self) -> crate::error::Result<super::SynapseConfig> {
         let content = std::fs::read_to_string(&self.config_path)?;
-        let config: super::SynapseConfig = toml::from_str(&content)?;
+        let config: super::SynapseConfig = toml::from_str(&content)
+            .map_err(|e| crate::error::SynapseError::Config(e.to_string()))?;
         Ok(config)
     }
 }

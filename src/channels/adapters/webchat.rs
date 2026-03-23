@@ -48,10 +48,7 @@ struct ErrorResponse {
 }
 
 /// Run the WebChat bot adapter — serves an HTTP API + embeddable widget.
-pub async fn run(
-    config: &SynapseConfig,
-    model_override: Option<&str>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(config: &SynapseConfig, model_override: Option<&str>) -> crate::error::Result<()> {
     let wc_configs: Vec<crate::config::WebChatBotConfig> = config.channel_configs("webchat");
     let wc_config = wc_configs
         .first()

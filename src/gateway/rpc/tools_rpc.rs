@@ -78,7 +78,7 @@ pub async fn handle_catalog(ctx: Arc<RpcContext>, _params: Value) -> Result<Valu
     }));
 
     // 6. MCP tools
-    if let Some(ref mcp_servers) = ctx.state.core.config.base.mcp {
+    if let Some(mcp_servers) = ctx.state.core.config.mcp_configs() {
         let mcp_tools: Vec<Value> = mcp_servers
             .iter()
             .map(|server| {

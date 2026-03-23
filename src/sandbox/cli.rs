@@ -4,7 +4,7 @@ use crate::config::SynapseConfig;
 pub async fn handle_sandbox_cli(
     action: SandboxAction,
     config: &SynapseConfig,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> crate::error::Result<()> {
     match action {
         SandboxAction::List { json } => {
             if let Some(ref sandbox_config) = config.sandbox {

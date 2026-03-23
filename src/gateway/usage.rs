@@ -221,7 +221,7 @@ impl UsageTracker {
     // -----------------------------------------------------------------------
 
     /// Load records from the JSONL persistence file.
-    pub async fn load_from_file(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn load_from_file(&self, path: &Path) -> crate::error::Result<()> {
         if !path.exists() {
             return Ok(());
         }
@@ -247,7 +247,7 @@ impl UsageTracker {
     }
 
     /// Save only NEW (unflushed) records to the JSONL persistence file (append mode).
-    pub async fn save_to_file(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn save_to_file(&self, path: &Path) -> crate::error::Result<()> {
         let records = self.records.read().await;
         let cursor = *self.flush_cursor.read().await;
         let new_records: Vec<&UsageRecord> = records.iter().skip(cursor).collect();
@@ -280,7 +280,7 @@ impl UsageTracker {
     }
 
     /// Load records from the configured persistence file (if any).
-    pub async fn load(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn load(&self) -> crate::error::Result<()> {
         if let Some(ref path) = self.persist_path {
             self.load_from_file(path).await?;
             let count = self.records.read().await.len();
@@ -294,7 +294,7 @@ impl UsageTracker {
     }
 
     /// Flush new records to the configured persistence file (if any).
-    pub async fn flush(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn flush(&self) -> crate::error::Result<()> {
         if let Some(ref path) = self.persist_path {
             self.save_to_file(path).await?;
         }

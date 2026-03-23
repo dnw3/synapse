@@ -219,6 +219,36 @@ pub fn is_owner_sender(sender_id: &str, config: &crate::config::SynapseConfig) -
     owners.is_empty() || owners.iter().any(|o| o == sender_id)
 }
 
+// ---------------------------------------------------------------------------
+// Sandbox tool restrictions
+// ---------------------------------------------------------------------------
+
+/// Returns tool names that should be denied based on sandbox workspace access.
+#[cfg(feature = "sandbox")]
+#[allow(dead_code)]
+pub fn sandbox_tool_restrictions(access: &synaptic::deep::sandbox::WorkspaceAccess) -> Vec<String> {
+    use synaptic::deep::sandbox::WorkspaceAccess;
+    match access {
+        WorkspaceAccess::ReadOnly => vec!["write_file", "edit_file", "apply_patch"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+        WorkspaceAccess::None => vec![
+            "write_file",
+            "edit_file",
+            "apply_patch",
+            "read_file",
+            "list_dir",
+            "glob",
+            "grep",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
+        WorkspaceAccess::ReadWrite => vec![],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

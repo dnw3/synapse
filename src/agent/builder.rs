@@ -111,7 +111,49 @@ pub async fn build_deep_agent_with_callback(
     extra_skills_dirs: &[std::path::PathBuf],
 ) -> Result<CompiledGraph<MessageState>, SynapticError> {
     // --- Backend selection ---
-    #[cfg(feature = "docker")]
+    #[cfg(feature = "sandbox")]
+    let backend: Arc<dyn synaptic::deep::backend::Backend> = {
+        use crate::sandbox::orchestrator::{ResolvedBackend, SandboxOrchestrator};
+
+        let orchestrator: Option<Arc<SandboxOrchestrator>> =
+            if let Some(ref sandbox_cfg) = config.sandbox {
+                if sandbox_cfg.mode != crate::sandbox::config::SandboxMode::Off {
+                    use synaptic::deep::sandbox::SandboxProviderRegistry;
+                    let provider_registry = Arc::new(SandboxProviderRegistry::new());
+                    let persistent = crate::sandbox::registry::SandboxPersistentRegistry::new(
+                        crate::sandbox::registry::SandboxPersistentRegistry::default_path(),
+                    );
+                    Some(Arc::new(SandboxOrchestrator::new(
+                        provider_registry,
+                        sandbox_cfg.clone(),
+                        persistent,
+                    )))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+        if let Some(ref orch) = orchestrator {
+            let session_key = "main";
+            let agent_id = agent_name.unwrap_or("default");
+            match orch.resolve_backend(session_key, agent_id, None).await? {
+                ResolvedBackend::Host => Arc::new(FilesystemBackend::new(cwd)),
+                ResolvedBackend::Sandboxed(instance) => {
+                    tracing::info!(
+                        backend = "sandbox",
+                        runtime_id = %instance.runtime_id,
+                        "Using sandboxed backend"
+                    );
+                    instance.backend.clone()
+                }
+            }
+        } else {
+            Arc::new(FilesystemBackend::new(cwd))
+        }
+    };
+    #[cfg(all(not(feature = "sandbox"), feature = "docker"))]
     let backend: Arc<dyn synaptic::deep::backend::Backend> = {
         if let Some(ref docker_cfg) = config.docker {
             if docker_cfg.enabled {
@@ -139,7 +181,7 @@ pub async fn build_deep_agent_with_callback(
             Arc::new(FilesystemBackend::new(cwd))
         }
     };
-    #[cfg(not(feature = "docker"))]
+    #[cfg(not(any(feature = "sandbox", feature = "docker")))]
     let backend: Arc<dyn synaptic::deep::backend::Backend> = Arc::new(FilesystemBackend::new(cwd));
 
     let mut options = DeepAgentOptions::new(backend.clone());

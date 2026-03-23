@@ -17,6 +17,7 @@ pub enum ResolvedBackend {
     Sandboxed(Arc<SandboxInstance>),
 }
 
+#[allow(dead_code)]
 pub enum SandboxFilter {
     All,
     BySession(String),
@@ -30,6 +31,7 @@ pub struct SandboxOrchestrator {
     persistent: SandboxPersistentRegistry,
 }
 
+#[allow(dead_code)]
 impl SandboxOrchestrator {
     pub fn new(
         registry: Arc<SandboxProviderRegistry>,

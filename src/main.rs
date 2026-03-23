@@ -357,6 +357,10 @@ async fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         }
+        #[cfg(feature = "sandbox")]
+        Some(Command::Sandbox { action }) => {
+            sandbox::cli::handle_sandbox_cli(action, &config).await
+        }
         Some(Command::Models { action, name }) => {
             commands::run_models_command(&config, &action, name.as_deref())
         }

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::gateway::state::AppState;
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct SandboxListParams {
     pub provider: Option<String>,
 }
@@ -19,6 +20,7 @@ pub struct SandboxExplainParams {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub struct SandboxRecreateRequest {
     pub all: Option<bool>,
     pub session: Option<String>,

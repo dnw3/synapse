@@ -226,6 +226,13 @@ pub enum Command {
         name: Option<String>,
     },
 
+    /// Manage sandbox containers.
+    #[cfg(feature = "sandbox")]
+    Sandbox {
+        #[command(subcommand)]
+        action: SandboxAction,
+    },
+
     /// Manage workflows (list, run, status, approve, reject).
     Workflow {
         /// Action: list, run, status, approve, reject.
@@ -238,5 +245,43 @@ pub enum Command {
         /// JSON data to pass with approval.
         #[arg(long)]
         data: Option<String>,
+    },
+}
+
+#[cfg(feature = "sandbox")]
+#[derive(Subcommand, Debug)]
+pub enum SandboxAction {
+    /// List all sandbox instances.
+    List {
+        /// Output as JSON.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Recreate sandbox instances.
+    Recreate {
+        /// Recreate all instances.
+        #[arg(long)]
+        all: bool,
+        /// Filter by session key.
+        #[arg(long)]
+        session: Option<String>,
+        /// Filter by agent ID.
+        #[arg(long)]
+        agent: Option<String>,
+        /// Skip confirmation prompt.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Show effective sandbox config.
+    Explain {
+        /// Session key (default: "main").
+        #[arg(long)]
+        session: Option<String>,
+        /// Agent ID (default: "main").
+        #[arg(long)]
+        agent: Option<String>,
+        /// Output as JSON.
+        #[arg(long)]
+        json: bool,
     },
 }

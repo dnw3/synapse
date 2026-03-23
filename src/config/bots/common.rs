@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::{default_account_id, default_true, BotAllowlist};
+use super::{default_account_id, default_true, AdapterConfig, BotAllowlist};
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
@@ -356,4 +356,35 @@ pub struct ZaloBotConfig {
     pub port: Option<u16>,
     #[serde(default)]
     pub allowlist: BotAllowlist,
+}
+
+// ---------------------------------------------------------------------------
+// AdapterConfig impls for simple (non-retry) adapters
+// ---------------------------------------------------------------------------
+
+impl AdapterConfig for TelegramBotConfig {
+    fn enabled(&self) -> bool {
+        self.enabled
+    }
+    fn account_id(&self) -> &str {
+        &self.account_id
+    }
+}
+
+impl AdapterConfig for DiscordBotConfig {
+    fn enabled(&self) -> bool {
+        self.enabled
+    }
+    fn account_id(&self) -> &str {
+        &self.account_id
+    }
+}
+
+impl AdapterConfig for SlackBotConfig {
+    fn enabled(&self) -> bool {
+        self.enabled
+    }
+    fn account_id(&self) -> &str {
+        &self.account_id
+    }
 }

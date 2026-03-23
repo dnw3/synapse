@@ -95,6 +95,13 @@ impl BotAllowlist {
     }
 }
 
+/// Common interface for bot adapter configs used in the generic spawn loop.
+#[allow(dead_code)]
+pub trait AdapterConfig {
+    fn enabled(&self) -> bool;
+    fn account_id(&self) -> &str;
+}
+
 pub use crate::channels::dm::DmPolicy;
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]

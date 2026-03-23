@@ -40,7 +40,7 @@ export function LocalSkillsTab({ toast: _toast }: { toast: ReturnType<typeof use
   const skillsQ = useSkills();
   const toggleMut = useToggleSkill();
 
-  const skills = skillsQ.data ?? [];
+  const skillsData = skillsQ.data;
   const loading = skillsQ.isPending;
 
   const [search, setSearch] = useState("");
@@ -52,6 +52,7 @@ export function LocalSkillsTab({ toast: _toast }: { toast: ReturnType<typeof use
   const [detailSkill, setDetailSkill] = useState<SkillEntry | null>(null);
 
   const filtered = useMemo(() => {
+    const skills = skillsData ?? [];
     if (!search.trim()) return skills;
     const q = search.toLowerCase();
     return skills.filter(
@@ -59,7 +60,7 @@ export function LocalSkillsTab({ toast: _toast }: { toast: ReturnType<typeof use
         s.name.toLowerCase().includes(q) ||
         s.description.toLowerCase().includes(q)
     );
-  }, [skills, search]);
+  }, [skillsData, search]);
 
   const grouped = useMemo(() => {
     const map: Record<SourceGroup, SkillEntry[]> = { project: [], personal: [], "built-in": [] };
@@ -224,6 +225,7 @@ function LocalSkillDetailModal({
         setLoading(false);
       }).catch(() => setLoading(false));
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
     }
   }, [skill.path]);
@@ -232,6 +234,7 @@ function LocalSkillDetailModal({
   useEffect(() => {
     if (detailTab === "files" && !filesLoaded.current && skillDir) {
       filesLoaded.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilesLoading(true);
       fetchJSON<{ files: { name: string; size: number }[] }>(`/skills/files?path=${encodeURIComponent(skillDir)}`).then(data => {
         if (data?.files) setFileList(data.files);

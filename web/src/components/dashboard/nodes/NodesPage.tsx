@@ -100,6 +100,7 @@ export default function NodesPage() {
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
   }, [loadData]);
 
@@ -109,26 +110,22 @@ export default function NodesPage() {
     return () => clearInterval(interval);
   }, [loadData]);
 
-  // QR expiry countdown
+  // QR expiry countdown — only (re)start the interval when expiry transitions to active
+  const qrActive = qrExpiry > 0;
   useEffect(() => {
-    if (qrExpiry <= 0) {
+    if (!qrActive) {
       if (qrTimerRef.current) clearInterval(qrTimerRef.current);
-      if (qrData) setQrData(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setQrData(null);
       return;
     }
     qrTimerRef.current = setInterval(() => {
-      setQrExpiry((prev) => {
-        if (prev <= 1) {
-          setQrData(null);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setQrExpiry((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
     return () => {
       if (qrTimerRef.current) clearInterval(qrTimerRef.current);
     };
-  }, [qrExpiry > 0]);
+  }, [qrActive]);
 
   const handleGenerateQr = async () => {
     setQrLoading(true);

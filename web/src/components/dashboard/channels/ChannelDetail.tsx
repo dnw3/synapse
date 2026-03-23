@@ -77,6 +77,7 @@ export function ChannelDetailPanel({
         initial[f.key] = channel.config[f.key] ?? "";
       }
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormValues(initial);
     setRevealedFields(new Set());
   }, [channel.name, channel.config, fields]);

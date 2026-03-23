@@ -233,7 +233,7 @@ export default function ConfigPage({ filterSection }: { filterSection?: string }
   }, [originalContent]);
 
   // Update an existing TOML field value
-  const handleFieldChange = useCallback((sectionKey: string, fieldKey: string, field: TomlField, newValue: string) => {
+  const handleFieldChange = useCallback((_sectionKey: string, fieldKey: string, field: TomlField, newValue: string) => {
     const lines = content.split("\n");
     if (field.line === field.endLine) {
       // Single-line value

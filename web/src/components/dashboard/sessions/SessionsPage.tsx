@@ -163,6 +163,7 @@ export default function SessionsPage() {
     if (activeWithinMin) {
       const mins = parseInt(activeWithinMin, 10);
       if (mins > 0) {
+        // eslint-disable-next-line react-hooks/purity
         const cutoff = Date.now() - mins * 60 * 1000;
         result = result.filter((s) => {
           const ts = s.updated_at || s.created_at;

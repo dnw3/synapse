@@ -57,10 +57,11 @@ export default function OverviewPage() {
   // Live uptime counter — initialized from module-level cache to survive tab switches
   const [liveUptime, setLiveUptime] = useState(() => getCachedUptime());
 
-  // Update cache when stats arrive
+  // Update cache when stats arrive; also sync live counter to fresh server value
   useEffect(() => {
     if (stats) {
       setCachedUptime(stats.uptime_secs);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLiveUptime(stats.uptime_secs);
     }
   }, [stats]);
@@ -411,7 +412,6 @@ export default function OverviewPage() {
           ) : (
             <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
               {requests.map((r) => {
-                const _successCount = r.status_counts["2xx"] ?? 0;
                 const errorCount = Object.entries(r.status_counts)
                   .filter(([k]) => k.startsWith("4") || k.startsWith("5"))
                   .reduce((sum, [, v]) => sum + v, 0);

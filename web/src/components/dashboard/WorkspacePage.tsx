@@ -98,6 +98,7 @@ export default function WorkspacePage() {
   }, [agentParam]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditingFile(null);
     setLoading(true);
     loadFiles();

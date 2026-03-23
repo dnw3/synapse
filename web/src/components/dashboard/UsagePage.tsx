@@ -192,7 +192,6 @@ export default function UsagePage() {
       setLoading(true);
       load();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, usageQ.isPending]);
 
   const handleRefresh = () => {

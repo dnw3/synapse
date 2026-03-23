@@ -3,16 +3,19 @@ import { GatewayClient, type HelloOk } from "../lib/gateway-client";
 
 export function useGatewayClient() {
   const clientRef = useRef<GatewayClient | null>(null);
+  const [client, setClient] = useState<GatewayClient | null>(null);
   const [connected, setConnected] = useState(false);
   const [helloOk, setHelloOk] = useState<HelloOk | null>(null);
 
   useEffect(() => {
-    const client = new GatewayClient();
-    clientRef.current = client;
+    const gc = new GatewayClient();
+    clientRef.current = gc;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setClient(gc);
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${protocol}//${window.location.host}/ws/__dashboard__`;
 
-    client.connect(url).then((hello) => {
+    gc.connect(url).then((hello) => {
       setConnected(true);
       setHelloOk(hello);
     }).catch((err) => {
@@ -20,10 +23,11 @@ export function useGatewayClient() {
     });
 
     return () => {
-      client.close();
+      gc.close();
+      setClient(null);
       setConnected(false);
     };
   }, []);
 
-  return { client: clientRef.current, connected, helloOk };
+  return { client, connected, helloOk };
 }

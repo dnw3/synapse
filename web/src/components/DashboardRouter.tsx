@@ -11,6 +11,7 @@ import PageSkeleton from "./PageSkeleton";
 import { ErrorBoundary } from "./ErrorBoundary";
 
 // Lazy page components
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const pages: Record<string, React.LazyExoticComponent<React.ComponentType<any>>> = {
   overview: lazy(() => import("./dashboard/OverviewPage")),
   usage: lazy(() => import("./dashboard/UsagePage")),

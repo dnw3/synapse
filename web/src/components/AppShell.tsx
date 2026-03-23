@@ -33,11 +33,6 @@ function viewKeyFromPath(pathname: string): ViewKey {
   return "overview";
 }
 
-function pathFromViewKey(key: ViewKey): string {
-  if (key === "chat") return "/chat";
-  return `/dashboard/${key}`;
-}
-
 // ---------------------------------------------------------------------------
 // AppShell
 // ---------------------------------------------------------------------------

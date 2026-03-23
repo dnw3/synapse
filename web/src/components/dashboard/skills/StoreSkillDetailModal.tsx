@@ -46,6 +46,7 @@ export function StoreSkillDetailModal({
   const [fileContentLoading, setFileContentLoading] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetchJSON<StoreSkillDetail>(`/store/skills/${encodeURIComponent(slug)}`).then((d) => {
       setDetail(d);
@@ -57,6 +58,7 @@ export function StoreSkillDetailModal({
   useEffect(() => {
     if (detailTab === "files" && !filesLoaded.current) {
       filesLoaded.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFilesLoading(true);
       fetchJSON<{ files: { name: string; size: number }[]; skillMd: string | null }>(`/store/skills/${encodeURIComponent(slug)}/files`).then((d) => {
         if (d) {

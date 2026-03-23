@@ -112,6 +112,7 @@ export default function InstancesPage() {
   }, [client, helloOk]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadInstances();
   }, [loadInstances]);
 

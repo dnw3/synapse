@@ -43,6 +43,7 @@ export function SkillStoreTab({ toast }: { toast: ReturnType<typeof useToast>["t
 
   // Load status + initial list
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setItems([]);
     setHasMore(true);
@@ -84,6 +85,7 @@ export function SkillStoreTab({ toast }: { toast: ReturnType<typeof useToast>["t
   // Debounced search
   useEffect(() => {
     if (!search.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchResults(null);
       return;
     }

@@ -123,10 +123,11 @@ plugins = ["dep:libloading"]
 broadcast = []
 voice = ["synaptic/voice-openai", "dep:cpal"]
 browser = ["synaptic/browser"]
+sandbox = ["synaptic/sandbox", "synaptic/sandbox-docker", "synaptic/sandbox-ssh"]
 otel = ["synaptic/otel", "dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
 notify = ["dep:notify-rust"]
 tui = ["dep:ratatui", "dep:crossterm"]
-full = ["task", "web", "docker", "voice", "browser", "notify", "broadcast", "bot-lark", "bot-slack", "bot-telegram", "bot-discord", "bot-dingtalk", "bot-line", "bot-mattermost", "bot-matrix", "bot-teams", "bot-googlechat", "bot-wechat", "bot-whatsapp", "bot-signal", "bot-imessage", "bot-irc", "bot-webchat", "bot-twitch", "bot-nostr", "bot-nextcloud", "bot-synology", "bot-tlon", "bot-zalo", "tui"]
+full = ["task", "web", "docker", "sandbox", "voice", "browser", "notify", "broadcast", "bot-lark", "bot-slack", "bot-telegram", "bot-discord", "bot-dingtalk", "bot-line", "bot-mattermost", "bot-matrix", "bot-teams", "bot-googlechat", "bot-wechat", "bot-whatsapp", "bot-signal", "bot-imessage", "bot-irc", "bot-webchat", "bot-twitch", "bot-nostr", "bot-nextcloud", "bot-synology", "bot-tlon", "bot-zalo", "tui"]
 
 [dev-dependencies]
 tempfile = "3.27.0"

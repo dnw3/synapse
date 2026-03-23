@@ -4430,6 +4430,7 @@ name = "synaptic-deep"
 version = "0.4.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "futures",
  "regex",
  "serde",
@@ -4648,6 +4649,7 @@ dependencies = [
  "serde_json",
  "synaptic-core",
  "tokio",
+ "tracing",
  "urlencoding",
 ]
 

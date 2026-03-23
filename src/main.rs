@@ -56,6 +56,9 @@ mod channels;
 #[cfg(feature = "docker")]
 mod docker;
 
+#[cfg(feature = "sandbox")]
+mod sandbox;
+
 #[cfg(feature = "tui")]
 mod tui;
 

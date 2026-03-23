@@ -115,8 +115,11 @@ pub struct SynapseConfig {
 
     /// Web server configuration.
     pub serve: Option<ServeConfig>,
-    /// Docker sandbox configuration.
+    /// Docker sandbox configuration (legacy).
     pub docker: Option<DockerConfig>,
+    /// Sandbox configuration.
+    #[cfg(feature = "sandbox")]
+    pub sandbox: Option<crate::sandbox::SandboxConfig>,
     /// Authentication configuration (for web server).
     pub auth: Option<AuthConfig>,
 

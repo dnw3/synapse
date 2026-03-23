@@ -139,6 +139,10 @@ pub struct AppState {
     pub bundle_agent_dirs: Vec<std::path::PathBuf>,
     /// Shared AgentSession for unified message processing pipeline.
     pub agent_session: Arc<AgentSession>,
+
+    /// Transient MCP servers (runtime-only, not persisted to TOML).
+    pub transient_mcp:
+        Arc<RwLock<HashMap<String, (synaptic::config::McpServerConfig, Vec<Arc<dyn Tool>>)>>>,
 }
 
 // ── Builder helpers ─────────────────────────────────────────────────────────
@@ -558,6 +562,9 @@ impl AppState {
 
             // Unified agent session
             agent_session,
+
+            // Transient MCP servers (runtime-only)
+            transient_mcp: Arc::new(RwLock::new(HashMap::new())),
         };
 
         Ok(state)

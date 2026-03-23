@@ -9,7 +9,7 @@ use synaptic::mcp::{
 use crate::config::SynapseConfig;
 
 /// Convert an McpServerConfig into an McpConnection.
-fn config_to_mcp_connection(mc: &synaptic::config::McpServerConfig) -> Option<McpConnection> {
+pub fn config_to_mcp_connection(mc: &synaptic::config::McpServerConfig) -> Option<McpConnection> {
     match mc.transport.as_str() {
         "stdio" => {
             let command = mc.command.clone()?;

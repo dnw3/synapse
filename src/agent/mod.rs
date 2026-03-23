@@ -3,7 +3,7 @@ mod builder;
 pub mod callbacks;
 pub mod context_engine;
 pub mod discovery;
-mod mcp;
+pub(crate) mod mcp;
 pub(crate) mod middleware;
 mod middleware_setup;
 pub(crate) mod model;

@@ -61,6 +61,9 @@ pub struct AgentSubState {
     pub model: Arc<dyn ChatModel>,
     #[allow(dead_code)]
     pub mcp_tools: Vec<Arc<dyn Tool>>,
+    /// Shared MCP client — connected once at startup, reused for health checks and reconnection.
+    #[allow(dead_code)]
+    pub mcp_client: Arc<synaptic::mcp::MultiServerMcpClient>,
     pub transient_mcp: Arc<RwLock<HashMap<String, TransientMcpServer>>>,
     pub cost_tracker: Arc<CostTrackingCallback>,
     pub usage_tracker: Arc<UsageTracker>,
@@ -140,6 +143,7 @@ pub struct AppState {
 /// Agent model, MCP tools, cost/usage tracking, and memory.
 struct AgentBundle {
     model: Arc<dyn ChatModel>,
+    mcp_client: Arc<synaptic::mcp::MultiServerMcpClient>,
     mcp_tools: Vec<Arc<dyn Tool>>,
     cost_tracker: Arc<CostTrackingCallback>,
     usage_tracker: Arc<UsageTracker>,
@@ -149,7 +153,7 @@ struct AgentBundle {
 
 async fn build_agent_bundle(config: &SynapseConfig) -> crate::error::Result<AgentBundle> {
     let model = agent::build_model(config, None)?;
-    let mcp_tools = agent::load_mcp_tools(config).await;
+    let (mcp_client, mcp_tools) = agent::build_mcp_client(config).await;
 
     let cost_tracker = Arc::new(CostTrackingCallback::new(default_pricing()));
 
@@ -172,6 +176,7 @@ async fn build_agent_bundle(config: &SynapseConfig) -> crate::error::Result<Agen
 
     Ok(AgentBundle {
         model,
+        mcp_client,
         mcp_tools,
         cost_tracker,
         usage_tracker,
@@ -276,19 +281,7 @@ async fn build_infra_bundle(
         synaptic::plugin::PluginRegistry::new(event_bus.clone()),
     ));
 
-    // --- Phase 1: Register builtin event subscribers (tracing, thinking, etc.) ---
-    {
-        let mut reg = plugin_registry.write().await;
-        if let Err(e) = crate::plugin::register_builtin_plugins(
-            &mut reg,
-            Arc::clone(cost_tracker),
-            Arc::clone(usage_tracker),
-        ) {
-            tracing::warn!(error = %e, "failed to register builtin plugins");
-        }
-    }
-
-    // --- Phase 2: Use PluginManager for all plugin lifecycle ---
+    // --- All plugins through PluginManager ---
     let mut plugin_manager = crate::plugins::manager::PluginManager::new(
         config.plugins.clone(),
         plugin_registry.clone(),
@@ -296,6 +289,14 @@ async fn build_infra_bundle(
             .unwrap_or_default()
             .join(".synapse/plugins"),
     );
+
+    // Observability plugin (tracing, thinking, loop detection, cost tracking)
+    plugin_manager.add_builtin(Box::new(
+        crate::plugins::observability::ObservabilityPlugin::new(
+            Arc::clone(cost_tracker),
+            Arc::clone(usage_tracker),
+        ),
+    ));
 
     // Register slot-assigned plugins via factory registry (e.g., memory-viking)
     let factory_registry = crate::plugins::registry::default_registry();
@@ -346,7 +347,7 @@ async fn build_infra_bundle(
         tracing::warn!(error = %e, "failed to discover external plugins");
     }
 
-    // --- Phase 3: Start all plugin-managed services ---
+    // Start all plugin-managed services
     plugin_manager.start_services().await;
 
     // Collect bundle dirs before dropping plugin_manager
@@ -480,6 +481,10 @@ impl AppState {
             crate::gateway::exec_approvals::ExecApprovalsConfig::load(),
         ));
 
+        // ── Transient MCP (shared between AgentSession and AgentSubState) ──
+        let transient_mcp: Arc<RwLock<HashMap<String, TransientMcpServer>>> =
+            Arc::new(RwLock::new(HashMap::new()));
+
         // ── AgentSession for unified pipeline ──────────────────────────
         let agent_session = {
             let session = AgentSession::new(
@@ -488,6 +493,8 @@ impl AppState {
                 true, // deep_agent
             )
             .with_channel("web")
+            .with_mcp_tools(agent_bundle.mcp_tools.clone())
+            .with_transient_mcp(transient_mcp.clone())
             .with_gateway(channels.channel_registry.clone(), rpc.broadcaster.clone())
             .with_tracking(
                 agent_bundle.cost_tracker.clone(),
@@ -517,7 +524,8 @@ impl AppState {
             agent: AgentSubState {
                 model: agent_bundle.model,
                 mcp_tools: agent_bundle.mcp_tools,
-                transient_mcp: Arc::new(RwLock::new(HashMap::new())),
+                mcp_client: agent_bundle.mcp_client,
+                transient_mcp,
                 cost_tracker: agent_bundle.cost_tracker,
                 usage_tracker: agent_bundle.usage_tracker,
                 memory_provider,

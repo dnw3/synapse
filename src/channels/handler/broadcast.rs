@@ -78,17 +78,14 @@ impl AgentSession {
                         if deep {
                             let cwd =
                                 std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                            let mcp_tools = agent::load_mcp_tools(&config).await;
-
                             let agent = agent::build_deep_agent_with_callback(
                                 model,
                                 &config,
                                 &cwd,
                                 checkpointer,
-                                mcp_tools,
+                                vec![], // broadcast mode: no MCP tools
                                 None,
                                 Some(Arc::new(agent::BotSafetyCallback)),
-                                None,
                                 None,
                                 None,
                                 None,

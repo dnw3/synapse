@@ -39,11 +39,21 @@ pub fn config_to_mcp_connection(mc: &synaptic::config::McpServerConfig) -> Optio
     }
 }
 
-/// Load MCP tools from config. Returns empty vec on failure (non-fatal).
-pub async fn load_mcp_tools(config: &SynapseConfig) -> Vec<Arc<dyn Tool>> {
+/// Build an MCP client from config and connect to all servers.
+///
+/// Returns the connected client (for shared state) and discovered tools.
+/// On failure, returns a client with no tools (non-fatal).
+pub async fn build_mcp_client(
+    config: &SynapseConfig,
+) -> (Arc<MultiServerMcpClient>, Vec<Arc<dyn Tool>>) {
     let mcp_configs = match config.mcp_configs() {
         Some(configs) if !configs.is_empty() => configs,
-        _ => return Vec::new(),
+        _ => {
+            return (
+                Arc::new(MultiServerMcpClient::new(HashMap::new())),
+                Vec::new(),
+            )
+        }
     };
 
     let mut servers = HashMap::new();
@@ -54,21 +64,33 @@ pub async fn load_mcp_tools(config: &SynapseConfig) -> Vec<Arc<dyn Tool>> {
     }
 
     if servers.is_empty() {
-        return Vec::new();
+        return (
+            Arc::new(MultiServerMcpClient::new(HashMap::new())),
+            Vec::new(),
+        );
     }
 
     let count = servers.len();
     tracing::info!(server_count = count, "Connecting to MCP server(s)");
 
-    let client = MultiServerMcpClient::new(servers);
+    let client = Arc::new(MultiServerMcpClient::new(servers));
     match synaptic::mcp::load_mcp_tools(&client).await {
         Ok(tools) => {
             tracing::info!(tool_count = tools.len(), "Loaded tools from MCP servers");
-            tools
+            (client, tools)
         }
         Err(e) => {
             tracing::warn!(error = %e, "Failed to load MCP tools");
-            Vec::new()
+            (client, Vec::new())
         }
     }
+}
+
+/// Load MCP tools from config. Returns empty vec on failure (non-fatal).
+///
+/// Convenience wrapper over [`build_mcp_client`] for callers that don't
+/// need the client reference (e.g., task/REPL mode).
+pub async fn load_mcp_tools(config: &SynapseConfig) -> Vec<Arc<dyn Tool>> {
+    let (_client, tools) = build_mcp_client(config).await;
+    tools
 }

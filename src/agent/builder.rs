@@ -76,7 +76,6 @@ pub async fn build_deep_agent(
         None,
         None,
         None,
-        None,
         "unknown",
         None,
         None,
@@ -88,7 +87,7 @@ pub async fn build_deep_agent(
     .await
 }
 
-/// Build a Deep Agent with an optional custom security callback and optional LTM.
+/// Build a Deep Agent with an optional custom security callback.
 #[allow(clippy::too_many_arguments)]
 pub async fn build_deep_agent_with_callback(
     model: Arc<dyn ChatModel>,
@@ -98,7 +97,6 @@ pub async fn build_deep_agent_with_callback(
     mcp_tools: Vec<Arc<dyn Tool>>,
     system_prompt_override: Option<&str>,
     security_callback: Option<Arc<dyn SecurityConfirmationCallback>>,
-    ltm: Option<Arc<crate::memory::LongTermMemory>>,
     session_mgr: Option<Arc<synaptic::session::SessionManager>>,
     session_overrides: Option<SessionOverrides>,
     cost_tracker: Option<Arc<CostTrackingCallback>>,
@@ -221,20 +219,20 @@ pub async fn build_deep_agent_with_callback(
     options.context.system_prompt = Some(system_prompt);
 
     // --- Memory provider + user profile ---
-    // Get memory provider from plugin registry (set by memory plugin in build_infra_bundle)
+    // Get memory provider from plugin registry (set by memory plugin during plugin init)
     let memory_provider_arc: Arc<dyn synaptic::memory::MemoryProvider> = {
         if let Some(ref registry) = plugin_registry {
             let reg = registry.read().await;
             if let Some(provider) = reg.memory_slot() {
                 provider.clone()
             } else {
-                // Fallback: no memory plugin registered
                 tracing::warn!("no memory plugin registered, using noop provider");
                 Arc::new(crate::memory::NativeMemoryProvider::new_noop())
             }
         } else {
-            // No plugin registry — fallback to factory (e.g., REPL without gateway)
-            crate::memory::build_memory_provider(config, ltm.clone())
+            // No plugin registry at all — noop memory (callers should use build_cli_plugins)
+            tracing::warn!("no plugin registry provided, using noop memory provider");
+            Arc::new(crate::memory::NativeMemoryProvider::new_noop())
         }
     };
 

@@ -72,17 +72,14 @@ impl AgentSession {
         // Build deep agent
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let checkpointer = Arc::new(self.session_mgr.checkpointer());
-        let mcp_tools = agent::load_mcp_tools(&self.config).await;
-
         let agent = agent::build_deep_agent_with_callback(
             self.model.clone(),
             &self.config,
             &cwd,
             checkpointer,
-            mcp_tools,
+            self.all_mcp_tools().await,
             None,
             Some(Arc::new(agent::BotSafetyCallback)),
-            None, // no LTM tools in bot mode
             None, // no session tools in bot mode
             None, // no session overrides in bot mode
             self.tracking.as_ref().map(|t| t.cost_tracker.clone()),

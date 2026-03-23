@@ -77,6 +77,19 @@ impl From<reqwest::Error> for SynapseError {
     }
 }
 
+#[cfg(any(
+    feature = "bot-slack",
+    feature = "bot-discord",
+    feature = "bot-mattermost",
+    feature = "bot-whatsapp",
+    feature = "web",
+))]
+impl From<tokio_tungstenite::tungstenite::Error> for SynapseError {
+    fn from(e: tokio_tungstenite::tungstenite::Error) -> Self {
+        Self::Channel(e.to_string())
+    }
+}
+
 impl From<String> for SynapseError {
     fn from(s: String) -> Self {
         Self::Internal(s)

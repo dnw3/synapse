@@ -11,6 +11,7 @@ use crate::agent::{self, InteractiveApprovalCallback};
 use crate::config::SynapseConfig;
 use crate::display;
 use crate::memory::LongTermMemory;
+use crate::plugins;
 /// Run a Deep Agent task with streaming output.
 pub async fn run_task(
     config: &SynapseConfig,
@@ -65,7 +66,10 @@ pub async fn run_task(
     ));
     ltm.load().await.ok();
 
-    // Build deep agent with filesystem backend + MCP tools + interactive approval + LTM
+    // Initialize plugin system (memory plugin, services, bundles)
+    let plugin_bundle = plugins::build_cli_plugins(config, Some(ltm.clone())).await;
+
+    // Build deep agent with filesystem backend + MCP tools + interactive approval
     let checkpointer = Arc::new(session_mgr.checkpointer());
     let approval = Arc::new(InteractiveApprovalCallback::new());
     let agent = agent::build_deep_agent_with_callback(
@@ -76,17 +80,16 @@ pub async fn run_task(
         mcp_tools,
         system_prompt_override.as_deref(),
         Some(approval),
-        Some(ltm.clone()),
         None,
         None,
         None,
         "repl",
         None,
+        Some(plugin_bundle.event_bus),
+        Some(plugin_bundle.plugin_registry),
         None,
-        None, // no plugin registry in task/repl mode
-        None, // no channel registry in task/repl mode
         agent::SessionKind::Full,
-        &[], // no bundle skills in task/repl mode
+        &plugin_bundle.bundle_skills_dirs,
     )
     .await?;
 

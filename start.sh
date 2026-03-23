@@ -19,19 +19,6 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 # ── Features ────────────────────────────────────────────────────────────
 FEATURES="web,plugins,bot-telegram,bot-discord,bot-slack,bot-lark"
 
-# ── OpenViking ─────────────────────────────────────────────────────────
-# Note: OpenViking lifecycle is now managed by VikingService (in-process).
-# Shell-level management removed — see src/plugins/viking_service.rs.
-
-stop_viking() {
-  # Legacy cleanup: kill any leftover openviking-server processes
-  pids=$(pgrep -f "openviking-server" 2>/dev/null || true)
-  if [ -n "$pids" ]; then
-    echo "$pids" | xargs kill 2>/dev/null || true
-    echo "  Stopped OpenViking server."
-  fi
-}
-
 # ── Helpers ─────────────────────────────────────────────────────────────
 build_backend() {
   local profile="${1:-debug}"
@@ -153,7 +140,6 @@ case "$MODE" in
       echo "Shutting down..."
       kill "$FRONTEND_PID" 2>/dev/null
       kill "$BACKEND_PID" 2>/dev/null
-      stop_viking
       wait "$FRONTEND_PID" 2>/dev/null
       wait "$BACKEND_PID" 2>/dev/null
       echo "Done."
@@ -185,8 +171,6 @@ case "$MODE" in
   stop)
     echo "Stopping synapse and vite processes..."
     count=0
-    # Kill any leftover OpenViking processes (legacy cleanup)
-    stop_viking
     # Kill synapse processes
     pids=$(pgrep -f "target/(debug|release)/synapse" 2>/dev/null || true)
     if [ -n "$pids" ]; then

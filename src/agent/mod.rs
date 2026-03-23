@@ -24,5 +24,5 @@ pub mod workspace;
 pub use self::bootstrap::{BootstrapLoader, SessionKind};
 pub use self::builder::{build_deep_agent, build_deep_agent_with_callback, SessionOverrides};
 pub use self::callbacks::{BotSafetyCallback, InteractiveApprovalCallback};
-pub use self::mcp::load_mcp_tools;
+pub use self::mcp::{build_mcp_client, load_mcp_tools};
 pub use self::model::{build_model, build_model_by_name};

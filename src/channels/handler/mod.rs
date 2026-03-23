@@ -113,6 +113,12 @@ pub struct AgentSession {
     run_queue: Arc<crate::gateway::run_queue::AgentRunQueue>,
     /// Resolver for tool display metadata (emoji, label, detail).
     display_resolver: Arc<crate::agent::tool_display::ToolDisplayResolver>,
+    /// MCP tools loaded once at startup (shared across all requests).
+    mcp_tools: Vec<Arc<dyn synaptic::core::Tool>>,
+    /// Transient MCP servers (dashboard-added, gateway only).
+    transient_mcp: Option<
+        Arc<RwLock<std::collections::HashMap<String, crate::gateway::state::TransientMcpServer>>>,
+    >,
 
     // Optional capabilities
     /// Gateway-mode capabilities (broadcaster, channel registry, router, outbound).
@@ -142,6 +148,8 @@ impl AgentSession {
             session_map: RwLock::new(std::collections::HashMap::new()),
             run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
             display_resolver,
+            mcp_tools: Vec::new(),
+            transient_mcp: None,
             gateway: None,
             tracking: None,
             plugins: None,
@@ -189,6 +197,8 @@ impl AgentSession {
             session_map: RwLock::new(std::collections::HashMap::new()),
             run_queue: Arc::new(crate::gateway::run_queue::AgentRunQueue::new()),
             display_resolver: display_resolver2,
+            mcp_tools: Vec::new(),
+            transient_mcp: None,
             gateway: None,
             tracking: None,
             plugins: None,
@@ -250,6 +260,34 @@ impl AgentSession {
     pub fn with_channel(mut self, channel: &str) -> Self {
         self.channel = channel.to_string();
         self
+    }
+
+    /// Set pre-loaded MCP tools (shared across all requests, loaded once at startup).
+    pub fn with_mcp_tools(mut self, tools: Vec<Arc<dyn synaptic::core::Tool>>) -> Self {
+        self.mcp_tools = tools;
+        self
+    }
+
+    /// Set transient MCP servers (dashboard-added, gateway only).
+    pub fn with_transient_mcp(
+        mut self,
+        transient: Arc<
+            RwLock<std::collections::HashMap<String, crate::gateway::state::TransientMcpServer>>,
+        >,
+    ) -> Self {
+        self.transient_mcp = Some(transient);
+        self
+    }
+
+    /// Get all MCP tools — persistent + transient (merged at call time).
+    pub async fn all_mcp_tools(&self) -> Vec<Arc<dyn synaptic::core::Tool>> {
+        let mut tools = self.mcp_tools.clone();
+        if let Some(ref transient) = self.transient_mcp {
+            for server in transient.read().await.values() {
+                tools.extend(server.tools.iter().cloned());
+            }
+        }
+        tools
     }
 
     /// Set the Outbound trait impl for the new channel trait interface.

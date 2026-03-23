@@ -11,7 +11,9 @@ Describe yourself so the assistant can personalize responses.
 - Language: English
 - Response style: concise
 - Code style: modern, minimal comments
+- Theme: Dark mode (深色模式)
+- Favorite programming language: Rust
 
 ## Context
 - Primary project:
-- Tech stack:
+- Tech stack: Rust

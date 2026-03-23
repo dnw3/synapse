@@ -16,8 +16,6 @@ mod hub;
 mod init;
 mod memory;
 mod notify;
-#[allow(dead_code)]
-mod plugin;
 mod plugins;
 mod repl;
 #[allow(dead_code)]

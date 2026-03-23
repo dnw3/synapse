@@ -67,11 +67,6 @@ export default function AppShell() {
   const activeView = viewKeyFromPath(location.pathname);
   const isChatView = activeView === "chat";
 
-  // Replace setActiveView with navigate
-  const setActiveView = (v: ViewKey) => {
-    navigate(pathFromViewKey(v));
-  };
-
   // ── Identity & model via TanStack Query ─────────────────────────────
   const identityQuery = useQuery({
     queryKey: ["identity"],
@@ -207,7 +202,7 @@ export default function AppShell() {
       labelZh: "聊天",
       category: "navigation",
       icon: <MessageSquare className="h-3.5 w-3.5" />,
-      action: () => setActiveView("chat"),
+      action: () => navigate("/chat"),
     },
     ...TABS.map((tab) => ({
       id: `nav:${tab.key}`,
@@ -215,7 +210,7 @@ export default function AppShell() {
       labelZh: tab.labelZh,
       category: "navigation" as const,
       icon: <LayoutDashboard className="h-3.5 w-3.5" />,
-      action: () => setActiveView(tab.key as ViewKey),
+      action: () => navigate(`/dashboard/${tab.key}`),
     })),
     {
       id: "cmd:new",
@@ -249,7 +244,7 @@ export default function AppShell() {
       icon: <MessageSquare className="h-3.5 w-3.5" />,
       action: () => {
         session.setActiveKey(s.sessionKey);
-        setActiveView("chat");
+        navigate("/chat");
       },
     })),
   ];
@@ -279,8 +274,6 @@ export default function AppShell() {
 
           {/* Unified Sidebar */}
           <UnifiedSidebar
-            activeView={activeView}
-            onViewChange={(v) => { setActiveView(v as ViewKey); setMobileMenuOpen(false); }}
             identity={identity}
             themeMode={theme.mode}
             onCycleTheme={theme.cycleMode}

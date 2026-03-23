@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate } from "react-router-dom";
 import { X, ChevronDown, MessageSquare } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { cn } from "../lib/cn";
@@ -20,9 +21,6 @@ function loadCollapsed(): Record<string, boolean> {
 }
 
 interface UnifiedSidebarProps {
-  // Navigation
-  activeView: string;
-  onViewChange: (view: string) => void;
   // Identity
   identity: IdentityInfo | null;
   // Theme
@@ -37,8 +35,6 @@ interface UnifiedSidebarProps {
 }
 
 export default function UnifiedSidebar({
-  activeView,
-  onViewChange,
   identity,
   themeMode,
   onCycleTheme,
@@ -48,6 +44,9 @@ export default function UnifiedSidebar({
   onClose,
 }: UnifiedSidebarProps) {
   const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeView = location.pathname === "/chat" ? "chat" : location.pathname.replace("/dashboard/", "");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(loadCollapsed);
 
   // Persist collapse state
@@ -109,7 +108,7 @@ export default function UnifiedSidebar({
             >
               {/* Chat tab item */}
               <button
-                onClick={() => onViewChange("chat")}
+                onClick={() => navigate("/chat")}
                 className={cn(
                   "relative flex items-center gap-2 w-full rounded-[6px] text-[13px] transition-all duration-150 cursor-pointer px-2 py-1.5 h-[32px]",
                   isChatActive
@@ -165,7 +164,7 @@ export default function UnifiedSidebar({
                     return (
                       <button
                         key={key}
-                        onClick={() => onViewChange(key)}
+                        onClick={() => navigate(`/dashboard/${key}`)}
                         className={cn(
                           "relative flex items-center gap-2 w-full rounded-[6px] text-[13px] transition-all duration-150 cursor-pointer px-2 py-1.5 h-[32px]",
                           isActive

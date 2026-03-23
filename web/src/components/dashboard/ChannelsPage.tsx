@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Radio, Globe, Terminal, RefreshCw, ChevronDown, ChevronRight, Save, Wifi, WifiOff, ShieldCheck, UserCheck, UserX, Check, Loader2 } from "lucide-react";
+import { Radio, RefreshCw, ChevronDown, ChevronRight, Save, Wifi, WifiOff, ShieldCheck, UserCheck, UserX, Check, Loader2 } from "lucide-react";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import type { ChannelEntry, McpServerInfo, BindingEntry } from "../../types/dashboard";
+import type { ChannelEntry, BindingEntry } from "../../types/dashboard";
 import {
   SectionCard,
   SectionHeader,
@@ -237,19 +237,6 @@ function LiveStatusSection({ api }: { api: ReturnType<typeof import("../../hooks
       )}
     </SectionCard>
   );
-}
-
-function transportBadgeClass(transport: string): string {
-  switch (transport.toLowerCase()) {
-    case "stdio":
-      return "bg-[var(--accent)]/15 text-[var(--accent)] border-[var(--accent)]/30";
-    case "sse":
-      return "bg-[var(--warning)]/15 text-[var(--warning)] border-[var(--warning)]/30";
-    case "streamable-http":
-      return "bg-[var(--success)]/15 text-[var(--success)] border-[var(--success)]/30";
-    default:
-      return "bg-[var(--bg-content)] text-[var(--text-secondary)] border-[var(--separator)]";
-  }
 }
 
 // Per-channel config field definitions
@@ -731,7 +718,6 @@ export default function ChannelsPage() {
   const { toasts, addToast } = useToast();
 
   const [channels, setChannels] = useState<ChannelEntry[]>([]);
-  const [mcpServers, setMcpServers] = useState<McpServerInfo[]>([]);
   const [bindings, setBindings] = useState<BindingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
@@ -739,13 +725,11 @@ export default function ChannelsPage() {
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
-    const [ch, mcp, bd] = await Promise.all([
+    const [ch, bd] = await Promise.all([
       api.fetchChannels(),
-      api.fetchMcpServers(),
       api.fetchBindings(),
     ]);
     if (ch) setChannels(ch);
-    if (mcp) setMcpServers(mcp);
     if (bd) setBindings(bd);
     setLoading(false);
   }, [api]);
@@ -961,55 +945,6 @@ export default function ChannelsPage() {
 
       {/* DM Pairing */}
       <DmPairingSection api={api} addToast={addToast} />
-
-      {/* MCP Servers */}
-      <SectionCard>
-        <SectionHeader
-          icon={<Globe className="h-4 w-4" />}
-          title={t("dashboard.mcpServers", "MCP Servers")}
-          right={
-            <span className="px-1.5 py-0.5 rounded-full bg-[var(--bg-content)] text-[10px] font-mono text-[var(--text-tertiary)] tabular-nums">
-              {mcpServers.length}
-            </span>
-          }
-        />
-
-        {mcpServers.length === 0 ? (
-          <EmptyState
-            icon={<Terminal className="h-5 w-5" />}
-            message={t("dashboard.noMcp", "No MCP servers configured")}
-          />
-        ) : (
-          <div className="space-y-2">
-            {mcpServers.map((mcp) => (
-              <div
-                key={mcp.name}
-                className="px-3.5 py-3 rounded-[var(--radius-md)] bg-[var(--bg-content)]/60 border border-[var(--border-subtle)] hover:border-[var(--separator)] transition-all"
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[13px] font-medium text-[var(--text-primary)] truncate">
-                    {mcp.name}
-                  </span>
-                  <span
-                    className={cn(
-                      "px-2 py-0.5 rounded-full text-[10px] font-medium border flex-shrink-0",
-                      transportBadgeClass(mcp.transport)
-                    )}
-                  >
-                    {mcp.transport}
-                  </span>
-                </div>
-                {mcp.command && (
-                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-[var(--text-tertiary)] truncate">
-                    <Terminal className="h-3 w-3 flex-shrink-0" />
-                    <span className="truncate">{mcp.command}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </SectionCard>
 
       <ToastContainer toasts={toasts} />
     </div>

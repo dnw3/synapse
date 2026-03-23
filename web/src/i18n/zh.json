@@ -933,5 +933,9 @@
     "no_instances": "未找到沙箱实例",
     "destroy": "销毁",
     "recreate": "重建"
-  }
+  },
+  "error.unexpected": "出现了一些问题",
+  "error.loadFailed": "数据加载失败",
+  "error.retry": "重试",
+  "error.operationFailed": "操作失败"
 }

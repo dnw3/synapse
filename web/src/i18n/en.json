@@ -932,5 +932,9 @@
     "no_instances": "No sandbox instances found",
     "destroy": "Destroy",
     "recreate": "Recreate"
-  }
+  },
+  "error.unexpected": "Something went wrong",
+  "error.loadFailed": "Failed to load data",
+  "error.retry": "Retry",
+  "error.operationFailed": "Operation failed"
 }

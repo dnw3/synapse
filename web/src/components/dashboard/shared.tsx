@@ -1,8 +1,11 @@
 import { useState, useRef, useCallback } from "react";
+import type { ReactNode } from "react";
 import { ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/cn";
 import type { StatsCardProps } from "../../types/dashboard";
+import type { UseQueryResult } from "@tanstack/react-query";
+import PageSkeleton from "../PageSkeleton";
 
 export function StatsCard({ icon, label, value, sub, trend, accent, pulse }: StatsCardProps) {
   return (
@@ -115,6 +118,33 @@ export function EmptyState({ icon, message, description, action }: {
       {action && <div className="mt-2">{action}</div>}
     </div>
   );
+}
+
+export function QueryContainer<T>({
+  query,
+  children,
+  emptyState,
+}: {
+  query: UseQueryResult<T>;
+  children: (data: T) => ReactNode;
+  emptyState?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  if (query.isPending) return <PageSkeleton />;
+  if (query.isError)
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
+        <p className="text-[14px] text-[var(--error)]">{t("error.loadFailed")}</p>
+        <button
+          onClick={() => query.refetch()}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-md)] text-[12px] font-medium text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 transition-colors cursor-pointer"
+        >
+          {t("error.retry")}
+        </button>
+      </div>
+    );
+  if (!query.data) return <>{emptyState ?? null}</>;
+  return <>{children(query.data)}</>;
 }
 
 export function LoadingSkeleton({ className }: { className?: string }) {

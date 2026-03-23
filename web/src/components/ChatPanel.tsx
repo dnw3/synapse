@@ -68,6 +68,31 @@ function MessageDivider({ label }: { label: string }) {
   );
 }
 
+/** Get the earliest timestamp from a turn's messages */
+function turnTimestamp(messages: Message[]): number | undefined {
+  for (const m of messages) {
+    if (m.timestamp) return m.timestamp;
+  }
+  return undefined;
+}
+
+/** Format a timestamp for time separator display */
+function formatSeparatorTime(ms: number): string {
+  const d = new Date(ms);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (isToday) return time;
+  if (isYesterday) return `Yesterday ${time}`;
+  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+}
+
+const TIME_GAP_MS = 5 * 60 * 1000; // 5 minutes
+
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -773,11 +798,15 @@ export default function ChatPanel({
               .slice(0, 3)
               .join(", ");
 
+            // Time separator: insert when gap > 5 minutes between turns
+            const currentTs = turnTimestamp(turn.messages);
+            const prevTs = i > 0 ? turnTimestamp(turns[i - 1].messages) : undefined;
+            const showTimeSep = currentTs && prevTs && (currentTs - prevTs > TIME_GAP_MS);
+
             return (
               <div key={i}>
-                {/* Add a divider every 10 human-turn groups from the start */}
-                {turn.type === "human" && i > 0 && i % 10 === 0 && (
-                  <MessageDivider label={t("divider.start")} />
+                {showTimeSep && (
+                  <MessageDivider label={formatSeparatorTime(currentTs)} />
                 )}
                 {turn.type === "human" ? (
                   <div className="group relative">

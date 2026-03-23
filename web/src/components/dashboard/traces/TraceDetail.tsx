@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Clock, Coins, Cpu, Wrench, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Clock, Coins, Cpu, Wrench, ChevronRight, Copy, Check } from "lucide-react";
 import { cn } from "../../../lib/cn";
 import type { TraceRecord, TraceSubView } from "./types";
 import OverviewView from "./OverviewView";
@@ -27,6 +28,28 @@ function formatTokens(n: number): string {
 function truncateId(id: string, len = 12): string {
   if (id.length <= len) return id;
   return `...${id.slice(-len)}`;
+}
+
+function CopyableLogId({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  const { t } = useTranslation();
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      title={copied ? t("logid.copied") : t("logid.tooltip")}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--radius-sm)] bg-[var(--bg-content)] border border-[var(--border-subtle)] text-[12px] font-mono text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-colors cursor-pointer"
+    >
+      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 opacity-50" />}
+      <span>{copied ? t("logid.copied") : id}</span>
+    </button>
+  );
 }
 
 const SUB_VIEWS: TraceSubView[] = ["overview", "timeline", "steps"];
@@ -69,6 +92,12 @@ export function TraceDetail({
         <ArrowLeft className="h-3.5 w-3.5" />
         {t("traces.detail.backToList")}
       </button>
+
+      {/* LogID — always visible, copyable */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)]">LogID</span>
+        <CopyableLogId id={trace.request_id} />
+      </div>
 
       {/* Breadcrumb (only when trace has a parent) */}
       {trace.metadata.parent_request_id && (

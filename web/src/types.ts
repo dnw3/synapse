@@ -37,6 +37,7 @@ export interface Message {
   content: string;
   tool_calls: ToolCall[];
   request_id?: string;
+  timestamp?: number;
   reasoning?: string;
   usage?: MessageUsage;
   model?: string;

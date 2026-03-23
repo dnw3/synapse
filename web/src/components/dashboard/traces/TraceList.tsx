@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
+import { useState } from "react";
 import {
   Search, RefreshCw, ChevronDown, Clock,
-  Cpu, Wrench, Coins, Activity,
+  Cpu, Wrench, Coins, Activity, Copy, Check,
 } from "lucide-react";
 import { cn } from "../../../lib/cn";
 import { EmptyState, LoadingSpinner } from "../shared";
@@ -41,6 +42,31 @@ function formatRelativeTime(isoStr: string): string {
 function truncateId(id: string, len = 12): string {
   if (id.length <= len) return id;
   return `...${id.slice(-len)}`;
+}
+
+function CopyableLogId({ id, truncated }: { id: string; truncated?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const { t } = useTranslation();
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(id);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const display = truncated ? truncateId(id) : id;
+
+  return (
+    <button
+      onClick={handleCopy}
+      title={copied ? t("logid.copied") : `${id}\n${t("logid.tooltip")}`}
+      className="inline-flex items-center gap-1 text-[12px] font-mono font-medium text-[var(--text-primary)] tabular-nums hover:text-[var(--accent)] transition-colors cursor-pointer"
+    >
+      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 opacity-40" />}
+      <span>{copied ? t("logid.copied") : display}</span>
+    </button>
+  );
 }
 
 const STATUS_BORDER: Record<string, string> = {
@@ -189,9 +215,7 @@ export function TraceList({
                 {/* Header: request_id + status + time */}
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-[12px] font-mono font-medium text-[var(--text-primary)] tabular-nums truncate">
-                      {truncateId(trace.request_id)}
-                    </span>
+                    <CopyableLogId id={trace.request_id} truncated />
                     <span className={cn(
                       "inline-flex items-center px-1.5 py-[1px] rounded-[var(--radius-sm)] text-[10px] font-semibold uppercase tracking-wider",
                       badge.bg, badge.text

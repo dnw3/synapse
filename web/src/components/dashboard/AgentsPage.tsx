@@ -61,7 +61,7 @@ export default function AgentsPage() {
   const [fileLoading, setFileLoading] = useState(false);
   const [fileSaving, setFileSaving] = useState(false);
   const [fileSaved, setFileSaved] = useState(false);
-  const [filePreview, setFilePreview] = useState(false);
+  const [filePreview, setFilePreview] = useState(true);
 
   const agentParam = selected && selected !== "default" ? selected : undefined;
 
@@ -637,21 +637,9 @@ export default function AgentsPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] overflow-hidden">
                             <button
-                              onClick={() => setFilePreview(false)}
-                              className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer",
-                                !filePreview
-                                  ? "bg-[var(--accent)]/10 text-[var(--accent)]"
-                                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-content)]"
-                              )}
-                            >
-                              <Pencil className="h-3 w-3" />
-                              Edit
-                            </button>
-                            <button
                               onClick={() => setFilePreview(true)}
                               className={cn(
-                                "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer border-l border-[var(--border-subtle)]",
+                                "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer",
                                 filePreview
                                   ? "bg-[var(--accent)]/10 text-[var(--accent)]"
                                   : "text-[var(--text-secondary)] hover:bg-[var(--bg-content)]"
@@ -659,6 +647,18 @@ export default function AgentsPage() {
                             >
                               <Eye className="h-3 w-3" />
                               Preview
+                            </button>
+                            <button
+                              onClick={() => setFilePreview(false)}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition-colors cursor-pointer border-l border-[var(--border-subtle)]",
+                                !filePreview
+                                  ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-content)]"
+                              )}
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Edit
                             </button>
                           </div>
                           <div className="flex items-center gap-2">

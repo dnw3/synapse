@@ -44,13 +44,15 @@ function copyAsMarkdown(msgs: Message[]) {
   navigator.clipboard.writeText(md).catch(() => {});
 }
 
+/** Format ms timestamp to HH:MM */
+function formatTime(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 function LogIdBadge({ requestId }: { requestId: string }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
-
-  // Decode timestamp from LogID: first 13 chars are milliseconds
-  const ts = parseInt(requestId.slice(0, 13), 10);
-  const timeStr = !isNaN(ts) ? new Date(ts).toLocaleTimeString() : "";
 
   const handleCopy = () => {
     navigator.clipboard.writeText(requestId).then(() => {
@@ -62,20 +64,17 @@ function LogIdBadge({ requestId }: { requestId: string }) {
   return (
     <button
       onClick={handleCopy}
-      title={t("logid.tooltip")}
-      className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono text-[var(--text-tertiary)] bg-[var(--bg-content)]/60 border border-[var(--border-subtle)] hover:border-[var(--accent)]/30 hover:text-[var(--text-secondary)] transition-all cursor-pointer select-none"
+      title={`${requestId}\n${t("logid.tooltip")}`}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-all cursor-pointer select-none"
     >
       {copied ? (
         <Check className="h-2.5 w-2.5 text-[var(--success)]" />
       ) : (
-        <Copy className="h-2.5 w-2.5" />
+        <Copy className="h-2.5 w-2.5 opacity-40" />
       )}
       <span className={copied ? "text-[var(--success)]" : ""}>
-        {copied ? t("logid.copied") : `${requestId.slice(0, 8)}...${requestId.slice(-4)}`}
+        {copied ? t("logid.copied") : requestId}
       </span>
-      {timeStr && !copied && (
-        <span className="text-[var(--text-tertiary)] ml-0.5">{timeStr}</span>
-      )}
     </button>
   );
 }
@@ -171,15 +170,20 @@ export default function MessageBubble({ message, turn, onDelete, onToolResultCli
   if (message && message.role === "human") {
     return (
       <div className="flex gap-3 justify-end animate-message-in-right">
-        <div
-          className="max-w-[65%] px-4 py-2.5 text-white text-[15px] leading-[1.75]"
-          style={{
-            background: "var(--accent)",
-            borderRadius: "16px 16px 4px 16px",
-            boxShadow: "var(--shadow-sm)",
-          }}
-        >
-          {message.content}
+        <div className="flex flex-col items-end gap-0.5 max-w-[65%]">
+          <div
+            className="px-4 py-2.5 text-white text-[15px] leading-[1.75]"
+            style={{
+              background: "var(--accent)",
+              borderRadius: "16px 16px 4px 16px",
+              boxShadow: "var(--shadow-sm)",
+            }}
+          >
+            {message.content}
+          </div>
+          {message.timestamp && (
+            <span className="text-[10px] text-[var(--text-tertiary)] mr-1">{formatTime(message.timestamp)}</span>
+          )}
         </div>
         <div className="w-7 h-7 rounded-full bg-[var(--bg-content)] border border-[var(--separator)] flex items-center justify-center flex-shrink-0">
           <User className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
@@ -306,7 +310,13 @@ export default function MessageBubble({ message, turn, onDelete, onToolResultCli
           </div>
         )}
 
-        {lastRequestId && <LogIdBadge requestId={lastRequestId} />}
+        {/* Time + LogID footer */}
+        <div className="flex items-center gap-2 mt-0.5">
+          {lastAssistantMsg?.timestamp && (
+            <span className="text-[10px] text-[var(--text-tertiary)]">{formatTime(lastAssistantMsg.timestamp)}</span>
+          )}
+          {lastRequestId && <LogIdBadge requestId={lastRequestId} />}
+        </div>
       </div>
     </div>
   );

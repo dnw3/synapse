@@ -225,27 +225,13 @@ code, pre, .font-mono { font-family: var(--font-mono) !important; }
 
 /* ── Legacy Compatibility Aliases ─────────────────────────
    These map old token names to new ones so existing components
-   keep working until they are rewritten in subsequent tasks. */
+   keep working until they are rewritten in subsequent tasks.
+   Unused aliases have been removed; only active tokens remain. */
 :root {
   --bg-primary: var(--bg-window);
-  --bg-surface: var(--bg-content);
-  --border-default: var(--separator);
-  --border-strong: var(--separator);
-  --font-sans: var(--font-body);
-  --shadow-glow: 0 0 20px var(--accent-glow);
-  --noise-opacity: 0;
-  --scrollbar-thumb: rgba(99,99,102,0.15);
-  --scrollbar-thumb-hover: rgba(99,99,102,0.30);
-  --prose-code-bg: var(--bg-content);
-  --input-bg: var(--bg-content);
-  --card-glow: var(--accent-glow);
+  --bg-secondary: var(--bg-content);
   --chart-grid: var(--border-subtle);
   --chart-tick: var(--text-tertiary);
-  --stat-positive: var(--success);
-  --stat-negative: var(--error);
-  --stat-neutral: var(--text-secondary);
-  --chart-area-fill: var(--accent-glow);
-  --chart-line: var(--accent);
   --chart-1: var(--accent);
   --chart-2: var(--accent-light);
   --chart-3: var(--success);

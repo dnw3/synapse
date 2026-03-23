@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Radio, Globe, Terminal, RefreshCw, ChevronDown, ChevronRight, Save, Wifi, WifiOff, ShieldCheck, UserCheck, UserX, Check, Loader2 } from "lucide-react";
 import { useDashboardAPI } from "../../hooks/useDashboardAPI";
-import type { ChannelEntry, McpEntry, BindingEntry } from "../../types/dashboard";
+import type { ChannelEntry, McpServerInfo, BindingEntry } from "../../types/dashboard";
 import {
   SectionCard,
   SectionHeader,
@@ -731,7 +731,7 @@ export default function ChannelsPage() {
   const { toasts, addToast } = useToast();
 
   const [channels, setChannels] = useState<ChannelEntry[]>([]);
-  const [mcpServers, setMcpServers] = useState<McpEntry[]>([]);
+  const [mcpServers, setMcpServers] = useState<McpServerInfo[]>([]);
   const [bindings, setBindings] = useState<BindingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
@@ -741,7 +741,7 @@ export default function ChannelsPage() {
   const loadData = useCallback(async () => {
     const [ch, mcp, bd] = await Promise.all([
       api.fetchChannels(),
-      api.fetchMcp(),
+      api.fetchMcpServers(),
       api.fetchBindings(),
     ]);
     if (ch) setChannels(ch);

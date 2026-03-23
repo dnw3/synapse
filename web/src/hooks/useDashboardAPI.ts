@@ -10,7 +10,8 @@ import type {
   ConfigData,
   ChannelEntry,
   SkillEntry,
-  McpEntry,
+  McpServerInfo,
+  McpTestResult,
   RequestMetricsResponse,
   UsageTimeseriesEntry,
   UsageSessionEntry,
@@ -111,7 +112,40 @@ export function useDashboardAPI() {
   const fetchConfig = useCallback(() => fetchJSON<ConfigData>("/config"), [fetchJSON]);
   const fetchChannels = useCallback(() => fetchJSON<ChannelEntry[]>("/channels"), [fetchJSON]);
   const fetchSkills = useCallback(() => fetchJSON<SkillEntry[]>("/skills"), [fetchJSON]);
-  const fetchMcp = useCallback(() => fetchJSON<McpEntry[]>("/mcp"), [fetchJSON]);
+  // ── MCP Servers ──────────────────────────────────────────────────────────
+
+  const fetchMcpServers = useCallback(
+    () => fetchJSON<McpServerInfo[]>("/mcp"),
+    [fetchJSON]
+  );
+
+  const createMcpServer = useCallback(
+    (server: Omit<McpServerInfo, "status" | "tools" | "lastChecked" | "error">) =>
+      postJSON<McpServerInfo>("/mcp", server),
+    [postJSON]
+  );
+
+  const updateMcpServer = useCallback(
+    (name: string, server: Partial<McpServerInfo>) =>
+      putJSON<McpServerInfo>(`/mcp/${encodeURIComponent(name)}`, server),
+    [putJSON]
+  );
+
+  const deleteMcpServer = useCallback(
+    (name: string) => deleteJSON(`/mcp/${encodeURIComponent(name)}`),
+    [deleteJSON]
+  );
+
+  const testMcpServer = useCallback(
+    (name: string) => postJSON<McpTestResult>(`/mcp/${encodeURIComponent(name)}/test`),
+    [postJSON]
+  );
+
+  const persistMcpServer = useCallback(
+    (name: string) => postJSON<McpServerInfo>(`/mcp/${encodeURIComponent(name)}/persist`),
+    [postJSON]
+  );
+
   const fetchRequests = useCallback(async () => {
     const resp = await fetchJSON<RequestMetricsResponse>("/requests");
     return resp?.endpoints ?? null;
@@ -320,7 +354,9 @@ export function useDashboardAPI() {
     // Core
     fetchStats, fetchUsage, fetchProviders, fetchHealth,
     fetchSessions, fetchSchedules, fetchConfig, fetchChannels,
-    fetchSkills, fetchMcp, fetchRequests, fetchLogs, saveConfig,
+    fetchSkills, fetchRequests, fetchLogs, saveConfig,
+    // MCP Servers
+    fetchMcpServers, createMcpServer, updateMcpServer, deleteMcpServer, testMcpServer, persistMcpServer,
     // Usage
     fetchUsageTimeseries, fetchUsageSessions,
     // Schedules CRUD
@@ -351,7 +387,8 @@ export function useDashboardAPI() {
   }), [
     fetchStats, fetchUsage, fetchProviders, fetchHealth,
     fetchSessions, fetchSchedules, fetchConfig, fetchChannels,
-    fetchSkills, fetchMcp, fetchRequests, fetchLogs, saveConfig,
+    fetchSkills, fetchRequests, fetchLogs, saveConfig,
+    fetchMcpServers, createMcpServer, updateMcpServer, deleteMcpServer, testMcpServer, persistMcpServer,
     fetchUsageTimeseries, fetchUsageSessions,
     createSchedule, updateSchedule, deleteSchedule, triggerSchedule, toggleSchedule, fetchScheduleRuns,
     fetchConfigSchema, patchConfig, validateConfig, reloadConfig,

@@ -7,7 +7,7 @@ import { User, Bot, Copy, Check, Trash2, Volume2, VolumeX } from "lucide-react";
 import type { Message } from "../types";
 import ToolCallCard from "./ToolCallCard";
 import ThinkingBlock from "./ThinkingBlock";
-import { useIdentity } from "../App";
+import { useIdentity } from "../contexts";
 
 interface Props {
   /** Single message (human) */

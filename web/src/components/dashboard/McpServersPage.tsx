@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Cable, Plus, MoreVertical, RefreshCw, Save, Trash2,
-  Loader2, Pencil, Zap, ChevronDown, ChevronRight,
+  Cable, Plus, LayoutGrid, List, X, Loader2,
+  Wrench, RefreshCw, Save, Trash2, Pencil, Zap,
 } from "lucide-react";
 import {
   useMcpServers, useCreateMcpServer, useUpdateMcpServer,
@@ -43,6 +43,8 @@ function transportBadgeStyle(transport: McpServerInfo["transport"]): React.CSSPr
   }
 }
 
+const VIEW_KEY = "synapse:mcp-view";
+
 // ---------------------------------------------------------------------------
 // McpServersPage
 // ---------------------------------------------------------------------------
@@ -63,11 +65,19 @@ export default function McpServersPage() {
   const loading = serversQ.isPending;
 
   // UI state
-  const [expandedServer, setExpandedServer] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
+    try { return (localStorage.getItem(VIEW_KEY) as "grid" | "list") || "grid"; } catch { return "grid"; }
+  });
+  const [selectedServer, setSelectedServer] = useState<McpServerInfo | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editServer, setEditServer] = useState<McpServerInfo | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
-  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+
+  // Persist view mode
+  const changeView = (mode: "grid" | "list") => {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_KEY, mode); } catch { /* noop */ }
+  };
 
   // Action loading helper
   const withActionLoading = async (key: string, fn: () => Promise<void>) => {
@@ -90,9 +100,8 @@ export default function McpServersPage() {
     });
   };
 
-  // Reconnect (update triggers reconnect on backend)
+  // Reconnect
   const handleReconnect = async (server: McpServerInfo) => {
-    setMenuOpen(null);
     await withActionLoading(`reconnect:${server.name}`, async () => {
       try {
         await updateMut.mutateAsync({ name: server.name, server: {} });
@@ -106,7 +115,6 @@ export default function McpServersPage() {
 
   // Persist transient server
   const handlePersist = async (name: string) => {
-    setMenuOpen(null);
     await withActionLoading(`persist:${name}`, async () => {
       persistMut.mutate(name);
     });
@@ -119,10 +127,10 @@ export default function McpServersPage() {
       return;
     }
     resetConfirm();
-    setMenuOpen(null);
     await withActionLoading(`delete:${name}`, async () => {
       deleteMut.mutate(name);
     });
+    if (selectedServer?.name === name) setSelectedServer(null);
   };
 
   // Modal save handler
@@ -135,7 +143,7 @@ export default function McpServersPage() {
     toast({ variant: "success", title: t("dashboard.mcpServers.saved") });
   };
 
-  // Modal test handler — creates/updates first then tests
+  // Modal test handler
   const handleModalTest = async (server: Omit<McpServerInfo, "status" | "tools" | "lastChecked" | "error">): Promise<McpTestResult | null> => {
     try {
       if (editServer) {
@@ -143,8 +151,7 @@ export default function McpServersPage() {
       } else {
         await createMut.mutateAsync(server);
       }
-      const result = await testMut.mutateAsync(server.name);
-      return result;
+      return await testMut.mutateAsync(server.name);
     } catch {
       return null;
     }
@@ -152,7 +159,6 @@ export default function McpServersPage() {
 
   // Open edit modal
   const openEdit = (server: McpServerInfo) => {
-    setMenuOpen(null);
     setEditServer(server);
     setShowModal(true);
   };
@@ -163,18 +169,25 @@ export default function McpServersPage() {
     setShowModal(true);
   };
 
-  // Close menu when clicking outside
-  const menuRef = useRef<HTMLDivElement>(null);
+  // Escape key closes drawer
   useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (showModal) return; // modal handles its own escape
+        if (selectedServer) setSelectedServer(null);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedServer, showModal]);
+
+  // Keep selectedServer in sync with fetched data
+  useEffect(() => {
+    if (selectedServer) {
+      const updated = servers.find((s) => s.name === selectedServer.name);
+      if (updated) setSelectedServer(updated);
+    }
+  }, [servers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Status summary
   const connectedCount = servers.filter((s) => s.status === "connected").length;
@@ -186,7 +199,36 @@ export default function McpServersPage() {
           icon={<Cable className="h-4 w-4" />}
           title={t("dashboard.mcpServers.title")}
           right={
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {/* Grid / List toggle */}
+              <div className="flex items-center gap-0.5 bg-[var(--bg-window)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-0.5">
+                <button
+                  onClick={() => changeView("grid")}
+                  title={t("dashboard.mcpServers.viewGrid", "网格视图")}
+                  className={cn(
+                    "p-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer",
+                    viewMode === "grid"
+                      ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm"
+                      : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                  )}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => changeView("list")}
+                  title={t("dashboard.mcpServers.viewList", "列表视图")}
+                  className={cn(
+                    "p-1.5 rounded-[var(--radius-sm)] transition-colors cursor-pointer",
+                    viewMode === "list"
+                      ? "bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm"
+                      : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                  )}
+                >
+                  <List className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {/* Status summary */}
               {!loading && servers.length > 0 && (
                 <span className="text-xs text-[var(--text-tertiary)]">
                   {t("dashboard.mcpServers.statusSummary", {
@@ -195,6 +237,8 @@ export default function McpServersPage() {
                   })}
                 </span>
               )}
+
+              {/* Add button */}
               <button
                 onClick={openAdd}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[12px] font-medium bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer"
@@ -208,9 +252,9 @@ export default function McpServersPage() {
 
         {/* Loading */}
         {loading && (
-          <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <LoadingSkeleton key={i} className="h-16" />
+              <LoadingSkeleton key={i} className="h-32" />
             ))}
           </div>
         )}
@@ -224,185 +268,53 @@ export default function McpServersPage() {
           />
         )}
 
-        {/* Server list */}
+        {/* Content */}
         {!loading && servers.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {servers.map((server) => {
-              const isExpanded = expandedServer === server.name;
-              const isLoading = (key: string) => !!actionLoading[key];
-
-              return (
-                <div
-                  key={server.name}
-                  className="bg-[var(--bg-elevated)] rounded-[var(--radius-lg)] border border-[var(--separator)] overflow-hidden transition-colors"
-                >
-                  {/* Collapsed row */}
-                  <div className="flex items-center gap-3 px-4 py-3">
-                    {/* Expand toggle */}
-                    <button
-                      onClick={() => setExpandedServer(isExpanded ? null : server.name)}
-                      className="p-0.5 rounded text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors cursor-pointer"
-                    >
-                      {isExpanded
-                        ? <ChevronDown className="h-4 w-4" />
-                        : <ChevronRight className="h-4 w-4" />}
-                    </button>
-
-                    {/* Status */}
-                    <StatusDot status={mcpHealthToStatus(server.status)} />
-
-                    {/* Name */}
-                    <button
-                      onClick={() => setExpandedServer(isExpanded ? null : server.name)}
-                      className="text-sm font-medium text-[var(--text-primary)] truncate cursor-pointer bg-transparent border-none p-0 text-left"
-                    >
-                      {server.name}
-                    </button>
-
-                    {/* Transport badge */}
-                    <span
-                      className="text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0"
-                      style={transportBadgeStyle(server.transport)}
-                    >
-                      {server.transport}
-                    </span>
-
-                    {/* Transient badge */}
-                    {server.transient && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-tertiary)] flex-shrink-0">
-                        {t("dashboard.mcpServers.transient")}
-                      </span>
-                    )}
-
-                    {/* Tool count */}
-                    <span className="text-xs text-[var(--text-tertiary)] flex-shrink-0 ml-auto mr-2">
-                      {server.tools.length} {t("dashboard.mcpServers.tools")}
-                    </span>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {/* Test */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleTest(server.name); }}
-                        disabled={isLoading(`test:${server.name}`)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-[var(--radius-sm)] text-[11px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer disabled:opacity-50"
-                        title={t("dashboard.mcpServers.test")}
-                      >
-                        {isLoading(`test:${server.name}`)
-                          ? <Loader2 className="h-3 w-3 animate-spin" />
-                          : <Zap className="h-3 w-3" />}
-                        {t("dashboard.mcpServers.test")}
-                      </button>
-
-                      {/* Edit */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openEdit(server); }}
-                        className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-                        title={t("dashboard.mcpServers.edit")}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-
-                      {/* More menu */}
-                      <div className="relative" ref={menuOpen === server.name ? menuRef : undefined}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setMenuOpen(menuOpen === server.name ? null : server.name);
-                          }}
-                          className="p-1.5 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-                        >
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </button>
-
-                        {menuOpen === server.name && (
-                          <div className="absolute right-0 top-full mt-1 w-40 bg-[var(--bg-elevated)] border border-[var(--separator)] rounded-[var(--radius-md)] shadow-[var(--shadow-lg)] py-1 z-30 animate-fade-in">
-                            {/* Reconnect */}
-                            <button
-                              onClick={() => handleReconnect(server)}
-                              disabled={isLoading(`reconnect:${server.name}`)}
-                              className="flex items-center gap-2 w-full px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                              {isLoading(`reconnect:${server.name}`)
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <RefreshCw className="h-3.5 w-3.5" />}
-                              {t("dashboard.mcpServers.reconnect")}
-                            </button>
-
-                            {/* Persist (transient only) */}
-                            {server.transient && (
-                              <button
-                                onClick={() => handlePersist(server.name)}
-                                disabled={isLoading(`persist:${server.name}`)}
-                                className="flex items-center gap-2 w-full px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer disabled:opacity-50"
-                              >
-                                {isLoading(`persist:${server.name}`)
-                                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  : <Save className="h-3.5 w-3.5" />}
-                                {t("dashboard.mcpServers.persist")}
-                              </button>
-                            )}
-
-                            {/* Delete */}
-                            <button
-                              onClick={() => handleDelete(server.name)}
-                              disabled={isLoading(`delete:${server.name}`)}
-                              className={cn(
-                                "flex items-center gap-2 w-full px-3 py-1.5 text-[12px] transition-colors cursor-pointer disabled:opacity-50",
-                                confirming === `delete:${server.name}`
-                                  ? "text-[var(--error)] bg-[var(--error)]/10"
-                                  : "text-[var(--error)] hover:bg-[var(--bg-hover)]"
-                              )}
-                            >
-                              {isLoading(`delete:${server.name}`)
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <Trash2 className="h-3.5 w-3.5" />}
-                              {confirming === `delete:${server.name}`
-                                ? t("dashboard.mcpServers.deleteConfirm")
-                                : t("dashboard.mcpServers.delete")}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Error message */}
-                  {server.error && (
-                    <div className="px-4 pb-2 -mt-1">
-                      <span className="text-[11px] text-[var(--error)]">{server.error}</span>
-                    </div>
-                  )}
-
-                  {/* Expanded: tools table */}
-                  {isExpanded && (
-                    <div className="px-4 pb-3 pt-1 border-t border-[var(--separator)]">
-                      {server.tools.length === 0 ? (
-                        <span className="text-xs text-[var(--text-tertiary)] italic">
-                          {t("dashboard.mcpServers.noTools")}
-                        </span>
-                      ) : (
-                        <div className="flex flex-col gap-1">
-                          {server.tools.map((tool) => (
-                            <div
-                              key={tool.name}
-                              className="flex items-start gap-4 py-1.5 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] transition-colors"
-                            >
-                              <span className="text-[12px] font-mono text-[var(--text-primary)] flex-shrink-0 min-w-[180px]">
-                                {tool.name}
-                              </span>
-                              <span className="text-[12px] text-[var(--text-secondary)] leading-relaxed">
-                                {tool.description}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+          <div className="flex gap-4">
+            {/* Main area */}
+            <div className={cn("flex-1 min-w-0", selectedServer && "max-w-[calc(100%-396px)]")}>
+              {viewMode === "grid" ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {servers.map((s) => (
+                    <McpCard
+                      key={s.name}
+                      server={s}
+                      selected={selectedServer?.name === s.name}
+                      onClick={() => setSelectedServer(s)}
+                      t={t}
+                    />
+                  ))}
                 </div>
-              );
-            })}
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {servers.map((s) => (
+                    <McpRow
+                      key={s.name}
+                      server={s}
+                      selected={selectedServer?.name === s.name}
+                      onClick={() => setSelectedServer(s)}
+                      t={t}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Drawer */}
+            {selectedServer && (
+              <McpDrawer
+                server={selectedServer}
+                onClose={() => setSelectedServer(null)}
+                onTest={handleTest}
+                onEdit={openEdit}
+                onReconnect={handleReconnect}
+                onPersist={handlePersist}
+                onDelete={handleDelete}
+                actionLoading={actionLoading}
+                confirming={confirming}
+                t={t}
+              />
+            )}
           </div>
         )}
       </SectionCard>
@@ -415,7 +327,295 @@ export default function McpServersPage() {
         onTest={handleModalTest}
         editServer={editServer}
       />
+    </div>
+  );
+}
 
+// ---------------------------------------------------------------------------
+// McpCard (grid mode)
+// ---------------------------------------------------------------------------
+
+function McpCard({ server, selected, onClick, t }: {
+  server: McpServerInfo;
+  selected: boolean;
+  onClick: () => void;
+  t: (key: string, opts?: Record<string, string>) => string;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={cn(
+        "bg-[var(--bg-elevated)] rounded-[var(--radius-lg)] p-4 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors border",
+        selected ? "border-[var(--accent)]" : "border-[var(--separator)]"
+      )}
+    >
+      <div className="flex justify-between items-start mb-2">
+        <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">{server.name}</h3>
+        <StatusDot status={mcpHealthToStatus(server.status)} />
+      </div>
+      <div className="flex items-center gap-2 mb-3">
+        <span
+          className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+          style={transportBadgeStyle(server.transport)}
+        >
+          {server.transport}
+        </span>
+        {server.transient && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-tertiary)]">
+            {t("dashboard.mcpServers.transient")}
+          </span>
+        )}
+      </div>
+      {server.command && (
+        <p className="text-xs text-[var(--text-secondary)] mb-1 truncate font-mono">{server.command}</p>
+      )}
+      {server.url && (
+        <p className="text-xs text-[var(--text-secondary)] mb-1 truncate font-mono">{server.url}</p>
+      )}
+      <div className="flex items-center gap-2 mt-2">
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)]">
+          {server.tools.length} {t("dashboard.mcpServers.tools")}
+        </span>
+      </div>
+      {server.error && (
+        <p className="text-[11px] text-[var(--error)] mt-2 truncate">{server.error}</p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// McpRow (list mode)
+// ---------------------------------------------------------------------------
+
+function McpRow({ server, selected, onClick, t }: {
+  server: McpServerInfo;
+  selected: boolean;
+  onClick: () => void;
+  t: (key: string, opts?: Record<string, string>) => string;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-4 px-4 py-3 rounded-[var(--radius-md)] cursor-pointer hover:bg-[var(--bg-hover)] transition-colors border",
+        selected ? "border-[var(--accent)] bg-[var(--bg-elevated)]" : "border-transparent bg-[var(--bg-elevated)]"
+      )}
+    >
+      <StatusDot status={mcpHealthToStatus(server.status)} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm font-medium text-[var(--text-primary)] truncate">{server.name}</span>
+        </div>
+        <p className="text-xs text-[var(--text-secondary)] truncate font-mono">
+          {server.command || server.url || server.transport}
+        </p>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span
+          className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+          style={transportBadgeStyle(server.transport)}
+        >
+          {server.transport}
+        </span>
+        {server.transient && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-tertiary)]">
+            {t("dashboard.mcpServers.transient")}
+          </span>
+        )}
+        <span className="text-[10px] text-[var(--text-tertiary)]">
+          {server.tools.length} {t("dashboard.mcpServers.tools")}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// McpDrawer
+// ---------------------------------------------------------------------------
+
+function McpDrawer({ server, onClose, onTest, onEdit, onReconnect, onPersist, onDelete, actionLoading, confirming, t }: {
+  server: McpServerInfo;
+  onClose: () => void;
+  onTest: (name: string) => void;
+  onEdit: (server: McpServerInfo) => void;
+  onReconnect: (server: McpServerInfo) => void;
+  onPersist: (name: string) => void;
+  onDelete: (name: string) => void;
+  actionLoading: Record<string, boolean>;
+  confirming: string | null;
+  t: (key: string, opts?: Record<string, string>) => string;
+}) {
+  return (
+    <div className="w-[380px] flex-shrink-0 bg-[var(--bg-elevated)] border border-[var(--separator)] rounded-[var(--radius-lg)] p-5 overflow-y-auto max-h-[calc(100vh-220px)] animate-fade-in">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="text-base font-semibold text-[var(--text-primary)]" style={{ fontFamily: "var(--font-heading)" }}>
+            {server.name}
+          </h3>
+          <div className="flex items-center gap-2 mt-1">
+            <StatusDot status={mcpHealthToStatus(server.status)} />
+            <span className="text-xs text-[var(--text-secondary)]">{server.status}</span>
+            <span className="text-[var(--separator)]">&middot;</span>
+            <span
+              className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+              style={transportBadgeStyle(server.transport)}
+            >
+              {server.transport}
+            </span>
+            {server.transient && (
+              <>
+                <span className="text-[var(--separator)]">&middot;</span>
+                <span className="text-[10px] text-[var(--text-tertiary)]">{t("dashboard.mcpServers.transient")}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1 rounded-[var(--radius-sm)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Connection info */}
+      <div className="mb-4">
+        {server.command && (
+          <div className="mb-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] block mb-1">Command</span>
+            <p className="text-xs text-[var(--text-secondary)] font-mono bg-[var(--bg-window)] px-2 py-1.5 rounded-[var(--radius-sm)] break-all">
+              {server.command} {server.args?.join(" ")}
+            </p>
+          </div>
+        )}
+        {server.url && (
+          <div className="mb-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)] block mb-1">URL</span>
+            <p className="text-xs text-[var(--text-secondary)] font-mono bg-[var(--bg-window)] px-2 py-1.5 rounded-[var(--radius-sm)] break-all">
+              {server.url}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Error */}
+      {server.error && (
+        <div className="mb-4 px-3 py-2 rounded-[var(--radius-sm)] bg-[var(--error)]/10 border border-[var(--error)]/20">
+          <span className="text-[11px] text-[var(--error)]">{server.error}</span>
+        </div>
+      )}
+
+      {/* Actions bar */}
+      <div className="flex items-center gap-2 mb-4 py-3 border-y border-[var(--separator)]">
+        <button
+          onClick={() => onTest(server.name)}
+          disabled={!!actionLoading[`test:${server.name}`]}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer disabled:opacity-50 border border-[var(--border-subtle)]"
+        >
+          {actionLoading[`test:${server.name}`]
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <Zap className="h-3.5 w-3.5" />}
+          {t("dashboard.mcpServers.test")}
+        </button>
+        <button
+          onClick={() => onEdit(server)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer border border-[var(--border-subtle)]"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          {t("dashboard.mcpServers.edit")}
+        </button>
+        <button
+          onClick={() => onReconnect(server)}
+          disabled={!!actionLoading[`reconnect:${server.name}`]}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer disabled:opacity-50 border border-[var(--border-subtle)]"
+        >
+          {actionLoading[`reconnect:${server.name}`]
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <RefreshCw className="h-3.5 w-3.5" />}
+          {t("dashboard.mcpServers.reconnect")}
+        </button>
+      </div>
+
+      {/* Tools */}
+      <DrawerSection icon={<Wrench className="h-3.5 w-3.5" />} title={`${t("dashboard.mcpServers.tools")} (${server.tools.length})`}>
+        {server.tools.length === 0 ? (
+          <span className="text-xs text-[var(--text-tertiary)] italic">
+            {t("dashboard.mcpServers.noTools")}
+          </span>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {server.tools.map((tool) => (
+              <div
+                key={tool.name}
+                className="py-1.5 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <span className="text-[11px] font-mono text-[var(--text-primary)] block">
+                  {tool.name}
+                </span>
+                <span className="text-[11px] text-[var(--text-tertiary)] leading-relaxed line-clamp-2">
+                  {tool.description}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </DrawerSection>
+
+      {/* Persist / Delete */}
+      <div className="mt-4 pt-4 border-t border-[var(--separator)] flex items-center gap-2">
+        {server.transient && (
+          <button
+            onClick={() => onPersist(server.name)}
+            disabled={!!actionLoading[`persist:${server.name}`]}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[12px] font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer disabled:opacity-50 border border-[var(--border-subtle)]"
+          >
+            {actionLoading[`persist:${server.name}`]
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <Save className="h-3.5 w-3.5" />}
+            {t("dashboard.mcpServers.persist")}
+          </button>
+        )}
+        <button
+          onClick={() => onDelete(server.name)}
+          disabled={!!actionLoading[`delete:${server.name}`]}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-1.5 rounded-[var(--radius-md)] text-[12px] font-medium transition-colors cursor-pointer disabled:opacity-50",
+            confirming === `delete:${server.name}`
+              ? "bg-[var(--error)] text-white"
+              : "text-[var(--error)] hover:bg-[var(--error)]/10"
+          )}
+        >
+          {actionLoading[`delete:${server.name}`]
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <Trash2 className="h-3.5 w-3.5" />}
+          {confirming === `delete:${server.name}`
+            ? t("dashboard.mcpServers.deleteConfirm")
+            : t("dashboard.mcpServers.delete")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DrawerSection
+// ---------------------------------------------------------------------------
+
+function DrawerSection({ icon, title, children }: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-[var(--text-tertiary)]">{icon}</span>
+        <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">{title}</span>
+      </div>
+      {children}
     </div>
   );
 }

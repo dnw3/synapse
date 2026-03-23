@@ -141,6 +141,7 @@ pub struct AppState {
     pub agent_session: Arc<AgentSession>,
 
     /// Transient MCP servers (runtime-only, not persisted to TOML).
+    #[allow(clippy::type_complexity)]
     pub transient_mcp:
         Arc<RwLock<HashMap<String, (synaptic::config::McpServerConfig, Vec<Arc<dyn Tool>>)>>>,
 }

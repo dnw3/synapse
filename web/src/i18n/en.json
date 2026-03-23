@@ -859,5 +859,24 @@
     "card": "Card",
     "unknown": "Canvas Block",
     "fallback": "Unsupported canvas type"
+  },
+  "sandbox": {
+    "title": "Sandbox",
+    "mode": "Mode",
+    "active_instances": "Active Instances",
+    "providers": "Providers",
+    "status": {
+      "running": "Running",
+      "stopped": "Stopped",
+      "not_found": "Not Found"
+    },
+    "recreate_all": "Recreate All",
+    "prune_idle": "Prune Idle",
+    "config_explain": "Config Explain",
+    "config_mismatch": "Config mismatch — consider recreating",
+    "confirm_recreate": "This will destroy and recreate {{count}} sandbox(es). Continue?",
+    "no_instances": "No sandbox instances found",
+    "destroy": "Destroy",
+    "recreate": "Recreate"
   }
 }

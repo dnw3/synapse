@@ -276,6 +276,7 @@ export type TabKey =
   | "instances"
   | "nodes"
   | "plugins"
+  | "sandbox"
   | "communications"
   | "automation"
   | "infrastructure"

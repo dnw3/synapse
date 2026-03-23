@@ -860,5 +860,24 @@
     "card": "卡片",
     "unknown": "画布块",
     "fallback": "不支持的画布类型"
+  },
+  "sandbox": {
+    "title": "沙箱",
+    "mode": "模式",
+    "active_instances": "活跃实例",
+    "providers": "提供者",
+    "status": {
+      "running": "运行中",
+      "stopped": "已停止",
+      "not_found": "未找到"
+    },
+    "recreate_all": "全部重建",
+    "prune_idle": "清理空闲",
+    "config_explain": "配置说明",
+    "config_mismatch": "配置不匹配 — 建议重建",
+    "confirm_recreate": "这将销毁并重建 {{count}} 个沙箱。继续？",
+    "no_instances": "未找到沙箱实例",
+    "destroy": "销毁",
+    "recreate": "重建"
   }
 }

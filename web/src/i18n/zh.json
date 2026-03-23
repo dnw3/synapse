@@ -871,7 +871,7 @@
   },
   "agentFiles": {
     "title": "Agent 文件",
-    "noAgent": "选择一个 Agent 查看文件",
+    "noAgent": "选择一个文件查看",
     "save": "保存",
     "saved": "已保存",
     "loading": "加载中..."

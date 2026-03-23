@@ -26,7 +26,7 @@ export default function AgentFilesTab({ agentName }: AgentFilesTabProps) {
   const loadWorkspaceFiles = useCallback(async () => {
     try {
       const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
-      const data = await fetchJSON<{ filename: string; size_bytes?: number }[]>(`/workspace/files${qs}`);
+      const data = await fetchJSON<{ filename: string; size_bytes?: number }[]>(`/workspace${qs}`);
       if (data) setWorkspaceFiles(data.map((f) => ({ name: f.filename, size: f.size_bytes ?? 0 })));
     } catch { /* ignore */ }
   }, [agentParam]);
@@ -44,7 +44,7 @@ export default function AgentFilesTab({ agentName }: AgentFilesTabProps) {
     setFileLoading(true);
     try {
       const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
-      const data = await fetchJSON<{ content: string }>(`/workspace/files/${encodeURIComponent(filename)}${qs}`);
+      const data = await fetchJSON<{ content: string }>(`/workspace/${encodeURIComponent(filename)}${qs}`);
       setFileContent(data?.content ?? "");
     } catch {
       setFileContent("");
@@ -58,7 +58,7 @@ export default function AgentFilesTab({ agentName }: AgentFilesTabProps) {
     setFileSaving(true);
     try {
       const qs = agentParam ? `?agent=${encodeURIComponent(agentParam)}` : "";
-      await putJSON(`/workspace/files/${encodeURIComponent(selectedFile)}${qs}`, { content: fileContent });
+      await putJSON(`/workspace/${encodeURIComponent(selectedFile)}${qs}`, { content: fileContent });
       setFileSaved(true);
       setTimeout(() => setFileSaved(false), 2000);
     } catch { /* ignore */ }
@@ -88,7 +88,7 @@ export default function AgentFilesTab({ agentName }: AgentFilesTabProps) {
         ))}
         {workspaceFiles.length === 0 && (
           <span className="text-[11px] text-[var(--text-tertiary)]">
-            {t("agents.noChannels")}
+            {t("agentFiles.noFiles", "暂无工作区文件")}
           </span>
         )}
       </div>

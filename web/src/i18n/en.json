@@ -870,7 +870,7 @@
   },
   "agentFiles": {
     "title": "Agent Files",
-    "noAgent": "Select an agent to view files",
+    "noAgent": "Select a file to view",
     "save": "Save",
     "saved": "Saved",
     "loading": "Loading..."

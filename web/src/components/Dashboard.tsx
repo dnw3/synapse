@@ -17,6 +17,7 @@ import {
   Brain,
   Puzzle,
   Box,
+  Cable,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -39,6 +40,7 @@ import DebugPage from "./dashboard/DebugPage";
 import InstancesPage from "./dashboard/InstancesPage";
 import NodesPage from "./dashboard/NodesPage";
 import PluginsPage from "./dashboard/PluginsPage";
+import McpServersPage from "./dashboard/McpServersPage";
 import SandboxPanel from "./dashboard/SandboxPanel";
 
 // Tabs that need full-height flex layout (editors, log viewers, scrollable tables)
@@ -63,6 +65,7 @@ export const TABS: (TabDef & { i18nKey: string })[] = [
   { key: "schedules", labelZh: "定时任务", labelEn: "Schedules", i18nKey: "dashboard.schedules", icon: <CalendarClock className="h-4 w-4" /> },
   { key: "nodes", labelZh: "节点", labelEn: "Nodes", i18nKey: "dashboard.nodes", icon: <Network className="h-4 w-4" /> },
   { key: "plugins", labelZh: "插件", labelEn: "Plugins", i18nKey: "dashboard.plugins.title", icon: <Puzzle className="h-4 w-4" /> },
+  { key: "mcp-servers", labelZh: "MCP 服务器", labelEn: "MCP Servers", i18nKey: "dashboard.mcpServers.title", icon: <Cable className="h-4 w-4" /> },
   { key: "sandbox", labelZh: "沙箱", labelEn: "Sandbox", i18nKey: "sandbox.title", icon: <Box className="h-4 w-4" /> },
   // Agent
   { key: "agents", labelZh: "代理", labelEn: "Agents", i18nKey: "dashboard.agents", icon: <Bot className="h-4 w-4" /> },
@@ -78,7 +81,7 @@ export const TABS: (TabDef & { i18nKey: string })[] = [
 ];
 
 export const SIDEBAR_SECTIONS: (SidebarSection & { i18nKey: string })[] = [
-  { labelZh: "控制", labelEn: "Control", i18nKey: "dashboard.control", keys: ["overview", "channels", "instances", "sessions", "usage", "schedules", "nodes", "plugins", "sandbox"] },
+  { labelZh: "控制", labelEn: "Control", i18nKey: "dashboard.control", keys: ["overview", "channels", "instances", "sessions", "usage", "schedules", "nodes", "plugins", "mcp-servers", "sandbox"] },
   { labelZh: "代理", labelEn: "Agent", i18nKey: "dashboard.agent", keys: ["agents", "skills"] },
   { labelZh: "设置", labelEn: "Settings", i18nKey: "dashboard.settings", keys: ["config", "communications", "automation", "infrastructure", "ai-agents", "logs", "debug"] },
 ];
@@ -163,6 +166,7 @@ export default function Dashboard({ connected: wsConnected, sessionCount, messag
         {activeTab === "instances" && <InstancesPage />}
         {activeTab === "nodes" && <NodesPage />}
         {activeTab === "plugins" && <PluginsPage />}
+        {activeTab === "mcp-servers" && <McpServersPage />}
         {activeTab === "sandbox" && <SandboxPanel />}
         {activeTab === "communications" && <ConfigPage filterSection="communications" />}
         {activeTab === "automation" && <ConfigPage filterSection="automation" />}

@@ -2,7 +2,7 @@ import { useRef, Fragment } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Trash2, Pencil, PackageMinus, ExternalLink } from "lucide-react";
 import { cn } from "../../../lib/cn";
-import type { SessionEntry } from "../../../types/dashboard";
+import type { NormalizedSession } from "./sessionsHelpers";
 import { formatTokens, formatCost, formatDate } from "../../../lib/format";
 import {
   type SortField,
@@ -96,7 +96,7 @@ function InlineSelect({
 }
 
 interface SessionsTableProps {
-  sessions: SessionEntry[];
+  sessions: NormalizedSession[];
   sortField: SortField;
   sortOrder: SortOrder;
   onSort: (f: SortField) => void;
@@ -111,7 +111,7 @@ interface SessionsTableProps {
   editingLabelId: string | null;
   editLabelValue: string;
   setEditLabelValue: (v: string) => void;
-  onStartLabelEdit: (session: SessionEntry) => void;
+  onStartLabelEdit: (session: NormalizedSession) => void;
   onLabelSave: (id: string) => void;
   onCancelLabelEdit: () => void;
   confirming: string | null;

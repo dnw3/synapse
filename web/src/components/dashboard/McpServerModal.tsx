@@ -19,7 +19,7 @@ interface KVRow {
   value: string;
 }
 
-function recordToRows(rec?: Record<string, string>): KVRow[] {
+function recordToRows(rec?: Record<string, string> | null): KVRow[] {
   if (!rec) return [];
   return Object.entries(rec).map(([key, value]) => ({ key, value }));
 }

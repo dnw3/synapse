@@ -1,11 +1,11 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { fetchJSON, postJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
-import type {
-  DebugInvokeRequest,
-  DebugInvokeResponse,
-  DebugHealthResponse,
-} from "../../types/dashboard";
+import {
+  DebugInvokeResponseSchema,
+  DebugHealthResponseSchema,
+} from "../../schemas/dashboard";
+import type { DebugInvokeRequest } from "../../types/dashboard";
 
 export const debugKeys = {
   all: ["debug"] as const,
@@ -16,7 +16,7 @@ export function useDebugInvoke() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (req: DebugInvokeRequest) =>
-      postJSON<DebugInvokeResponse>("/debug/invoke", req),
+      postJSON("/debug/invoke", req, DebugInvokeResponseSchema),
     onError: (err: Error) => {
       toast({ variant: "error", title: "Debug invoke failed", description: err.message });
     },
@@ -26,6 +26,6 @@ export function useDebugInvoke() {
 export function useDebugHealth() {
   return useQuery({
     queryKey: debugKeys.health(),
-    queryFn: () => fetchJSON<DebugHealthResponse>("/debug/health"),
+    queryFn: () => fetchJSON("/debug/health", DebugHealthResponseSchema),
   });
 }

@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON, postJSON, putJSON, deleteJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
-import type { McpServerInfo, McpTestResult } from "../../types/dashboard";
+import { McpServerInfoSchema, McpTestResultSchema } from "../../schemas/dashboard";
+import type { McpServerInfo } from "../../types/dashboard";
 
 export const mcpKeys = {
   all: ["mcp"] as const,
@@ -11,7 +13,7 @@ export const mcpKeys = {
 export function useMcpServers() {
   return useQuery({
     queryKey: mcpKeys.list(),
-    queryFn: () => fetchJSON<McpServerInfo[]>("/mcp"),
+    queryFn: () => fetchJSON("/mcp", z.array(McpServerInfoSchema)),
   });
 }
 
@@ -21,7 +23,7 @@ export function useCreateMcpServer() {
   return useMutation({
     mutationFn: (
       server: Omit<McpServerInfo, "status" | "tools" | "lastChecked" | "error">
-    ) => postJSON<McpServerInfo>("/mcp", server),
+    ) => postJSON("/mcp", server, McpServerInfoSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: mcpKeys.all });
       toast({ variant: "success", title: "MCP server created" });
@@ -37,7 +39,7 @@ export function useUpdateMcpServer() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: ({ name, server }: { name: string; server: Partial<McpServerInfo> }) =>
-      putJSON<McpServerInfo>(`/mcp/${encodeURIComponent(name)}`, server),
+      putJSON(`/mcp/${encodeURIComponent(name)}`, server, McpServerInfoSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: mcpKeys.all });
       toast({ variant: "success", title: "MCP server updated" });
@@ -67,12 +69,12 @@ export function useTestMcpServer() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (name: string) =>
-      postJSON<McpTestResult>(`/mcp/${encodeURIComponent(name)}/test`),
+      postJSON(`/mcp/${encodeURIComponent(name)}/test`, undefined, McpTestResultSchema),
     onSuccess: (data) => {
       if (data?.success) {
         toast({ variant: "success", title: "MCP server test passed" });
       } else {
-        toast({ variant: "error", title: "MCP server test failed", description: data?.error });
+        toast({ variant: "error", title: "MCP server test failed", description: data?.error ?? undefined });
       }
     },
     onError: (err: Error) => {
@@ -86,7 +88,7 @@ export function usePersistMcpServer() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (name: string) =>
-      postJSON<McpServerInfo>(`/mcp/${encodeURIComponent(name)}/persist`),
+      postJSON(`/mcp/${encodeURIComponent(name)}/persist`, undefined, McpServerInfoSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: mcpKeys.all });
       toast({ variant: "success", title: "MCP server persisted" });

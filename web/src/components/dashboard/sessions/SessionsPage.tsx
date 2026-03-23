@@ -8,7 +8,7 @@ import {
   usePatchSessionOverrides, useCompactSession,
 } from "../../../hooks/queries/useSessionsQueries";
 import { useSessionCtx } from "../../../contexts";
-import type { SessionEntry } from "../../../types/dashboard";
+import type { NormalizedSession } from "./sessionsHelpers";
 import {
   SectionCard,
   SectionHeader,
@@ -74,10 +74,10 @@ export default function SessionsPage() {
   const rawData = sessionsQ.data;
   const sessions = useMemo(() => {
     if (!rawData) return [];
-    const rawArr = rawData.sessions ?? [];
+    const rawArr = Array.isArray(rawData) ? rawData : [];
     return rawArr.map((r) => normalizeSession(r as unknown as Record<string, unknown>));
   }, [rawData]);
-  const total = rawData?.total ?? sessions.length;
+  const total = sessions.length;
   const loading = sessionsQ.isPending;
 
   // Helper for navigation to chat
@@ -134,7 +134,7 @@ export default function SessionsPage() {
     setEditValue(id);
   };
 
-  const startLabelEdit = (session: SessionEntry) => {
+  const startLabelEdit = (session: NormalizedSession) => {
     setEditingLabelId(session.id);
     setEditLabelValue(session.label ?? "");
   };

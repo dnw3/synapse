@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON, postJSON, deleteJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
-import type { PluginInfo } from "../../types/dashboard";
+import { PluginInfoSchema } from "../../schemas/dashboard";
 
 export const pluginsKeys = {
   all: ["plugins"] as const,
@@ -11,7 +12,7 @@ export const pluginsKeys = {
 export function usePlugins() {
   return useQuery({
     queryKey: pluginsKeys.list(),
-    queryFn: () => fetchJSON<{ plugins: PluginInfo[] }>("/plugins"),
+    queryFn: () => fetchJSON("/plugins", z.object({ plugins: z.array(PluginInfoSchema) })),
   });
 }
 
@@ -20,9 +21,10 @@ export function useTogglePlugin() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
-      postJSON<{ ok: boolean; name: string; enabled: boolean; message?: string }>(
+      postJSON(
         "/plugins/toggle",
-        { name, enabled }
+        { name, enabled },
+        z.object({ ok: z.boolean(), name: z.string(), enabled: z.boolean(), message: z.string().optional() })
       ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: pluginsKeys.all });
@@ -47,11 +49,11 @@ export function useControlService() {
       service: string;
       action: "start" | "stop";
     }) =>
-      postJSON<{ ok: boolean; service: string; status: string }>("/plugins/service-control", {
-        plugin,
-        service,
-        action,
-      }),
+      postJSON(
+        "/plugins/service-control",
+        { plugin, service, action },
+        z.object({ ok: z.boolean(), service: z.string(), status: z.string() })
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: pluginsKeys.all });
       toast({ variant: "success", title: "Service control applied" });
@@ -67,9 +69,11 @@ export function useInstallPlugin() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (path: string) =>
-      postJSON<{ ok: boolean; name?: string; message?: string }>("/plugins/install", {
-        name: path,
-      }),
+      postJSON(
+        "/plugins/install",
+        { name: path },
+        z.object({ ok: z.boolean(), name: z.string().optional(), message: z.string().optional() })
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: pluginsKeys.all });
       toast({ variant: "success", title: "Plugin installed" });

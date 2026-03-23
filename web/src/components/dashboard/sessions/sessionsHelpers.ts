@@ -26,8 +26,11 @@ export function extractAgentId(sessionKey: string): string {
   return match?.[1] ?? "default";
 }
 
+/** Normalized session with `id` always present (populated from `key`). */
+export type NormalizedSession = SessionEntry & { id: string };
+
 /** Normalize a raw API session object: ensure `id` mirrors `key`. */
-export function normalizeSession(raw: Record<string, unknown>): SessionEntry {
+export function normalizeSession(raw: Record<string, unknown>): NormalizedSession {
   const key = (raw.key as string) ?? (raw.id as string) ?? "";
   return {
     ...(raw as unknown as SessionEntry),

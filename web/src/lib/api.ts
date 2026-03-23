@@ -1,3 +1,5 @@
+import type { ZodType } from "zod";
+
 const BASE = "/api/dashboard";
 
 export class ApiError extends Error {
@@ -10,16 +12,25 @@ export class ApiError extends Error {
   }
 }
 
-export async function fetchJSON<T>(path: string): Promise<T> {
+function parseWithSchema<T>(data: unknown, schema?: ZodType<T>): T {
+  if (schema) return schema.parse(data);
+  return data as T;
+}
+
+export async function fetchJSON<T>(path: string, schema?: ZodType<T>): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new ApiError(res.status, res.statusText);
-  return res.json();
+  const data: unknown = await res.json().catch(() => {
+    throw new ApiError(res.status, "Invalid JSON response");
+  });
+  return parseWithSchema(data, schema);
 }
 
 export async function mutateJSON<T>(
   method: string,
   path: string,
   body?: unknown,
+  schema?: ZodType<T>,
 ): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
@@ -37,15 +48,16 @@ export async function mutateJSON<T>(
   if (!contentType.includes("application/json")) {
     return undefined as unknown as T;
   }
-  return res.json();
+  const data: unknown = await res.json();
+  return parseWithSchema(data, schema);
 }
 
-export const postJSON = <T,>(path: string, body?: unknown) =>
-  mutateJSON<T>("POST", path, body);
-export const putJSON = <T,>(path: string, body: unknown) =>
-  mutateJSON<T>("PUT", path, body);
-export const patchJSON = <T,>(path: string, body: unknown) =>
-  mutateJSON<T>("PATCH", path, body);
+export const postJSON = <T,>(path: string, body?: unknown, schema?: ZodType<T>) =>
+  mutateJSON<T>("POST", path, body, schema);
+export const putJSON = <T,>(path: string, body: unknown, schema?: ZodType<T>) =>
+  mutateJSON<T>("PUT", path, body, schema);
+export const patchJSON = <T,>(path: string, body: unknown, schema?: ZodType<T>) =>
+  mutateJSON<T>("PATCH", path, body, schema);
 export const deleteJSON = (path: string) =>
   mutateJSON<void>("DELETE", path);
 

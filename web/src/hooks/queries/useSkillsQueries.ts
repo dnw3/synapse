@@ -1,13 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON, postJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
-import type {
-  SkillEntry,
-  StoreSearchResult,
-  StoreSkillItem,
-  StoreSkillDetail,
-  StoreStatus,
-} from "../../types/dashboard";
+import {
+  SkillEntrySchema,
+  StoreSearchResultSchema,
+  StoreSkillItemSchema,
+  StoreSkillDetailSchema,
+  StoreStatusSchema,
+  OkResponseSchema,
+} from "../../schemas/dashboard";
 
 export const skillsKeys = {
   all: ["skills"] as const,
@@ -31,7 +33,7 @@ export const storeKeys = {
 export function useSkills() {
   return useQuery({
     queryKey: skillsKeys.list(),
-    queryFn: () => fetchJSON<SkillEntry[]>("/skills"),
+    queryFn: () => fetchJSON("/skills", z.array(SkillEntrySchema)),
   });
 }
 
@@ -40,7 +42,7 @@ export function useToggleSkill() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (name: string) =>
-      postJSON<{ enabled: boolean }>(`/skills/${encodeURIComponent(name)}/toggle`),
+      postJSON(`/skills/${encodeURIComponent(name)}/toggle`, undefined, z.object({ enabled: z.boolean() })),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: skillsKeys.all });
       toast({ variant: "success", title: "Skill toggled" });
@@ -55,8 +57,9 @@ export function useSkillFiles(path: string) {
   return useQuery({
     queryKey: skillsKeys.files(path),
     queryFn: () =>
-      fetchJSON<{ files: { name: string; size: number }[] }>(
-        `/skills/files?path=${encodeURIComponent(path)}`
+      fetchJSON(
+        `/skills/files?path=${encodeURIComponent(path)}`,
+        z.object({ files: z.array(z.object({ name: z.string(), size: z.number() })) })
       ),
     enabled: !!path,
   });
@@ -66,8 +69,9 @@ export function useSkillFileContent(path: string) {
   return useQuery({
     queryKey: skillsKeys.content(path),
     queryFn: () =>
-      fetchJSON<{ content: string }>(
-        `/skills/content?path=${encodeURIComponent(path)}`
+      fetchJSON(
+        `/skills/content?path=${encodeURIComponent(path)}`,
+        z.object({ content: z.string() })
       ),
     enabled: !!path,
   });
@@ -77,8 +81,9 @@ export function useStoreSearch(q: string, limit = 20) {
   return useQuery({
     queryKey: storeKeys.search(q, limit),
     queryFn: () =>
-      fetchJSON<{ results: StoreSearchResult[]; source: string }>(
-        `/store/search?q=${encodeURIComponent(q)}&limit=${limit}`
+      fetchJSON(
+        `/store/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+        z.object({ results: z.array(StoreSearchResultSchema), source: z.string() })
       ),
     enabled: !!q,
   });
@@ -91,7 +96,7 @@ export function useStoreList(limit = 20, sort?: string, offset?: number) {
       let path = `/store/skills?limit=${limit}`;
       if (sort) path += `&sort=${sort}`;
       if (offset) path += `&cursor=${offset}`;
-      return fetchJSON<{ items: StoreSkillItem[]; source: string }>(path);
+      return fetchJSON(path, z.object({ items: z.array(StoreSkillItemSchema), source: z.string() }));
     },
   });
 }
@@ -101,7 +106,7 @@ export function useStoreInstall() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: ({ slug, version }: { slug: string; version?: string }) =>
-      postJSON<{ ok: boolean }>("/store/install", { slug, version }),
+      postJSON("/store/install", { slug, version }, OkResponseSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: skillsKeys.all });
       qc.invalidateQueries({ queryKey: storeKeys.status() });
@@ -117,7 +122,7 @@ export function useStoreDetail(slug: string) {
   return useQuery({
     queryKey: storeKeys.detail(slug),
     queryFn: () =>
-      fetchJSON<StoreSkillDetail>(`/store/skills/${encodeURIComponent(slug)}`),
+      fetchJSON(`/store/skills/${encodeURIComponent(slug)}`, StoreSkillDetailSchema),
     enabled: !!slug,
   });
 }
@@ -126,8 +131,9 @@ export function useStoreFiles(slug: string) {
   return useQuery({
     queryKey: storeKeys.files(slug),
     queryFn: () =>
-      fetchJSON<{ files: { name: string; size: number }[]; skillMd: string | null }>(
-        `/store/skills/${encodeURIComponent(slug)}/files`
+      fetchJSON(
+        `/store/skills/${encodeURIComponent(slug)}/files`,
+        z.object({ files: z.array(z.object({ name: z.string(), size: z.number() })), skillMd: z.string().nullable() })
       ),
     enabled: !!slug,
   });
@@ -141,8 +147,9 @@ export function useStoreFileContent(slug: string, filePath: string) {
         .split("/")
         .map(encodeURIComponent)
         .join("/");
-      return fetchJSON<{ content: string | null }>(
-        `/store/skills/${encodeURIComponent(slug)}/files/${encodedPath}`
+      return fetchJSON(
+        `/store/skills/${encodeURIComponent(slug)}/files/${encodedPath}`,
+        z.object({ content: z.string().nullable() })
       );
     },
     enabled: !!slug && !!filePath,
@@ -152,6 +159,6 @@ export function useStoreFileContent(slug: string, filePath: string) {
 export function useStoreStatus() {
   return useQuery({
     queryKey: storeKeys.status(),
-    queryFn: () => fetchJSON<StoreStatus>("/store/status"),
+    queryFn: () => fetchJSON("/store/status", StoreStatusSchema),
   });
 }

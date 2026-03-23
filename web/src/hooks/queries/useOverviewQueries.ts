@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON } from "../../lib/api";
-import type {
-  StatsData,
-  UsageData,
-  ProviderInfo,
-  HealthData,
-  RequestEntry,
-  RequestMetricsResponse,
-  IdentityInfo,
-} from "../../types/dashboard";
+import {
+  StatsDataSchema,
+  UsageDataSchema,
+  ProviderInfoSchema,
+  HealthDataSchema,
+  RequestMetricsResponseSchema,
+  IdentityInfoSchema,
+} from "../../schemas/dashboard";
 
 export const statsKeys = {
   all: ["stats"] as const,
@@ -43,36 +43,36 @@ export const identityKeys = {
 export function useStats() {
   return useQuery({
     queryKey: statsKeys.detail(),
-    queryFn: () => fetchJSON<StatsData>("/stats"),
+    queryFn: () => fetchJSON("/stats", StatsDataSchema),
   });
 }
 
 export function useUsage() {
   return useQuery({
     queryKey: usageKeys.detail(),
-    queryFn: () => fetchJSON<UsageData>("/usage"),
+    queryFn: () => fetchJSON("/usage", UsageDataSchema),
   });
 }
 
 export function useProviders() {
   return useQuery({
     queryKey: providersKeys.list(),
-    queryFn: () => fetchJSON<ProviderInfo[]>("/providers"),
+    queryFn: () => fetchJSON("/providers", z.array(ProviderInfoSchema)),
   });
 }
 
 export function useHealth() {
   return useQuery({
     queryKey: healthKeys.detail(),
-    queryFn: () => fetchJSON<HealthData>("/health"),
+    queryFn: () => fetchJSON("/health", HealthDataSchema),
   });
 }
 
 export function useRequests() {
   return useQuery({
     queryKey: requestsKeys.list(),
-    queryFn: async (): Promise<RequestEntry[]> => {
-      const resp = await fetchJSON<RequestMetricsResponse>("/requests");
+    queryFn: async () => {
+      const resp = await fetchJSON("/requests", RequestMetricsResponseSchema);
       return resp.endpoints;
     },
   });
@@ -83,7 +83,7 @@ export function useIdentity(agent?: string) {
     queryKey: identityKeys.detail(agent),
     queryFn: () => {
       const qs = agent ? `?agent=${encodeURIComponent(agent)}` : "";
-      return fetchJSON<IdentityInfo>(`/identity${qs}`);
+      return fetchJSON(`/identity${qs}`, IdentityInfoSchema);
     },
     staleTime: Infinity,
   });

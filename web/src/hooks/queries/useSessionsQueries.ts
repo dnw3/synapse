@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON, deleteJSON, patchJSON, postJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
-import type { SessionEntry } from "../../types/dashboard";
+import { SessionEntrySchema, OkResponseSchema } from "../../schemas/dashboard";
 
 export const sessionsKeys = {
   all: ["sessions"] as const,
@@ -24,8 +25,9 @@ export function useSessions(params?: {
       if (params?.sort) qs.set("sort", params.sort);
       if (params?.order) qs.set("order", params.order);
       const q = qs.toString();
-      return fetchJSON<{ sessions: SessionEntry[]; total: number }>(
-        `/sessions${q ? `?${q}` : ""}`
+      return fetchJSON(
+        `/sessions${q ? `?${q}` : ""}`,
+        z.array(SessionEntrySchema)
       );
     },
   });
@@ -51,9 +53,9 @@ export function useRenameSession() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: ({ id, displayName }: { id: string; displayName: string }) =>
-      patchJSON<{ ok: boolean }>(`/sessions/${encodeURIComponent(id)}`, {
+      patchJSON(`/sessions/${encodeURIComponent(id)}`, {
         display_name: displayName,
-      }),
+      }, OkResponseSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: sessionsKeys.all });
       toast({ variant: "success", title: "Session renamed" });
@@ -75,9 +77,10 @@ export function usePatchSessionOverrides() {
       id: string;
       overrides: { label?: string; thinking?: string; verbose?: string };
     }) =>
-      patchJSON<{ ok: boolean }>(
+      patchJSON(
         `/sessions/${encodeURIComponent(id)}`,
-        overrides
+        overrides,
+        OkResponseSchema
       ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: sessionsKeys.all });
@@ -94,7 +97,7 @@ export function useCompactSession() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (id: string) =>
-      postJSON<{ ok: boolean }>(`/sessions/${encodeURIComponent(id)}/compact`),
+      postJSON(`/sessions/${encodeURIComponent(id)}/compact`, undefined, OkResponseSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: sessionsKeys.all });
       toast({ variant: "success", title: "Session compacted" });

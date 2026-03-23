@@ -288,7 +288,7 @@ function StoreSkillCard({
   const versions = item.stats?.versions ?? 0;
   const version = item.latestVersion?.version || item.displayName;
   const osTags = item.metadata?.os?.filter(Boolean) ?? [];
-  const [owner, setOwner] = useState<{ handle?: string; image?: string } | null>(null);
+  const [owner, setOwner] = useState<{ handle?: string | null; image?: string | null; displayName?: string | null } | null>(null);
 
   // Lazy-load owner on hover
   const ownerLoaded = useRef(false);
@@ -397,7 +397,7 @@ function StoreSkillCard({
           {owner && (
             <div className="flex items-center gap-1.5">
               {owner.image ? (
-                <img src={owner.image} alt={owner.handle} className="h-4 w-4 rounded-full" />
+                <img src={owner.image} alt={owner.handle ?? undefined} className="h-4 w-4 rounded-full" />
               ) : (
                 <User className="h-3 w-3 text-[var(--text-tertiary)]" />
               )}

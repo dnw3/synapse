@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON, postJSON, putJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
-import type { ChannelEntry } from "../../types/dashboard";
+import { ChannelEntrySchema, OkResponseSchema } from "../../schemas/dashboard";
 
 export const channelsKeys = {
   all: ["channels"] as const,
@@ -11,7 +12,7 @@ export const channelsKeys = {
 export function useChannels() {
   return useQuery({
     queryKey: channelsKeys.list(),
-    queryFn: () => fetchJSON<ChannelEntry[]>("/channels"),
+    queryFn: () => fetchJSON("/channels", z.array(ChannelEntrySchema)),
   });
 }
 
@@ -20,7 +21,7 @@ export function useToggleChannel() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (name: string) =>
-      postJSON<{ enabled: boolean }>(`/channels/${encodeURIComponent(name)}/toggle`),
+      postJSON(`/channels/${encodeURIComponent(name)}/toggle`, undefined, z.object({ enabled: z.boolean() })),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: channelsKeys.all });
       toast({ variant: "success", title: "Channel toggled" });
@@ -36,7 +37,7 @@ export function useUpdateChannelConfig() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: ({ name, config }: { name: string; config: Record<string, string> }) =>
-      putJSON<{ ok: boolean }>(`/channels/${encodeURIComponent(name)}/config`, config),
+      putJSON(`/channels/${encodeURIComponent(name)}/config`, config, OkResponseSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: channelsKeys.all });
       toast({ variant: "success", title: "Channel config updated" });

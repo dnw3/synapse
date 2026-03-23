@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON, putJSON, patchJSON, postJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
-import type { ConfigData } from "../../types/dashboard";
+import { ConfigDataSchema, OkResponseSchema } from "../../schemas/dashboard";
 
 export const configKeys = {
   all: ["config"] as const,
@@ -12,7 +13,7 @@ export const configKeys = {
 export function useConfig() {
   return useQuery({
     queryKey: configKeys.detail(),
-    queryFn: () => fetchJSON<ConfigData>("/config"),
+    queryFn: () => fetchJSON("/config", ConfigDataSchema),
   });
 }
 
@@ -28,7 +29,7 @@ export function useSaveConfig() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (content: string) =>
-      putJSON<{ success: boolean }>("/config", { content }),
+      putJSON("/config", { content }, z.object({ success: z.boolean() })),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: configKeys.all });
       toast({ variant: "success", title: "Config saved" });
@@ -44,7 +45,7 @@ export function usePatchConfig() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (fields: Record<string, unknown>) =>
-      patchJSON<{ ok: boolean }>("/config", fields),
+      patchJSON("/config", fields, OkResponseSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: configKeys.all });
       toast({ variant: "success", title: "Config updated" });
@@ -59,7 +60,7 @@ export function useValidateConfig() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (content: string) =>
-      postJSON<{ valid: boolean; errors?: string[] }>("/config/validate", { content }),
+      postJSON("/config/validate", { content }, z.object({ valid: z.boolean(), errors: z.array(z.string()).optional() })),
     onError: (err: Error) => {
       toast({ variant: "error", title: "Failed to validate config", description: err.message });
     },
@@ -70,7 +71,7 @@ export function useReloadConfig() {
   const qc = useQueryClient();
   const { toast } = useToast();
   return useMutation({
-    mutationFn: () => postJSON<{ ok: boolean }>("/config/reload"),
+    mutationFn: () => postJSON("/config/reload", undefined, OkResponseSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: configKeys.all });
       toast({ variant: "success", title: "Config reloaded" });

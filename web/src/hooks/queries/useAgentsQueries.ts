@@ -1,12 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON, postJSON, putJSON, deleteJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
+import {
+  AgentEntrySchema,
+  ToolCatalogGroupSchema,
+  DebugInvokeResponseSchema,
+} from "../../schemas/dashboard";
 import type {
   AgentEntry,
-  ToolCatalogGroup,
   BindingEntry,
   BroadcastGroupEntry,
-  DebugInvokeResponse,
 } from "../../types/dashboard";
 
 export const agentsKeys = {
@@ -32,7 +36,7 @@ export const broadcastsKeys = {
 export function useAgents() {
   return useQuery({
     queryKey: agentsKeys.list(),
-    queryFn: () => fetchJSON<AgentEntry[]>("/agents"),
+    queryFn: () => fetchJSON("/agents", z.array(AgentEntrySchema)),
   });
 }
 
@@ -41,7 +45,7 @@ export function useCreateAgent() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (agent: Partial<AgentEntry>) =>
-      postJSON<AgentEntry>("/agents", agent),
+      postJSON("/agents", agent, AgentEntrySchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: agentsKeys.all });
       toast({ variant: "success", title: "Agent created" });
@@ -57,7 +61,7 @@ export function useUpdateAgent() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: ({ name, agent }: { name: string; agent: Partial<AgentEntry> }) =>
-      putJSON<AgentEntry>(`/agents/${encodeURIComponent(name)}`, agent),
+      putJSON(`/agents/${encodeURIComponent(name)}`, agent, AgentEntrySchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: agentsKeys.all });
       toast({ variant: "success", title: "Agent updated" });
@@ -86,7 +90,7 @@ export function useDeleteAgent() {
 export function useToolsCatalog() {
   return useQuery({
     queryKey: toolsCatalogKeys.list(),
-    queryFn: () => fetchJSON<ToolCatalogGroup[]>("/tools"),
+    queryFn: () => fetchJSON("/tools", z.array(ToolCatalogGroupSchema)),
   });
 }
 
@@ -94,10 +98,10 @@ export function useBindings() {
   return useQuery({
     queryKey: bindingsKeys.list(),
     queryFn: async (): Promise<BindingEntry[]> => {
-      const resp = await postJSON<DebugInvokeResponse>("/debug/invoke", {
+      const resp = await postJSON("/debug/invoke", {
         method: "bindings.list",
         params: {},
-      });
+      }, DebugInvokeResponseSchema);
       return (resp?.result as { bindings: BindingEntry[] } | undefined)?.bindings ?? [];
     },
   });
@@ -107,10 +111,10 @@ export function useBroadcasts() {
   return useQuery({
     queryKey: broadcastsKeys.list(),
     queryFn: async (): Promise<BroadcastGroupEntry[]> => {
-      const resp = await postJSON<DebugInvokeResponse>("/debug/invoke", {
+      const resp = await postJSON("/debug/invoke", {
         method: "broadcasts.list",
         params: {},
-      });
+      }, DebugInvokeResponseSchema);
       return (
         (resp?.result as { broadcasts: BroadcastGroupEntry[] } | undefined)?.broadcasts ?? []
       );

@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON, fetchRaw } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
 
@@ -13,7 +14,7 @@ export function useLogs(lines = 200, level?: string) {
     queryFn: () => {
       const qs = new URLSearchParams({ lines: String(lines) });
       if (level && level !== "all") qs.set("level", level);
-      return fetchJSON<{ lines: string[]; file?: string }>(`/logs?${qs}`);
+      return fetchJSON(`/logs?${qs}`, z.object({ lines: z.array(z.string()), file: z.string().optional() }));
     },
   });
 }

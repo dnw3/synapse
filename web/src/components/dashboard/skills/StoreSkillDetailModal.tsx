@@ -173,7 +173,7 @@ export function StoreSkillDetailModal({
                     <div className="flex items-center gap-2 mt-3">
                       <span className="text-[11px] text-[var(--text-tertiary)]">{t("dashboard.storeBy", "by")}</span>
                       {owner.image ? (
-                        <img src={owner.image} alt={owner.handle} className="h-5 w-5 rounded-full" />
+                        <img src={owner.image} alt={owner.handle ?? undefined} className="h-5 w-5 rounded-full" />
                       ) : (
                         <User className="h-4 w-4 text-[var(--text-tertiary)]" />
                       )}

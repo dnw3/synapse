@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { fetchJSON, postJSON, putJSON, deleteJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
-import type { ScheduleEntry, ScheduleRunEntry } from "../../types/dashboard";
+import { ScheduleEntrySchema, ScheduleRunEntrySchema, OkResponseSchema } from "../../schemas/dashboard";
+import type { ScheduleEntry } from "../../types/dashboard";
 
 export const schedulesKeys = {
   all: ["schedules"] as const,
@@ -12,7 +14,7 @@ export const schedulesKeys = {
 export function useSchedules() {
   return useQuery({
     queryKey: schedulesKeys.list(),
-    queryFn: () => fetchJSON<ScheduleEntry[]>("/schedules"),
+    queryFn: () => fetchJSON("/schedules", z.array(ScheduleEntrySchema)),
   });
 }
 
@@ -21,7 +23,7 @@ export function useCreateSchedule() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (schedule: Partial<ScheduleEntry>) =>
-      postJSON<ScheduleEntry>("/schedules", schedule),
+      postJSON("/schedules", schedule, ScheduleEntrySchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: schedulesKeys.all });
       toast({ variant: "success", title: "Schedule created" });
@@ -37,7 +39,7 @@ export function useUpdateSchedule() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: ({ name, schedule }: { name: string; schedule: Partial<ScheduleEntry> }) =>
-      putJSON<ScheduleEntry>(`/schedules/${encodeURIComponent(name)}`, schedule),
+      putJSON(`/schedules/${encodeURIComponent(name)}`, schedule, ScheduleEntrySchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: schedulesKeys.all });
       toast({ variant: "success", title: "Schedule updated" });
@@ -68,7 +70,7 @@ export function useTriggerSchedule() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (name: string) =>
-      postJSON<{ ok: boolean }>(`/schedules/${encodeURIComponent(name)}/trigger`),
+      postJSON(`/schedules/${encodeURIComponent(name)}/trigger`, undefined, OkResponseSchema),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: schedulesKeys.all });
       toast({ variant: "success", title: "Schedule triggered" });
@@ -84,7 +86,7 @@ export function useToggleSchedule() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: (name: string) =>
-      postJSON<{ enabled: boolean }>(`/schedules/${encodeURIComponent(name)}/toggle`),
+      postJSON(`/schedules/${encodeURIComponent(name)}/toggle`, undefined, z.object({ enabled: z.boolean() })),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: schedulesKeys.all });
       toast({ variant: "success", title: "Schedule toggled" });
@@ -99,7 +101,7 @@ export function useScheduleRuns(name: string) {
   return useQuery({
     queryKey: schedulesKeys.runs(name),
     queryFn: () =>
-      fetchJSON<ScheduleRunEntry[]>(`/schedules/${encodeURIComponent(name)}/runs`),
+      fetchJSON(`/schedules/${encodeURIComponent(name)}/runs`, z.array(ScheduleRunEntrySchema)),
     enabled: !!name,
   });
 }

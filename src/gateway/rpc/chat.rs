@@ -54,6 +54,10 @@ pub async fn handle_history(ctx: Arc<RpcContext>, params: Value) -> Result<Value
             {
                 obj["request_id"] = Value::String(rid.to_string());
             }
+            // Include timestamp if present (milliseconds since epoch)
+            if let Some(ts) = m.additional_kwargs().get("timestamp") {
+                obj["timestamp"] = ts.clone();
+            }
             // Include tool_calls if present
             let tool_calls = m.tool_calls();
             if !tool_calls.is_empty() {

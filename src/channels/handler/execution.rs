@@ -22,6 +22,7 @@ impl AgentSession {
         content_blocks: &[ContentBlock],
         ctx: RunContext,
         agent_info: &ResolvedAgentInfo,
+        request_id: Option<&str>,
     ) -> Result<(String, u32, u32), Box<dyn std::error::Error + Send + Sync>> {
         let memory = self.session_mgr.memory();
 
@@ -44,10 +45,21 @@ impl AgentSession {
         }
 
         // Append user message (with multimodal content blocks if present)
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
         let human_msg = if content_blocks.is_empty() {
             Message::human(text)
         } else {
             Message::human(text).with_content_blocks(content_blocks.to_vec())
+        }
+        .with_additional_kwarg("timestamp", serde_json::json!(now_ms));
+        let human_msg = if let Some(rid) = request_id {
+            human_msg
+                .with_additional_kwarg("request_id", serde_json::Value::String(rid.to_string()))
+        } else {
+            human_msg
         };
         memory
             .append(session_id, human_msg.clone())
@@ -198,10 +210,23 @@ impl AgentSession {
             final_state.ok_or_else(|| AgentError("no output from agent stream".into()))?;
         let response = extract_final_response(&final_state.messages);
 
-        // Save new messages to history
+        // Save new messages to history, injecting request_id + timestamp
         let saved_count = memory.load(session_id).await.map(|m| m.len()).unwrap_or(0);
+        let save_ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
         for msg in final_state.messages.iter().skip(saved_count) {
-            memory.append(session_id, msg.clone()).await.ok();
+            let mut m = msg
+                .clone()
+                .with_additional_kwarg("timestamp", serde_json::json!(save_ts));
+            if let Some(rid) = request_id {
+                m = m.with_additional_kwarg(
+                    "request_id",
+                    serde_json::Value::String(rid.to_string()),
+                );
+            }
+            memory.append(session_id, m).await.ok();
         }
 
         // Token-aware trimming with pre-compaction LTM flush

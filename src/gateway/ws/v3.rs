@@ -551,9 +551,6 @@ async fn handle_v3_agent(
         streaming_output: Some(Arc::new(streaming_handle)),
     };
 
-    // Record pre-execution token count for delta tracking
-    let pre_snap = state.cost_tracker.snapshot().await;
-    let pre_tokens = pre_snap.total_input_tokens + pre_snap.total_output_tokens;
     let execution_start = std::time::Instant::now();
 
     // --- Spawn agent execution task ---
@@ -659,24 +656,8 @@ async fn handle_v3_agent(
                         .await;
                 }
 
-                // Update session token count — find by session_key field (store key),
-                // since get_session() expects a UUID session_id.
-                {
-                    let snap = state.cost_tracker.snapshot().await;
-                    let post_tokens = snap.total_input_tokens + snap.total_output_tokens;
-                    let delta = post_tokens.saturating_sub(pre_tokens);
-                    if delta > 0 {
-                        if let Ok(sessions) = state.sessions.list_sessions().await {
-                            if let Some(mut info) = sessions
-                                .into_iter()
-                                .find(|s| s.session_key.as_deref() == Some(&store_key))
-                            {
-                                info.total_tokens += delta;
-                                let _ = state.sessions.update_session(&info).await;
-                            }
-                        }
-                    }
-                }
+                // Session token count is updated inside AgentSession::handle_message()
+                // using the per-request token values returned by the agent.
 
                 let elapsed = execution_start.elapsed().as_millis();
 

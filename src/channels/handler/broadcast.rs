@@ -174,6 +174,7 @@ impl AgentSession {
                             &content_blocks,
                             RunContext::default(),
                             agent_info,
+                            Some(&msg.request_id),
                         )
                         .await
                     {

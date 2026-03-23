@@ -151,7 +151,14 @@ impl AgentSession {
                 info.channel = Some(msg.channel.platform.clone());
                 info.chat_type = Some(Self::peer_kind_to_chat_type(&peer_kind));
                 if info.display_name.is_none() {
-                    info.display_name = msg.sender.id.clone();
+                    // For web channel, use the request key (e.g. "main") as display name
+                    // instead of the ephemeral connection ID ("conn:UUID").
+                    // For bot channels, sender.id is the actual user ID (e.g. Lark open_id).
+                    info.display_name = if msg.channel.platform == "web" {
+                        Some(crate::session::key::to_request_key(session_key).to_string())
+                    } else {
+                        msg.sender.id.clone()
+                    };
                 }
                 info.updated_at = now;
                 let _ = self.session_mgr.update_session(&info).await;
@@ -173,7 +180,14 @@ impl AgentSession {
             info.session_key = Some(session_key.to_string());
             info.channel = Some(msg.channel.platform.clone());
             info.chat_type = Some(Self::peer_kind_to_chat_type(&peer_kind));
-            info.display_name = msg.sender.id.clone();
+            // For web channel, use the request key (e.g. "main") as display name
+            // instead of the ephemeral connection ID ("conn:UUID").
+            // For bot channels, sender.id is the actual user ID (e.g. Lark open_id).
+            info.display_name = if msg.channel.platform == "web" {
+                Some(crate::session::key::to_request_key(session_key).to_string())
+            } else {
+                msg.sender.id.clone()
+            };
             info.updated_at = now;
             let _ = self.session_mgr.update_session(&info).await;
         }

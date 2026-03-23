@@ -360,8 +360,15 @@ impl AgentSession {
 
         let result: Result<(String, u32, u32), Box<dyn std::error::Error + Send + Sync>> =
             if self.deep_agent {
-                self.handle_deep_agent(&sid, &msg.content, &content_blocks, ctx, &agent_info)
-                    .await
+                self.handle_deep_agent(
+                    &sid,
+                    &msg.content,
+                    &content_blocks,
+                    ctx,
+                    &agent_info,
+                    Some(&msg.request_id),
+                )
+                .await
             } else {
                 // Simple chat doesn't support streaming, fall back
                 let res = self
@@ -397,7 +404,20 @@ impl AgentSession {
             }
         }
 
-        let (response, _, _) = result?;
+        let (response, input_tokens, output_tokens) = result?;
+
+        // Update session total_tokens
+        let token_delta = (input_tokens + output_tokens) as u64;
+        if token_delta > 0 {
+            if let Ok(Some(mut info)) = self.session_mgr.get_session(&sid).await {
+                info.total_tokens += token_delta;
+                info.updated_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                let _ = self.session_mgr.update_session(&info).await;
+            }
+        }
 
         // Resolve delivery target via priority chain
         let fallback_delivery = Self::delivery_context_from_inbound(&msg);

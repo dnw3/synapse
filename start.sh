@@ -199,6 +199,9 @@ case "$MODE" in
       echo "$pids" | xargs kill 2>/dev/null || true
       count=$((count + $(echo "$pids" | wc -l)))
     fi
+    # Kill sandbox containers
+    docker ps -q --filter "name=synapse-sbx-" 2>/dev/null | xargs -r docker kill 2>/dev/null || true
+    docker ps -aq --filter "name=synapse-sbx-" 2>/dev/null | xargs -r docker rm -f 2>/dev/null || true
     # Clean up ports 3000 and 5173
     for port in 3000 5173; do
       pids=$(lsof -ti:"$port" 2>/dev/null || true)

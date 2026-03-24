@@ -26,6 +26,15 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  const m = Math.floor(s / 60);
+  const remainder = Math.round(s % 60);
+  return `${m}m${remainder}s`;
+}
+
 function shortenModel(model: string): string {
   return model
     .replace(/^(openai\/|anthropic\/|google\/)/, "")
@@ -300,6 +309,9 @@ export default function MessageBubble({ message, turn, onDelete, onToolResultCli
             )}
             {lastAssistantMsg.usage.output_tokens != null && (
               <span>↓{formatTokens(lastAssistantMsg.usage.output_tokens)}</span>
+            )}
+            {lastAssistantMsg.usage.duration_ms != null && (
+              <span>⏱{formatDuration(lastAssistantMsg.usage.duration_ms)}</span>
             )}
             {lastAssistantMsg.usage.cost_usd != null && (
               <span>${lastAssistantMsg.usage.cost_usd.toFixed(4)}</span>

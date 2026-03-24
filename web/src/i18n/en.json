@@ -531,7 +531,7 @@
     "allOperational": "All Systems Operational",
     "gatewayDisconnected": "Gateway Disconnected",
     "lastRefresh": "Last refresh",
-    "poweredBy": "Synapse · Powered by Synaptic Framework",
+    "poweredBy": "Powered by Synaptic",
     "plugins": {
       "title": "Plugins",
       "install": "Install Plugin",

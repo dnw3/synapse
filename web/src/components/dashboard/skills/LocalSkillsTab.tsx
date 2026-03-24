@@ -337,7 +337,7 @@ function LocalSkillDetailModal({
               </div>
 
               {/* Right side: version + toggle — matches store's version card + install button */}
-              <div className="flex flex-col items-end gap-2 shrink-0">
+              <div className="flex flex-col items-end gap-2 shrink-0 mt-5">
                 {skill.version && (
                   <div className="text-center px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg-content)] border border-[var(--border-subtle)]">
                     <div className="text-[9px] uppercase tracking-wider text-[var(--text-tertiary)] mb-0.5">

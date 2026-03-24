@@ -90,8 +90,9 @@ export function ConfigForm({
     const sensitive = fieldSchema.sensitive || isSensitiveKey(fieldSchema.key, sensitivePatterns);
     const isArray = tomlField?.value.startsWith("[");
 
-    const onChangeExisting = (v: string) => onFieldChange(activeMerged!.schema.key, fieldSchema.key, tomlField!, v);
-    const onChangeNew = (v: string) => onAddField(activeMerged!.schema.key, fieldSchema.key, v, fieldSchema.type);
+    const tomlKey = activeMerged!.toml?.key ?? activeMerged!.schema.key;
+    const onChangeExisting = (v: string) => onFieldChange(tomlKey, fieldSchema.key, tomlField!, v);
+    const onChangeNew = (v: string) => onAddField(tomlKey, fieldSchema.key, v, fieldSchema.type);
     const onChange = hasValue ? onChangeExisting : onChangeNew;
 
     // Dynamic placeholder for base_url: use provider_defaults map from schema
@@ -180,19 +181,19 @@ export function ConfigForm({
           <div className="flex items-center gap-3">
             <BooleanField
               value={f.value === "true"}
-              onChange={(v) => onFieldChange(activeMerged!.schema.key, f.key, f, v ? "true" : "false")}
+              onChange={(v) => onFieldChange(activeMerged!.toml?.key ?? activeMerged!.schema.key, f.key, f, v ? "true" : "false")}
             />
             <span className="text-[12px] text-[var(--text-secondary)]">{f.value}</span>
           </div>
         ) : sensitive ? (
           <SecretField
             value={displayValue}
-            onChange={(v) => onFieldChange(activeMerged!.schema.key, f.key, f, requote(f.value, v))}
+            onChange={(v) => onFieldChange(activeMerged!.toml?.key ?? activeMerged!.schema.key, f.key, f, requote(f.value, v))}
           />
         ) : (
           <TextField
             value={displayValue}
-            onChange={(v) => onFieldChange(activeMerged!.schema.key, f.key, f, requote(f.value, v))}
+            onChange={(v) => onFieldChange(activeMerged!.toml?.key ?? activeMerged!.schema.key, f.key, f, requote(f.value, v))}
           />
         )}
       </div>
@@ -245,23 +246,25 @@ export function ConfigForm({
         <SectionCard className="flex-1 flex flex-col min-h-0 overflow-y-auto">
           {activeMerged ? (
             <>
-              <div className="flex items-center gap-3 mb-1">
-                <span className="text-[var(--text-tertiary)]">
+              <div className="flex items-start gap-3 mb-1">
+                <span className="text-[var(--text-tertiary)] mt-0.5 flex-shrink-0">
                   {SECTION_ICONS[activeMerged.schema.icon] ?? <Settings2 className="h-4.5 w-4.5" />}
                 </span>
-                <div>
-                  <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">
-                    {activeMerged.schema.label}
-                  </h3>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">
+                      {activeMerged.schema.label}
+                    </h3>
+                    <span className="text-[10px] font-mono text-[var(--text-tertiary)] bg-[var(--bg-content)] px-2 py-0.5 rounded-md flex-shrink-0">
+                      {activeMerged.toml?.isArrayTable ? `[[${activeMerged.toml?.key ?? activeMerged.schema.key}]]` : `[${activeMerged.toml?.key ?? activeMerged.schema.key}]`}
+                    </span>
+                  </div>
                   {activeMerged.schema.description && (
                     <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
                       {activeMerged.schema.description}
                     </p>
                   )}
                 </div>
-                <span className="ml-auto text-[10px] font-mono text-[var(--text-tertiary)] bg-[var(--bg-content)] px-2 py-0.5 rounded-md">
-                  {activeMerged.toml?.isArrayTable ? `[[${activeMerged.schema.key}]]` : `[${activeMerged.schema.key}]`}
-                </span>
               </div>
 
               <div className="mt-3">

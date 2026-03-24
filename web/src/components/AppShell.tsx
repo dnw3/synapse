@@ -9,7 +9,6 @@ import { Toaster, useToast } from "./ui/toast";
 import { fetchJSON } from "../lib/api";
 import { IdentityContext, GatewayContext, SessionContext } from "../contexts";
 import UnifiedSidebar from "./UnifiedSidebar";
-import Toolbar from "./Toolbar";
 import ChatPanel, { FocusModeExitButton } from "./chat";
 import CommandPalette, { type PaletteEntry } from "./CommandPalette";
 import SetupWizard from "./SetupWizard";
@@ -17,7 +16,7 @@ import ToolOutputSidebar from "./ToolOutputSidebar";
 import type { IdentityInfo } from "../types/dashboard";
 import { TABS, type TabKey } from "./Dashboard";
 import {
-  LayoutDashboard, MessageSquare, Terminal,
+  LayoutDashboard, Menu, MessageSquare, Terminal,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -144,14 +143,6 @@ export default function AppShell() {
 
   // Combine persisted + streaming messages
   const allMessages = [...session.messages, ...session.streaming.messages];
-
-  // Toolbar title
-  const activeSession = session.sessions.find((s) => s.sessionKey === session.activeKey);
-  const currentPageTitle = isChatView
-    ? (activeSession?.displayName || t("chat.newChat"))
-    : t(TABS.find((tb) => tb.key === activeView)?.i18nKey ?? "app.title");
-  const toolbarSubtitle = isChatView ? t("sidebar.messages", { count: allMessages.length }) : undefined;
-  const toolbarStatus = (!["idle", "pong"].includes(gw.status)) ? t(`status.${gw.status}`) : undefined;
 
   // ── ChatPanel (rendered directly, not via Outlet) ─────────────────────
   const chatPanel = (
@@ -281,16 +272,16 @@ export default function AppShell() {
           {/* Main content */}
           <main className="flex-1 flex flex-col min-w-0">
             {/* Chat view has its own top bar — hide Toolbar */}
+            {/* Mobile-only hamburger for dashboard views */}
             {!isChatView && (
-              <Toolbar
-                title={currentPageTitle}
-                subtitle={toolbarSubtitle}
-                modelBadge={undefined}
-                connected={gw.connected}
-                status={toolbarStatus}
-                onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                showMenu={true}
-              />
+              <div className="md:hidden flex items-center h-[44px] px-4 flex-shrink-0 bg-[var(--bg-window)]/80 backdrop-blur-[20px] border-b border-[var(--separator)]">
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors rounded-[var(--radius-sm)]"
+                >
+                  <Menu className="h-4 w-4" />
+                </button>
+              </div>
             )}
 
             <div className="flex-1 flex overflow-hidden">

@@ -70,14 +70,46 @@ export default function UnifiedSidebar({
         isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}
     >
-      {/* Window controls / mobile close */}
-      <div className="flex-shrink-0 flex items-end px-3 md:block h-[38px] pb-1">
+      {/* Brand header + mobile close */}
+      <div className="flex-shrink-0 relative px-3 pt-3 pb-2">
+        {/* Mobile close */}
         <button
           onClick={onClose}
-          className="md:hidden p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors rounded-[var(--radius-sm)]"
+          className="md:hidden absolute top-2.5 right-2.5 p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors rounded-[var(--radius-sm)]"
         >
           <X className="h-4 w-4" />
         </button>
+        {/* Brand identity */}
+        <div className="flex items-center gap-2 min-w-0 px-1">
+          {identity?.avatar_url ? (
+            <img src={identity.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-gradient-end)] flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
+              {identity?.emoji || "S"}
+            </div>
+          )}
+          <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">
+            {identity?.name || t("sidebar.brand")}
+          </span>
+          {connected !== undefined && (
+            <span
+              className={`w-2 h-2 rounded-full flex-shrink-0 transition-colors ${
+                connected
+                  ? "bg-[var(--status-ok,#34c759)]"
+                  : "bg-[var(--status-danger,#ff3b30)]"
+              }`}
+              style={{
+                boxShadow: connected
+                  ? "0 0 0 3px color-mix(in srgb, var(--status-ok, #34c759) 14%, transparent)"
+                  : "0 0 0 3px color-mix(in srgb, var(--status-danger, #ff3b30) 14%, transparent)",
+              }}
+              role="img"
+              aria-live="polite"
+              aria-label={connected ? t("status.connected") : t("status.disconnected")}
+              title={connected ? t("status.connected") : t("status.disconnected")}
+            />
+          )}
+        </div>
       </div>
 
       {/* Scrollable navigation */}

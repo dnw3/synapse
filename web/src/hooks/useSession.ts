@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import type { Message, FileAttachment } from "../types";
+import type { Message, MessageUsage, FileAttachment } from "../types";
 import type { UseGatewayReturn } from "./useGateway";
 import { useSessionLifecycle } from "./useSessionLifecycle";
 import { useStreamingHandler } from "./useStreamingHandler";
@@ -93,7 +93,7 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
 
   // --- Callbacks for streaming handler ---
 
-  const onTurnComplete = useCallback(() => {
+  const onTurnComplete = useCallback((usage?: MessageUsage) => {
     dispatch({ type: "UNLOCK" });
     // Refresh messages from server, then clear streaming & flush queue
     const key = lifecycle.activeKeyRef.current;
@@ -101,6 +101,15 @@ export function useSession(gw: UseGatewayReturn): UseSessionReturn {
       lifecycle.gwRef.current.call<{ messages: Message[] }>("chat.history", { sessionKey: key })
         .then(result => {
           const msgs = result.messages ?? (result as unknown as Message[]);
+          // Attach usage (tokens + duration) to the last assistant message
+          if (usage) {
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i].role === "assistant" && msgs[i].content) {
+                msgs[i] = { ...msgs[i], usage };
+                break;
+              }
+            }
+          }
           lifecycle.setMessages(msgs);
           lifecycle.updateCache(key, msgs);
         })

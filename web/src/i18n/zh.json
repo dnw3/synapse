@@ -532,7 +532,7 @@
     "allOperational": "系统运行正常",
     "gatewayDisconnected": "网关未连接",
     "lastRefresh": "上次刷新",
-    "poweredBy": "Synapse · 由 Synaptic 框架驱动",
+    "poweredBy": "由 Synaptic 驱动",
     "plugins": {
       "title": "插件",
       "install": "安装插件",

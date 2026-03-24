@@ -30,6 +30,7 @@ export interface MessageUsage {
   cache_read_tokens?: number;
   cache_write_tokens?: number;
   cost_usd?: number;
+  duration_ms?: number;
 }
 
 export interface Message {

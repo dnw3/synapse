@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer } from "react";
-import type { Message } from "../types";
+import type { Message, MessageUsage } from "../types";
 import type { UseGatewayReturn } from "./useGateway";
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ export interface UseStreamingHandlerReturn {
 export function useStreamingHandler(
   gw: UseGatewayReturn,
   activeKeyRef: React.RefObject<string | null>,
-  onTurnComplete: () => void,
+  onTurnComplete: (usage?: MessageUsage) => void,
   onApproval: (request: ApprovalRequest) => void,
   onError: (error: string) => void,
   onSessionsChanged: () => void,
@@ -190,9 +190,14 @@ export function useStreamingHandler(
           });
           break;
 
-        case "agent.turn.complete":
-          onTurnComplete();
+        case "agent.turn.complete": {
+          const usage: MessageUsage = {};
+          if (typeof payload.input_tokens === "number") usage.input_tokens = payload.input_tokens;
+          if (typeof payload.output_tokens === "number") usage.output_tokens = payload.output_tokens;
+          if (typeof payload.duration_ms === "number") usage.duration_ms = payload.duration_ms;
+          onTurnComplete(Object.keys(usage).length > 0 ? usage : undefined);
           break;
+        }
 
         case "agent.error": {
           const rid = (payload.request_id as string) ?? null;

@@ -133,14 +133,46 @@ export default function ConfigPage({ filterSection }: { filterSection?: string }
     };
 
     if (schema) {
+      // Build a set of TOML keys claimed by schema (for both exact and suffix matches)
+      const claimedTomlKeys = new Set<string>();
+
       const result: MergedEntry[] = schema.sections.map((ss) => {
-        const tomlSection = tomlMap.get(ss.key);
+        // Try exact match first
+        let tomlSection = tomlMap.get(ss.key);
+        // Then try "channels.{key}" (channel configs live under [channels.*])
+        if (!tomlSection) tomlSection = tomlMap.get(`channels.${ss.key}`);
+        // Then try any dotted parent prefix (e.g. "agent.tools" for schema "agent.tools")
+        if (!tomlSection) {
+          const suffix = `.${ss.key}`;
+          // Prefer shorter keys (more specific match)
+          let bestMatch: TomlSection | undefined;
+          let bestLen = Infinity;
+          for (const [tk, tv] of tomlMap) {
+            if (tk.endsWith(suffix) && !claimedTomlKeys.has(tk) && tk.length < bestLen) {
+              bestMatch = tv;
+              bestLen = tk.length;
+            }
+          }
+          tomlSection = bestMatch;
+        }
+        if (tomlSection) {
+          claimedTomlKeys.add(tomlSection.key);
+          // Also merge nested sub-sections (e.g. "channels.lark.card" fields into "lark")
+          const prefix = tomlSection.key + ".";
+          for (const [tk, tv] of tomlMap) {
+            if (tk.startsWith(prefix)) {
+              claimedTomlKeys.add(tk);
+              tomlSection = { ...tomlSection, fields: [...tomlSection.fields, ...tv.fields] };
+            }
+          }
+        }
         return { schema: ss, toml: tomlSection ?? null, hasData: !!tomlSection && tomlSection.fields.length > 0 };
       });
-      // Add TOML sections not in schema
+
+      // Add TOML sections not claimed by any schema
       const schemaKeys = new Set(schema.sections.map((s) => s.key));
       for (const ts of parsedSections) {
-        if (!schemaKeys.has(ts.key)) {
+        if (!schemaKeys.has(ts.key) && !claimedTomlKeys.has(ts.key)) {
           result.push({
             schema: { key: ts.key, label: ts.key, order: 999, icon: "settings", fields: [] } as { key: string; label: string; description?: string; order: number; icon: string; fields: ConfigFieldSchema[] },
             toml: ts,

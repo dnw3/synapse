@@ -640,7 +640,29 @@
       "reconnectFailed": "重新连接失败",
       "testResult": "{{name}}: {{toolCount}} 个工具, {{latency}}ms",
       "statusSummary": "{{connected}} 已连接, {{total}} 总计",
-      "edit": "编辑"
+      "edit": "编辑",
+      "playground": {
+        "title": "工具测试台",
+        "execute": "执行",
+        "executing": "执行中...",
+        "parameters": "参数",
+        "result": "结果",
+        "history": "历史",
+        "success": "成功",
+        "error": "错误",
+        "copy": "复制",
+        "copied": "已复制!",
+        "noParams": "该工具不需要参数",
+        "tryTool": "试用",
+        "formMode": "表单",
+        "jsonMode": "JSON",
+        "historyClear": "清除",
+        "required": "必填",
+        "serverNotFound": "未找到 MCP 服务器",
+        "toolNotFound": "未找到工具",
+        "selectTool": "选择一个工具进行测试",
+        "invalidJson": "无效的 JSON"
+      }
     }
   },
   "debug": {

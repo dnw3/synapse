@@ -639,7 +639,29 @@
       "reconnectFailed": "Reconnect failed",
       "testResult": "{{name}}: {{toolCount}} tools, {{latency}}ms",
       "statusSummary": "{{connected}} connected, {{total}} total",
-      "edit": "Edit"
+      "edit": "Edit",
+      "playground": {
+        "title": "Tool Playground",
+        "execute": "Execute",
+        "executing": "Executing...",
+        "parameters": "Parameters",
+        "result": "Result",
+        "history": "History",
+        "success": "Success",
+        "error": "Error",
+        "copy": "Copy",
+        "copied": "Copied!",
+        "noParams": "This tool takes no parameters",
+        "tryTool": "Try",
+        "formMode": "Form",
+        "jsonMode": "JSON",
+        "historyClear": "Clear",
+        "required": "Required",
+        "serverNotFound": "MCP server not found",
+        "toolNotFound": "Tool not found",
+        "selectTool": "Select a tool to test",
+        "invalidJson": "Invalid JSON"
+      }
     }
   },
   "debug": {

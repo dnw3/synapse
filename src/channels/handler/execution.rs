@@ -234,7 +234,7 @@ impl AgentSession {
         // Token-aware trimming with pre-compaction LTM flush
         let mut current = memory.load(session_id).await.unwrap_or_default();
         let token_count = HeuristicTokenCounter.count_messages(&current);
-        let threshold = self.config.memory.auto_compact_threshold;
+        let threshold = self.config.memory.effective_compact_threshold();
         if token_count > threshold {
             let ltm_dir = if agent_info.id != "default" {
                 crate::config::agent_memory_dir(&agent_info.id)
@@ -315,7 +315,7 @@ impl AgentSession {
         // Token-aware trimming
         let current = memory.load(session_id).await.unwrap_or_default();
         let token_count = HeuristicTokenCounter.count_messages(&current);
-        let threshold = self.config.memory.auto_compact_threshold;
+        let threshold = self.config.memory.effective_compact_threshold();
         if token_count > threshold {
             let keep_recent = self.config.memory.keep_recent;
             memory.clear(session_id).await.ok();

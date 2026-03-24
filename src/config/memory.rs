@@ -6,15 +6,25 @@ pub struct MemoryConfig {
     /// Whether auto-compaction is enabled when token count exceeds threshold.
     #[serde(default = "default_true")]
     pub auto_compact: bool,
-    /// Token threshold for auto-compaction (default: 80000, ~80% of 128k context).
-    #[serde(default = "default_auto_compact_threshold")]
-    pub auto_compact_threshold: usize,
-    /// Compaction strategy: "truncate" or "summarize".
-    #[serde(default = "default_compact_strategy")]
-    pub compact_strategy: String,
     /// Number of recent messages to keep after compaction.
     #[serde(default = "default_keep_recent")]
     pub keep_recent: usize,
+
+    /// Context window size override in tokens (0 = auto-detect from model/provider).
+    #[serde(default)]
+    pub context_window: usize,
+    /// Whether to opt-in to 1M context window for supported Anthropic models.
+    #[serde(default)]
+    pub context_1m: bool,
+    /// Tokens reserved for the model's output generation. Default: 8192.
+    #[serde(default = "default_reserved_output_tokens")]
+    pub reserved_output_tokens: usize,
+    /// Hard limit on message count — triggers immediate trimming. Default: 100.
+    #[serde(default = "default_max_messages")]
+    pub max_messages: usize,
+    /// Safety margin multiplier for post-condense verification (e.g. 1.2 = 20% headroom).
+    #[serde(default = "default_safety_margin")]
+    pub safety_margin: f64,
 
     /// Whether long-term memory is enabled.
     #[serde(default = "default_true")]
@@ -109,11 +119,27 @@ pub struct MemoryConfig {
     // Viking config moved to [plugins.entries.memory-viking].config.
 }
 
-fn default_auto_compact_threshold() -> usize {
-    80000
+impl MemoryConfig {
+    /// Compute an effective token threshold for legacy manual trimming code paths
+    /// (REPL, bot channels). Uses `context_window` if set, otherwise 128k, at ~80%.
+    pub fn effective_compact_threshold(&self) -> usize {
+        let window = if self.context_window > 0 {
+            self.context_window
+        } else {
+            128_000
+        };
+        (window as f64 * 0.8) as usize
+    }
 }
-fn default_compact_strategy() -> String {
-    "summarize".to_string()
+
+fn default_reserved_output_tokens() -> usize {
+    8192
+}
+fn default_max_messages() -> usize {
+    100
+}
+fn default_safety_margin() -> f64 {
+    1.2
 }
 fn default_keep_recent() -> usize {
     10
@@ -168,9 +194,12 @@ impl Default for MemoryConfig {
     fn default() -> Self {
         Self {
             auto_compact: true,
-            auto_compact_threshold: default_auto_compact_threshold(),
-            compact_strategy: default_compact_strategy(),
             keep_recent: default_keep_recent(),
+            context_window: 0,
+            context_1m: false,
+            reserved_output_tokens: default_reserved_output_tokens(),
+            max_messages: default_max_messages(),
+            safety_margin: default_safety_margin(),
             ltm_enabled: true,
             ltm_max_entries: default_ltm_max_entries(),
             ltm_recall_limit: default_ltm_recall_limit(),

@@ -200,7 +200,7 @@ pub async fn repl(
                 if config.memory.auto_compact {
                     let counter = HeuristicTokenCounter;
                     let estimated = counter.count_messages(messages);
-                    if estimated > config.memory.auto_compact_threshold {
+                    if estimated > config.memory.effective_compact_threshold() {
                         let keep = config.memory.keep_recent;
                         let (system_msg, rest) = if !messages.is_empty() && messages[0].is_system()
                         {

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { fetchJSON, postJSON, putJSON, deleteJSON } from "../../lib/api";
 import { useToast } from "../../components/ui/toast";
-import { McpServerInfoSchema, McpTestResultSchema } from "../../schemas/dashboard";
+import { McpServerInfoSchema, McpTestResultSchema, McpInvokeResultSchema } from "../../schemas/dashboard";
 import type { McpServerInfo } from "../../types/dashboard";
 
 export const mcpKeys = {
@@ -80,6 +80,21 @@ export function useTestMcpServer() {
     onError: (err: Error) => {
       toast({ variant: "error", title: "Failed to test MCP server", description: err.message });
     },
+  });
+}
+
+export function useInvokeMcpTool() {
+  return useMutation({
+    mutationFn: ({ serverName, toolName, arguments: args }: {
+      serverName: string;
+      toolName: string;
+      arguments: Record<string, unknown>;
+    }) =>
+      postJSON(
+        `/mcp/${encodeURIComponent(serverName)}/tools/${encodeURIComponent(toolName)}/invoke`,
+        { arguments: args },
+        McpInvokeResultSchema,
+      ),
   });
 }
 

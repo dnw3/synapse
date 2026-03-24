@@ -20,6 +20,10 @@ pub fn routes() -> Router<AppState> {
         .route("/dashboard/mcp/{name}", put(update_mcp).delete(delete_mcp))
         .route("/dashboard/mcp/{name}/test", post(test_mcp))
         .route("/dashboard/mcp/{name}/persist", post(persist_mcp))
+        .route(
+            "/dashboard/mcp/{server_name}/tools/{tool_name}/invoke",
+            post(invoke_mcp_tool),
+        )
         .route("/dashboard/requests", get(get_requests))
         .route("/dashboard/logs", get(get_logs))
         .route("/dashboard/logs/export", get(export_logs))
@@ -606,6 +610,105 @@ async fn test_mcp(
                 tool_count: 0,
                 latency_ms: latency,
                 error: Some(e),
+            })
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/dashboard/mcp/:server_name/tools/:tool_name/invoke
+// ---------------------------------------------------------------------------
+
+#[derive(Deserialize)]
+struct McpInvokeRequest {
+    #[serde(default = "default_arguments")]
+    arguments: serde_json::Value,
+}
+
+fn default_arguments() -> serde_json::Value {
+    serde_json::Value::Object(Default::default())
+}
+
+#[derive(Serialize)]
+struct McpInvokeResponse {
+    success: bool,
+    result: Option<serde_json::Value>,
+    #[serde(rename = "latencyMs")]
+    latency_ms: u64,
+    error: Option<String>,
+}
+
+async fn invoke_mcp_tool(
+    State(state): State<AppState>,
+    AxumPath((server_name, tool_name)): AxumPath<(String, String)>,
+    Json(body): Json<McpInvokeRequest>,
+) -> Json<McpInvokeResponse> {
+    let prefixed = format!("{}_{}", server_name, tool_name);
+
+    // Search persistent MCP tools first
+    let tool = state.agent.mcp_tools.iter().find(|t| t.name() == prefixed);
+
+    // Fall back to transient MCP tools
+    let transient_guard;
+    let tool = if let Some(t) = tool {
+        t.clone()
+    } else {
+        transient_guard = state.agent.transient_mcp.read().await;
+        if let Some(server) = transient_guard.get(&server_name) {
+            if let Some(t) = server.tools.iter().find(|t| t.name() == prefixed) {
+                t.clone()
+            } else {
+                return Json(McpInvokeResponse {
+                    success: false,
+                    result: None,
+                    latency_ms: 0,
+                    error: Some(format!(
+                        "Tool '{}' not found on server '{}'",
+                        tool_name, server_name
+                    )),
+                });
+            }
+        } else {
+            return Json(McpInvokeResponse {
+                success: false,
+                result: None,
+                latency_ms: 0,
+                error: Some(format!("MCP server '{}' not found", server_name)),
+            });
+        }
+    };
+
+    let start = std::time::Instant::now();
+    match tool.call(body.arguments).await {
+        Ok(result) => {
+            let latency = start.elapsed().as_millis() as u64;
+            tracing::info!(
+                server = %server_name,
+                tool = %tool_name,
+                latency_ms = latency,
+                "MCP tool invoke succeeded"
+            );
+            Json(McpInvokeResponse {
+                success: true,
+                result: Some(result),
+                latency_ms: latency,
+                error: None,
+            })
+        }
+        Err(e) => {
+            let latency = start.elapsed().as_millis() as u64;
+            tracing::warn!(
+                server = %server_name,
+                tool = %tool_name,
+                error = %e,
+                latency_ms = latency,
+                "MCP tool invoke failed"
+            );
+            Json(McpInvokeResponse {
+                success: false,
+                result: None,
+                latency_ms: latency,
+                error: Some(e.to_string()),
             })
         }
     }

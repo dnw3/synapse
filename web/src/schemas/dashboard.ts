@@ -335,6 +335,14 @@ export const McpTestResultSchema = z.object({
 });
 export type McpTestResult = z.infer<typeof McpTestResultSchema>;
 
+export const McpInvokeResultSchema = z.object({
+  success: z.boolean(),
+  result: z.unknown().nullable(),
+  latencyMs: z.number(),
+  error: z.string().nullable(),
+});
+export type McpInvokeResult = z.infer<typeof McpInvokeResultSchema>;
+
 // ---------------------------------------------------------------------------
 // Workspace
 // ---------------------------------------------------------------------------

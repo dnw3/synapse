@@ -30,6 +30,7 @@ export type {
   McpToolInfo,
   McpServerInfo,
   McpTestResult,
+  McpInvokeResult,
   WorkspaceFileEntry,
   WorkspaceFileContent,
   UsageTimeseriesEntry,

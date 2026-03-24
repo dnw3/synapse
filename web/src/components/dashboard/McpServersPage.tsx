@@ -19,6 +19,7 @@ import {
 } from "./shared";
 import { useToast } from "../ui/toast";
 import McpServerModal from "./McpServerModal";
+import ToolPlaygroundDrawer from "./ToolPlaygroundDrawer";
 import { cn } from "../../lib/cn";
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,7 @@ export default function McpServersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editServer, setEditServer] = useState<McpServerInfo | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  const [playgroundTarget, setPlaygroundTarget] = useState<{ server: string; tool: string } | null>(null);
 
   // Persist view mode
   const changeView = (mode: "grid" | "list") => {
@@ -173,13 +175,14 @@ export default function McpServersPage() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (showModal) return; // modal handles its own escape
+        if (showModal) return;
+        if (playgroundTarget) { setPlaygroundTarget(null); return; }
         if (selectedServer) setSelectedServer(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedServer, showModal]);
+  }, [selectedServer, showModal, playgroundTarget]);
 
   // Keep selectedServer in sync with fetched data
   useEffect(() => {
@@ -272,7 +275,11 @@ export default function McpServersPage() {
         {!loading && servers.length > 0 && (
           <div className="flex gap-4">
             {/* Main area */}
-            <div className={cn("flex-1 min-w-0", selectedServer && "max-w-[calc(100%-396px)]")}>
+            <div className={cn(
+              "flex-1 min-w-0",
+              playgroundTarget && "max-w-[calc(100%-496px)]",
+              !playgroundTarget && selectedServer && "max-w-[calc(100%-396px)]",
+            )}>
               {viewMode === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {servers.map((s) => (
@@ -300,8 +307,15 @@ export default function McpServersPage() {
               )}
             </div>
 
-            {/* Drawer */}
-            {selectedServer && (
+            {/* Drawer — show playground OR server detail, not both */}
+            {playgroundTarget ? (
+              <ToolPlaygroundDrawer
+                servers={servers}
+                initialServer={playgroundTarget.server}
+                initialTool={playgroundTarget.tool}
+                onClose={() => setPlaygroundTarget(null)}
+              />
+            ) : selectedServer ? (
               <McpDrawer
                 server={selectedServer}
                 onClose={() => setSelectedServer(null)}
@@ -310,11 +324,15 @@ export default function McpServersPage() {
                 onReconnect={handleReconnect}
                 onPersist={handlePersist}
                 onDelete={handleDelete}
+                onTryTool={(serverName, toolName) => {
+                  setSelectedServer(null);
+                  setPlaygroundTarget({ server: serverName, tool: toolName });
+                }}
                 actionLoading={actionLoading}
                 confirming={confirming}
                 t={t}
               />
-            )}
+            ) : null}
           </div>
         )}
       </SectionCard>
@@ -435,7 +453,7 @@ function McpRow({ server, selected, onClick, t }: {
 // McpDrawer
 // ---------------------------------------------------------------------------
 
-function McpDrawer({ server, onClose, onTest, onEdit, onReconnect, onPersist, onDelete, actionLoading, confirming, t }: {
+function McpDrawer({ server, onClose, onTest, onEdit, onReconnect, onPersist, onDelete, onTryTool, actionLoading, confirming, t }: {
   server: McpServerInfo;
   onClose: () => void;
   onTest: (name: string) => void;
@@ -443,6 +461,7 @@ function McpDrawer({ server, onClose, onTest, onEdit, onReconnect, onPersist, on
   onReconnect: (server: McpServerInfo) => void;
   onPersist: (name: string) => void;
   onDelete: (name: string) => void;
+  onTryTool: (serverName: string, toolName: string) => void;
   actionLoading: Record<string, boolean>;
   confirming: string | null;
   t: (key: string, opts?: Record<string, string>) => string;
@@ -550,14 +569,26 @@ function McpDrawer({ server, onClose, onTest, onEdit, onReconnect, onPersist, on
             {server.tools.map((tool) => (
               <div
                 key={tool.name}
-                className="py-1.5 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] transition-colors"
+                className="py-1.5 px-2 rounded-[var(--radius-sm)] hover:bg-[var(--bg-hover)] transition-colors flex items-start justify-between gap-1"
               >
-                <span className="text-[11px] font-mono text-[var(--text-primary)] block">
-                  {tool.name}
-                </span>
-                <span className="text-[11px] text-[var(--text-tertiary)] leading-relaxed line-clamp-2">
-                  {tool.description}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-mono text-[var(--text-primary)] block">
+                    {tool.name}
+                  </span>
+                  <span className="text-[11px] text-[var(--text-tertiary)] leading-relaxed line-clamp-2">
+                    {tool.description}
+                  </span>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTryTool(server.name, tool.name);
+                  }}
+                  title={t("dashboard.mcpServers.playground.tryTool")}
+                  className="flex-shrink-0 mt-0.5 p-1 rounded-[var(--radius-xs)] text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all cursor-pointer"
+                >
+                  <Zap className="h-3 w-3" />
+                </button>
               </div>
             ))}
           </div>

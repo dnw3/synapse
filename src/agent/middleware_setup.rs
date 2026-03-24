@@ -2,11 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use synaptic::callbacks::CostTrackingCallback;
-use synaptic::condenser::CondenserMiddleware;
-use synaptic::condenser::{
-    ChunkedSummarizingCondenser, Condenser, LlmSummarizingCondenser, TokenBudgetCondenser,
-};
-use synaptic::core::{ChatModel, RunContext, SynapticError, TokenCounter};
+use synaptic::condenser::{AdaptiveCondenser, AdaptiveCondenserOptions, CondenserMiddleware};
+use synaptic::core::{ChatModel, RunContext, SynapticError};
 use synaptic::deep::backend::Backend;
 use synaptic::deep::DeepAgentOptions;
 use synaptic::middleware::{
@@ -64,7 +61,7 @@ pub(crate) async fn setup_middleware(
     options: &mut DeepAgentOptions,
     config: &SynapseConfig,
     model: &Arc<dyn ChatModel>,
-    backend: &Arc<dyn Backend>,
+    _backend: &Arc<dyn Backend>,
     security_callback: Option<Arc<dyn SecurityConfirmationCallback>>,
     session_overrides: Option<&SessionOverrides>,
     cost_tracker: Option<Arc<CostTrackingCallback>>,
@@ -129,49 +126,31 @@ pub(crate) async fn setup_middleware(
     // Verbose interceptor (session override)
     setup_verbose(options, session_overrides);
 
-    // Auto-compaction via CondenserMiddleware
+    // Auto-compaction via AdaptiveCondenser + CondenserMiddleware
     if config.memory.auto_compact {
-        let condenser: Arc<dyn Condenser> = match config.memory.compact_strategy.as_str() {
-            "summarize" => Arc::new(LlmSummarizingCondenser::new(
-                model.clone(),
-                config.memory.auto_compact_threshold,
-                config.memory.keep_recent,
-            )),
-            "chunked" => Arc::new(ChunkedSummarizingCondenser::new(
-                model.clone(),
-                config.memory.auto_compact_threshold,
-                config.memory.keep_recent,
-                30,
-            )),
-            _ => {
-                let counter: Arc<dyn TokenCounter> =
-                    Arc::new(synaptic::core::HeuristicTokenCounter);
-                Arc::new(TokenBudgetCondenser::new(
-                    config.memory.auto_compact_threshold,
-                    counter,
-                ))
-            }
+        let resolver = Arc::new(
+            crate::agent::context_resolver::SynapseContextWindowResolver::new(
+                config.memory.context_window,
+                config.memory.context_1m,
+            ),
+        );
+        let condenser_opts = AdaptiveCondenserOptions {
+            safety_margin: config.memory.safety_margin,
+            max_messages: config.memory.max_messages,
+            keep_recent: config.memory.keep_recent,
+            ..Default::default()
         };
-        let condenser_mw = CondenserMiddleware::new(condenser);
+        let condenser = Arc::new(AdaptiveCondenser::new(model.clone(), condenser_opts));
+        let condenser_mw =
+            CondenserMiddleware::new(condenser, resolver, config.memory.reserved_output_tokens);
         options.interceptors.push(Arc::new(condenser_mw));
         tracing::info!(
-            strategy = %config.memory.compact_strategy,
-            threshold = config.memory.auto_compact_threshold,
-            "Auto-compaction enabled"
+            max_messages = config.memory.max_messages,
+            keep_recent = config.memory.keep_recent,
+            safety_margin = config.memory.safety_margin,
+            reserved_output_tokens = config.memory.reserved_output_tokens,
+            "condenser: initialized"
         );
-    }
-
-    // DeepSummarizationMiddleware
-    if config.memory.auto_compact {
-        let summarization =
-            synaptic::deep::middleware::summarization::DeepSummarizationMiddleware::new(
-                backend.clone(),
-                model.clone(),
-                config.memory.auto_compact_threshold,
-                0.8,
-            );
-        options.interceptors.push(Arc::new(summarization));
-        tracing::info!("Deep summarization middleware enabled");
     }
 
     // Cost tracking interceptor — records token usage from every LLM response

@@ -2,6 +2,7 @@ pub mod bootstrap;
 mod builder;
 pub mod callbacks;
 pub mod context_engine;
+pub mod context_resolver;
 pub mod discovery;
 pub(crate) mod mcp;
 pub(crate) mod middleware;

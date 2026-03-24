@@ -323,10 +323,6 @@ pub async fn build_deep_agent_with_callback(
         }
     }
 
-    if let Some(max_turns) = config.agent_config().max_turns {
-        options.condenser.max_input_tokens = max_turns * 4000;
-    }
-
     // --- Tools ---
     tools_setup::register_tools(
         &mut options,
